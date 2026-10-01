@@ -3,12 +3,16 @@
 > 目标：零向量检索——只用中文本体图（原子事实 + 实体 + 关系）回答长对话记忆问题，
 > 严格判题（exact 口径），锚点对话 ≥90% 后全量 10 段验证。
 
+## 当前双口径实验
+
+作答与评测修复采用独立、固定图的 conv-26 实验，见 [EVALUATION_V1.md](EVALUATION_V1.md)。旧轮次成绩属于历史口径，不能直接与新口径比较。
+
 ## 数据与纪律
 
 - 数据集：`/Users/xu/git/memory-prompt/eval-datasets/locomo-zh/locomo10_zh.json`
   （10 段对话 / 5,882 条消息 / 1,986 题；类别映射实测为 **1=多跳 2=时间 3=开放域 4=单跳 5=对抗**）
 - **数据纪律**（评测有效性前提，违反即成绩作废）：
-  - 建图输入 = session 原文 + session 日期；禁读 `event_summary/observation/session_summary`（答案泄漏）。
+  - 初始对话文本实验只用 session 原文与日期；从 iter12 起，按数据集所有方指示加入已翻译的 `observation/event_summary`。当前固定图包含该标注层；这与对话文本限定实验输入不同，必须披露。`session_summary` 未加入。
   - 作答输入 = 问题 + 图；禁 gold/evidence/类别/原文全文。
   - 判题 = 盲判（题目/类别/gold/预测）。
   - 失败归因可读 evidence/答案，但结论只能改提示词/schema/工具，不得写死题目。

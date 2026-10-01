@@ -34,7 +34,9 @@ def attribute_failures(conv: Conversation, report: dict,
         cover_fids: set[str] = set()
         for d in qa.evidence:
             cover_fids.update(facts_by_dia.get(d, []))
-        if qa.answer is None:                                   # 对抗题
+        if g["grade"] in ("evaluation_error", "answer_error"):
+            attr = "执行故障(不归因于本体或语义作答)"
+        elif qa.answer is None:                                   # 对抗题
             if out and out.refused:
                 attr = "拒答带猜测" if g["grade"] == "partial" else "拒答被判错(争议)"
             else:

@@ -59,7 +59,12 @@ class LLMClient:
                              if cfg.fast_base_url != cfg.api_base_url
                              or cfg.fast_api_key != cfg.api_key
                              else self._client)                        # fast 档（可异站）
+        # 并发池：fast 与 strong 异站时分池（互不排队），同站共享一池——
+        # 单网关不得看到 2×并发（429 红线）。全部并发控制收口于此，任务层不限量
         self._sem = asyncio.Semaphore(cfg.max_concurrency)
+        self._sem_fast = (asyncio.Semaphore(cfg.fast_max_concurrency)
+                          if self._client_fast is not self._client
+                          else self._sem)
         self._ledger_lock = asyncio.Lock()
         self._retry_log = cfg.work_dir / "logs" / "retry.jsonl"
         self._retry_log.parent.mkdir(parents=True, exist_ok=True)
@@ -98,10 +103,12 @@ class LLMClient:
         last_err: Exception | None = None
         use_client = (self._client_fast if MODEL_ROLES.get(role) == "fast"
                       else self._client)
+        use_sem = (self._sem_fast if MODEL_ROLES.get(role) == "fast"
+                   else self._sem)
         is_glm_endpoint = "bigmodel" in str(getattr(use_client, "base_url", "") or "")
         for attempt in range(self.cfg.max_retries):
             try:
-                async with self._sem:
+                async with use_sem:
                     t0 = time.time()
                     # glm-5.3 系列为思考型模型：reasoning_content 消耗 completion 预算，
                     # 请求侧加 reasoning 余量，保证正文拿满 max_tokens；

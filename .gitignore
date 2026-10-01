@@ -29,3 +29,18 @@ datasets/travelplanner/runs/
 datasets/locomo/runs/cache/
 datasets/locomo/runs/logs/
 datasets/locomo/runs/cost_ledger.jsonl
+
+# Versioned LoCoMo experiments: keep reports, exclude request caches and runtime logs
+datasets/locomo/runs/experiments/*/runtime/
+datasets/locomo/runs/experiments/*/connectivity/
+datasets/locomo/runs/experiments/*/verdict_cache/
+datasets/locomo/runs/experiments/*/blind_verdict_cache/
+datasets/locomo/runs/experiments/*/evaluation_snapshots/
+datasets/locomo/runs/experiments/*/evaluations/
+datasets/locomo/runs/dual_reports/*/*/runtime/
+datasets/locomo/runs/dual_reports/*/*/cache/
+
+# 收口迭代（2026-10-02）：报告与审计入库；逐轮快照是代码副本（git 历史可代）、
+# 带完整轨迹的逐轮 answers.jsonl 不入库（判分 delta 已浓缩进 patch-impact.md）
+datasets/locomo/runs/closeout/snapshots/
+datasets/locomo/runs/conv-44/closeout-r*/answers.jsonl

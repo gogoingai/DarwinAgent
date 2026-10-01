@@ -68,15 +68,8 @@ class Grade:
 
 def is_clean_refusal(pred: str) -> bool:
     """干净拒答：以标准拒答句开头，且后半句没有具体实体/数字猜测。"""
-    p = pred.strip()
-    head = p.startswith(REFUSAL) or any(p.startswith(h) for h in REFUSAL_HINTS)
-    if not head:
-        return False
-    rest = p[len(REFUSAL):] if p.startswith(REFUSAL) else ""
-    # 拒答句之后若跟着冒号/逗号解释，允许"图中没有关于X的记录"类说明，禁具体值猜测
-    if re.search(r"[\d]", rest) and len(re.findall(r"[\d]", rest)) > 4:
-        return False
-    return True
+    p = normalize_answer_text(pred)
+    return p in {normalize_answer_text(REFUSAL), *map(normalize_answer_text, REFUSAL_HINTS)}
 
 
 def deterministic_grade(qa: QA, pred: str) -> str | None:
@@ -85,31 +78,11 @@ def deterministic_grade(qa: QA, pred: str) -> str | None:
         return "wrong"
     # 对抗题（含 2 个有 gold 的特例——有 gold 走普通路径）
     if qa.answer is None:
-        pn = normalize_answer_text(pred)
-        trap = normalize_answer_text(qa.adversarial_answer or "")
-        if trap and trap in pn:
-            return "wrong"                 # 掉进陷阱（含"拒答但猜出陷阱值"）
         if is_clean_refusal(pred):
             return "exact"
         return None                        # 拒答带其他猜测等细节交 LLM 分级
-    # 带 gold 的对抗题（"不是"型）：pred 以 gold 答案开头即 exact（idx167/178 实证：
-    # 正确的"不是，…"曾被对抗 rubric 判 wrong）
-    if qa.category == 5 and str(qa.answer):
-        if normalize_answer_text(pred).startswith(normalize_answer_text(str(qa.answer))):
-            return "exact"
-    # 整数 gold：数字精确匹配（含中文数字计数："三个孩子" ≡ 3）
-    if isinstance(qa.answer, (int, float)):
-        gd = str(int(qa.answer))
-        pd_ = extract_digits(normalize_answer_text(pred))
-        if not pd_:
-            m = re.match(r"([零一二两三四五六七八九十]{1,3})", str(pred).strip())
-            if m:
-                v = cn_num(m.group(1))
-                pd_ = str(int(v)) if v is not None else ""
-        if pd_ == gd or answer_equivalent(str(qa.answer), pred):
-            return "exact"
-        return None
-    if answer_equivalent(str(qa.answer), pred):
+    from .protocol import complete_equal
+    if complete_equal(qa.answer, pred):
         return "exact"
     return None
 
@@ -124,28 +97,22 @@ async def llm_grade(qa: QA, pred: str, client: LLMClient, conv_id: str) -> dict:
     user = JUDGE_TEMPLATE.format(question=qa.question, gold=gold,
                                  response=pred or "（空）",
                                  category_rules=CATEGORY_RULES[cat])
-    r = await client.chat(
-        role="locomo_judge",
+    from .protocol import checked_json
+    def validate(obj):
+        if obj.get("grade") not in ("exact", "partial", "wrong"):
+            raise ValueError("invalid grade")
+        if not isinstance(obj.get("missing"), list) or not all(isinstance(x, str) for x in obj["missing"]):
+            raise ValueError("invalid missing elements")
+        if not isinstance(obj.get("reason"), str) or not obj["reason"].strip():
+            raise ValueError("invalid reason")
+        return obj
+    result = await checked_json(client, role="locomo_judge", max_tokens=2048,
+        namespace=ns(conv_id, "judge_validated_v1"), validator=validate,
         messages=[{"role": "system", "content": JUDGE_SYSTEM},
-                  {"role": "user", "content": user}],
-        temperature=0.0, max_tokens=512, json_mode=True,
-        namespace=ns(conv_id, "judge"))
-    m = re.search(r"\{.*\}", r.content, re.S)
-    if m:
-        try:
-            obj = json.loads(m.group(0))
-            g = str(obj.get("grade", "")).lower()
-            if g in ("exact", "partial", "wrong"):
-                return {"grade": g,
-                        "missing": [str(x) for x in (obj.get("missing") or [])][:6],
-                        "reason": str(obj.get("reason", ""))[:200]}
-        except Exception:
-            pass
-    low = r.content.lower()
-    for g in ("exact", "partial", "wrong"):
-        if re.search(rf"\b{g}\b", low):
-            return {"grade": g, "missing": [], "reason": r.content[:200]}
-    return {"grade": "wrong", "missing": [], "reason": f"判分解析失败: {r.content[:120]}"}
+                  {"role": "user", "content": user}])
+    if result["status"] != "ok":
+        return {"grade": "evaluation_error", "missing": [], "reason": "判分执行失败，未计为答错"}
+    return result
 
 
 def char_bigram_f1(gold: str, pred: str) -> float:
@@ -166,7 +133,8 @@ def char_bigram_f1(gold: str, pred: str) -> float:
 
 
 async def grade_all(qa_list: list[QA], preds: dict[int, str], client: LLMClient,
-                    conv_id: str, repairs: dict[int, dict] | None = None) -> dict:
+                    conv_id: str, repairs: dict[int, dict] | None = None,
+                    answer_statuses: dict[int, str] | None = None) -> dict:
     if repairs is None:
         repairs = load_repairs(conv_id)
     grades: list[Grade] = []
@@ -176,6 +144,9 @@ async def grade_all(qa_list: list[QA], preds: dict[int, str], client: LLMClient,
         # 主口径：修复后 gold；并算原始 gold 口径（未修复题两次调用同键，判分缓存命中）
         rqa = apply_repair(qa, repairs.get(qa.idx))
         for tgt, out in ((rqa, grades), (qa, orig_grades)):
+            if answer_statuses and answer_statuses.get(qa.idx, "ok") != "ok":
+                out.append(Grade(tgt.idx, "answer_error", "execution", "作答执行失败，未计为语义答错"))
+                continue
             det = deterministic_grade(tgt, pred)
             if det == "exact":
                 g = Grade(tgt.idx, "exact", "det")
@@ -189,8 +160,10 @@ async def grade_all(qa_list: list[QA], preds: dict[int, str], client: LLMClient,
             out.append(g)
     report = _aggregate(qa_list, grades, conv_id)
     orig_n = sum(g.grade == "exact" for g in orig_grades)
+    orig_errors = sum(g.grade in ("evaluation_error", "answer_error") for g in orig_grades)
     report["orig_exact"] = orig_n
-    report["orig_exact_rate"] = round(orig_n / max(len(orig_grades), 1), 4)
+    report["orig_exact_rate"] = None if orig_errors else round(orig_n / max(len(orig_grades), 1), 4)
+    report["orig_evaluation_errors"] = orig_errors
     report["repairs_applied"] = len(repairs)
     return report
 
@@ -199,20 +172,23 @@ def _aggregate(qa_list: list[QA], grades: list[Grade], conv_id: str) -> dict:
     by_cat: dict[str, dict] = {}
     exact_n = 0
     for qa, g in zip(qa_list, grades):
-        c = by_cat.setdefault(qa.cat_name, {"n": 0, "exact": 0, "partial": 0, "wrong": 0})
+        c = by_cat.setdefault(qa.cat_name, {"n": 0, "exact": 0, "partial": 0, "wrong": 0, "evaluation_error": 0, "answer_error": 0})
         c["n"] += 1
         c[g.grade] += 1
         exact_n += g.grade == "exact"
+    errors = sum(g.grade in ("evaluation_error", "answer_error") for g in grades)
     topic = [ (qa, g) for qa, g in zip(qa_list, grades) if qa.category in TOPIC_CATEGORIES ]
     return {
         "conv": conv_id,
         "n": len(grades),
         "exact": exact_n,
-        "exact_rate": round(exact_n / max(len(grades), 1), 4),
-        "j_exact_rate": round(
+        "exact_rate": None if errors else round(exact_n / max(len(grades), 1), 4),
+        "evaluation_errors": errors,
+        "exact_rate_bounds": [exact_n / max(len(grades), 1), (exact_n + errors) / max(len(grades), 1)],
+        "j_exact_rate": None if any(g.grade in ("evaluation_error", "answer_error") for _, g in topic) else round(
             sum(g.grade == "exact" for _, g in topic) / max(len(topic), 1), 4),
         "f1_avg": round(sum(g.f1 for g in grades) / max(len(grades), 1), 4),
-        "by_category": {k: {**v, "exact_rate": round(v["exact"] / v["n"], 4)}
+        "by_category": {k: {**v, "exact_rate": None if v["evaluation_error"] or v["answer_error"] else round(v["exact"] / v["n"], 4)}
                         for k, v in by_cat.items()},
         "grades": [{"idx": g.idx, "grade": g.grade, "source": g.source,
                     "reason": g.reason, "missing": g.missing, "f1": round(g.f1, 3)}

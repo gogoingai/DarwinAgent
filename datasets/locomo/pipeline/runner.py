@@ -105,28 +105,29 @@ async def answer_all(conv: Conversation, toolbox: ToolBox, client: LLMClient,
 
     todo = [qa for qa in conv.qas
             if qa.idx not in done and (idx_filter is None or qa.idx in idx_filter)]
-    sem = asyncio.Semaphore(4)
+    # 并发控制收口在 LLMClient 的档位池（fast/strong 各自限流）；
+    # 任务层不限量：所有题并发起跑，调用在池上排队，两池保持饱和
 
     async def _one(qa):
-        async with sem:
-            try:
-                o = await run_qa(qa.idx, qa.question, conv.header(), toolbox,
-                                 client, lc, conv.sample_id)
-            except Exception as e:  # noqa: BLE001
-                o = QAOutput(idx=qa.idx, question=qa.question,
-                             answer=f"对话中未提及该信息", refused=True,
-                             trajectory={"error": repr(e)[:300]})
-            async with _lock:
-                outputs[qa.idx] = o
-                done.add(qa.idx)
-                with answers_path.open("a") as f:
-                    f.write(json.dumps({
-                        "idx": o.idx, "question": o.question, "answer": o.answer,
-                        "evidence": o.evidence, "refused": o.refused,
-                        "n_steps": o.n_steps, "collected": o.collected,
-                        "trajectory": o.trajectory,
-                    }, ensure_ascii=False) + "\n")
-                ckpt_path.write_text(json.dumps({"done": sorted(done)}))
+        try:
+            o = await run_qa(qa.idx, qa.question, conv.header(), toolbox,
+                             client, lc, conv.sample_id)
+        except Exception as e:  # noqa: BLE001
+            o = QAOutput(idx=qa.idx, question=qa.question,
+                         answer="", refused=False, status="answer_error",
+                         trajectory={"error": repr(e)[:300]})
+        async with _lock:
+            outputs[qa.idx] = o
+            done.add(qa.idx)
+            with answers_path.open("a") as f:
+                f.write(json.dumps({
+                    "idx": o.idx, "question": o.question, "answer": o.answer,
+                    "evidence": o.evidence, "refused": o.refused,
+                    "n_steps": o.n_steps, "collected": o.collected,
+                    "trajectory": o.trajectory, "status": o.status,
+                    "context_fids": o.context_fids, "context_text": o.context_text, "raw_outputs": o.raw_outputs,
+                }, ensure_ascii=False) + "\n")
+            ckpt_path.write_text(json.dumps({"done": sorted(done)}))
             if len(done) % 20 == 0:
                 print(f"  [{conv.sample_id}] {len(done)}/{len(conv.qas)} 题")
 
@@ -141,7 +142,8 @@ async def answer_all(conv: Conversation, toolbox: ToolBox, client: LLMClient,
                 idx=i, question=o["question"], answer=o["answer"],
                 evidence=o.get("evidence", []), refused=o.get("refused", False),
                 n_steps=o.get("n_steps", 0), collected=o.get("collected", []),
-                trajectory=o.get("trajectory", {}))
+                trajectory=o.get("trajectory", {}), status=o.get("status", "ok"),
+                context_fids=o.get("context_fids", []), context_text=o.get("context_text", ""), raw_outputs=o.get("raw_outputs", []))
     return out_map
 
 
@@ -165,12 +167,13 @@ async def eval_conversation(lc: LocomoConfig, client: LLMClient, conv_id: str,
     outputs = await answer_all(conv, toolbox, client, lc, out_dir, idx_filter)
     preds = {i: o.answer for i, o in outputs.items()}
     qas = [qa for qa in conv.qas if qa.idx in preds]
-    report = await grade_all(qas, preds, client, conv_id)
+    report = await grade_all(qas, preds, client, conv_id,
+                             answer_statuses={i: o.status for i, o in outputs.items()})
     failures = attribute_failures(conv, report, outputs, result.facts)
     write_failures(out_dir, failures, report)
     print(f"[{conv_id}] {tag}: exact {report['exact']}/{report['n']}"
-          f" = {report['exact_rate']:.1%} | J口径 {report['j_exact_rate']:.1%}"
+          f" = {report['exact_rate']} | J口径 {report['j_exact_rate']}"
           f" | F1 {report['f1_avg']:.3f}")
     for cat, v in report["by_category"].items():
-        print(f"    {cat}: {v['exact']}/{v['n']} = {v['exact_rate']:.1%}")
+        print(f"    {cat}: {v['exact']}/{v['n']} = {v['exact_rate']}")
     return report

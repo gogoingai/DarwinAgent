@@ -30,6 +30,8 @@ class Turn:
     speaker: str
     dia_id: str                          # 如 "D2:3"
     text: str
+    image_caption: str = ""             # 仅评测/审计读取，不进入建图输入
+    image_query: str = ""               # 搜图意图，不是发生事实
 
 
 @dataclass
@@ -114,7 +116,8 @@ def load_conversation(path: Path, sample_id: str) -> Conversation:
         date_raw = conv_d.get(f"session_{no}_date_time", "")
         turns = [
             Turn(speaker=t.get("speaker", ""), dia_id=t.get("dia_id", ""),
-                 text=t.get("text", ""))
+                 text=t.get("text", ""), image_caption=t.get("blip_caption") or "",
+                 image_query=t.get("query") or "")
             for t in conv_d[f"session_{no}"]
             if t.get("text")
         ]

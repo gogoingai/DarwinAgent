@@ -44,13 +44,14 @@ oak/
 | 任务 | 指标 | 本仓库 | 论文/对照 |
 |---|---|---|---|
 | TravelPlanner | Final（官方评测器，50 题） | **78%** | 55.9% |
-| LoCoMo 中文 conv-26 | 严格 exact（修复后 gold，199 题） | **79.9%** | 原始 gold 口径 72.9% |
-| LoCoMo 中文 conv-26 | 官方宽松口径 | **89.4%** | Mem0-Graph ≈0.40 F1 |
+| LoCoMo 中文 conv-26 | 历史 exact（旧修复 gold，199 题） | **79.9%** | 历史原始 gold 口径 73.9%；待统一复评 |
+| LoCoMo 中文 conv-26 | 历史混合 gold 宽松评分（已停用） | **89.4%** | 不作跨系统同口径比较 |
 | LoCoMo 中文 conv-44 | 严格 exact（旧版栈零调参首跑） | **68.3%** | — |
 
-> 说明：locomo 成绩为**锚点对话 conv-26**（199 题，gold 修复后口径）；全量 10 段未跑，
-> 不得外推。天花板审计（gold 可达性逐题验证）显示约 9% 的题标准答案在译文中不存在，
-> 量化证据见 `datasets/locomo/pipeline/OPTIMIZATION_LOG.md` 与 `PLAN-90.md`。
+conv-26 正在固定图上进行原始/审计 gold × 宽松/精准的完整复评，见[独立实验报告](datasets/locomo/runs/experiments/conv26_dual_v4/REPORT.md)。旧评分不代表本轮基线或系统上限，未验证全量十段。
+
+> 历史上限审计与旧评分记录见 `datasets/locomo/pipeline/OPTIMIZATION_LOG.md` 与 `PLAN-90.md`；
+> 它们不能证明 90% 可达或不可达。当前结论须依据统一判分与逐要素诊断。
 
 ## 快速开始
 

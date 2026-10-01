@@ -247,7 +247,7 @@ def _resolve_core(anchor: date, e: str) -> date | None:
         n = cn_num(m.group(1)) or 0
         delta = timedelta(weeks=n) if n < 200 else None
         if delta is not None:
-            return anchor - delta if "前" in m.group(3) else anchor + delta
+            return anchor - delta if "前" in m.group(0) else anchor + delta
     m = re.search(r"([0-9一二两三四五六七八九十]+)\s*(?:个)?月[前后]", e)
     if m:
         n = cn_num(m.group(1)) or 0
@@ -388,35 +388,16 @@ def answer_equivalent(gold: str | int, pred: str) -> bool:
     p = normalize_answer_text(pred)
     if not g or not p:
         return False
-    if g == p:
+    from .protocol import complete_equal
+    if complete_equal(gold, pred):
         return True
-    # "N年前" 模式：gold=N年前 且 pred 含同一数值的"X年前"表述（允许"约/大约"）→ exact
-    m = re.fullmatch(r"(\d+|[一二两三四五六七八九十]+)年前", str(gold).strip())
-    if m:
-        n = cn_num(m.group(1))
-        if n is not None:
-            if n == 2 and "两年前" in p:
-                return True
-            if n == 10 and "十年前" in p:
-                return True
-            if f"{n}年前" in p.replace("约", "").replace("大约", ""):
-                return True
-    # 纯数字等价：gold=2022 / pred="2022年"
-    gd, pd_ = extract_digits(g), extract_digits(p)
-    if gd and pd_ and gd == pd_ and re.fullmatch(r"\d+", g):
-        return pd_.startswith(gd) and len(re.sub(r"\D", "", p)) == len(gd)
-    # 日期等价：gold 的各成分都被 pred 覆盖且相等（pred 可更细）
+    # 不从解释、否定句或备选列表中抽数字短路。非完整等价一律交给判分器。
+    if re.fullmatch(r"\d+", str(gold).strip()) and re.fullmatch(r"[零一二两三四五六七八九十]+", p):
+        return cn_num(p) == int(g)
+    # 日期完整等价；新增的年月日限定必须交评测器核对事实。
     gc, pc = date_components(g), date_components(p)
-    if gc and pc:
-        for gv, pv in ((gc[0], pc[0]), (gc[1], pc[1]), (gc[2], pc[2])):
-            if gv and pv and gv != pv:
-                return False
-            if gv and not pv:
-                return False            # gold 有年份 pred 没有 → 交给 LLM
-        return True
-    # 多元素列表（、/,/;分隔）集合等价（顺序无关，元素须逐一完全一致）
-    gs = {normalize_answer_text(x) for x in re.split(r"[、,，;；]", str(gold)) if x.strip()}
-    ps = {normalize_answer_text(x) for x in re.split(r"[、,，;；]", str(pred)) if x.strip()}
-    if gs and ps and gs == ps and len(gs) > 0:
-        return not gs & {""}            # 元素皆非空
+    date_chars = r"[0-9零一二两三四五六七八九十年月日号\s-]+"
+    if gc and pc and re.fullmatch(date_chars, str(gold)) and re.fullmatch(date_chars, str(pred)):
+        return gc == pc
+    # 列表顺序与重复次数可能是题目要求，不能脱离问题按集合短路。
     return False

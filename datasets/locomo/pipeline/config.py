@@ -1,13 +1,12 @@
 """locomo 配置：复用 oak 的 Config/LLMClient，但产物目录与模型路由独立。
 
-模型路由（双档）：
+模型路由（双档，无自动回退——网关不可用即报错，保证 campaign 模型同质）：
 - strong = glm-5.3（智谱直连，本体起草 / 终答 / 判题）
-- fast   = deepseek-v1-flash（commandcode 网关，事实抽取 / ReAct 步骤 / 归并审计）
-  网关不可用时（probe_models 探测落盘）回退 glm-5.3-flash 同站。
+- fast   = deepseek/deepseek-v4-flash-fast（commandcode 网关，事实抽取 / ReAct 步骤 / 归并审计）
+  连通性检查用 probe_models.py 手动跑（落 runs/model_probe.json，仅诊断用，不驱动切换）。
 """
 from __future__ import annotations
 
-import json
 import os
 from dataclasses import dataclass
 from pathlib import Path
@@ -34,7 +33,6 @@ class LocomoConfig:
     anchor_id: str = "conv-26"
     react_max_steps: int = 10
     audit_extract: bool = True         # 建图后二道完整性审计
-    fast_available: bool = True        # 探测结果：fast 网关是否可用
 
     # ---- 派生路径 ----
     @property
@@ -46,22 +44,6 @@ class LocomoConfig:
 
     def probe_path(self) -> Path:
         return self.runs_dir / "model_probe.json"
-
-
-def _apply_probe_fallback(cfg: Config, probe_path: Path) -> bool:
-    """读探测结果：fast 网关不可用则回退 glm-5.3-flash 同站。返回 fast 是否可用。"""
-    if not probe_path.exists():
-        return True                     # 未探测过：按可用处理（探测脚本会先跑）
-    try:
-        r = json.loads(probe_path.read_text())
-    except Exception:
-        return True
-    if r.get("fast_ok"):
-        return True
-    cfg.fast_base_url = cfg.api_base_url
-    cfg.fast_api_key = cfg.api_key
-    cfg.model_fast = "glm-5.3-flash"
-    return False
 
 
 def load_locomo_config() -> LocomoConfig:
@@ -94,7 +76,6 @@ def load_locomo_config() -> LocomoConfig:
         "LOCOMO_DATA",
         str(LOCOMO_TASK_DIR / "data" / "locomo10_zh.json")))
     lc = LocomoConfig(cfg=cfg, dataset_path=dataset_path)
-    lc.fast_available = _apply_probe_fallback(cfg, lc.probe_path())
 
     for d in (cfg.work_dir, cfg.cache_dir, cfg.ledger_path.parent,
               cfg.work_dir / "logs"):

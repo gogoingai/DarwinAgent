@@ -1,6 +1,6 @@
 # datasets/locomo —— 中文 LoCoMo 本体问答（OaK，零向量）
 
-> 用 OaK 动态本体思想在中文 LoCoMo 长对话记忆基准上做问答：**conv-26（199 题）严格判分 79.9%，官方宽松判分（LoCoMo 论文同口径）89.4%**，同口径高于 Mem0/Mem0-Graph 已发表成绩约 20 个百分点。全程零向量（无任何嵌入检索），数据集、记忆、本体全中文。
+> 用 OaK 在中文 LoCoMo 长对话上验证图记忆问答。本阶段只核查 conv-26 的 199 题：固定图，统一原始/审计 gold 的宽松与精准评测，进行一轮作答优化。旧宽松成绩混用 gold，已撤回；当前不能与其他系统发表成绩作同口径比较。全程零向量检索。
 
 ## 目录结构
 
@@ -28,6 +28,10 @@ datasets/locomo/
     └── frozen/              # 冻结版：schema + 主题词表 + 最优轮报告（iter22）
 ```
 
+## 作答与评测修复
+
+正在用固定图对 conv-26 做统一双口径复评和一轮作答验证，见 [pipeline/EVALUATION_V1.md](pipeline/EVALUATION_V1.md)。文档中的旧数字为历史结果；此前宽松结果混用了修复与原始 gold，不能作为新口径基线或官方评测复现。
+
 ## 快速开始
 
 ```bash
@@ -43,7 +47,7 @@ uv run python -m datasets.locomo.pipeline.run_anchor --anchor
 # 4) 全量 10 段对话验证（约 10-15 小时）
 uv run python -m datasets.locomo.pipeline.run_full
 
-# 5) 官方宽松口径复评
+# 5) 本地统一双口径复评（独立于官方评测器）
 uv run python -m datasets.locomo.pipeline.lenient_report conv-26 iter22
 ```
 
@@ -57,6 +61,6 @@ uv run python -m datasets.locomo.pipeline.lenient_report conv-26 iter22
 
 ## 注意
 
-- 数据纪律（评测有效性前提）：建图禁读数据集自带摘要字段；作答只见问题与图；判分盲判——详见 [pipeline/README.md](pipeline/README.md)。
+- 数据纪律（评测有效性前提）：当前固定图包含 observation/event_summary 标注层，需披露；作答只见问题与图；判分盲判——详见 [pipeline/README.md](pipeline/README.md)。
 - 中文数据集 QA 与对话分开翻译，存在系统性噪声（图片-only 细节 / gold-语料矛盾 / 术语漂移），天花板审计与 18 条修复见 `pipeline/OPTIMIZATION_LOG.md`。
 - 完整产物（含 LLM 请求缓存，可零 API 费用复现全部轨迹）：<https://huggingface.co/datasets/justis-xu/oak-locomo>
