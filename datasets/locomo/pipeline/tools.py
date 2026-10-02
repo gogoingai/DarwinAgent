@@ -81,6 +81,8 @@ class ToolBox:
 
     def __init__(self, graph: nx.MultiDiGraph):
         self.g = graph
+        from .prompts.lexicon import SYNONYMS
+        self.query_synonyms = SYNONYMS
         self.facts: dict[str, dict] = {}          # 编号 -> row
         self.entities: dict[str, dict] = {}       # 名称/姓名 -> {__id__, etype, props}
         self.alias: dict[str, str] = {}           # 别名 -> 规范名

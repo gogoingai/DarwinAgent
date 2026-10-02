@@ -8,13 +8,16 @@ from pathlib import Path
 
 from ..config_task import Config, load_config
 from oak.llm.client import LLMClient
+from oak.engine import BuildEngine
+from oak.runtime import digest
 from ..data.queries import Query, load_queries, partition_train
 from ..data.corpus import reference_chunks, distance_chunks
 from oak.schema.model import Schema
 from ..schema_builder import build_schema
 from ..kg_extract import extract_graph_from_chunks
 from oak.kg.graph import (build_graph, save_graph, load_graph, graph_stats,
-                        graph_samples, derive_relations, enrich_city_nodes)
+                        graph_samples, derive_relations)
+from oak_domains.travel_planning.graph import enrich_city_nodes
 from ..funcs.catalog import FunctionCatalog
 from ..funcs.compiler import compile_functions, set_trial_graphs
 from ..agent.react import run_react
@@ -57,13 +60,13 @@ async def _build_kg(client, cfg, schema, queries: list[Query], round_dir: Path, 
         all_chunks.extend(chs)
 
     # 距离矩阵是结构化源：程序化直建（不走 LLM），City 边由 derive 补
-    from oak.kg.graph import programmatic_distance_entities
+    from oak_domains.travel_planning.graph import programmatic_distance_entities
     dist_entities, dist_relations = [], []
     if cfg.include_distance_matrix_corpus:
         dist_entities = programmatic_distance_entities(schema, cfg.tp_root)
 
-    entities, relations, stats = await extract_graph_from_chunks(
-        client, cfg, schema, all_chunks, ns)
+    engine = BuildEngine(extract_graph_from_chunks, lambda: {"schema": digest(schema.to_yaml())})
+    entities, relations, stats = await engine.run(client, cfg, schema, all_chunks, ns)
     entities = entities + dist_entities
     relations = relations + dist_relations
     g = enrich_city_nodes(

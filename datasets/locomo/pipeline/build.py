@@ -9,7 +9,7 @@ import asyncio
 import hashlib
 import json
 import re
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 from oak.kg.graph import EntityCandidate, RelationCandidate
@@ -27,7 +27,7 @@ from .schema_skeleton import (DEFAULT_TOPICS, EXTRACTABLE_ETYPES,
 _CHUNK_CHARS = 3000          # 超长 session 切块阈值
 _MAX_FACTS_PER_SESSION = 60
 # 建图逻辑版本号（进图指纹）：别名消毒/派生规则等代码变化时递增，防旧图缓存复用
-BUILD_VER = 6
+BUILD_VER = 7
 
 
 def _override_dates(facts: list[dict], session) -> None:
@@ -76,16 +76,19 @@ class BuildResult:
 # ---------------------------------------------------------------- fingerprint
 def graph_fingerprint(conv: Conversation, schema: Schema, lc: LocomoConfig,
                       topics: list[str]) -> str:
-    blob = json.dumps({
-        "build_ver": BUILD_VER,
-        "schema": schema.to_yaml(),
-        "sys": EXTRACT_SYSTEM,
-        "tpl": render_extract_prompt(conv.sessions[0], conv, topics)[:500],
-        "model": lc.cfg.model_fast,
-        "audit": lc.audit_extract,
-        "topics": topics,
-    }, ensure_ascii=False, sort_keys=True)
-    return hashlib.sha256(blob.encode()).hexdigest()[:8]
+    from oak.runtime import digest
+    pipe = Path(__file__).resolve().parent
+    identities = {name: hashlib.sha256((pipe / name).read_bytes()).hexdigest()
+                  for name in ("build.py", "prompts/extract.py", "entity_resolve.py", "dates.py")}
+    from oak.kg import graph as graph_module
+    return digest({
+        "build_ver": BUILD_VER, "schema": schema.to_yaml(), "assets": identities,
+        "graph_code": hashlib.sha256(Path(graph_module.__file__).read_bytes()).hexdigest(),
+        "sessions": [{**asdict(session), "date_iso": session.date_iso.isoformat() if session.date_iso else None} for session in conv.sessions],
+        "observations": conv.observations, "events": conv.events,
+        "speakers": conv.speakers, "model": lc.cfg.model_fast,
+        "endpoint": lc.cfg.fast_base_url, "audit": lc.audit_extract, "topics": topics,
+    })[:16]
 
 
 # ---------------------------------------------------------------- 抽取
@@ -115,7 +118,7 @@ def _extract_json(text: str) -> dict | None:
         return None
     try:
         obj = json.loads(m.group(0))
-        return obj if isinstance(obj, dict) else None
+        return obj if isinstance(obj, dict) and all(isinstance(obj.get(k), list) for k in ("f", "e", "r")) else None
     except Exception:
         return None
 
@@ -168,8 +171,15 @@ def _norm_fact(o: dict, session_no: int) -> dict | None:
     y = str(o.get("y") or "其他").strip()
     if y not in FACT_TYPES:
         y = "其他"
-    tp = [str(x).strip() for x in (o.get("tp") or []) if str(x).strip()][:3]
-    ev = [str(x).strip() for x in (o.get("ev") or []) if str(x).strip()][:8]
+    def _str_list(v, cap: int) -> list[str]:
+        # 抽取 LLM 偶发把列表字段写成 int/str（如 "tp": 5）——统一收敛为字符串列表
+        if isinstance(v, str):
+            v = [v]
+        if not isinstance(v, list):
+            return []
+        return [str(x).strip() for x in v if str(x).strip()][:cap]
+    tp = _str_list(o.get("tp"), 3)
+    ev = _str_list(o.get("ev"), 8)
     src = [x.strip() for x in re.split(r"[;；,，\s]+", str(o.get("src") or "")) if x.strip()]
     src = [x for x in src if re.fullmatch(r"D\d+:\d+", x)][:4]
     d = str(o.get("d") or "").strip()
@@ -198,8 +208,14 @@ def _ground_fact(fact: dict, blob: str, valid_dia: set[str]) -> bool:
     return True
 
 
-def _filter_session(obj: dict, session) -> tuple[list[dict], list[list], list[list], int]:
+def _filter_session(obj: dict, session, schema=None) -> tuple[list[dict], list[list], list[list], int]:
     """解析+grounding 过滤一个 session 的抽取结果。返回 (facts, entities, rels, dropped)。"""
+    if schema is None:
+        from .schema_skeleton import load_skeleton
+        schema = load_skeleton()
+    etypes = {e.name for e in schema.entities if e.name not in ("会话", "原子事实", "主题")
+              and len(e.primary_key) == 1}
+    rtypes = {r.name for r in schema.relations}
     blob = _fold("".join(f"{t.speaker}{t.text}" for t in session.turns))
     valid_dia = {t.dia_id for t in session.turns}
     facts: list[dict] = []
@@ -224,7 +240,7 @@ def _filter_session(obj: dict, session) -> tuple[list[dict], list[list], list[li
             continue
         etype, name = str(e[0]).strip(), str(e[1]).strip()
         alias = str(e[2]).strip() if len(e) > 2 else ""
-        if etype in EXTRACTABLE_ETYPES and name and _fold(name) in blob:
+        if etype in etypes and name and _fold(name) in blob:
             ents.append([etype, name, alias])
     rels: list[list] = []
     ent_names = {e[1] for e in ents}
@@ -232,7 +248,7 @@ def _filter_session(obj: dict, session) -> tuple[list[dict], list[list], list[li
         if not isinstance(r, (list, tuple)) or len(r) < 3:
             continue
         rel, a, b = str(r[0]).strip(), str(r[1]).strip(), str(r[2]).strip()
-        if rel in EXTRACTABLE_RELATIONS and a and b and a != b \
+        if rel in rtypes and a and b and a != b \
                 and a in ent_names and b in ent_names:
             rels.append([rel, a, b])
     return facts, ents, rels, dropped
@@ -258,11 +274,10 @@ async def build_graph_for(conv: Conversation, schema: Schema, lc: LocomoConfig,
         for ch in chunks:
             sub = type(session)(no=session.no, date_iso=session.date_iso,
                                 date_raw=session.date_raw, turns=ch)
-            obj = await _extract_one(client, conv.sample_id, render_extract_prompt(sub, conv, topics))
+            obj = await _extract_one(client, conv.sample_id, render_extract_prompt(sub, conv, topics, schema))
             if obj is None:
-                dropped += 1
-                continue
-            f2, e2, r2, d2 = _filter_session(obj, sub)
+                raise ValueError(f"Extraction protocol failed for session {session.no}")
+            f2, e2, r2, d2 = _filter_session(obj, sub, schema)
             _override_dates(f2, sub)
             facts += f2
             ents += e2
@@ -271,8 +286,10 @@ async def build_graph_for(conv: Conversation, schema: Schema, lc: LocomoConfig,
             # 二道审计：对照原文补漏（同契约同 grounding；只补不重写）
             if lc.audit_extract:
                 aobj = await _audit_one(client, conv, sub, f2)
+                if aobj is None:
+                    raise ValueError(f"Audit protocol failed for session {session.no}")
                 if aobj:
-                    af, ae, ar, ad = _filter_session(aobj, sub)
+                    af, ae, ar, ad = _filter_session(aobj, sub, schema)
                     _override_dates(af, sub)
                     seen = {_fold(x["t"]) for x in facts}
                     facts += [x for x in af if _fold(x["t"]) not in seen]
@@ -297,12 +314,12 @@ async def build_graph_for(conv: Conversation, schema: Schema, lc: LocomoConfig,
         all_facts.append({"s": spk, "t": stmt.strip(), "y": "背景",
                           "d": "", "g": "无", "o": "", "n": "", "tp": [],
                           "ev": [], "src": [dia_id], "session_no": int(m.group(1))})
-    for d_iso, spk, ev in conv.events:
+    for event_no, (d_iso, spk, ev) in enumerate(conv.events):
         if not ev.strip():
             continue
         all_facts.append({"s": spk, "t": ev.strip(), "y": "事件",
                           "d": d_iso, "g": "日" if d_iso else "无", "o": "", "n": "",
-                          "tp": [], "ev": [], "src": [], "session_no": 0})
+                          "tp": [], "ev": [], "src": [f"event_summary:{conv.sample_id}:{event_no}"], "session_no": 0})
 
     # 2) 实体归并
     names = ([e[1] for e in all_ents] + [e[2] for e in all_ents if e[2]]
@@ -349,10 +366,10 @@ async def build_graph_for(conv: Conversation, schema: Schema, lc: LocomoConfig,
             continue
         ent_by_name[name] = (etype, [alias] if alias and alias != name else [])
     for name, (etype, aliases) in ent_by_name.items():
-        pk = "姓名" if etype == "人物" else "名称"
+        pk = schema.entity(etype).primary_key[0]
         entities.append(EntityCandidate(
             etype=etype, key={pk: name},
-            properties={"别名": ";".join(aliases)}, chunk_id=conv.sample_id))
+            properties=({"别名": ";".join(aliases)} if "别名" in schema.entity(etype).attr_names() else {}), chunk_id=conv.sample_id))
     for s in conv.speakers:                       # 说话人保底入图
         if s not in ent_by_name or ent_by_name[s][0] != "人物":
             entities.append(EntityCandidate(
@@ -438,7 +455,7 @@ async def build_graph_for(conv: Conversation, schema: Schema, lc: LocomoConfig,
             tail=("人物", {"姓名": b}) if b in person_names
             else (ent_by_name[b][0], {"名称": b})))
 
-    g = build_graph(entities, relations, schema)
+    g = build_graph(entities, relations, schema, on_invalid="isolate")
 
     # 5) 落盘 + 统计（evidence 覆盖率为事后诊断，不进图）
     gdir.mkdir(parents=True, exist_ok=True)
@@ -446,13 +463,14 @@ async def build_graph_for(conv: Conversation, schema: Schema, lc: LocomoConfig,
     facts_path.write_text("\n".join(json.dumps(f.__dict__, ensure_ascii=False) for f in facts))
     stats = graph_stats(g)
     stats.update({"sessions": len(conv.sessions), "facts": len(facts),
+                  "validation_errors": g.graph.get("validation_errors", []),
                   "ungrounded_dropped": dropped_total,
                   "entities_canonical": len(ent_by_name),
                   "canon_map_size": len(canon)})
     covered = set()
     for f in facts:
         covered.update(f.sources)
-    stats["evidence_coverage"] = round(len(covered & {
+    stats["evidence_coverage"] = None if not conv.qas else round(len(covered & {
         d for qa in conv.qas for d in qa.evidence}) / max(
         len({d for qa in conv.qas for d in qa.evidence}), 1), 3)
     (gdir / "stats.json").write_text(json.dumps(stats, ensure_ascii=False, indent=2))

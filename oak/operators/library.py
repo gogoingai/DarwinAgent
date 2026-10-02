@@ -14,7 +14,7 @@ import networkx as nx
 # ContextVar：协程级隔离，并发跑题不互相踩图（曾经的错图竞态根源）
 _G: contextvars.ContextVar["nx.MultiDiGraph | None"] = \
     contextvars.ContextVar("oak_graph", default=None)
-_slot_extractor = None          # async fn(text, slot_names) -> dict（由管线注入）
+_slot_extractor = contextvars.ContextVar("oak_slot_extractor", default=None)
 
 
 def set_graph(g: nx.MultiDiGraph) -> None:
@@ -28,8 +28,7 @@ def get_graph() -> nx.MultiDiGraph:
 
 
 def set_slot_extractor(fn) -> None:
-    global _slot_extractor
-    _slot_extractor = fn
+    _slot_extractor.set(fn)
 
 
 def _rows_of(g: nx.MultiDiGraph, etype: str) -> list[dict]:
@@ -81,8 +80,9 @@ def lookup_entities(etype: str, filters: dict | None = None, limit: int = 50) ->
 
 def extract_runtime_slots(text: str, slot_names: list[str]) -> dict:
     """自然语言 → 带类型槽位（LLM 后端；未注入时退化为关键词匹配）。"""
-    if _slot_extractor is not None:
-        return _slot_extractor(text, slot_names)
+    extractor = _slot_extractor.get()
+    if extractor is not None:
+        return extractor(text, slot_names)
     # 退化实现：简单关键词兜底
     t = text.lower()
     out = {}
@@ -121,7 +121,8 @@ def traverse_relations(start_id: str, relation: str, direction: str = "out",
     for nid in visited:
         nd = g.nodes[nid]
         row = {"__id__": nid, "__type__": nd.get("etype", "?")}
-        row.update({k: v for k, v in nd.items() if not k.startswith("__")})
+        from ..kg.graph import node_view
+        row.update(node_view(nd))
         rows.append(row)
     return rows
 
@@ -171,7 +172,9 @@ def filter_relation_connected(rows: list[dict], via_relation: str,
             if target_etype and td.get("etype") != target_etype:
                 continue
             if target_filter:
-                ok = all(str(v).lower() in str(td.get(k, "")).lower()
+                from ..kg.graph import node_view
+                target = node_view(td)
+                ok = all(str(v).lower() in str(target.get(k, "")).lower()
                          for k, v in target_filter.items())
                 if not ok:
                     continue

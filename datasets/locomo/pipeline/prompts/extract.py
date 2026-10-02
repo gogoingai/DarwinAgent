@@ -56,7 +56,14 @@ AUDIT_TEMPLATE = """对照原文检查已有原子事实清单，找出**遗漏*
 输出 JSON（同原契约）：{{"f":[...],"e":[...],"r":[...]}}"""
 
 
-def render_extract_prompt(session, conv, topics: list[str] | None = None) -> str:
+def render_extract_prompt(session, conv, topics: list[str] | None = None, schema=None) -> str:
+    if schema is None:
+        from ..schema_skeleton import load_skeleton
+        schema = load_skeleton()
+    etypes = [e.name for e in schema.entities if e.name not in ("会话", "原子事实", "主题")
+              and len(e.primary_key) == 1]
+    relations = [r.name for r in schema.relations if r.name not in
+                 ("归属于", "属于主题", "记录于", "喜爱") and not r.name.startswith("涉及")]
     transcript = "\n".join(
         f"[{t.dia_id}] {t.speaker}: {t.text}" for t in session.turns
     )
@@ -69,8 +76,8 @@ def render_extract_prompt(session, conv, topics: list[str] | None = None) -> str
         transcript=transcript,
         fact_types="/".join(FACT_TYPES),
         topics="/".join(topics or DEFAULT_TOPICS),
-        etypes="/".join(EXTRACTABLE_ETYPES),
-        relations="/".join(EXTRACTABLE_RELATIONS),
+        etypes="/".join(etypes),
+        relations="/".join(relations),
     )
 
 

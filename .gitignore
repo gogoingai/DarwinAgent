@@ -44,3 +44,8 @@ datasets/locomo/runs/dual_reports/*/*/cache/
 # 带完整轨迹的逐轮 answers.jsonl 不入库（判分 delta 已浓缩进 patch-impact.md）
 datasets/locomo/runs/closeout/snapshots/
 datasets/locomo/runs/conv-44/closeout-r*/answers.jsonl
+
+# ---- iter_v2/portable_v1 实验产物:可重建的重原料不入库(LLM 响应缓存/图快照) ----
+# 记录类产物(answers/report/failures/system_side/契约/决策/frozen_code)全部入库
+datasets/locomo/runs/**/cache/
+datasets/locomo/runs/**/graph_*/

@@ -35,61 +35,140 @@ def node_view(nd: dict) -> dict:
     return view
 
 
+class GraphValidationError(ValueError):
+    pass
+
+
 def node_id(etype: str, key: dict) -> str:
-    parts = sorted(f"{k}={canon_value(v)}" for k, v in key.items())
-    return f"{etype}::" + "|".join(parts)
+    # Structured boundaries prevent delimiter collisions. Values remain typed.
+    payload = [[str(k), v]
+               for k, v in sorted(key.items())]
+    return f"{etype}::" + json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
 
 
-def build_graph(entities, relations, schema) -> nx.MultiDiGraph:
-    """entities: EntityCandidate 列表；relations: RelationCandidate 列表。"""
+def _typed(value, dtype):
+    import math
+    if value is None:
+        return None
+    if dtype == "string":
+        if isinstance(value, (dict, list, tuple)):
+            raise GraphValidationError("Expected scalar string")
+        return str(value)
+    if dtype == "int":
+        if isinstance(value, bool) or not re.fullmatch(r"-?\d+", str(value).strip()):
+            raise GraphValidationError(f"Expected int: {value!r}")
+        return int(value)
+    if dtype == "float":
+        if isinstance(value, bool):
+            raise GraphValidationError("Boolean is not a float")
+        number = float(value)
+        if not math.isfinite(number):
+            raise GraphValidationError("Nonfinite float")
+        return number
+    if dtype == "bool":
+        if type(value) is bool:
+            return value
+        if str(value).lower() in ("true", "false"):
+            return str(value).lower() == "true"
+        raise GraphValidationError("Expected bool")
+    if dtype == "date":
+        from datetime import date
+        return date.fromisoformat(str(value)).isoformat()
+    raise GraphValidationError(f"Unknown dtype: {dtype}")
+
+
+def build_graph(entities, relations, schema, *, on_invalid="raise") -> nx.MultiDiGraph:
+    """Validate all candidates; quarantine must be explicitly requested."""
+    if on_invalid not in ("raise", "isolate"):
+        raise ValueError("on_invalid must be raise or isolate")
+    errors = schema.validate()
+    if errors:
+        raise GraphValidationError(str(errors))
     g = nx.MultiDiGraph()
-    provenance: dict[str, dict] = {}
+    g.graph.update(format_version=2, validation_errors=[])
+    relations_by_name = {r.name: r for r in schema.relations}
+
+    def invalid(kind, value, exc):
+        issue = {"kind": kind, "value": repr(value)[:500], "error": str(exc)}
+        if on_invalid == "raise":
+            raise GraphValidationError(str(issue)) from exc
+        g.graph["validation_errors"].append(issue)
+
+    def normalize(etype, key, properties):
+        entity = schema.entity(etype)
+        if entity is None:
+            raise GraphValidationError(f"Undeclared entity type {etype!r}")
+        attrs = {a.name: a.dtype for a in entity.attributes}
+        if set(key) != set(entity.primary_key):
+            raise GraphValidationError(f"{etype}: expected primary key {entity.primary_key}")
+        nk = {k: _typed(v, attrs[k]) for k, v in key.items()}
+        if any(v is None or (isinstance(v, str) and not v.strip()) for v in nk.values()):
+            raise GraphValidationError("Empty primary key")
+        np = {}
+        for raw, value in properties.items():
+            name = entity.canonical_attr(raw)
+            if name is None:
+                raise GraphValidationError(f"{etype}: undeclared attribute {raw!r}")
+            v = _typed(value, attrs[name])
+            if name in nk:
+                if v != nk[name]:
+                    raise GraphValidationError("Property conflicts with primary key")
+            else:
+                np[name] = v
+        return nk, np
+
+    def subtype(actual, allowed):
+        seen, pending = set(), [actual]
+        while pending:
+            current = pending.pop()
+            if current in allowed:
+                return True
+            if current in seen:
+                continue
+            seen.add(current)
+            pending.extend(ax.params["sup"] for ax in schema.axioms
+                           if ax.kind == "subclass" and ax.params.get("sub") == current)
+        return False
 
     for e in entities:
-        ent = schema.entity(e.etype)
-        if ent is None:
-            continue
-        nid = node_id(e.etype, e.key)
-        if g.has_node(nid):
-            # 同键签名：属性补齐（后到不覆盖已有非空值）
+        try:
+            key, props = normalize(e.etype, e.key, e.properties)
+            nid = node_id(e.etype, key)
+            if nid not in g:
+                g.add_node(nid, etype=e.etype, __key__=json.dumps(key, ensure_ascii=False),
+                           __merged__=0, __sources__=[], **props)
             cur = g.nodes[nid]
-            for k, v in e.properties.items():
+            for k, v in props.items():
                 if cur.get(k) in (None, "") and v not in (None, ""):
                     cur[k] = v
-            provenance[nid]["chunks"].add(e.chunk_id)
-            provenance[nid]["n_merged"] += 1
-        else:
-            g.add_node(nid, etype=e.etype,
-                       __key__=json.dumps(e.key, ensure_ascii=False),
-                       **{k: v for k, v in e.properties.items()})
-            provenance[nid] = {"chunks": {e.chunk_id}, "n_merged": 1}
+            cur["__merged__"] += 1
+            if e.chunk_id not in cur["__sources__"]:
+                cur["__sources__"].append(e.chunk_id)
+        except (ValueError, TypeError, KeyError) as exc:
+            invalid("entity", e, exc)
 
-    seen_edges: set[tuple[str, str, str]] = set()
     for r in relations:
         try:
-            head_id = node_id(r.head[0], r.head[1])
-            tail_id = node_id(r.tail[0], r.tail[1])
-        except Exception:
-            continue
-        if not g.has_node(head_id) or not g.has_node(tail_id):
-            # 端点实体未被抽出（可能被过滤）：把端点补成裸节点，保边连通
-            if not g.has_node(head_id):
-                g.add_node(head_id, etype=r.head[0],
-                           __key__=json.dumps(r.head[1], ensure_ascii=False))
-                provenance[head_id] = {"chunks": set(), "n_merged": 0}
-            if not g.has_node(tail_id):
-                g.add_node(tail_id, etype=r.tail[0],
-                           __key__=json.dumps(r.tail[1], ensure_ascii=False))
-                provenance[tail_id] = {"chunks": set(), "n_merged": 0}
-        ek = (head_id, r.relation, tail_id)
-        if ek in seen_edges:
-            continue                            # 重连后去重
-        seen_edges.add(ek)
-        g.add_edge(head_id, tail_id, key=r.relation, relation=r.relation)
-
-    for nid, pv in provenance.items():
-        if g.has_node(nid):
-            g.nodes[nid]["__merged__"] = pv["n_merged"]
+            spec = relations_by_name.get(r.relation)
+            if spec is None:
+                raise GraphValidationError(f"Undeclared relation {r.relation!r}")
+            hk, _ = normalize(r.head[0], r.head[1], {})
+            tk, _ = normalize(r.tail[0], r.tail[1], {})
+            if not subtype(r.head[0], spec.domain) or not subtype(r.tail[0], [spec.range]):
+                raise GraphValidationError(f"Domain/range mismatch for {r.relation}")
+            head_id, tail_id = node_id(r.head[0], hk), node_id(r.tail[0], tk)
+            if spec.functional and head_id in g:
+                if any(ed.get("relation") == r.relation and tgt != tail_id
+                       for _, tgt, ed in g.out_edges(head_id, data=True)):
+                    raise GraphValidationError(f"Functional relation conflict: {r.relation}")
+            for nid, etype, key in ((head_id, r.head[0], hk), (tail_id, r.tail[0], tk)):
+                if nid not in g:
+                    g.add_node(nid, etype=etype, __key__=json.dumps(key, ensure_ascii=False),
+                               __merged__=0, __sources__=[], __incomplete__=True)
+            if not g.has_edge(head_id, tail_id, key=r.relation):
+                g.add_edge(head_id, tail_id, key=r.relation, relation=r.relation)
+        except (ValueError, TypeError, KeyError, IndexError) as exc:
+            invalid("relation", r, exc)
     return g
 
 
@@ -110,16 +189,17 @@ def derive_relations(g: nx.MultiDiGraph, schema) -> nx.MultiDiGraph:
     属性可能存于 __key__（主键）或普通属性 —— 两者都读。
     目标节点不存在时自动创建（值类实体）。幂等：重复调用不产生重边。
     """
-    from ..schema.model import Schema  # noqa: F401
-
-    def _target_id(rtype_name: str, value: str) -> str:
-        rng = schema.entity(rtype_name)
-        pk_field = rng.primary_key[0] if rng else "name"
-        return node_id(rtype_name, {pk_field: value})
+    if schema.validate():
+        raise GraphValidationError(str(schema.validate()))
 
     for rel in schema.relations:
         if not rel.derive:
             continue
+        rng = schema.entity(rel.range)
+        if len(rng.primary_key) != 1:
+            raise GraphValidationError("Attribute-derived endpoints need an explicit single primary key")
+        pk_field = rng.primary_key[0]
+        dtype = next(a.dtype for a in rng.attributes if a.name == pk_field)
         attr = rel.derive.get("attr")
         attr_by_domain = rel.derive.get("attr_by_domain") or {}
         if not attr and not attr_by_domain:
@@ -140,216 +220,29 @@ def derive_relations(g: nx.MultiDiGraph, schema) -> nx.MultiDiGraph:
                 val = val.strip()
                 if not val:
                     continue
-                tid = _target_id(rel.range, val)
+                key_value = _typed(val, dtype)
+                tid = node_id(rel.range, {pk_field: key_value})
+                if rel.functional and any(ed.get("relation") == rel.name and tgt != tid
+                                          for _, tgt, ed in g.out_edges(nid, data=True)):
+                    raise GraphValidationError(f"Functional derived relation conflict: {rel.name}")
                 if not g.has_node(tid):
-                    rng = schema.entity(rel.range)
-                    pk_field = rng.primary_key[0] if rng else "name"
                     g.add_node(tid, etype=rel.range,
-                               __key__=json.dumps({pk_field: val}, ensure_ascii=False),
-                               **{pk_field: val})
+                               __key__=json.dumps({pk_field: key_value}, ensure_ascii=False),
+                               __incomplete__=True, **{pk_field: key_value})
                 if not g.has_edge(nid, tid, key=rel.name):
                     g.add_edge(nid, tid, key=rel.name, relation=rel.name, derived=True)
     return g
 
 
-def augment_graph_with_official(g: nx.MultiDiGraph, q, tp_root) -> int:
-    """用官方库补齐该题相关城市的餐/住/景实体（返回新增节点数）。
 
-    动机（q47/q116 实证）：图的实体是该题 reference 语料子集，而官方评测按**全量
-    官方库**判存在性。语料缺某城餐馆时，模型会以为该城不可停留而放弃出计划；
-    官方库有数据的实体即使语料没给也是合法的。故把该题涉及城市（州题取州内全城，
-    城市题取 org+dest）的官方实体并入图，使规划候选与官方判据一致。
-    """
-    import csv as _csv
-    tp = Path(tp_root)
-    if q is None:
-        return 0
-    state_map: dict[str, str] = {}
-    f = tp / "database/background/citySet_with_states.txt"
-    if f.exists():
-        for ln in f.read_text().splitlines():
-            if "\t" in ln:
-                c, s = ln.split("\t", 1)
-                state_map[c.strip()] = s.strip()
-    cities: set[str] = {q.org, q.dest}
-    if state_map.get(q.dest) or any(v == q.dest for v in state_map.values()):
-        cities |= {c for c, s in state_map.items() if s == q.dest}
-    # 图上已有的业务城市也纳入
-    for _, nd in g.nodes(data=True):
-        if nd.get("etype") in ("Restaurant", "Accommodation", "Attraction"):
-            v = nd.get("City") or nd.get("city")
-            if v:
-                cities.add(str(v))
-
-    _NA = {"", "nan", "NaN", "NA", "None", "null"}
-
-    def _alive(row: dict) -> bool:
-        """官方加载语义 dropna()：任一列为空的行整行丢弃（僵尸行会被评测判 invalid）。"""
-        return all(v is not None and str(v).strip() not in _NA for v in row.values())
-
-    specs = [
-        ("Restaurant", "database/restaurants/clean_restaurant_2022.csv", "Name", "City",
-         lambda r: {"Name": r["Name"], "City": r["City"], "Cuisines": r.get("Cuisines"),
-                    "Average Cost": r.get("Average Cost")}),
-        ("Accommodation", "database/accommodations/clean_accommodations_2022.csv",
-         "NAME", "city",
-         lambda r: {"NAME": r["NAME"], "city": r["city"], "room type": r.get("room type"),
-                    "price": r.get("price"), "minimum nights": r.get("minimum nights"),
-                    "maximum occupancy": r.get("maximum occupancy"),
-                    "house_rules": r.get("house_rules")}),
-        ("Attraction", "database/attractions/attractions.csv", "Name", "City",
-         lambda r: {"Name": r["Name"], "City": r["City"], "Address": r.get("Address")}),
-    ]
-    added = 0
-    for etype, rel, ncol, ccol, pick in specs:
-        p = tp / rel
-        if not p.exists():
-            continue
-        with p.open(newline="", encoding="utf-8") as fh:
-            for row in _csv.DictReader(fh):
-                if not _alive(row):
-                    continue
-                city = (row.get(ccol) or "").strip()
-                if city not in cities:
-                    continue
-                props = {k: v for k, v in pick(row).items()
-                         if v not in (None, "", "nan", "NaT")}
-                key = {"Name": props.get(ncol) or props.get("NAME"), ccol: city} \
-                    if etype != "Accommodation" else {"NAME": props.get("NAME"), "city": city}
-                key = {k: v for k, v in key.items() if v not in (None, "")}
-                if not key:
-                    continue
-                nid = node_id(etype, key)
-                if g.has_node(nid):
-                    cur = g.nodes[nid]
-                    for k, v in props.items():      # 官方值补齐/覆盖（权威）
-                        if v not in (None, ""):
-                            cur[k] = v
-                    continue
-                g.add_node(nid, etype=etype, __key__=json.dumps(key, ensure_ascii=False),
-                           __source__="official", **{k: v for k, v in props.items()
-                                                     if k not in key})
-                added += 1
-    return added
-
-
-def _city_base(name: str) -> str:
-    """城市名规范化：去尾部 "(State)" 括注 + strip（语料与官方 citySet 对齐用）。"""
-    name = str(name).strip()
-    return name.split(" (")[0].strip() if " (" in name else name
-
-
-def enrich_city_nodes(g: nx.MultiDiGraph, tp_root) -> nx.MultiDiGraph:
-    """运行时 City enrich：state（官方 citySet_with_states.txt）+ 三类业务计数 + covered。
-
-    - 幂等；必须在 derive_relations 之后调用（City 节点此时才齐全）。
-    - covered = restaurant/accommodation/attraction 计数都 > 0：距离矩阵/航班端点
-      产生的 City 不算 covered（无餐住景数据，不可作为停留城市）。
-    - 这是图元数据，不进 schema、不由抽取 LLM 产生。
-    """
-    from pathlib import Path as _P
-    state_map: dict[str, str] = {}
-    f = _P(tp_root) / "database" / "background" / "citySet_with_states.txt"
-    if f.exists():
-        for ln in f.read_text().splitlines():
-            if "\t" in ln:
-                c, s = ln.split("\t", 1)
-                state_map[c.strip()] = s.strip()
-
-    counts = {"Restaurant": {}, "Accommodation": {}, "Attraction": {}}
-    for _, nd in g.nodes(data=True):
-        t = nd.get("etype")
-        if t in counts:
-            city = node_view(nd).get("City") or node_view(nd).get("city")
-            if city:
-                cb = _city_base(city)
-                counts[t][cb] = counts[t].get(cb, 0) + 1
-
-    for nid, nd in g.nodes(data=True):
-        if nd.get("etype") != "City":
-            continue
-        name = node_view(nd).get("name")
-        if not name:
-            continue
-        base = _city_base(name)
-        rc = counts["Restaurant"].get(base, 0)
-        ac = counts["Accommodation"].get(base, 0)
-        atc = counts["Attraction"].get(base, 0)
-        nd["state"] = state_map.get(name) or state_map.get(base) or ""
-        nd["restaurant_count"] = rc
-        nd["accommodation_count"] = ac
-        nd["attraction_count"] = atc
-        # 有任一业务数据即可作为停留城市（官方只查城市合法性与实体存在，
-        # 不要求三类齐全——q47 Jamestown 有住宿+景点、q116 Jacksonville 有餐馆）
-        nd["covered"] = bool(rc > 0 or ac > 0 or atc > 0)
-    return g
-
-
-def covered_cities(g: nx.MultiDiGraph, state: str | None = None) -> list[dict]:
-    """有完整业务数据的城市清单（P5 权威运行时块 / 州内选城用）。
-
-    附最低住宿价并按其升序（第五轮：模型偏好便宜城，攻 valid_cost 类失败）。
-    """
-    acc_min: dict[str, float] = {}
-    for _, nd in g.nodes(data=True):
-        if nd.get("etype") == "Accommodation":
-            v = node_view(nd)
-            c = _city_base(v.get("city") or "")
-            try:
-                p = float(str(v.get("price")).replace(",", "").replace("$", ""))
-                if c and p > 0:
-                    acc_min[c] = min(acc_min.get(c, p), p)
-            except Exception:
-                pass
-    out = []
-    for _, nd in g.nodes(data=True):
-        if nd.get("etype") != "City" or not nd.get("covered"):
-            continue
-        if state and nd.get("state") != state:
-            continue
-        name = node_view(nd).get("name")
-        if name:
-            out.append({"name": str(name), "state": nd.get("state", ""),
-                        "restaurants": nd.get("restaurant_count", 0),
-                        "accommodations": nd.get("accommodation_count", 0),
-                        "attractions": nd.get("attraction_count", 0),
-                        "min_hotel_price": acc_min.get(_city_base(name))})
-    out.sort(key=lambda c: (c.get("min_hotel_price") is None,
-                            c.get("min_hotel_price") or 0, c["name"]))
-    return out
-
-
-def programmatic_distance_entities(schema, tp_root) -> list:
-    """距离矩阵 csv 程序化转实体候选（结构化源不走 LLM 抽取）。
-
-    匹配 schema 中同时含 origin/destination 字段的实体类型。
-    City 边由 derive_relations 按 derive 规则补齐。
-    """
-    import csv
-    from pathlib import Path
-
-    target = None
-    for e in schema.entities:
-        names = e.attr_names()
-        if {"origin", "destination"} <= names:
-            target = e
-            break
-    if target is None:
-        return []
-    f = Path(tp_root) / "database" / "googleDistanceMatrix" / "distance.csv"
-    if not f.exists():
-        return []
-    out = []
-    with f.open(newline="", encoding="utf-8") as fh:
-        for row in csv.DictReader(fh):
-            key = {k: row.get(k) for k in target.primary_key}
-            if not all(key.values()):
-                continue
-            props = {a.name: row.get(a.name) for a in target.attributes
-                     if a.name not in key and row.get(a.name)}
-            out.append(EntityCandidate(etype=target.name, key=key,
-                                       properties=props, chunk_id="distance/csv"))
-    return out
+def __getattr__(name):
+    # Compatibility for previous users; production adapters import their domain.
+    if name in {"augment_graph_with_official", "enrich_city_nodes", "covered_cities", "programmatic_distance_entities"}:
+        import warnings
+        from oak_domains.travel_planning import graph as travel_graph
+        warnings.warn("Travel graph helpers moved to oak_domains.travel_planning.graph", DeprecationWarning, stacklevel=2)
+        return getattr(travel_graph, name)
+    raise AttributeError(name)
 
 
 def graph_stats(g: nx.MultiDiGraph) -> dict:

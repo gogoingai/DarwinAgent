@@ -10,7 +10,7 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
-# role -> tier；tier 再映射到具体模型（两任务共用；任务可只使用自己的角色前缀）
+# Framework roles; application-specific roles are injected by adapters.
 MODEL_ROLES: dict[str, str] = {
     "schema": "strong",      # P1 需求分析 / P2 模式草拟
     "func_gen": "strong",    # P4 函数生成（含能力规划）
@@ -19,15 +19,7 @@ MODEL_ROLES: dict[str, str] = {
     "react": "fast",         # P5 ReAct 执行
     "slots": "fast",         # extract_runtime_slots 槽位提取
     "plan_repair": "fast",   # 计划格式修复 / salvage
-    # ---- locomo 任务（中文 LoCoMo 本体问答）----
-    "locomo_schema": "strong",   # P1/P2 本体起草
-    "locomo_answer": "strong",   # 终答合成 + 证据自检
-    "locomo_judge": "strong",    # 严格判分
-    "locomo_extract": "fast",    # 原子事实抽取
-    "locomo_util": "fast",       # 实体归并 / 完整性审计 / 格式修复
-    "locomo_steps": "fast",      # ReAct 步骤
-    # ---- mem0 基线（只-ADD 记忆，中文）----
-    "mem0_extract": "fast",      # 加法事实提取
+
 }
 
 
@@ -49,16 +41,29 @@ class Config:
     max_retries: int = 5
 
     # 框架级路径（任务通常覆盖 work_dir 以隔离产物）
-    work_dir: Path = PROJECT_ROOT / "runs"
+    work_dir: Path = field(default_factory=lambda: Path.cwd() / "runs")
 
-    # 成本硬顶（按 namespace 计；locomo 用 lc* 前缀天然绕开）
+    # Legacy default limits; applications register explicit namespace scopes.
     limits: dict = field(default_factory=lambda: {
         "build_round_calls": 600,      # 单轮 LLM 调用上限
         "inference_calls_per_q": 60,   # 单测试题上限
     })
 
+    role_tiers: dict[str, str] = field(default_factory=lambda: dict(MODEL_ROLES))
+    namespace_limits: dict[str, int] = field(default_factory=dict)
+    thinking_disabled_roles: set[str] = field(default_factory=set)
+    empty_response_passthrough_roles: set[str] = field(default_factory=lambda: {"judicator"})
+    reasoning_buffer: int = 3072
+    external_reasoning_buffer: int = 8192
+
+    def tier_for(self, role: str) -> str:
+        tier = self.role_tiers.get(role)
+        if tier not in ("strong", "fast"):
+            raise ValueError(f"unknown LLM role or tier: {role}")
+        return tier
+
     def model_for(self, role: str) -> str:
-        tier = MODEL_ROLES.get(role)
+        tier = self.tier_for(role)
         if tier is None:
             raise ValueError(f"unknown LLM role: {role}")
         return self.model_strong if tier == "strong" else self.model_fast

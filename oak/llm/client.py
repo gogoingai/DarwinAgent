@@ -16,10 +16,16 @@ from typing import Any
 from openai import AsyncOpenAI, APIConnectionError, APIStatusError, APITimeoutError
 import httpx
 
-from ..config import Config, MODEL_ROLES
+from ..config import Config
+from ..runtime.artifacts import atomic_json
+from ..runtime.budgets import counter_transaction
 
 
 class BudgetExceeded(RuntimeError):
+    pass
+
+
+class EmptyCompletion(RuntimeError):
     pass
 
 
@@ -31,8 +37,7 @@ REASONING_BUFFER_EXTERNAL = 8192
 
 # 关闭深度思考的角色（机械执行类任务：抽取/ReAct/槽位/格式修复走 flash 且无需长思考）；
 # 核心推理步骤（schema 草拟、函数编译、评判器）保留思考
-THINKING_OFF_ROLES = {"kg", "react", "slots", "plan_repair",
-                      "locomo_extract", "locomo_util", "locomo_steps"}
+THINKING_OFF_ROLES = {"kg", "react", "slots", "plan_repair"}
 
 
 @dataclass
@@ -48,6 +53,13 @@ class LLMResult:
 class LLMClient:
     def __init__(self, cfg: Config) -> None:
         self.cfg = cfg
+        if not cfg.fast_base_url:
+            cfg.fast_base_url = cfg.api_base_url
+            cfg.fast_api_key = cfg.fast_api_key or cfg.api_key
+        elif cfg.fast_base_url == cfg.api_base_url and not cfg.fast_api_key:
+            cfg.fast_api_key = cfg.api_key
+        cfg.work_dir = Path(cfg.work_dir)
+        cfg.work_dir.mkdir(parents=True, exist_ok=True)
         # 直连不走系统代理（本地代理会吞掉国内 API 的长请求）
         def _mk(base_url: str, api_key: str) -> AsyncOpenAI:
             return AsyncOpenAI(
@@ -70,6 +82,11 @@ class LLMClient:
         self._retry_log.parent.mkdir(parents=True, exist_ok=True)
         # 命名空间调用计数（内存 + 台账聚合），供限额检查
         self._ns_calls: dict[str, int] = {}
+        self._budget_lock = asyncio.Lock()
+        self._budget_path = cfg.work_dir / "call_counts.json"
+        if self._budget_path.exists():
+            self._ns_calls = json.loads(self._budget_path.read_text())
+
 
     # ---------- 对外主入口 ----------
     async def chat(
@@ -84,13 +101,22 @@ class LLMClient:
         use_cache: bool = True,
     ) -> LLMResult:
         model = self.cfg.model_for(role)
-        key = self._cache_key(model, messages, temperature, max_tokens, json_mode)
+        tier = self.cfg.tier_for(role)
+        endpoint = self.cfg.fast_base_url if tier == "fast" else self.cfg.api_base_url
+        thinking_off = role in THINKING_OFF_ROLES or role in self.cfg.thinking_disabled_roles
+        request_buffer = (0 if thinking_off else self.cfg.reasoning_buffer) if "bigmodel" in endpoint else self.cfg.external_reasoning_buffer
+        key = self._cache_key(model, messages, temperature, max_tokens, json_mode,
+                              endpoint=endpoint, thinking_off=thinking_off, request_buffer=request_buffer)
         cache_file = self.cfg.cache_dir / namespace / f"{key}.json"
 
+        async with self._budget_lock:
+            with counter_transaction(self._budget_path) as counts:
+                self._ns_calls = counts
+                self._check_budget(namespace)
+                counts[namespace] = counts.get(namespace, 0) + 1
         if use_cache and cache_file.exists():
             try:
                 data = json.loads(cache_file.read_text())
-                self._count(namespace)
                 return LLMResult(
                     content=data["content"], usage=data.get("usage", {}),
                     cache_hit=True, elapsed_s=0.0, model=model, role=role,
@@ -98,12 +124,10 @@ class LLMClient:
             except Exception:
                 pass  # 缓存损坏则重打
 
-        self._check_budget(namespace)
-
         last_err: Exception | None = None
-        use_client = (self._client_fast if MODEL_ROLES.get(role) == "fast"
+        use_client = (self._client_fast if self.cfg.tier_for(role) == "fast"
                       else self._client)
-        use_sem = (self._sem_fast if MODEL_ROLES.get(role) == "fast"
+        use_sem = (self._sem_fast if self.cfg.tier_for(role) == "fast"
                    else self._sem)
         is_glm_endpoint = "bigmodel" in str(getattr(use_client, "base_url", "") or "")
         for attempt in range(self.cfg.max_retries):
@@ -114,9 +138,9 @@ class LLMClient:
                     # 请求侧加 reasoning 余量，保证正文拿满 max_tokens；
                     # 已关思考的角色不需要余量；无法关思考的外部模型给大余量
                     if is_glm_endpoint:
-                        buffer = 0 if role in THINKING_OFF_ROLES else REASONING_BUFFER
+                        buffer = 0 if thinking_off else self.cfg.reasoning_buffer
                     else:
-                        buffer = REASONING_BUFFER_EXTERNAL
+                        buffer = self.cfg.external_reasoning_buffer
                     kwargs: dict[str, Any] = dict(
                         model=model, messages=messages,
                         temperature=temperature,
@@ -127,7 +151,7 @@ class LLMClient:
                     )
                     if json_mode:
                         kwargs["response_format"] = {"type": "json_object"}
-                    if role in THINKING_OFF_ROLES and is_glm_endpoint:
+                    if thinking_off and is_glm_endpoint:
                         # thinking 开关仅智谱端点支持；第三方网关忽略
                         kwargs["extra_body"] = {"thinking": {"type": "disabled"}}
                     # 流式聚合（本地 TUN 代理会挂起非流式长请求）
@@ -159,8 +183,11 @@ class LLMClient:
                 else:
                     result.usage["empty_content"] = True
                 await self._append_ledger(namespace, role, model, usage, cache_hit=False)
-                self._count(namespace)
+                if not content.strip() and role not in self.cfg.empty_response_passthrough_roles:
+                    raise EmptyCompletion(f"Empty generation response from {model}")
                 return result
+            except EmptyCompletion as e:
+                last_err = e
             except (APIConnectionError, APITimeoutError) as e:
                 last_err = e
             except APIStatusError as e:
@@ -187,10 +214,28 @@ class LLMClient:
     # ---------- 限额与台账 ----------
     def _count(self, namespace: str) -> None:
         self._ns_calls[namespace] = self._ns_calls.get(namespace, 0) + 1
+        atomic_json(self._budget_path, self._ns_calls)
+
+    async def aclose(self) -> None:
+        await self._client.close()
+        if self._client_fast is not self._client:
+            await self._client_fast.close()
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *exc):
+        await self.aclose()
 
     def _check_budget(self, namespace: str) -> None:
         # 命名空间 r{n}_* 受单轮上限约束；inf_q* 受单题上限约束
         n = self._ns_calls.get(namespace, 0)
+        for scope, explicit in self.cfg.namespace_limits.items():
+            if namespace == scope or namespace.startswith(scope + "_"):
+                used = sum(count for name, count in self._ns_calls.items()
+                           if name == scope or name.startswith(scope + "_"))
+                if used >= explicit:
+                    raise BudgetExceeded(f"{scope}: {used} >= explicit_limit={explicit}")
         if namespace.startswith("r") and "_inf" not in namespace:
             limit = self.cfg.limits.get("build_round_calls")
             if limit and n >= limit:
@@ -234,22 +279,23 @@ class LLMClient:
 
     # ---------- 缓存 ----------
     @staticmethod
-    def _cache_key(model, messages, temperature, max_tokens, json_mode) -> str:
-        blob = json.dumps({
+    def _cache_key(model, messages, temperature, max_tokens, json_mode, *,
+                   endpoint="", thinking_off=False, request_buffer=None) -> str:
+        value = {
             "m": model, "msg": messages, "t": temperature,
-            "mt": max_tokens, "j": json_mode,
-        }, ensure_ascii=False, sort_keys=True)
+            "mt": max_tokens, "j": json_mode, "endpoint": endpoint,
+            "thinking_off": thinking_off, "transport_version": 2,
+        }
+        default_buffer = (0 if thinking_off else REASONING_BUFFER) if "bigmodel" in endpoint else REASONING_BUFFER_EXTERNAL
+        if request_buffer is not None and request_buffer != default_buffer:
+            value["request_buffer"] = request_buffer
+        blob = json.dumps(value, ensure_ascii=False, sort_keys=True)
         return hashlib.sha256(blob.encode()).hexdigest()
 
     @staticmethod
     def _save_cache(path: Path, result: LLMResult) -> None:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = path.with_suffix(".tmp")
-        tmp.write_text(json.dumps({
-            "content": result.content, "usage": result.usage,
-            "model": result.model,
-        }, ensure_ascii=False))
-        tmp.rename(path)                      # 原子替换，并发安全
+        atomic_json(path, {"content": result.content, "usage": result.usage,
+                           "model": result.model})
 
     def _log_retry(self, namespace, role, attempt, err, backoff) -> None:
         try:

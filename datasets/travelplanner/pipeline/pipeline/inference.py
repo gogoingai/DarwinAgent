@@ -7,12 +7,14 @@ import logging
 
 from ..config_task import Config, load_config
 from oak.llm.client import LLMClient
+from oak.engine import InferenceEngine
+from oak.runtime import digest
 from ..data.queries import Query, load_queries, stratified_test_subset
 from ..data.corpus import reference_chunks, distance_chunks
 from oak.schema.model import Schema
 from ..kg_extract import extract_graph_from_chunks
-from oak.kg.graph import (build_graph, save_graph, graph_stats, derive_relations,
-                        enrich_city_nodes, augment_graph_with_official)
+from oak.kg.graph import (build_graph, save_graph, graph_stats, derive_relations)
+from oak_domains.travel_planning.graph import enrich_city_nodes, augment_graph_with_official
 from ..funcs.catalog import FunctionCatalog
 from ..agent.react import run_react
 from ..agent.planner import finalize_plan, to_plan_record
@@ -46,7 +48,7 @@ async def run_inference(cfg: Config | None = None, limit: int | None = None,
     log.info("%s queries: %s", "anchor" if anchor else "test", idx_list)
 
     # 距离矩阵是结构化源：程序化直建（不走 LLM）
-    from oak.kg.graph import programmatic_distance_entities
+    from oak_domains.travel_planning.graph import programmatic_distance_entities
     dist_entities = (programmatic_distance_entities(schema, cfg.tp_root)
                      if cfg.include_distance_matrix_corpus else [])
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -113,7 +115,10 @@ async def run_inference(cfg: Config | None = None, limit: int | None = None,
     pending = [q for q in queries if q.idx not in done_idx]
     for i in range(0, len(pending), 5):
         batch = pending[i:i + 5]
-        await asyncio.gather(*[_wrap(sem, one, q) for q in batch])
+        engine = InferenceEngine(one, lambda: {"schema": digest(schema.to_yaml()),
+                                  "functions": {p.name: digest(p.read_text()) for p in cfg.final_dir.glob("*.py")}},
+                                 concurrency=cfg.max_concurrency)
+        await engine.run(batch)
         # 恢复 checkpoint 集
         done_idx |= {q.idx for q in batch if plans_by_idx.get(q.idx) is not None}
         done_path.write_text(json.dumps(sorted(done_idx)))

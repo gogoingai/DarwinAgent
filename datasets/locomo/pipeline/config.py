@@ -8,12 +8,13 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from dotenv import load_dotenv
 
 from oak.config import Config
+from oak.kernel.harness import Harness
 
 LOCOMO_ROOT = Path(__file__).resolve().parent          # datasets/locomo/pipeline
 LOCOMO_TASK_DIR = LOCOMO_ROOT.parent                        # datasets/locomo
@@ -32,12 +33,14 @@ class LocomoConfig:
     dataset_path: Path
     anchor_id: str = "conv-26"
     react_max_steps: int = 10
+    harness: Harness = field(default_factory=Harness)
+    evaluation_concurrency: int = 1
     audit_extract: bool = True         # 建图后二道完整性审计
 
     # ---- 派生路径 ----
     @property
     def runs_dir(self) -> Path:
-        return LOCOMO_TASK_DIR / "runs"
+        return self.cfg.work_dir
 
     def conv_dir(self, sample_id: str) -> Path:
         return self.runs_dir / sample_id
@@ -49,6 +52,12 @@ class LocomoConfig:
 def load_locomo_config() -> LocomoConfig:
     load_dotenv(PROJECT_ROOT / ".env")
     cfg = Config()
+    cfg.role_tiers.update({"locomo_schema": "strong", "locomo_answer": "strong",
+                           "locomo_review": "strong", "locomo_judge": "strong",
+                           "locomo_extract": "fast", "locomo_util": "fast",
+                           "locomo_steps": "fast", "mem0_extract": "fast"})
+    cfg.thinking_disabled_roles.update({"locomo_extract", "locomo_util", "locomo_steps"})
+    cfg.empty_response_passthrough_roles.add("locomo_judge")
     cfg.api_base_url = ZHIPU_BASE
     cfg.api_key = os.environ.get("ZHIPU_API_KEY", "")
     if not cfg.api_key:

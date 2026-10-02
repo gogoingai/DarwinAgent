@@ -8,12 +8,14 @@ from __future__ import annotations
 from pathlib import Path
 
 from oak.kernel.checks import GraphAccessors
+from oak.kernel import KernelAssets
+from oak.kg.graph import node_view
 
 LOCOMO_ACCESSORS = GraphAccessors(
-    node_name=lambda n: str(n.get("id", n.get("__key__", ""))).split("=")[-1].rstrip("}"),
-    node_aliases=lambda n: ([n["别名"]] if n.get("别名") else []),
+    node_name=lambda n: str(node_view(n).get("姓名") or node_view(n).get("名称") or node_view(n).get("序号", "")),
+    node_aliases=lambda n: [a for a in str(n.get("别名", "")).split(";") if a],
     speakers=lambda g: {
-        str(n.get("id", "")).split("=")[-1].rstrip("}")
+        str(node_view(n).get("姓名", ""))
         for n in g.get("nodes", [])
         if n.get("身份") in ("说话人甲", "说话人乙")
     },
@@ -25,6 +27,7 @@ LOCOMO_ACCESSORS = GraphAccessors(
     answer_text=lambda a: str(a.get("answer", "")),
     answer_evidence=lambda a: list(a.get("evidence", []) or []),
     answer_status_ok=lambda a: a.get("status", "ok") == "ok",
+    refusal_text="对话中未提及该信息",
 )
 
 
@@ -39,3 +42,22 @@ def graph_paths(conv_id: str, tag: str | None = None) -> dict[str, Path]:
         "facts": graph_dir / "facts.jsonl",
         "answers": answers,
     }
+
+
+def kernel_assets(schema_path: Path, harness_path: Path) -> KernelAssets:
+    pipe = Path(__file__).resolve().parent
+    import oak.llm.client, oak.operators.library, oak.kg.graph, oak.kernel.harness
+    from oak_domains.conversation_memory import harness as domain_harness
+    return KernelAssets(
+        schema_path=schema_path,
+        prompt_paths={"extract": pipe / "prompts/extract.py", "answer": pipe / "prompts/answer.py"},
+        function_paths=[pipe / "funcs_compile.py"],
+        check_ids=["alias-not-speaker", "fact-has-source", "answer-evidence-integrity", "refusal-cleanliness"],
+        check_paths=[Path(__import__("oak.kernel.checks", fromlist=["__file__"]).__file__)],
+        harness_path=harness_path,
+        dependency_paths=[pipe / "build.py", pipe / "entity_resolve.py", pipe / "tools.py", pipe / "agent.py", pipe / "dates.py",
+                          pipe / "config.py", pipe / "runner.py", pipe / "kernel_adapter.py", pipe / "prompts/lexicon.py",
+                          Path(domain_harness.__file__), Path(oak.llm.client.__file__), Path(oak.operators.library.__file__),
+                          Path(oak.kg.graph.__file__), Path(oak.kernel.harness.__file__)],
+        version="portable-v1", scope="domain",
+    )

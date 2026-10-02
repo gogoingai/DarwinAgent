@@ -30,6 +30,9 @@ class GraphAccessors:
     answer_text: Callable[[dict], str]
     answer_evidence: Callable[[dict], list[str]]
     answer_status_ok: Callable[[dict], bool]
+    nodes: Callable[[dict], list[dict]] = lambda g: g.get("nodes", [])
+    refusal_text: str = ""
+    answer_subject: Callable[[dict], str] | None = None
 
 
 @dataclass
@@ -61,9 +64,9 @@ def register(cid: str, statement: str):
 @register("alias-not-speaker", "别名不得等于任何说话人名或其他实体的规范名")
 def _alias_not_speaker(graph, answers, facts, acc):
     speakers = acc.speakers(graph)
-    names = {acc.node_name(n) for n in graph.get("nodes", [])}
+    names = {acc.node_name(n) for n in acc.nodes(graph)}
     out = []
-    for n in graph.get("nodes", []):
+    for n in acc.nodes(graph):
         nm = acc.node_name(n)
         for a in acc.node_aliases(n) or []:
             if (a in speakers or (a in names and a != nm)) and a:
@@ -79,7 +82,7 @@ def _fact_has_source(graph, answers, facts, acc):
 
 # ---------------------------------------------------------------- 答案级
 
-@register("answer-subject-consistency", "非拒答答案须能从其证据解析出主体（零主体=硬违规）")
+@register("answer-evidence-integrity", "非拒答答案必须有真实证据引用且证据具有主体")
 def _answer_subject(graph, answers, facts, acc):
     by_id = {acc.fact_id(f): f for f in facts}
     out = []
@@ -88,9 +91,13 @@ def _answer_subject(graph, answers, facts, acc):
             continue
         evs = acc.answer_evidence(a) or []
         subjects = {acc.fact_subject(by_id[e]) for e in evs if e in by_id} - {""}
-        if evs and not subjects:
-            out.append(Violation("answer-subject-consistency", acc.answer_idx(a),
-                                 f"有证据但零主体: {evs[:3]}"))
+        if not evs or any(e not in by_id for e in evs) or not subjects:
+            out.append(Violation("answer-evidence-integrity", acc.answer_idx(a),
+                                 f"缺少证据、引用不存在或零主体: {evs[:3]}"))
+        # This is only a direct-claim check. Multi-hop semantic grounding remains
+        # a domain review; a nonempty subject is never called semantic proof.
+        if acc.answer_subject and acc.answer_subject(a) not in subjects:
+            out.append(Violation("answer-direct-subject", acc.answer_idx(a), "声明主体无直接证据支持，须领域复核"))
     return out
 
 
@@ -101,21 +108,31 @@ def _refusal_clean(graph, answers, facts, acc):
         if not acc.answer_refused(a):
             continue
         txt = acc.answer_text(a).strip()
-        if txt and txt != "对话中未提及该信息":
+        if acc.refusal_text and txt != acc.refusal_text:
             out.append(Violation("refusal-cleanliness", acc.answer_idx(a), f"拒答不干净: {txt[:60]}"))
     return out
 
 
 def run_all(graph_path: Path, answers_path: Path, facts_path: Path | None,
-            acc: GraphAccessors) -> dict:
+            acc: GraphAccessors, check_ids: list[str] | None = None) -> dict:
     """对一组产物跑全部检查（框架入口；acc 由数据集适配器提供）。"""
     graph = json.loads(graph_path.read_text())
+    selected = set(check_ids) if check_ids is not None else {c.id for c in CHECKS}
+    if selected & {"answer-evidence-integrity", "refusal-cleanliness"} and not answers_path.is_file():
+        raise FileNotFoundError(answers_path)
+    if selected & {"fact-has-source", "answer-evidence-integrity"} and (facts_path is None or not facts_path.is_file()):
+        raise FileNotFoundError(facts_path or "Required fact artifact")
     answers = ([json.loads(l) for l in answers_path.read_text().splitlines() if l.strip()]
                if answers_path.exists() else [])
     facts = ([json.loads(l) for l in facts_path.read_text().splitlines() if l.strip()]
              if facts_path and facts_path.exists() else [])
+    known = {c.id for c in CHECKS}
+    if check_ids is not None and set(check_ids) - known:
+        raise ValueError(f"Unknown checks: {set(check_ids) - known}")
     report = {}
     for c in CHECKS:
+        if check_ids is not None and c.id not in check_ids:
+            continue
         try:
             report[c.id] = [v.__dict__ for v in c.verify(graph, answers, facts, acc)]
         except Exception as e:  # noqa: BLE001

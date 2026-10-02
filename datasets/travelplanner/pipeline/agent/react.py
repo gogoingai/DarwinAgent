@@ -208,7 +208,7 @@ async def run_react(client: LLMClient, cfg: Config, q: Query,
     cheat = "\n".join(f"- {e.name}: {', '.join(e.primary_key)}"
                       for e in schema.entities)
     # 权威 covered 城市块（运行时 enrich；模型不再从城市名猜州）
-    from oak.kg.graph import covered_cities as _cc
+    from oak_domains.travel_planning.graph import covered_cities as _cc
     cov_all = _cc(g)
     cov = [c for c in cov_all if c.get("state") == q.dest] or cov_all
     cov_json = json.dumps(cov, ensure_ascii=False)

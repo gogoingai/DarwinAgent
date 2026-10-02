@@ -14,7 +14,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
 from datasets.travelplanner.pipeline.config_task import load_config
 from datasets.travelplanner.pipeline.data.queries import load_queries
-from oak.kg.graph import load_graph, enrich_city_nodes
+from oak.kg.graph import load_graph
+from oak_domains.travel_planning.graph import enrich_city_nodes
 from datasets.travelplanner.pipeline.agent.graph_index import GraphIndex
 from datasets.travelplanner.pipeline.agent.validator import validate_plan_full
 from datasets.travelplanner.pipeline.agent.planner import local_repair, budget_downgrade

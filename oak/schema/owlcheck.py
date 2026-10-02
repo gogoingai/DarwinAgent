@@ -40,24 +40,9 @@ def static_checks(schema: Schema) -> list[OWLFinding]:
     findings: list[OWLFinding] = []
     names = {e.name for e in schema.entities}
 
-    # 子类环
+    # Subclass cycles express equivalence; they alone are not contradictions.
     sub = {(ax.params.get("sub"), ax.params.get("sup")) for ax in schema.axioms
            if ax.kind == "subclass"}
-    graph: dict[str, list[str]] = {}
-    for s, p in sub:
-        graph.setdefault(s, []).append(p)
-    for start in graph:
-        seen, stack = set(), [start]
-        while stack:
-            cur = stack.pop()
-            for nxt in graph.get(cur, []):
-                if nxt == start:
-                    findings.append(OWLFinding(
-                        "restriction", start,
-                        f"subclass 环: {start} 是自己的（间接）子类，模式不可满足。"))
-                if nxt not in seen:
-                    seen.add(nxt)
-                    stack.append(nxt)
 
     # disjoint 与 subclass 冲突：sub 有两个不相交的父类
     disjoint_sets: list[set[str]] = []
@@ -66,21 +51,23 @@ def static_checks(schema: Schema) -> list[OWLFinding]:
             cs = set(ax.params.get("classes", []))
             if len(cs) >= 2:
                 disjoint_sets.append(cs)
-    for s, p1 in sub:
-        for _, p2 in sub:
-            if s == s and p1 != p2:
-                pass
     # 更直接：某类的两个父类互斥
     parents: dict[str, set[str]] = {}
     for s, p in sub:
         parents.setdefault(s, set()).add(p)
-    for s, ps in parents.items():
+    for s in names:
+        ps, pending = {s}, list(parents.get(s, ()))
+        while pending:
+            p = pending.pop()
+            if p not in ps:
+                ps.add(p)
+                pending.extend(parents.get(p, ()))
         for ds in disjoint_sets:
             hit = ps & ds
             if len(hit) >= 2:
                 findings.append(OWLFinding(
                     "disjointness", s,
-                    f"{s} 的父类 {{{', '.join(sorted(hit))}}} 被声明为互斥，{s} 不可能有实例。",
+                    f"{s} 的继承闭包 {{{', '.join(sorted(hit))}}} 被声明为互斥，{s} 不可能有实例。",
                     culprits=[f"subclass: {s} <- {p}" for p in sorted(hit)] +
                              [f"disjoint: {sorted(ds)}"],
                 ))
@@ -132,7 +119,9 @@ def _build_owl(schema: Schema):
             dom = [cls[d] for d in r.domain if d in cls]
             rng = [cls[r.range]] if r.range in cls else []
             bases = [owl.ObjectProperty] + ([owl.FunctionalProperty] if r.functional else [])
-            oprops[r.name] = type(r.name, tuple(bases), {"domain": dom, "range": rng})
+            # The graph contract permits any declared domain, so this is a union.
+            domain = [owl.Or(dom)] if len(dom) > 1 else dom
+            oprops[r.name] = type(r.name, tuple(bases), {"domain": domain, "range": rng})
         # 公理
         for ax in schema.axioms:
             p = ax.params
@@ -154,12 +143,12 @@ def _build_owl(schema: Schema):
                 r = oprops.get(p.get("relation"))
                 c = cls.get(p.get("class"))
                 if r and c:
-                    rng_cls = cls.get(r.range[0]) if r.range else None
+                    rng_cls = r.range[0] if r.range else owl.Thing
                     if rng_cls is not None:
-                        if p.get("min"):
-                            c.is_a.append(r.some(rng_cls))
-                        if p.get("max") is not None and int(p["max"]) == 1 and r.functional:
-                            c.is_a.append(r.only(rng_cls))
+                        if p.get("min") is not None:
+                            c.is_a.append(r.min(int(p["min"]), rng_cls))
+                        if p.get("max") is not None:
+                            c.is_a.append(r.max(int(p["max"]), rng_cls))
         # probe individuals：每类一个假想实例（带主键字面量），让全局检查有据可依
         probes = {}
         for e in schema.entities:
@@ -168,7 +157,9 @@ def _build_owl(schema: Schema):
                 p = dprops.get(f"{e.name}.{k}")
                 if p is not None:
                     # 非 functional 属性必须赋列表（owlready2 语义）
-                    setattr(ind, python_attr(p.name), ["x"])
+                    attr = next(a for a in e.attributes if a.name == k)
+                    value = {"int": 1, "float": 1.0, "bool": True}.get(attr.dtype, "x")
+                    setattr(ind, p.python_name, value if owl.FunctionalProperty in p.is_a else [value])
             probes[e.name] = ind
     return world, onto, cls, oprops, dprops
 
@@ -183,8 +174,7 @@ def _hermit_consistent(world) -> bool:
     try:
         owl.sync_reasoner_hermit(world, infer_property_values=True)
         return len(list(world.inconsistent_classes())) == 0
-    except Exception:
-        # 推理抛错常因不一致导致 —— 视为不一致
+    except owl.OwlReadyInconsistentOntologyError:
         return False
 
 
@@ -272,11 +262,15 @@ def hermit_checks(schema: Schema, timeout_s: int = OWL_CHECK_TIMEOUT_S) -> tuple
     return findings, True
 
 
-def check_schema(schema: Schema, timeout_s: int = OWL_CHECK_TIMEOUT_S) -> tuple[list[OWLFinding], bool]:
+def check_schema(schema: Schema, timeout_s: int = OWL_CHECK_TIMEOUT_S, *,
+                 require_hermit: bool = True) -> tuple[list[OWLFinding], bool]:
     """完整验证入口：静态 + HermiT。返回 (findings, hermit_ok)。"""
-    findings = static_checks(schema)
+    findings = [OWLFinding("structure", None, e) for e in schema.validate()]
+    findings.extend(static_checks(schema))
     hermit_findings, ok = hermit_checks(schema, timeout_s)
     findings.extend(hermit_findings)
+    if require_hermit and not ok:
+        findings.append(OWLFinding("unverified", None, "HermiT unavailable, failed, or timed out; schema not verified"))
     return findings, ok
 
 

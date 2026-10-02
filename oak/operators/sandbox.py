@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import ast
-import concurrent.futures
+import multiprocessing as mp
 import traceback
 from dataclasses import dataclass
 from typing import Any, Callable
@@ -66,8 +66,13 @@ def check_source(src: str) -> str:
         raise SandboxError(f"SyntaxError: {e}")
     _check_node(tree)
     fn_names = [n.name for n in tree.body if isinstance(n, ast.FunctionDef)]
-    if not fn_names:
-        raise SandboxError("no function definition found")
+    if len(fn_names) != 1:
+        raise SandboxError("Exactly one function definition required")
+    for node in tree.body:
+        if isinstance(node, ast.Expr) and isinstance(node.value, ast.Constant) and isinstance(node.value.value, str):
+            continue
+        if not isinstance(node, ast.FunctionDef) or node.decorator_list:
+            raise SandboxError("Executable top-level statements and decorators are forbidden")
     return fn_names[0]
 
 
@@ -105,14 +110,45 @@ class TrialResult:
     elapsed_ms: int
 
 
-def _run_with_timeout(fn: Callable, args: dict, timeout_s: float, g) -> Any:
-    def wrapped():
-        ops.set_graph(g)               # 工作线程不继承协程 ContextVar，需线程内注入
-        return fn(**args)
-    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
-        fut = ex.submit(wrapped)
-        return fut.result(timeout=timeout_s)
+def _trial_worker(connection, fn, args, graph):
+    try:
+        ops.set_graph(graph)
+        connection.send((True, fn(**args)))
+    except BaseException as exc:
+        connection.send((False, type(exc).__name__ + ": " + str(exc)))
+    finally:
+        connection.close()
 
+
+def _run_with_timeout(fn: Callable, args: dict, timeout_s: float, g) -> Any:
+    if timeout_s <= 0:
+        raise ValueError("timeout must be positive")
+    # Existing generated functions are dynamically compiled; fork preserves the
+    # checked namespace. Windows needs source-based spawn and is not supported yet.
+    if "fork" not in mp.get_all_start_methods():
+        raise SandboxError("Process trials require a supported fork runtime")
+    ctx = mp.get_context("fork")
+    recv, send = ctx.Pipe(duplex=False)
+    process = ctx.Process(target=_trial_worker, args=(send, fn, args, g))
+    try:
+        process.start()
+        send.close()
+        if not recv.poll(timeout_s):
+            raise TimeoutError(f"Function trial exceeded {timeout_s}s")
+        ok, result = recv.recv()
+        if not ok:
+            raise SandboxError(result)
+        return result
+    finally:
+        recv.close()
+        send.close()
+        if process.pid is not None:
+            if process.is_alive():
+                process.terminate()
+            process.join(1)
+            if process.is_alive():
+                process.kill()
+                process.join(1)
 
 def trial_run(fn: Callable, graphs: dict[str, nx.MultiDiGraph],
               sample_args: dict, timeout_s: float = 10.0) -> list[TrialResult]:

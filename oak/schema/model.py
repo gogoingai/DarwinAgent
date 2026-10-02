@@ -204,6 +204,13 @@ class Schema:
             errs.append("实体类型名重复")
         for e in self.entities:
             attrset = e.attr_names()
+            if len(attrset) != len(e.attributes):
+                errs.append(f"实体 {e.name}: 属性重复")
+            if len(e.primary_key) != len(set(e.primary_key)):
+                errs.append(f"实体 {e.name}: 主键字段重复")
+            for target in e.attribute_aliases.values():
+                if target not in attrset:
+                    errs.append(f"实体 {e.name}: 属性别名指向不存在的字段 {target!r}")
             for k in e.primary_key:
                 if k not in attrset:
                     errs.append(f"实体 {e.name}: 主键字段 {k!r} 不在 attributes 中")
@@ -238,6 +245,11 @@ class Schema:
             elif ax.kind == "cardinality":
                 if p.get("relation") not in rnames or p.get("class") not in names:
                     errs.append(f"axiom cardinality: 引用不存在的关系/类")
+                bounds = [p.get(k) for k in ("min", "max") if p.get(k) is not None]
+                if any(type(v) is not int or v < 0 for v in bounds):
+                    errs.append("axiom cardinality: min/max 必须为非负整数")
+                elif p.get("min") is not None and p.get("max") is not None and p["min"] > p["max"]:
+                    errs.append("axiom cardinality: min 不得大于 max")
             elif ax.kind == "key_functional":
                 e = self.entity(p.get("entity", ""))
                 if e is None:

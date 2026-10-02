@@ -7,11 +7,16 @@ from __future__ import annotations
 import asyncio
 import json
 import re
+import hashlib
+from dataclasses import replace
 from pathlib import Path
 
 from oak.kg.graph import load_graph
 from oak.llm.client import LLMClient
 from oak.schema.model import Schema
+from oak.runtime import atomic_json, digest
+from oak.engine import BuildEngine, InferenceEngine
+from oak.contracts import QuestionInput
 
 from .agent import QAOutput, run_qa
 from .analyze import attribute_failures, write_failures
@@ -92,33 +97,62 @@ async def answer_all(conv: Conversation, toolbox: ToolBox, client: LLMClient,
     out_dir.mkdir(parents=True, exist_ok=True)
     answers_path = out_dir / "answers.jsonl"
     ckpt_path = out_dir / "checkpoint.json"
+    from oak_domains.conversation_memory import harness as domain_harness
+    pipe = Path(__file__).resolve().parent
+    identity = {
+        "questions": [{"idx": q.idx, "question": q.question} for q in conv.qas],
+        "graph": digest(__import__("networkx").node_link_data(toolbox.g, edges="links")),
+        "harness": lc.harness.to_dict(),
+        "request_policy": {"roles": lc.cfg.role_tiers, "thinking_disabled": sorted(lc.cfg.thinking_disabled_roles),
+                           "reasoning_buffer": lc.cfg.reasoning_buffer,
+                           "external_reasoning_buffer": lc.cfg.external_reasoning_buffer},
+        "models": {"strong": lc.cfg.model_strong, "fast": lc.cfg.model_fast,
+                   "strong_endpoint": lc.cfg.api_base_url, "fast_endpoint": lc.cfg.fast_base_url},
+        "assets": {str(p.relative_to(pipe)): hashlib.sha256(p.read_bytes()).hexdigest()
+                   for p in [pipe / "agent.py", pipe / "tools.py", pipe / "funcs_compile.py",
+                             pipe / "prompts/answer.py", pipe / "prompts/lexicon.py"]},
+        "domain_harness": hashlib.sha256(Path(domain_harness.__file__).read_bytes()).hexdigest(),
+    }
+    binding = out_dir / "generation_binding.json"
+    if binding.exists() and __import__("json").loads(binding.read_text()) != identity:
+        raise ValueError("Generation inputs changed; use a fresh run tag")
+    atomic_json(binding, identity)
     outputs: dict[int, QAOutput] = {}
     done: set[int] = set()
-    if ckpt_path.exists() and answers_path.exists():
-        done = set(json.loads(ckpt_path.read_text()).get("done", []))
+    if ckpt_path.exists() != answers_path.exists():
+        raise ValueError("Incomplete answer checkpoint; preserve and repair before resuming")
+    if ckpt_path.exists():
+        checkpoint = json.loads(ckpt_path.read_text())
+        if checkpoint.get("binding") != digest(identity):
+            raise ValueError("Checkpoint generation identity mismatch")
+        done = set(checkpoint.get("done", []))
         for line in answers_path.read_text().splitlines():
-            try:
-                o = json.loads(line)
-                outputs[o["idx"]] = o
-            except Exception:
-                pass
+            o = json.loads(line)
+            if type(o.get("idx")) is not int or o["idx"] in outputs:
+                raise ValueError("Invalid or duplicate answer checkpoint row")
+            outputs[o["idx"]] = o
+        expected_questions = {qa.idx: qa.question for qa in conv.qas}
+        if done != set(outputs) or any(i not in expected_questions or o.get("question") != expected_questions[i]
+                                     for i, o in outputs.items()):
+            raise ValueError("Checkpoint answers do not cover their declared question IDs")
 
-    todo = [qa for qa in conv.qas
+    todo = [QuestionInput(str(qa.idx), qa.question) for qa in conv.qas
             if qa.idx not in done and (idx_filter is None or qa.idx in idx_filter)]
     # 并发控制收口在 LLMClient 的档位池（fast/strong 各自限流）；
     # 任务层不限量：所有题并发起跑，调用在池上排队，两池保持饱和
 
     async def _one(qa):
+        idx, question = int(qa.id), qa.text
         try:
-            o = await run_qa(qa.idx, qa.question, conv.header(), toolbox,
+            o = await run_qa(idx, question, conv.header(), toolbox,
                              client, lc, conv.sample_id)
         except Exception as e:  # noqa: BLE001
-            o = QAOutput(idx=qa.idx, question=qa.question,
+            o = QAOutput(idx=idx, question=question,
                          answer="", refused=False, status="answer_error",
                          trajectory={"error": repr(e)[:300]})
         async with _lock:
-            outputs[qa.idx] = o
-            done.add(qa.idx)
+            outputs[idx] = o
+            done.add(idx)
             with answers_path.open("a") as f:
                 f.write(json.dumps({
                     "idx": o.idx, "question": o.question, "answer": o.answer,
@@ -127,12 +161,15 @@ async def answer_all(conv: Conversation, toolbox: ToolBox, client: LLMClient,
                     "trajectory": o.trajectory, "status": o.status,
                     "context_fids": o.context_fids, "context_text": o.context_text, "raw_outputs": o.raw_outputs,
                 }, ensure_ascii=False) + "\n")
-            ckpt_path.write_text(json.dumps({"done": sorted(done)}))
+            atomic_json(ckpt_path, {"done": sorted(done), "binding": digest(identity)})
             if len(done) % 20 == 0:
                 print(f"  [{conv.sample_id}] {len(done)}/{len(conv.qas)} 题")
 
     _lock = asyncio.Lock()
-    await asyncio.gather(*[_one(qa) for qa in todo])
+    engine = InferenceEngine(_one, lambda: {
+        "agent": hashlib.sha256((pipe / "agent.py").read_bytes()).hexdigest(),
+        "harness": lc.harness.to_dict(), "domain": hashlib.sha256(Path(domain_harness.__file__).read_bytes()).hexdigest()}, concurrency=12)
+    await engine.run(todo)
     out_map: dict[int, QAOutput] = {}
     for i, o in outputs.items():
         if isinstance(o, QAOutput):
@@ -152,9 +189,12 @@ async def eval_conversation(lc: LocomoConfig, client: LLMClient, conv_id: str,
                             ) -> dict:
     """单对话全流程。返回 report（含 attribution）。"""
     conv = load_conversation(lc.dataset_path, conv_id)
-    schema, topics = await ensure_schema(conv, lc, client)
+    build_input = replace(conv, qas=[])
+    schema, topics = await ensure_schema(build_input, lc, client)
     print(f"[{conv_id}] schema 就绪（{len(topics)} 主题）")
-    result = await build_graph_for(conv, schema, lc, client, topics)
+    from .build import graph_fingerprint
+    engine = BuildEngine(build_graph_for, lambda: {"graph": graph_fingerprint(build_input, schema, lc, topics)})
+    result = await engine.run(build_input, schema, lc, client, topics)
     print(f"[{conv_id}] 图就绪: {result.stats.get('facts')} 事实 / "
           f"{result.stats.get('n_nodes')} 节点 / 覆盖率 {result.stats.get('evidence_coverage')}")
     g = load_graph(result.graph_dir / "graph.json")
@@ -164,10 +204,29 @@ async def eval_conversation(lc: LocomoConfig, client: LLMClient, conv_id: str,
     tag = tag or f"iter{len(tags) + 1}"
     out_dir = lc.conv_dir(conv_id) / tag
     print(f"[{conv_id}] 作答开始 → {out_dir.name}")
+    out_dir.mkdir(parents=True, exist_ok=True)
+    (out_dir / "schema.yaml").write_text(schema.to_yaml())
+    atomic_json(out_dir / "harness.json", lc.harness.to_dict())
+    from .kernel_adapter import kernel_assets, LOCOMO_ACCESSORS
+    assets = kernel_assets(out_dir / "schema.yaml", out_dir / "harness.json")
+    identity = assets.manifest()
+    assets.write_manifest(out_dir / "kernel_manifest.json")
     outputs = await answer_all(conv, toolbox, client, lc, out_dir, idx_filter)
+    if assets.manifest() != identity:
+        raise ValueError("Kernel assets changed during the run")
+    from oak.kernel.checks import run_all
+    checks = run_all(result.graph_dir / "graph.json", out_dir / "answers.jsonl",
+                     result.graph_dir / "facts.jsonl", LOCOMO_ACCESSORS, assets.check_ids)
+    atomic_json(out_dir / "checks.json", checks)
+    if any(checks[c] for c in ("answer-evidence-integrity", "refusal-cleanliness")):
+        raise ValueError("Output contract failed; evaluation not published")
     preds = {i: o.answer for i, o in outputs.items()}
     qas = [qa for qa in conv.qas if qa.idx in preds]
-    report = await grade_all(qas, preds, client, conv_id,
+    grader = grade_all
+    if lc.evaluation_concurrency > 1:
+        from .evaluation_dispatch import grade_all_dispatched
+        grader = grade_all_dispatched
+    report = await grader(qas, preds, client, conv_id,
                              answer_statuses={i: o.status for i, o in outputs.items()})
     failures = attribute_failures(conv, report, outputs, result.facts)
     write_failures(out_dir, failures, report)

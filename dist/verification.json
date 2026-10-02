@@ -1,0 +1,23 @@
+{
+  "wheel": "oak_repro-0.2.0-py3-none-any.whl",
+  "sha256": "286c34214ab0f46690fb882c30aac55a8a152be6cae958ff677ba59158974ff6",
+  "environment": "Python 3.11 macOS",
+  "workspace_tests": {
+    "framework": 26,
+    "locomo_original": 16,
+    "travel_original": 28
+  },
+  "installed_tests": {
+    "contracts": 15,
+    "execution": 3,
+    "third_domain": true
+  },
+  "frozen_evaluation_files": 11,
+  "handoff_round": "r5",
+  "full_evaluation_started": false,
+  "limitations": [
+    "cross-machine and Windows unverified",
+    "function timeout requires fork",
+    "full learning controller and arbitrary module dependency execution incomplete"
+  ]
+}
