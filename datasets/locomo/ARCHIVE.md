@@ -9,6 +9,8 @@
 | `data/locomo10_zh.json` + `locomo10.json` | 4.7 MB | ✅ | ✅ | 数据集本体（中文版+英文原版） |
 | `runs/<conv>/graph_*/`（图+事实+统计） | ~15 MB | ✅ | ✅ | 每轮建图产物（含 observation 语料版） |
 | `runs/<conv>/iter*/`（answers/report/failures） | ~8 MB | ✅ | ✅ | 每轮作答、判分、失败归因 |
+| `runs/iter_v2/`（2026-10 三集迭代实验全量） | ~289 MB | 部分（记录入库,cache/graph 排除） | ✅ | single3 协议(conv-26/47/49) 9 轮:逐轮 answers/report/failures/system_side/契约/决策/incidents/FINAL-REPORT + 全部 LLM 缓存与图快照(零 API 费用复现) |
+| `runs/portable_v1/`（2026-10 修复轮） | ~17 MB | 部分（同上） | ✅ | r0-r5 各轮快照/契约/缓存/评测冻结哈希 |
 | `runs/conv-26/ceiling_audit.json` | 小 | ✅ | ✅ | 天花板审计（逐题 gold 可达性） |
 | `runs/schema_cache.json` | 小 | ✅ | ✅ | P1/P2 起草缓存（主题词表） |
 | `runs/anchor_set.json` | 小 | ✅ | ✅ | 固定锚点集（37 题） |
