@@ -9,7 +9,9 @@ from oak.runtime.artifacts import atomic_json, digest
 ASSET_PROTOCOL='''Generate a task asset package, not framework code. Return JSON only, shaped {"assets":[...]}.
 Every asset has id (stable safe identifier), kind F/C/P, content string, input_contract, output_contract,
 schema_dependencies [] (filled by the framework), role (P only), stage (C only graph/answer), description,
-trial_inputs (F only, at least one actual parameter object, otherwise []).
+trial_inputs: F MUST list at least one real, working parameter object; C and P use [].
+Assign only to plain local variable names — never to dict items, list items or attributes
+(no result["k"] = v, no obj.attr = v); build output dicts in one expression or with {...} literals.
 Field rules: every C MUST set "stage" to "graph" or "answer"; every P MUST set "role" to one of
 extract/tools/answer/review; F and C MUST NOT set role or stage.
 The schema S is FIXED and supplied as fixed_schema; do not generate, extend or patch it.
