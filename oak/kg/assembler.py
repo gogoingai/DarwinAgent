@@ -105,6 +105,7 @@ def anchoring_invariants(graph, sources: Mapping, expected_fingerprint: str | No
     errors = []
     facts = []
     fact_objs = []
+    expected_sources = {}
     fact_out_relations = ('subject', 'object_entity', 'object_value', 'occurrence_time', 'evidence')
     # Edge label integrity: the multigraph key and the relation attribute that queries read
     # must name the same relation on every edge, or structure checks and traversal diverge.
@@ -185,6 +186,17 @@ def anchoring_invariants(graph, sources: Mapping, expected_fingerprint: str | No
                     errors.append(f'证据定位连边与事实定义不一致')
         facts.append(fact.to_dict())
         fact_objs.append(fact)
+        # Provenance follows structure: each node's __sources__ must be exactly the evidence
+        # of the facts (or spans/views/registrations) that place it in the graph.
+        ev_sources = {ev.source_id for ev in fact.evidence}
+        expected_sources.setdefault(nid, set()).update(ev_sources)
+        for relation in ('subject', 'object_entity', 'object_value', 'occurrence_time'):
+            for t_nid in expected[relation]:
+                expected_sources.setdefault(t_nid, set()).update(ev_sources)
+        for ev in fact.evidence:
+            expected_sources.setdefault(node_id('EvidenceSpan',
+                {'id': digest({'source_id': ev.source_id, 'quote': ev.quote, 'start': ev.start, 'end': ev.end})}),
+                set()).add(ev.source_id)
     if not facts:
         errors.append('图中没有记忆节点')
     if schema is not None and schema.meta.get('materialized'):
@@ -198,15 +210,40 @@ def anchoring_invariants(graph, sources: Mapping, expected_fingerprint: str | No
             if nid not in plan:
                 errors.append(f'物化视图不可由事实推导: {nid[:64]}'); continue
             _, key, attrs, fact_ids = plan[nid]
-            values = node_view(actual_views[nid])
-            for field, value in {**key, **attrs}.items():
-                if values.get(field) != value:
+            planned = {**key, **attrs}
+            runtime_meta = {'node_id', 'entity_type', 'source_ids', 'claims'}
+            actual = {k: v for k, v in node_view(actual_views[nid]).items() if k not in runtime_meta}
+            if set(actual) != set(planned):
+                extra = sorted(set(actual) - set(planned)); missing = sorted(set(planned) - set(actual))
+                errors.append(f'物化视图 {nid[:64]} 属性集与事实推导不符（多余: {extra} 缺失: {missing}）')
+                continue
+            for field, value in planned.items():
+                if actual[field] != value:
                     errors.append(f'物化视图 {nid[:64]} 的 {field} 与事实推导不一致')
             want_edges = {node_id('AtomicFact', {'id': fid}) for fid in fact_ids}
             got_edges = {target for _, target, ed in graph.out_edges(nid, data=True)
                          if ed.get('relation') == 'materialized_from'}
             if got_edges != want_edges:
                 errors.append(f'物化视图 {nid[:64]} 的 materialized_from 连边与事实不一致')
+
+    for nid, nd in graph.nodes(data=True):
+        if nd.get('etype') == 'Source':
+            block = by_ref.get((nd.get('kind'), nd.get('document_id'), nd.get('location')))
+            if block is not None:
+                expected_sources.setdefault(nid, set()).add(block.source.id)
+    if schema is not None and schema.meta.get('materialized'):
+        for view_nid, (_, _, _, fact_ids) in plan.items():
+            union = set()
+            for f in fact_objs:
+                if f.id in fact_ids:
+                    union.update(ev.source_id for ev in f.evidence)
+            expected_sources.setdefault(view_nid, set()).update(union)
+    for nid, nd in graph.nodes(data=True):
+        if nd.get('etype') in ('AtomicFact', 'Entity', 'Value', 'Time', 'EvidenceSpan', 'Source') or            (schema is not None and schema.meta.get('materialized') and nd.get('etype') in schema.meta['materialized']):
+            actual = set(nd.get('__sources__', []))
+            want = expected_sources.get(nid)
+            if want is None or actual != want:
+                errors.append(f'节点 {nid[:56]} 的来源追踪与结构不符（__sources__ 应为 {sorted(want) if want else "无依据"}）')
 
     undirected = nx.Graph()
     undirected.add_nodes_from(graph.nodes)
