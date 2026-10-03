@@ -467,10 +467,12 @@ class GenericFeedbackContract(unittest.TestCase):
         rows = ({'query_id': 'q7', 'budget_exceeded': True, 'people': 3,
                  'constraint': 'no flight', 'plan_issues': ['超预算']},)
         ev = (SourceRef('message_text', 'c', '7'),)
+        class C:  id='c'
         result = RunResult('c', 'id', 'v', (AnswerResult('q7', 'answered', 'ok', evidence=ev),), 5)
         baseline = EvaluationResult({'feasible': 0, 'budget_ok': 1}, 1, 1, 0, 0, rows)
-        feedback = training_feedback([result], baseline)
-        self.assertEqual(feedback['diagnostics'][0]['constraint'], 'no flight')
+        feedback = training_feedback([C()], [result], [('c', rows)], baseline)
+        self.assertEqual(feedback['diagnostics'][0]['case_id'], 'c')
+        self.assertEqual(feedback['diagnostics'][0]['diagnostic']['constraint'], 'no flight')
         self.assertEqual(feedback['diagnostic_rows_total'], 1)
         self.assertIn('feasible', feedback['scores']['metrics'])
 
@@ -481,11 +483,94 @@ class GenericFeedbackContract(unittest.TestCase):
                ({'i': 9, 'payload': 'y' * 100},)
         big = {'i': 10, 'payload': 'z' * (FEEDBACK_BUDGET_CHARS + 10)}
         rows = rows + (big,)
+        class C:  id='c'
         result = RunResult('c', 'id', 'v', (), 0)
         baseline = EvaluationResult({'m': 0}, 0, 0, 0, 0, rows)
-        feedback = training_feedback([result], baseline)
-        self.assertEqual([r['i'] for r in feedback['diagnostics']], [9])
+        feedback = training_feedback([C()], [result], [('c', rows)], baseline)
+        self.assertEqual([r['diagnostic']['i'] for r in feedback['diagnostics']], [9])
         self.assertEqual(feedback['diagnostic_rows_total'], 5)
+
+
+
+class ReviewRoundSix(unittest.TestCase):
+    """P1 resume keeps adopted rounds; P2 one budget for the whole payload; P3 composite
+    question identity through admission; P4 per-case stage aggregation."""
+
+    def test_resume_with_stop_restores_adopted_round_and_pointer(self):
+        import asyncio
+        from tests.integration.test_experiment import RecordedExperiment
+        import contextlib, io
+        td = tempfile.TemporaryDirectory(); self.addCleanup(td.cleanup)
+        root = Path(td.name)
+        runner = RecordedExperiment(root)
+        from oak.kernel import TaskSpec
+        task = TaskSpec.load(Path(__file__).resolve().parents[2] / 'tasks/device_maintenance/task.yaml')
+        with contextlib.redirect_stdout(io.StringIO()):
+            first = asyncio.run(runner.run(runner.case.id, task, rounds=1))
+        self.assertEqual([d['accepted'] for d in first['rounds']], [True])
+        adopted_v = first['adopted_version']
+        (root / 'STOP').write_text('operator stop\n')
+        with contextlib.redirect_stdout(io.StringIO()):
+            again = asyncio.run(runner.run(runner.case.id, task, rounds=1, resume=True,
+                                           stop_file=root / 'STOP'))
+        # 恢复先还原完整决策史：R1 仍在、指针仍指 R1、无新提案
+        self.assertEqual([d['accepted'] for d in again['rounds']], [True])
+        self.assertEqual(again['adopted_version'], adopted_v)
+        self.assertTrue(again['stopped_by_operator'])
+        pointer = json.loads((root / 'published' / 'current.json').read_text())
+        self.assertEqual(pointer['version'], adopted_v)
+        self.assertFalse((root / 'R2').exists())
+
+    def test_feedback_budget_covers_entire_payload(self):
+        from oak.experiments.runner import training_feedback, FEEDBACK_BUDGET_CHARS
+        from oak.contracts import AnswerResult, EvaluationResult, RunResult, SourceRef
+        class C:  id='c'
+        ev = (SourceRef('t', 'c', '1'),)
+        huge_rows = tuple({'i': i, 'payload': 'x' * 2000} for i in range(40))
+        failures_mass = [AnswerResult(f'q{i}', 'execution_error', '', error='E' * 5000)
+                         for i in range(20)]
+        result = RunResult('c', 'id', 'v', tuple(failures_mass), 0)
+        baseline = EvaluationResult({'m': 0}, 20, 0, 20, 0, huge_rows)
+        feedback = training_feedback([C()], [result], [('c', huge_rows)], baseline)
+        self.assertNotIn('diagnostics', feedback['scores'])
+        payload = len(json.dumps(feedback, ensure_ascii=False))
+        self.assertLessEqual(payload, FEEDBACK_BUDGET_CHARS + 4000)  # 统计字段与框架开销之外受控
+        self.assertTrue(feedback['generation_failures_truncated'])
+        self.assertEqual(feedback['generation_failures_total'], 20)
+
+    def test_composite_question_identity_in_admission(self):
+        from oak.kernel.revision import AssetPatch, AssetRevisionService
+        from tests.fixtures import spec
+        from dataclasses import replace
+        td = tempfile.TemporaryDirectory(); self.addCleanup(td.cleanup)
+        root = Path(td.name); s = spec(root / 'assets')
+        a = s.bundle.get('answer_prompt')
+        composite = ['case-a::q1', 'case-b::q1']
+        svc = AssetRevisionService()
+        # 含糊（无 case 的裸 id）与不存在的依据都被拒绝
+        for bad in (['q1'], ['case-a::qX']):
+            with self.assertRaises(ValueError):
+                svc.propose(s.bundle, [AssetPatch(replace(a, content='Be precise.'), a.fingerprint,
+                                                  'r', tuple(bad))], root / 'cand', composite)
+        good = svc.propose(s.bundle, [AssetPatch(replace(a, content='Be precise.'), a.fingerprint,
+                                                 'r', ('case-b::q1',))], root / 'cand2', composite)
+        self.assertNotEqual(good.version, s.bundle.version)
+
+    def test_stage_statuses_per_case_layout(self):
+        from tests.integration.test_campaign import RecordedCampaign, protocol
+        td = tempfile.TemporaryDirectory(); self.addCleanup(td.cleanup)
+        root = Path(td.name)
+        controller = RecordedCampaign(root, spec=protocol(rounds=1))
+        v1 = root / 'validation' / 'v1'
+        for case, status in (('val-case', 'complete'), ('val-case-2', 'failed')):
+            d = v1 / case; d.mkdir(parents=True)
+            (d / 'stage.json').write_text(json.dumps({'status': status}))
+        statuses = controller._stage_statuses()
+        self.assertEqual(statuses['validation/v1/val-case']['status'], 'complete')
+        unhealthy = {k: v for k, v in statuses.items() if v['status'] != 'complete'}
+        self.assertEqual(list(unhealthy), ['validation/v1/val-case-2'])
+        self.assertEqual(unhealthy['validation/v1/val-case-2']['version'], 'v1')
+        self.assertEqual(unhealthy['validation/v1/val-case-2']['case'], 'val-case-2')
 
 if __name__ == '__main__':
     unittest.main()

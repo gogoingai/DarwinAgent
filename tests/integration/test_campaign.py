@@ -79,7 +79,7 @@ class RecordedCampaign(CampaignController):
             updated = asset.to_dict(); updated['content'] += '\nUse the records carefully. ' + name
             replies = {'proposal': [{'patches': [{'asset': updated, 'base_fingerprint': asset.fingerprint,
                 'reason': 'General instruction refined from this training run',
-                'training_evidence': ['q1']}]}]}
+                'training_evidence': ['train-case::q1']}]}]}
         else:
             declaration = json.loads((self.root / 'campaign.json').read_text())['declaration']['experiment_spec']
             phase = 'train' if name.startswith('R') or name == 'B0' else \

@@ -26,31 +26,74 @@ from .spec import aggregate_scores
 FEEDBACK_BUDGET_CHARS = 35000
 
 
-def training_feedback(results, baseline):
-    """Generic proposal feedback from the current training run only. Rows keep the
-    evaluator's own diagnostic shape (no dataset field is read by name); rows the
-    evaluator marks `passed: true` are skipped; the total stays within the budget."""
-    rows = list(plain(baseline.diagnostics))  # 诊断冻结为只读结构，反馈前原样化冻
+def training_feedback(cases, results, case_diagnostics, baseline):
+    """Generic proposal feedback from the current training run only. Question identity is the
+    composite (case_id, question_id); the evaluator's diagnostic rows keep their original
+    content, tagged with their case. One length budget covers diagnostics, generation
+    failures and graph diagnostics together."""
+    rows = []
+    rows_total = 0
+    for case_id, diagnostics in case_diagnostics:
+        for row in plain(diagnostics):
+            rows_total += 1
+            if row.get('passed') is True:
+                continue
+            rows.append({'case_id': case_id, 'diagnostic': row})
     picked = []; used = 0
     for row in rows:
-        if row.get('passed') is True:
-            continue
         size = len(json.dumps(row, ensure_ascii=False))
         if used + size > FEEDBACK_BUDGET_CHARS:
             break
         picked.append(row); used += size
     failures = []
-    for result in results:
-        failures += [{'question_id': a.question_id, 'error': a.error}
+    for case, result in zip(cases, results):
+        failures += [{'case_id': case.id, 'question_id': a.question_id, 'error': a.error}
                      for a in result.answers if a.status == 'execution_error']
     graph_diagnostics = []
     for result in results:
-        graph_diagnostics += list(result.graph_diagnostics)
+        graph_diagnostics += list(plain(result.graph_diagnostics))
+    remaining = FEEDBACK_BUDGET_CHARS - used
+    failures_kept = []
+    for failure in failures:
+        size = len(json.dumps(failure, ensure_ascii=False))
+        if remaining - size < 0:
+            break
+        failures_kept.append(failure); remaining -= size
+    graph_kept = []
+    for row in graph_diagnostics:
+        size = len(json.dumps(row, ensure_ascii=False))
+        if remaining - size < 0:
+            break
+        graph_kept.append(row); remaining -= size
     score_data = baseline.to_dict()
+    score_data.pop('diagnostics', None)  # 诊断单独装订，载荷不重复计费
     return {'scores': score_data, 'diagnostics': picked,
-            'diagnostic_rows_total': len(rows), 'diagnostic_rows_in_proposal': len(picked),
-            'generation_failures': failures, 'graph_diagnostics': plain(graph_diagnostics)}
+            'diagnostic_rows_total': rows_total, 'diagnostic_rows_in_proposal': len(picked),
+            'generation_failures': failures_kept,
+            'generation_failures_total': len(failures),
+            'generation_failures_truncated': len(failures) != len(failures_kept),
+            'graph_diagnostics': graph_kept,
+            'feedback_budget_chars': FEEDBACK_BUDGET_CHARS}
 
+
+def question_identity(case):
+    """Composite training identity: same-named questions in different cases stay distinct."""
+    return [f'{case.id}::{q.id}' for q in case.questions]
+
+
+
+
+def _per_case_feedback_facts(root, name, cases):
+    """Per-case diagnostics from the stage's evaluation checkpoints: the aggregated baseline
+    loses case attribution, the per-case files keep it."""
+    rows = []
+    for case in cases:
+        path = Path(root) / name / 'evaluation' / f'{case.id}.json'
+        diagnostics = ()
+        if path.exists():
+            diagnostics = plain(json.loads(path.read_text())['scores'].get('diagnostics', ()))
+        rows.append((case.id, diagnostics))
+    return rows
 
 class ExperimentRunner:
     def __init__(self,adapter,evaluator_factory,connection_config,run_config,policy,work_dir,frozen_files=(),client_factory=None):
@@ -143,31 +186,39 @@ class ExperimentRunner:
             decisions=[];stopped=False
             n=0
             while True:
-                if rounds is not None and n>=rounds: break
-                if stop_file is not None and Path(stop_file).exists(): stopped=True; break
-                n+=1
-                self.verify();name=f'R{n}';stage=self.root/name
-                decision_path=stage/'decision.json'
-                if decision_path.exists():
-                    decision=json.loads(decision_path.read_text());decisions.append(decision)
+                # Recorded decisions are always restored first — a STOP signal (or a rounds
+                # cap) must never truncate history that already happened.
+                next_decision=self.root/f'R{n+1}'/'decision.json'
+                if next_decision.exists():
+                    n+=1
+                    self.verify();name=f'R{n}';stage=self.root/name
+                    decision=json.loads(next_decision.read_text());decisions.append(decision)
                     if decision['accepted']:
                         adopted=KernelBundle(stage/'candidate'/'bundle')
                         baseline=EvaluationResult(**decision['candidate'])
+                        # The publish pointer must follow the restored adoption (B0 was
+                        # re-published above during resume), atomically and idempotently.
+                        self.revisions.publish(adopted,self.root/'published',decision)
                         # Needed as feedback for the next round even when restored.
                         if stage_gate is not None: stage_gate(name)
                         results,_=await self._stage(name,cases,spec.with_bundle(adopted))
                     continue
+                if stop_file is not None and Path(stop_file).exists(): stopped=True; break
+                if rounds is not None and n>=rounds: break
+                n+=1
+                self.verify();name=f'R{n}';stage=self.root/name
+                decision_path=stage/'decision.json'
                 candidate_path=stage/'candidate'/'bundle'
                 if (candidate_path/'manifest.json').exists(): candidate=KernelBundle(candidate_path)
                 else:
                     client=self._client(name)
-                    feedback=training_feedback(results,baseline)
+                    feedback=training_feedback(cases,results,_per_case_feedback_facts(self.root,name,cases),baseline)
                     questions=[]
                     for case in cases:
-                        questions+=[{'training_id':q.id,'text':q.text} for q in case.questions]
+                        questions+=[{'training_id':tid,'text':q.text} for tid,q in zip(question_identity(case),case.questions)]
                     try:
                         patches=await ProposalGenerator().propose(adopted,cases,feedback,client,self.config,stage/'proposal-call.json',questions)
-                        training_ids=[q.id for case in cases for q in case.questions]
+                        training_ids=[tid for case in cases for tid in question_identity(case)]
                         forbidden=[q.text for case in cases for q in case.questions]
                         candidate=self.revisions.propose(adopted,patches,stage/'candidate',training_ids,forbidden)
                     except Exception as exc:

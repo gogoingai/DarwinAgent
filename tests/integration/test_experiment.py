@@ -52,7 +52,7 @@ class RecordedExperiment(ExperimentRunner):
                 replies={'proposal':[{'patches':[{'asset':updated,
                     'base_fingerprint':'f'*64 if self.stale and stage=='R2' else asset.fingerprint,
                     'reason':'General task instruction refined from this training run',
-                    'training_evidence':[self.case.questions[0].id]}]}]}
+                    'training_evidence':[f'{self.case.id}::{self.case.questions[0].id}']}]}]}
         else:
             replies={role:list(values) for role,values in client(self.case).replies.items()}
         transport=LedgerRecordedClient(replies);self.created.append(transport)

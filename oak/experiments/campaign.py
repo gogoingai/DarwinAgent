@@ -243,11 +243,16 @@ class CampaignController:
         return await self._finalize(task_spec, train_summary)
 
     def _stage_statuses(self):
+        """Per-case stage records live at <phase>/<version>/<case>/stage.json."""
         statuses = {}
         for phase in ('validation', 'test'):
-            for path in sorted((self.root / phase).glob('*/stage.json')):
+            for path in sorted((self.root / phase).glob('*/*/stage.json')):
                 row = json.loads(path.read_text())
-                statuses[f'{phase}/{path.parent.name}'] = row.get('status')
+                key = f"{phase}/{path.parents[1].name}/{path.parent.name}"
+                statuses[key] = {'status': row.get('status'),
+                                 'version': path.parents[1].name,
+                                 'case': path.parent.name,
+                                 'phase': phase}
         return statuses
 
     async def _finalize(self, task_spec, train_summary):
@@ -296,12 +301,13 @@ class CampaignController:
         set_phase('done')
         stage_statuses = self._stage_statuses()
         healthy = (train_summary.get('status') == 'complete'
-                   and all(v == 'complete' for v in stage_statuses.values())
+                   and all(v['status'] == 'complete' for v in stage_statuses.values())
                    and all(EvaluationResult(**scores).completed == EvaluationResult(**scores).total
                            and EvaluationResult(**scores).evaluation_faults == 0
                            for scores in list(validation.values()) + list(test.values())))
         summary = {'status': 'complete' if healthy else 'failed',
-                   'unhealthy_stages': {k: v for k, v in stage_statuses.items() if v != 'complete'},
+                   'unhealthy_stages': {k: v for k, v in stage_statuses.items()
+                                        if v['status'] != 'complete'},
                    'train': train_summary,
                    'candidates': [{'order': c['order'], 'version': c['version']} for c in chain],
                    'validation': validation, 'selection': decision, 'selected': selected,
