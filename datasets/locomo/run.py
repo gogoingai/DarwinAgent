@@ -39,9 +39,12 @@ async def main(args):
         summary=await controller.run(spec,resume=args.resume)
         print(summary['status'])
     elif args.experiment:
+        # 采纳口径按会话自适应：conv-26 有修订 gold 走四口径主指标，其余会话原始 gold 严格为主。
+        policy=(AdoptionPolicy('repaired_precise',('original_lenient','original_precise','repaired_lenient'))
+                if args.case=='conv-26' else
+                AdoptionPolicy('original_precise',('original_lenient',)))
         runner=ExperimentRunner(adapter,lambda client,path:LocomoEvaluator(client,path),connection,config,
-            AdoptionPolicy('repaired_precise',('original_lenient','original_precise','repaired_lenient')),
-            root,frozen)
+            policy,root,frozen)
         summary=await runner.run(args.case,spec,rounds=args.rounds,resume=args.resume)
         print(summary['status'])
     else:
