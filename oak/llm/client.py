@@ -151,8 +151,8 @@ class LLMClient:
                     )
                     if json_mode:
                         kwargs["response_format"] = {"type": "json_object"}
-                    if thinking_off and is_glm_endpoint:
-                        # thinking 开关仅智谱端点支持；第三方网关忽略
+                    if thinking_off and model.startswith(tuple(self.cfg.thinking_disabled_models)):
+                        # 思考开关按模型判定（智谱 glm 系支持）；不支持的模型忽略该参数
                         kwargs["extra_body"] = {"thinking": {"type": "disabled"}}
                     if self.cfg.reasoning_effort and model.startswith(tuple(self.cfg.reasoning_effort_models)):
                         # 按模型判定：仅声明支持思考深度调节的模型发送（MiniMax-M3.1-Flash

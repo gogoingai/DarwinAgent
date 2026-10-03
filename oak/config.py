@@ -103,9 +103,13 @@ class Config:
     # 外部(非智谱)端点多为长思考模型且无思考开关：请求侧给足推理余量，正文才拿得到预算。
     # 实测 MiniMax-M3.1-Flash 抽取批推理 ~21k tokens+正文 ~5k（2026-10-03），8192 会空正文。
     external_reasoning_buffer: int = 32000
-    # 思考深度档：按模型名匹配发送（仅声明支持的模型生效，其他模型忽略该字段）。
+    # 思考行为按模型名决策（与挂在哪个档/端点无关）：
+    #   thinking_disabled_models  —— 支持 thinking:disabled 参数的模型（智谱 glm 系）
+    #   reasoning_effort_models  —— 仅支持思考深度档的模型（MiniMax M3.1 系；disabled 会 400）
+    #   其余思考型模型（DeepSeek reasoner 等）无法关闭，只能靠推理缓冲兜底。
     reasoning_effort: str = ""
     reasoning_effort_models: tuple = ("MiniMax-M3.1-Flash",)
+    thinking_disabled_models: tuple = ("glm-5", "glm-4")
 
     def tier_for(self, role: str) -> str:
         tier = self.role_tiers.get(role)
