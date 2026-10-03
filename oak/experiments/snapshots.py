@@ -74,7 +74,7 @@ def load_frozen_graph(snapshot_dir, corpus):
                         vector=None)
     known_sources = set(graph.sources)
     for _nid, nd in graph.graph.nodes(data=True):
-        sources = nd.get('__sources__', [])
-        if not sources or set(sources) - known_sources:
+        # 空来源（无来源派生事实）允许并在 manifest 披露；未知来源一律拒绝。
+        if set(nd.get('__sources__', [])) - known_sources:
             raise ValueError('快照图节点含未登记来源（导入改写不完整）')
     return graph

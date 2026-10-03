@@ -32,6 +32,7 @@ class CampaignController:
         self.frozen = snapshot_files([Path(__file__).resolve().parents[1], *frozen_files])
         self._injected_client = client_factory
         self.bootstrap_context = None  # 快照结构样本，由数据集装配层注入（冷启动 G1 用）
+        self.snapshot_root = None      # 每对话冻结快照目录，两臂共用（控变量核心）
 
     def verify(self):
         assert_files(self.frozen)
@@ -120,7 +121,9 @@ class CampaignController:
         client = self._client(stage_dir)
         try:
             case = self.adapter.generation_input(case_id)
-            result = await Pipeline(client, stage_dir / 'generation').run(case, task_spec, self.config)
+            result = await Pipeline(client, stage_dir / 'generation',
+                                    frozen_snapshot=None if self.snapshot_root is None else self.snapshot_root / case_id
+                                    ).run(case, task_spec, self.config)
             scores_path = stage_dir / 'evaluation.json'
             if scores_path.exists():
                 saved = json.loads(scores_path.read_text())
@@ -226,7 +229,8 @@ class CampaignController:
         set_phase('train')
         runner = ExperimentRunner(self.adapter, self.evaluator_factory, self.connection_config,
                                   self.config, self.spec.adoption, self.root / 'train', self.frozen_files,
-                                  client_factory=self._injected_client, bootstrap_context=self.bootstrap_context)
+                                  client_factory=self._injected_client, bootstrap_context=self.bootstrap_context,
+                                  snapshot_root=self.snapshot_root)
         def b0_gate(scores):
             return scores.completed == scores.total and scores.generation_faults == 0 and scores.evaluation_faults == 0
         train_summary = await runner.run(train_cases, task_spec,

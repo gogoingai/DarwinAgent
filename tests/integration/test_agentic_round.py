@@ -253,7 +253,7 @@ class SnapshotPipeline(unittest.TestCase):
         case = CaseInput('conv-x', corpus(), (QuestionInput('q1', '甲计划下周修打印机，做什么？'),))
         replies = {'tools': [{'action': 'call', 'asset_id': 'f_semantic', 'parameters': {'query': '甲计划下周修打印机'}},
                              {'action': 'ready'}],
-                   'answer': [{'status': 'answered', 'answer': '甲计划下周修打印机。', 'node_ids': ['n000003']}],
+                   'answer': [{'status': 'answered', 'answer': '甲计划下周修打印机。', 'node_ids': ['n000000']}],
                    'review': [review()]}
         client = RecordedClient(replies)
         result = asyncio.run(Pipeline(client, root / 'generation', frozen_snapshot=snapshot,

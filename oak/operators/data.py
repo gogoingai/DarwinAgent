@@ -16,7 +16,9 @@ class DataCapabilities:
         self.read_ids = set()
         self.read_operations = 0
         self._memory_rows = None  # lazy: 原子记忆 id -> row_id（首次 semantic_search 时构建）
-        for index, (nid, nd) in enumerate(sorted(graph_result.graph.nodes(data=True))):
+        # 行序＝图插入序（冻结快照的 JSON 装载序，确定且在改名探针副本中保持同序；
+        # 按节点 id 排序会在改名后重排，使带 limit 截断的 F 输出无法做改名跟随比对）。
+        for index, (nid, nd) in enumerate(graph_result.graph.nodes(data=True)):
             rid = f'n{index:06d}'
             self.actual_ids[rid] = nid
             self.rows[rid] = {'node_id': rid, 'entity_type': nd['etype'], **node_view(nd),

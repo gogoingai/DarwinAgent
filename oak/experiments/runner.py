@@ -104,7 +104,7 @@ def _per_case_feedback_facts(root, name, cases):
 
 class ExperimentRunner:
     def __init__(self,adapter,evaluator_factory,connection_config,run_config,policy,work_dir,
-                 frozen_files=(),client_factory=None,bootstrap_context=None):
+                 frozen_files=(),client_factory=None,bootstrap_context=None,snapshot_root=None):
         self.adapter,self.evaluator_factory=adapter,evaluator_factory
         self.connection_config,self.config,self.policy=connection_config,run_config,policy
         self.root=Path(work_dir)
@@ -113,6 +113,8 @@ class ExperimentRunner:
         self._injected_client=client_factory
         # bootstrap_context: 冻结快照结构样本（无标签），随冷启动 bootstrap 载荷进提示词。
         self.bootstrap_context=bootstrap_context
+        # snapshot_root: 每对话冻结记忆快照目录（<case_id>/ 子目录）；注入时臂间共享同一记忆面。
+        self.snapshot_root=Path(snapshot_root) if snapshot_root is not None else None
 
     def _stage_health(self):
         """Stage-level execution faults from the on-disk stage records. A candidate rejected
@@ -146,7 +148,9 @@ class ExperimentRunner:
         try:
             results=[];scores=[];identities=[]
             for case in cases:
-                result=await Pipeline(client,stage/'generation').run(case,spec,self.config)
+                result=await Pipeline(client,stage/'generation',
+                                      frozen_snapshot=None if self.snapshot_root is None else self.snapshot_root/case.id
+                                      ).run(case,spec,self.config)
                 scores_path=stage/'evaluation'/f'{case.id}.json'
                 if scores_path.exists():
                     saved=json.loads(scores_path.read_text())
@@ -188,7 +192,9 @@ class ExperimentRunner:
                      'connection':transport_identity(type('Connection',(),{'cfg':self.connection_config})()),
                      'policy':asdict(self.policy),'frozen_files':self.frozen,'rounds':rounds,'seed_assets':[],
                      'scope':list(scope or ()),
-                     'source_layers':sorted({b.source.kind for case in cases for b in case.corpus})}
+                     'source_layers':sorted({b.source.kind for case in cases for b in case.corpus}),
+                     'snapshots':({c.id:(self.snapshot_root/c.id/'manifest.json').read_text()
+                                   for c in cases} if self.snapshot_root is not None else {})}
         declaration=json.loads(json.dumps(declaration,ensure_ascii=False))
         experiment_path=self.root/'experiment.json'
         if experiment_path.exists():

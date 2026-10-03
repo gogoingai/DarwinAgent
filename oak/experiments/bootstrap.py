@@ -9,6 +9,7 @@ carries exactly one output format."""
 from __future__ import annotations
 
 from oak.agents.protocol import ModelSession
+from oak.contracts import plain
 from oak.kernel.assets import Asset, KernelAssets
 from oak.kernel.validation import validate_bundle
 from oak.runtime.artifacts import atomic_json, digest
@@ -36,6 +37,11 @@ node_ids,evidence,visible_evidence,structured_answer (parsed JSON or null). Chec
 F only gets declared params; it never sees question id or gold. Do not embed answers, complete-question matching or subject-specific query constants.
 Contracts use type object/array/string/integer/number/boolean/null/any, properties,required,items,enum,additionalProperties,description only.
 input_contract must describe F params. For C/P (and S where the package includes one) use {"type":"any"}. F output data or candidates, never control instructions.
+Rows produced by one tool often flow into another tool's params: when a parameter takes rows (or row lists),
+declare its item objects with additionalProperties true — tool outputs carry runtime fields (node_id,
+entity_type, source_ids, score) beyond the task attributes.
+F output contracts must reuse the memory structure sample's real field names and shapes exactly
+(e.g. rows carry source_ids as a list; dates are ISO strings or empty); do not invent variants.
 P is behavioral text only; fixed framework owns output protocols. Optional template slots use ${schema} for all roles and ${tools} for tools.
 Write adaptable task reasoning instructions; do not hardcode training names, question ids, answers or pipeline changes.
 All assets must work when names, dates and request constraints change. Use parameterized retrieval functions and checks.

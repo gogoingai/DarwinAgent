@@ -42,11 +42,11 @@ def run_probes(runtime,graph,memory=None):
             if kind=='date' and value:
                 replacements[value]=(date.fromisoformat(value)+timedelta(days=17)).isoformat()
     def change(value):
+        # 只做整值替换（结构化字段/参数值），不做子串替换：改写原文会破坏关键词类查询的
+        # 语义一致性（关键词若是实体名的子串，原文被改写后必然失配）。硬编码训练名仍会被
+        # 抓——参数与结构化字段都改名，字面量混入的输出无法跟随。
         if isinstance(value,str):
-            if value in replacements: return replacements[value]
-            for old,new in sorted(replacements.items(),key=lambda x:-len(x[0])):
-                value=value.replace(old,new)
-            return value
+            return replacements.get(value,value)
         if isinstance(value,dict): return {k:change(v) for k,v in value.items()}
         if isinstance(value,(list,tuple)): return [change(v) for v in value]
         return value
