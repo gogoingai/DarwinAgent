@@ -145,16 +145,35 @@ class ExperimentRunner:
         assert_files(self.frozen)
 
     async def _stage(self,name,cases,spec):
-        """Run every case of the split on the same bundle; aggregate by the frozen sum rule."""
+        """Run every case of the split on the same bundle; aggregate by the frozen sum rule.
+
+        Faulted questions get ONE bounded retry pass: their checkpoints are removed and the
+        pipeline reruns (healthy answers checkpoint-reuse at zero cost). A question that
+        fails twice is a real fault and stays; the retry is recorded in the stage summary."""
         self.verify();started=time.time();stage=self.root/name
         client=self._client(name)
         try:
-            results=[];scores=[];identities=[]
+            results=[];scores=[];identities=[];retries={}
             for case in cases:
-                result=await Pipeline(client,stage/'generation',
-                                      frozen_snapshot=None if self.snapshot_root is None else self.snapshot_root/case.id
-                                      ).run(case,spec,self.config)
+                pipeline=Pipeline(client,stage/'generation',
+                                  frozen_snapshot=None if self.snapshot_root is None else self.snapshot_root/case.id)
+                result=await pipeline.run(case,spec,self.config)
+                faulted=[a for a in result.answers if a.status=='execution_error']
+                if faulted and not getattr(self,'_fault_retried',set()).__contains__((name,case.id)):
+                    if not hasattr(self,'_fault_retried'): self._fault_retried=set()
+                    self._fault_retried.add((name,case.id))
+                    from oak.runtime.artifacts import digest as _digest
+                    for a in faulted:
+                        (stage/'generation'/case.id/'answers'/f'{_digest(a.question_id)}.json').unlink(missing_ok=True)
+                    result=await pipeline.run(case,spec,self.config)
+                    still=[a.question_id for a in result.answers if a.status=='execution_error']
+                    retries[case.id]={'questions':len(faulted),
+                                      'recovered':len(faulted)-len(still),
+                                      'still_faulted':still}
+                    print(json.dumps({'stage':name,'case':case.id,'fault_retry':retries[case.id]},ensure_ascii=False),flush=True)
                 scores_path=stage/'evaluation'/f'{case.id}.json'
+                if case.id in retries and retries[case.id]['recovered']:
+                    scores_path.unlink(missing_ok=True)  # 旧检查点基于故障答案集，重评
                 if scores_path.exists():
                     saved=json.loads(scores_path.read_text())
                     if saved['run_identity']!=result.identity or saved['asset_version']!=spec.bundle.version:
@@ -171,6 +190,7 @@ class ExperimentRunner:
             summary={'stage':name,'cases':[c.id for c in cases],
                      'status':'complete' if aggregated.completed==aggregated.total and not aggregated.evaluation_faults else 'failed',
                      'run_identities':identities,'asset_version':spec.bundle.version,'scores':aggregated.to_dict(),
+                     'fault_retries':retries,
                      'calls':client.ledger_summary(),'elapsed_s':round(time.time()-started,2)}
             atomic_json(stage/'stage.json',summary)
             print(json.dumps({k:summary[k] for k in ('stage','status','asset_version','elapsed_s')},ensure_ascii=False),flush=True)
