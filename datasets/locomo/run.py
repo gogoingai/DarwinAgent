@@ -28,10 +28,12 @@ SCOPE={'p':('P',),'pf':('P','F'),'sfcp':('S','F','C','P')}
 
 
 def arm_config(arm, vector_k=None):
-    # function_timeout_s 放宽：F 内 semantic_search 需要走一次嵌入端点。
+    # function_timeout_s 放宽：F 内 semantic_search 需要走一次嵌入端点；protocol_attempts
+    # 提到 5：bootstrap 长输出偶发 JSON 手误，多两次反馈重试显著降低换根率。
     if arm=='v0':
-        return RunConfig(retrieval_mode='vector_once',vector_k=vector_k or 30,function_timeout_s=15.0)
-    return RunConfig(function_timeout_s=15.0)
+        return RunConfig(retrieval_mode='vector_once',vector_k=vector_k or 30,
+                         function_timeout_s=15.0,protocol_attempts=5)
+    return RunConfig(function_timeout_s=15.0,protocol_attempts=5)
 
 
 def memory_structure_sample(snapshot_dir,max_facts=30):
