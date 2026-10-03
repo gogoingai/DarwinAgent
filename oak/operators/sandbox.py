@@ -82,9 +82,14 @@ def admit(source: str, kind='F', forbidden_questions=()):
         if isinstance(n, (ast.Assign, ast.AugAssign)):
             targets = n.targets if isinstance(n, ast.Assign) else [n.target]
             def local(t):
-                return isinstance(t, ast.Name) or isinstance(t, (ast.Tuple, ast.List)) and all(local(x) for x in t.elts)
+                # 局部 dict/list 的下标赋值是模型高频惯用法，运行期对冻结输入的写入会自然
+                # 抛 TypeError（mappingproxy/tuple 不可变），无需准入层一刀切。
+                return (isinstance(t, ast.Name)
+                        or isinstance(t, (ast.Tuple, ast.List)) and all(local(x) for x in t.elts)
+                        or isinstance(t, ast.Subscript)
+                        and (isinstance(t.value, ast.Name) or isinstance(t.value, ast.Subscript)))
             if not all(local(x) for x in targets):
-                raise SandboxError('Only local variable assignment is allowed')
+                raise SandboxError('Only local variable or local-container item assignment is allowed')
         if isinstance(n, ast.For) and n.orelse:
             raise SandboxError('For-else is unsupported')
         if isinstance(n, ast.comprehension) and n.is_async:
@@ -162,6 +167,13 @@ class Interpreter:
             env[node.id] = self.bound(value)
         elif isinstance(node, (ast.Tuple, ast.List)) and len(node.elts) == len(value):
             for n, v in zip(node.elts, value): self.target(n, v, env)
+        elif isinstance(node, ast.Subscript):
+            container = self.expr(node.value, env)
+            # 冻结输入（mappingproxy/tuple）在这里自然抛 TypeError，由沙箱统一转为 SandboxError。
+            try:
+                container[self.expr(node.slice, env)] = self.bound(value)
+            except TypeError as exc:
+                raise SandboxError(f'Immutable container item assignment: {exc}') from None
         else:
             raise SandboxError('Invalid local target')
 
@@ -197,6 +209,9 @@ class Interpreter:
                 raise SandboxError('Repetition limit exceeded')
         if isinstance(op, ast.Mod) and isinstance(a, str):
             raise SandboxError('String interpolation is unsupported')
+        # 能力返回被冻结为 tuple：序列拼接时按 list 归一，避免 list+tuple 的模型惯用法炸裂。
+        if isinstance(op, ast.Add) and isinstance(a,(list,tuple)) and isinstance(b,(list,tuple)):
+            return self.bound(list(a)+list(b))
         return self.bound(BINARY[type(op)](a,b))
 
     def expr(self, n, env):

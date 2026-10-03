@@ -78,7 +78,7 @@ class RestrictedExecution(unittest.TestCase):
                  'def run(params):\n return extract_runtime_slots("x", [])',
                  'def run(params):\n return model.chat()',
                  'def run(params):\n return __import__("os")',
-                 'def run(params):\n params["x"]=1\n return params',
+                 'def run(params):\n params.x=1\n return params',
                  'def run(params):\n while True:\n  pass\n return 1',
                  'def run(params):\n return (lambda: 1)()',
                  'def run(params):\n global x\n return 1',
@@ -88,6 +88,13 @@ class RestrictedExecution(unittest.TestCase):
                  'def run(params):\n return "The preset correct answer"']
         for source in samples:
             with self.subTest(source=source),self.assertRaises(SandboxError): admit(source)
+
+    def test_frozen_input_item_assignment_rejected_at_execution(self):
+        # 局部容器下标赋值准入放行；对冻结输入的写入在执行期被拒（不可变容器）。
+        fn=admit('def run(params):\n params["x"]=1\n return params')
+        with self.assertRaises(SandboxError): Interpreter(fn,{}).execute({'x':1})
+        fn2=admit('def run(params):\n out={}\n out["k"]=2\n return out')
+        self.assertEqual(Interpreter(fn2,{}).execute({}),{'k':2})
 
     def test_c_cannot_query_or_launch(self):
         for call in ['nodes()', 'search(["x"])','Pipeline()','publish()','client()']:

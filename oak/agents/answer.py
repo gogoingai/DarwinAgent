@@ -57,7 +57,12 @@ class AnswerAgent:
                      'visible_evidence':[caps.rows[x] for x in sorted(visible)],'feedback':feedback},
                     lambda obj: self._candidate(obj,visible))
                 if candidate['status']=='abstained' and not any(t['read_operations'] for t in tool_results):
-                    raise ProtocolError('Semantic abstention requires an actual data query',session.raw)
+                    # 拒答前必须做过实际查询：作为反馈给重试机会（与候选校验同路），
+                    # 重试耗尽仍无查询才整体失败。
+                    feedback.append({'candidate':candidate,
+                                     'task_checks':[{'check_id':'fixed.query_before_abstain','ok':False,
+                                                     'issues':['语义拒答前必须先完成至少一次实际数据查询']}]})
+                    continue
                 snapshot,opinions=self.runtime.check_candidate(question,candidate,graph,visible)
                 trace.append({'stage':'candidate','attempt':attempt,'candidate':candidate,'checks':opinions})
                 failures=[x for x in opinions if not x['ok']]

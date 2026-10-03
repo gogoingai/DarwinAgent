@@ -104,7 +104,8 @@ def _per_case_feedback_facts(root, name, cases):
 
 class ExperimentRunner:
     def __init__(self,adapter,evaluator_factory,connection_config,run_config,policy,work_dir,
-                 frozen_files=(),client_factory=None,bootstrap_context=None,snapshot_root=None):
+                 frozen_files=(),client_factory=None,bootstrap_context=None,snapshot_root=None,
+                 bootstrap_trial_graph=None):
         self.adapter,self.evaluator_factory=adapter,evaluator_factory
         self.connection_config,self.config,self.policy=connection_config,run_config,policy
         self.root=Path(work_dir)
@@ -115,6 +116,8 @@ class ExperimentRunner:
         self.bootstrap_context=bootstrap_context
         # snapshot_root: 每对话冻结记忆快照目录（<case_id>/ 子目录）；注入时臂间共享同一记忆面。
         self.snapshot_root=Path(snapshot_root) if snapshot_root is not None else None
+        # bootstrap_trial_graph: 冷启动 bootstrap 反馈环内的真图试跑（冻结快照图）。
+        self.bootstrap_trial_graph=bootstrap_trial_graph
 
     def _stage_health(self):
         """Stage-level execution faults from the on-disk stage records. A candidate rejected
@@ -207,7 +210,8 @@ class ExperimentRunner:
             else:
                 client=self._client('B0')
                 try: bundle=await AssetBootstrapper().initialize(cases,spec,client,self.config,bundle_path,
-                                                                 structure_sample=self.bootstrap_context)
+                                                                 structure_sample=self.bootstrap_context,
+                                                                 trial_graph=self.bootstrap_trial_graph)
                 finally: await client.aclose()
             if stage_gate is not None: stage_gate('B0')
             results,baseline=await self._stage('B0',cases,spec.with_bundle(bundle))

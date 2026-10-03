@@ -42,8 +42,8 @@ def memory_structure_sample(snapshot_dir,max_facts=30):
     g=load_graph(Path(snapshot_dir)/'graph.json')
     node_types=Counter(nd.get('etype') for _,nd in g.nodes(data=True))
     relations=Counter(ed.get('relation') for _,_,ed in g.edges(data=True))
-    facts=[]
-    for _,nd in sorted(g.nodes(data=True)):
+    facts=[];sample_row=None
+    for _nid,nd in sorted(g.nodes(data=True)):
         if nd.get('etype')=='原子事实' and len(facts)<max_facts:
             facts.append({k:nd.get(k) for k in ('编号','陈述','主体','类型','日期','日期原文','主题','出处')})
     return {'memory_id_field':manifest.get('memory_id_field','编号'),
@@ -51,7 +51,9 @@ def memory_structure_sample(snapshot_dir,max_facts=30):
             'node_types':dict(node_types),'relations':dict(relations),'fact_samples':facts,
             'row_fields':list(dict.fromkeys(
                 [k for row in facts for k in row] +
-                ['node_id', 'entity_type', 'source_ids', 'claims', 'score']))}
+                ['node_id', 'entity_type', 'source_ids', 'claims', 'score'])),
+            'row_addressing':'行由运行时字段 node_id（形如 n000001）寻址；编号是记忆业务 id，不是 node_id——'
+                             '要遍历关系先用 search/nodes 取行，再把行里的 node_id 传给 traverse。'}
 
 
 def frozen_files():
@@ -59,6 +61,20 @@ def frozen_files():
             ROOT/'datasets/locomo/run.py',ROOT/'datasets/locomo/pipeline',
             ROOT/'datasets/locomo/data/locomo10_zh.json',ROOT/'datasets/locomo/data/locomo10.json',
             ROOT/'datasets/locomo/data/gold_repairs.jsonl',AUDITED,LOCK_PATH,TASK_DIR]
+
+
+_TRIAL_GRAPH=None
+def bootstrap_trial_graph(adapter):
+    """冻结 conv-26 快照图（挂向量索引）：冷启动 bootstrap 的反馈环内真图试跑用。
+    两臂共用——V0 虽不走工具循环，其 bundle 的 F 仍要在同一记忆面上通过试跑与探针。"""
+    global _TRIAL_GRAPH
+    if _TRIAL_GRAPH is None:
+        from oak.experiments.snapshots import attach_vector, load_frozen_graph
+        corpus=adapter.generation_input('conv-26').corpus
+        graph=load_frozen_graph(SNAPSHOTS/'conv-26',corpus)
+        attach_vector(graph,SNAPSHOTS/'conv-26')
+        _TRIAL_GRAPH=graph
+    return _TRIAL_GRAPH
 
 
 def connection(root):
@@ -89,14 +105,15 @@ async def run_arm(args):
         runner=ExperimentRunner(adapter,lambda client,path:LocomoEvaluator(client,path),
                                 connection(root),config,spec.adoption,root/'train',frozen_files(),
                                 snapshot_root=SNAPSHOTS,
-                                bootstrap_context=None if args.arm=='v0' else memory_structure_sample(SNAPSHOTS/'conv-26'))
+                                bootstrap_context=memory_structure_sample(SNAPSHOTS/'conv-26'),
+                                bootstrap_trial_graph=bootstrap_trial_graph(adapter))
         summary=await runner.run(cases,task,rounds=0,resume=args.resume,scope=SCOPE[args.scope])
         print(summary['status'])
         return
     controller=CampaignController(adapter,lambda client,path:LocomoEvaluator(client,path),
-                                  connection(root),config,spec,root,frozen_files(),snapshot_root=SNAPSHOTS)
-    if args.arm=='g1':
-        controller.bootstrap_context=memory_structure_sample(SNAPSHOTS/'conv-26')
+                                  connection(root),config,spec,root,frozen_files(),snapshot_root=SNAPSHOTS,
+                                  bootstrap_context=memory_structure_sample(SNAPSHOTS/'conv-26'))
+    controller.bootstrap_trial_graph=bootstrap_trial_graph(adapter)
     summary=await controller.run(task,resume=args.resume,scope=SCOPE[args.scope])
     print(summary['status'])
 

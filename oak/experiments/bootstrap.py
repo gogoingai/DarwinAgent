@@ -14,8 +14,9 @@ from oak.kernel.assets import Asset, KernelAssets
 from oak.kernel.validation import validate_bundle
 from oak.runtime.artifacts import atomic_json, digest
 
-_CORE_RULES='''Assign only to plain local variable names — never to dict items, list items or attributes
-(no result["k"] = v, no obj.attr = v); build output dicts in one expression or with {...} literals.
+_CORE_RULES='''Assign to plain local variable names or to items of dicts/lists you created locally
+(out["k"] = v on your own dict is fine; inputs are immutable and reject writes);
+never assign to attributes (no obj.attr = v).
 Field rules: every C MUST set "stage" to "graph" or "answer"; every P MUST set "role" to one of
 extract/tools/answer/review; F and C MUST NOT set role or stage.
 No H, paths, imports, permissions, pipeline, model calls or postprocessing.
@@ -42,6 +43,8 @@ declare its item objects with additionalProperties true — tool outputs carry r
 entity_type, source_ids, score) beyond the task attributes.
 F output contracts must reuse the memory structure sample's real field names and shapes exactly
 (e.g. rows carry source_ids as a list; dates are ISO strings or empty); do not invent variants.
+Capability results are immutable sequences (tuples): combine with list(a)+list(b) or [*a,*b], never
+mutate them; build fresh lists with comprehensions.
 P is behavioral text only; fixed framework owns output protocols. Optional template slots use ${schema} for all roles and ${tools} for tools.
 Write adaptable task reasoning instructions; do not hardcode training names, question ids, answers or pipeline changes.
 All assets must work when names, dates and request constraints change. Use parameterized retrieval functions and checks.
@@ -82,6 +85,11 @@ _ATOMIC_MEMORY_CLAUSE='''Hard minimum for this task's schema S: declare at least
 meta.atomic_memory_type; that type MUST carry at least the attributes 编号 (memory id) and 陈述 (statement).
 Everything else about S is yours to design from the memory structure sample: additional attributes, other node
 types, relation types and axioms as the task needs. The declared atomic-memory type is frozen after admission.
+The package MUST include at least one retrieval F that actually queries the graph (nodes/search/traverse/
+semantic_search) so answering starts from retrieved memory, not prior knowledge.
+The frozen memory graph already exists: its node type names are the exact keys of memory_structure.node_types
+and its relation names the keys of memory_structure.relations. S MUST declare those same names verbatim
+(including meta.atomic_memory_type being one of them); inventing synonyms makes every query miss.
 '''
 
 _REVISION_OUTPUT='''This is one revision, not a fresh bootstrap. Return JSON only, shaped {"patches":[{"asset":a complete asset
@@ -122,7 +130,7 @@ def revision_protocol(base):
 
 class AssetBootstrapper:
     async def initialize(self, cases, spec, client, config, target, seed_schema=None,
-                         structure_sample=None):
+                         structure_sample=None, trial_graph=None):
         if isinstance(cases, tuple) and len(cases) == 1:
             cases = cases[0]
         if not isinstance(cases, (list, tuple)):
@@ -183,8 +191,32 @@ class AssetBootstrapper:
                 from oak.kernel.validation import atomic_memory_errors
                 problems = atomic_memory_errors(schema)
                 if problems: raise ValueError('S 原子记忆内核不合规: ' + str(problems))
+            if structure_sample:
+                known_types = set(structure_sample.get('node_types') or {})
+                if known_types:
+                    declared = {e.name for e in schema.entities}
+                    unknown = sorted(declared - known_types)
+                    if unknown:
+                        raise ValueError(f'S 声明了快照图中不存在的节点类型 {unknown}；'
+                                         f'必须沿用 memory_structure.node_types 的既有名称')
+                    if declared and schema.meta.get('atomic_memory_type') not in known_types:
+                        raise ValueError('meta.atomic_memory_type 必须是快照 node_types 中的既有类型名')
             for a in assets.assets:
                 if a.kind in {'F', 'C'}: admit(a.content, a.kind, [q.text for q in questions])
+            if trial_graph is not None:
+                # 真图实参试跑在 bootstrap 反馈环内完成：契约与实测不符在这里就被定位并
+                # 反馈给模型重生成，而不是等到 B0 阶段炸掉整个 campaign。
+                import tempfile
+                from oak.kernel.functions import FunctionRegistry
+                from oak.operators.sandbox import Limits
+                with tempfile.TemporaryDirectory() as trial_dir:
+                    trial_bundle = assets.export(Path(trial_dir) / 'trial')
+                    registry = FunctionRegistry(
+                        trial_bundle,
+                        Limits(config.function_steps, config.function_timeout_s, config.result_bytes),
+                        [q.text for q in questions])
+                    registry.trial(trial_graph,
+                                   {a.id: list(a.trial_inputs) for a in assets.assets if a.kind == 'F'})
             return assets
         protocol = ASSET_PROTOCOL if anchored else (
             LEGACY_ASSET_PROTOCOL + ('\n' + _ATOMIC_MEMORY_CLAUSE if atomic_required else ''))
