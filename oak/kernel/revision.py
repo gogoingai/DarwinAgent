@@ -44,6 +44,13 @@ class AssetRevisionService:
             elif p.base_fingerprint is not None:
                 raise ValueError('Unknown patch baseline')
             assets[p.asset.id]=p.asset
+        # The graph mode is frozen at initialization: an S patch may extend the anchored
+        # vocabulary but must not add, remove or alter the meta.anchoring declaration.
+        from oak.schema.model import Schema
+        base_anchor=Schema.from_yaml(next(a.content for a in base.assets.assets if a.kind=='S')).meta.get('anchoring')
+        cand_anchor=Schema.from_yaml(next(a.content for a in assets.values() if a.kind=='S')).meta.get('anchoring')
+        if base_anchor!=cand_anchor:
+            raise ValueError('meta.anchoring 在初始化后冻结：不可通过补丁增删或改动（不可切换抽取模式）')
         target.parent.mkdir(parents=True,exist_ok=True)
         staging=Path(tempfile.mkdtemp(prefix='.candidate-',dir=target.parent))
         try:

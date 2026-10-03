@@ -56,10 +56,12 @@ class CampaignController:
         existing = set()
         if self._ledger_path().exists():
             existing = {line.strip() for line in self._ledger_path().read_text().splitlines() if line.strip()}
-        if key in existing:
-            return
-        with self._ledger_path().open('a') as handle:
-            handle.write(key + '\n')
+        if key not in existing:
+            if self.spec.max_question_runs is not None and self._ledger_total() + questions > self.spec.max_question_runs:
+                raise ValueError(f'Question-run cap exceeded at registration: {self._ledger_total()}+{questions}'
+                                 f' > {self.spec.max_question_runs} ({phase}/{version})')
+            with self._ledger_path().open('a') as handle:
+                handle.write(key + '\n')
 
     def _guard_runs(self, planned):
         if self.spec.max_question_runs is not None and self._ledger_total() + planned > self.spec.max_question_runs:
@@ -144,10 +146,19 @@ class CampaignController:
         declaration = json.loads(json.dumps(declaration, ensure_ascii=False))
         state_path = self.root / 'campaign.json'
         if state_path.exists():
-            if not resume or json.loads(state_path.read_text())['declaration'] != declaration:
+            state = json.loads(state_path.read_text())
+            if not resume or state['declaration'] != declaration:
                 raise ValueError('Existing campaign requires explicit resume with exactly the same identity')
+            if state.get('phase') == 'done':
+                raise ValueError('Campaign sealed: the test split is unblinded and the campaign is final; start a new root')
+            if state.get('phase') == 'blocked_b0':
+                raise ValueError('Campaign blocked at the B0 gate; the run identity is unchanged so resume cannot change the outcome')
         else:
-            atomic_json(state_path, {'declaration': declaration, 'phase': 'precheck'})
+            state = {'declaration': declaration, 'phase': 'precheck'}
+            atomic_json(state_path, state)
+        # Phase discipline: once past training, the campaign never returns to proposals.
+        if state.get('phase') in ('validation', 'selection', 'test'):
+            return await self._resume_from(task_spec, state, state_path)
         precheck = self.root / 'precheck.json'
         if not precheck.exists() or not json.loads(precheck.read_text()).get('passed'):
             raise ValueError('Precheck missing or not passed: run datasets/locomo/scripts/precheck first')
@@ -171,6 +182,26 @@ class CampaignController:
         if train_summary['status'] == 'blocked_b0':
             set_phase('blocked_b0')
             return {'status': 'blocked_b0', 'train': train_summary}
+        return await self._finalize(task_spec, train_summary)
+
+    async def _resume_from(self, task_spec, state, state_path):
+        """Post-training phases only: validation, selection and test are final and never
+        re-open proposals, whatever happened to the STOP marker meanwhile."""
+        train_summary = json.loads((self.root / 'train' / 'summary.json').read_text())
+        return await self._finalize(task_spec, train_summary)
+
+    def _stage_statuses(self):
+        statuses = {}
+        for phase in ('validation', 'test'):
+            for path in sorted((self.root / phase).glob('*/stage.json')):
+                row = json.loads(path.read_text())
+                statuses[f'{phase}/{path.parent.name}'] = row.get('status')
+        return statuses
+
+    async def _finalize(self, task_spec, train_summary):
+        def set_phase(phase):
+            state = json.loads((self.root / 'campaign.json').read_text())
+            atomic_json(self.root / 'campaign.json', {**state, 'phase': phase})
 
         chain = self._candidate_chain()
         validation_case = self.spec.validation[0]
@@ -211,7 +242,15 @@ class CampaignController:
             test[version] = scores.to_dict()
 
         set_phase('done')
-        summary = {'status': 'complete', 'train': train_summary,
+        stage_statuses = self._stage_statuses()
+        healthy = (train_summary.get('status') == 'complete'
+                   and all(v == 'complete' for v in stage_statuses.values())
+                   and all(EvaluationResult(**scores).completed == EvaluationResult(**scores).total
+                           and EvaluationResult(**scores).evaluation_faults == 0
+                           for scores in list(validation.values()) + list(test.values())))
+        summary = {'status': 'complete' if healthy else 'failed',
+                   'unhealthy_stages': {k: v for k, v in stage_statuses.items() if v != 'complete'},
+                   'train': train_summary,
                    'candidates': [{'order': c['order'], 'version': c['version']} for c in chain],
                    'validation': validation, 'selection': decision, 'selected': selected,
                    'test': test, 'question_runs': self._ledger_total(),

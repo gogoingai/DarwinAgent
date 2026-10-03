@@ -139,13 +139,15 @@ class ThreeSetCampaign(unittest.TestCase):
         with self.assertRaises(ValueError):
             execute(protocol(rounds=1, cap=5))
 
-    def test_resume_is_idempotent(self):
+    def test_resume_after_completion_is_sealed(self):
         root, td, summary = execute(protocol(rounds=1))
         self.addCleanup(td.cleanup)
-        again_root, again_td, again = execute(protocol(rounds=1), resume=True, root=root)
-        self.assertEqual(again['selected'], summary['selected'])
-        self.assertEqual(again['question_runs'], summary['question_runs'])
-        self.assertEqual(again['status'], 'complete')
+        again = json.loads((root / 'campaign-summary.json').read_text())
+        with self.assertRaises(ValueError) as caught:
+            execute(protocol(rounds=1), resume=True, root=root)
+        self.assertIn('sealed', str(caught.exception))
+        # The sealed summary on disk is untouched by the refused resume.
+        self.assertEqual(json.loads((root / 'campaign-summary.json').read_text()), again)
 
     def test_missing_precheck_refuses_to_start(self):
         td = tempfile.TemporaryDirectory(); self.addCleanup(td.cleanup)

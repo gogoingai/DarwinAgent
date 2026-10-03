@@ -33,7 +33,7 @@ order_by(rows,field,descending=False), date_difference(left_iso,right_iso).
 Rows include node_id, entity_type, the node attributes above, source_ids. Fact rows expose text/predicate/
 polarity/modality; entity rows expose class and name; time rows expose raw/precision/start/end/anchor_source_id.
 Allowed builtins len,min,max,sum,sorted,set,dict,list,tuple,str,int,float,round,abs,enumerate,zip,range,bool,any,all,ceil,isinstance.
-type() is not registered; use isinstance(x, str/int/float/bool) for type checks.
+type() is not registered; use isinstance(x, str/int/float/bool) for type checks. The top-level snapshot is a frozen mapping: isinstance(snapshot, dict) is False; test keys with .get() or 'in', never with dict type checks.
 Allowed methods get,keys,values,items,lower,upper,strip,split,splitlines,join,startswith,endswith,replace,isdigit,count,append,extend,add.
 Inputs/operator values are immutable; append/extend only on newly created local lists. No mutation of dictionaries.
 C content is one def check(candidate): returning exactly {"ok":bool,"issues":[nonempty strings]}, ok equals not issues.

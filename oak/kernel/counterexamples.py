@@ -25,11 +25,15 @@ def run_probes(runtime,graph,memory=None):
     vocabulary=set(runtime.schema.meta.get('entity_classes') or [])
     replacements={}
     for _,nd in graph.graph.nodes(data=True):
+        if nd.get('etype') in {'Source','EvidenceSpan'}: continue  # provenance structure, not subject data
         spec=runtime.schema.entity(nd['etype']); values=node_view(nd)
         dtypes={a.name:a.dtype for a in spec.attributes}
         for key in spec.primary_key:
             value=values.get(key)
-            if dtypes[key]=='string' and isinstance(value,str) and 1<=len(value)<=48 and value not in vocabulary:
+            # Subject names only, never values that could collide with hex/digit fragments
+            # inside digests (numeric ids, hexish strings); classes are vocabulary.
+            if (isinstance(value,str) and 2<=len(value)<=48 and value not in vocabulary
+                    and value.strip('0123456789abcdefABCDEF')):
                 replacements[value]='cf_'+digest(value)[:12]
         for key,kind in dtypes.items():
             value=values.get(key)

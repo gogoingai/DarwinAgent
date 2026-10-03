@@ -203,7 +203,10 @@ class Interpreter:
         self.tick()
         if n is None: return None
         if isinstance(n, ast.Constant): return self.bound(n.value)
-        if isinstance(n, ast.Name): return env[n.id]
+        if isinstance(n, ast.Name):
+            if n.id in env: return env[n.id]
+            if n.id in BUILTINS: return BUILTINS[n.id]  # type objects as values, e.g. isinstance(x, str)
+            raise SandboxError(f'Unresolved name: {n.id}')
         if isinstance(n, ast.List): return self.bound([self.expr(x,env) for x in n.elts])
         if isinstance(n, ast.Tuple): return self.bound(tuple(self.expr(x,env) for x in n.elts))
         if isinstance(n, ast.Set): return self.bound({self.expr(x,env) for x in n.elts})

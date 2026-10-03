@@ -59,6 +59,10 @@ def anchoring_invariants(graph, sources: Mapping, expected_fingerprint: str | No
         except Exception as exc:
             errors.append(f'事实节点 {nid} 定义不完整: {exc}')
             continue
+        # The retrievable node attributes must say exactly what __fact__ defines;
+        # leaving __fact__ intact while rewriting visible attributes is a violation.
+        if any(nd.get(field) != getattr(fact, field) for field in ('id', 'text', 'predicate', 'polarity', 'modality')):
+            errors.append(f'事实节点 {nid} 的可检索属性与 __fact__ 定义不一致')
         for ev in fact.evidence:
             block = sources.get(ev.source_id)
             if block is None or block.text[ev.start:ev.end] != ev.quote:
@@ -171,23 +175,32 @@ class GraphAssembler:
             dtypes = {a.name: a.dtype for a in view_spec.attributes}
             subjects = {}
             for fact in sorted(memory.facts, key=lambda f: f.id):
-                if fact.object_value is None:
+                # Only unconditional positive statements materialize into typed views:
+                # negation, plans and hypotheses stay as facts and never overwrite attributes.
+                if fact.object_value is None or fact.polarity != 'positive' or fact.modality != 'statement':
                     continue
                 subjects.setdefault(node_id('Entity', {'class': fact.subject.cls, 'name': fact.subject.name}), []).append(fact)
             for entity_nid in sorted(subjects):
                 entity = g.nodes.get(entity_nid)
                 if entity is None or entity.get('class') != declaration['entity_class']:
                     continue
-                attrs = {}; contributing = []
+                collected = {}; contributing = []
                 for fact in subjects[entity_nid]:
                     if fact.predicate not in dtypes:
                         continue
                     try:
-                        attrs[fact.predicate] = _typed(fact.object_value.value, dtypes[fact.predicate])
+                        value = _typed(fact.object_value.value, dtypes[fact.predicate])
                     except Exception:
                         skipped_views += 1; continue
-                    contributing.append(fact)
-                if not contributing:
+                    collected.setdefault(fact.predicate, []).append((fact, value))
+                attrs = {}
+                for predicate, pairs in sorted(collected.items()):
+                    if len({v for _, v in pairs}) > 1:
+                        skipped_views += 1  # conflicting evidenced values: no silent pick
+                        continue
+                    attrs[predicate] = pairs[0][1]
+                    contributing.extend(f for f, _ in pairs)
+                if not attrs or not contributing:
                     continue
                 key = {k: attrs.get(k) for k in view_spec.primary_key}
                 if any(v is None or v == '' for v in key.values()):

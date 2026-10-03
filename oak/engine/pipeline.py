@@ -102,6 +102,9 @@ class Pipeline:
             try:
                 if anchored:
                     graph=GraphAssembler.build(memory,spec,runtime.schema)
+                    # Unified validation on first assembly too, not only on resume:
+                    # typed schema, instance axioms, task graph C and the anchoring invariants.
+                    runtime.validate_graph(graph,memory.fingerprint)
                 else:
                     graph=await ExtractionAgent(runtime,self.client,config,identity[:16]).extract_entities(case.corpus)
                 verify()
