@@ -122,3 +122,7 @@
 ### 路由变更（2026-10-03，用户拍板）
 
 commandcode fast 档周配额耗尽（重置 2026-10-04T02:47:55Z）阻塞第四次尝试后，用户决定 fast 档切回智谱 glm-5.3-flash（同端点同凭据、共享 strong 并发池；上一轮 iter_v2 的抽取即此配置，有先例）。按冻结规则：`.env` 注释 LOCOMO_FAST_* 三项，transport 身份变更 → atomic_v1 更名 atomic_v1_quota_blocked 保留，新根 atomic_v2 重新预检后重建 B0。
+
+### 路由变更二（2026-10-03，用户拍板）
+
+glm-5.3-flash 同站与 strong 档共享并发池（单网关并发红线），用户改定 fast 档为 MiniMax-M3.1-Flash-Preview（api.minimax.cn/v1，OpenAI 兼容，独立 6 并发池；连通探测明文/JSON 双模式 ~1.1s）。`.env` LOCOMO_FAST_* 指向 MiniMax，新根 atomic_v3。用户同时明确：训练迭代无限进行，不主动叫停。
