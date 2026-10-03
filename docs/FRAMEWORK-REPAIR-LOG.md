@@ -110,4 +110,4 @@
 - **事实锚定不变量**（用户澄清后定稿）：图来自记忆；每条事实是一等公民记忆节点（`__fact__` 完整定义），图上复原指纹==记忆指纹（round-trip）；一切结构回溯记忆节点、无游离结构。S 为 checked-in 固定种子（六类型+七关系+实体分类），冷启动只生成 F/C/P，提案只可对 S 只增不删扩展；validate_bundle 强制锚定声明。travel_planning/device_maintenance 迁移为「事实+声明物化视图」（Flight 等类型化行由事实谓词重建，materialized_from 回溯）。
 - **三集合 campaign**：评测器去 conv-26 硬编码（conv-26 四口径、conv-47/49 原始 gold 两口径；判题实现与 11 文件锁零改动）；`ExperimentSpec` + `CampaignController`：预检门 → B0 门（全完+双故障零）→ Rn 无限迭代（`--stop` 叫停）→ 候选锁定（B0+全部采纳版）→ 统一验证 → 选版（原始严格>B0 且宽松≥、零故障、同分取早）→ 测试一次性揭盲（指纹相同单跑）；逐题台账 + 可选安全上限；验证/测试诊断封存前不进提案。
 - **反例扩充**：事实级固定反例（否定/计划分别保存、重复按身份去重、增删事实图随之确定变化、改名/换日期身份跟随内容）接入每次装配后的 run_probes。
-- 离线检查 98（根 tests）+ 11（travel）+ 10（冻结评测协议）= 119 项全绿；`examples/third_domain.py` 录制传输离线验收通过。真实预检与 atomic_v1 实验记录待运行后补记于此。
+- 离线检查 98（根 tests）+ 11（travel）+ 10（冻结评测协议）= 119 项全绿。仓库外验收重跑于 `/private/tmp/oak-v04-portability/`：独立 venv 安装 `dist/oak_repro-0.4.0-py3-none-any.whl`（44 个包文件仅含 oak），仅拷贝第三任务声明/资产与示例，`python -I` 且清除 PYTHONPATH 后跑通 ExtractionAgent→MemoryResult→GraphAssembler→AnswerAgent 与 S/F/C/P（录制传输，不代表模型性能）。真实预检与 atomic_v1 实验记录待运行后补记于此。
