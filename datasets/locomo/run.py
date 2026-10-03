@@ -83,11 +83,10 @@ def connection(root):
     conn=load_connection(ROOT,root/'runtime','LOCOMO')
     conn.role_tiers['locomo_judge']='strong'
     conn.empty_response_passthrough_roles.add('locomo_judge')
-    # 用户决策：智谱端点全角色关闭深度思考——推理链吃光补全预算是 EmptyCompletion 突发
-    # 的直接原因；关思考后该故障类整体消失（第三方 fast 网关自动忽略该开关）。
+    # 用户决策：全角色关闭深度思考（EmptyCompletion 突发的根因是推理链吃光补全预算）。
+    # 「怎么关」按模型走注册表（glm/deepseek 发 thinking:disabled，MiniMax 发
+    # reasoning_effort=low，关不掉的模型缓冲兜底）；这里只声明「哪些角色关思考」。
     conn.thinking_disabled_roles.update({'answer','review','locomo_judge'})
-    # MiniMax-M3.1-Flash 强制思考（disabled 400），按模型名匹配发 reasoning_effort=low
-    # （实测推理近零、补全 token 11→2；用户拍板先用 low 加速）。
     conn.reasoning_effort='low'
     return conn
 

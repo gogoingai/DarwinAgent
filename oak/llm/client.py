@@ -1,6 +1,8 @@
-"""统一 LLM 客户端：模型路由、并发限制、退避重试、磁盘缓存、成本台账。
+"""统一 LLM 客户端：模型注册表路由、站点级并发池、退避重试、磁盘缓存、成本台账。
 
 全项目所有 LLM 调用的唯一通道——任何模块不得直接实例化 OpenAI client。
+端点/密钥/思考参数/推理缓冲/并发池全部按模型名从 oak.llm.registry 解析：
+把任何注册模型调到任何角色，请求行为自动跟着模型走。
 """
 from __future__ import annotations
 
@@ -9,7 +11,7 @@ import hashlib
 import json
 import random
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -17,6 +19,7 @@ from openai import AsyncOpenAI, APIConnectionError, APIStatusError, APITimeoutEr
 import httpx
 
 from ..config import Config
+from .registry import REGISTRY_VERSION, request_policy, resolve
 from ..runtime.artifacts import atomic_json
 from ..runtime.budgets import counter_transaction
 
@@ -29,14 +32,9 @@ class EmptyCompletion(RuntimeError):
     pass
 
 
-# 思考型模型的 reasoning token 余量（正文预算之外追加的请求侧 max_tokens）
-REASONING_BUFFER = 3072
-# 无法关闭思考的外部推理模型（如 commandcode 网关的 deepseek-v4.1-flash）：
-# reasoning 与正文共享 completion 预算，必须给足余量，否则正文被思考吃空
-REASONING_BUFFER_EXTERNAL = 8192
-
-# 关闭深度思考的角色（机械执行类任务：抽取/ReAct/槽位/格式修复走 flash 且无需长思考）；
-# 核心推理步骤（schema 草拟、函数编译、评判器）保留思考
+# 关闭深度思考的角色（机械执行类任务无需长思考）；核心推理步骤保留思考。
+# 「哪些角色关思考」是提示工程策略（Config 层）；「怎么关、关不掉怎么办」按模型
+# 走注册表——两个维度正交。
 THINKING_OFF_ROLES = {"kg", "react", "slots", "plan_repair"}
 
 
@@ -60,23 +58,9 @@ class LLMClient:
             cfg.fast_api_key = cfg.api_key
         cfg.work_dir = Path(cfg.work_dir)
         cfg.work_dir.mkdir(parents=True, exist_ok=True)
-        # 直连不走系统代理（本地代理会吞掉国内 API 的长请求）
-        def _mk(base_url: str, api_key: str) -> AsyncOpenAI:
-            return AsyncOpenAI(
-                base_url=base_url, api_key=api_key, timeout=300.0,
-                http_client=httpx.AsyncClient(trust_env=False, timeout=300.0),
-            )
-        self._client = _mk(cfg.api_base_url, cfg.api_key)             # strong 档
-        self._client_fast = (_mk(cfg.fast_base_url, cfg.fast_api_key)
-                             if cfg.fast_base_url != cfg.api_base_url
-                             or cfg.fast_api_key != cfg.api_key
-                             else self._client)                        # fast 档（可异站）
-        # 并发池：fast 与 strong 异站时分池（互不排队），同站共享一池——
-        # 单网关不得看到 2×并发（429 红线）。全部并发控制收口于此，任务层不限量
-        self._sem = asyncio.Semaphore(cfg.max_concurrency)
-        self._sem_fast = (asyncio.Semaphore(cfg.fast_max_concurrency)
-                          if self._client_fast is not self._client
-                          else self._sem)
+        # 站点池：按解析出的 (base_url, api_key) 惰性建客户端＋信号量。
+        # 同站模型共享一池（单网关不得看到 2×并发），异站分池互不排队。
+        self._sites: dict[tuple[str, str], tuple[AsyncOpenAI, asyncio.Semaphore]] = {}
         self._ledger_lock = asyncio.Lock()
         self._retry_log = cfg.work_dir / "logs" / "retry.jsonl"
         self._retry_log.parent.mkdir(parents=True, exist_ok=True)
@@ -87,6 +71,25 @@ class LLMClient:
         if self._budget_path.exists():
             self._ns_calls = json.loads(self._budget_path.read_text())
 
+        # 直连不走系统代理（本地代理会吞掉国内 API 的长请求）
+        def _mk(base_url: str, api_key: str) -> AsyncOpenAI:
+            return AsyncOpenAI(
+                base_url=base_url, api_key=api_key, timeout=300.0,
+                http_client=httpx.AsyncClient(trust_env=False, timeout=300.0),
+            )
+
+        self._mk = _mk
+        # 预热默认站点，保持「构造即可用」的旧契约
+        self._site_for(cfg.model_strong)
+
+    def _site_for(self, model: str) -> tuple[AsyncOpenAI, asyncio.Semaphore]:
+        resolved = resolve(model, self.cfg)
+        site = self._sites.get(resolved.pool_id)
+        if site is None:
+            site = (self._mk(resolved.base_url, resolved.api_key),
+                    asyncio.Semaphore(resolved.pool_size))
+            self._sites[resolved.pool_id] = site
+        return site
 
     # ---------- 对外主入口 ----------
     async def chat(
@@ -101,12 +104,11 @@ class LLMClient:
         use_cache: bool = True,
     ) -> LLMResult:
         model = self.cfg.model_for(role)
-        tier = self.cfg.tier_for(role)
-        endpoint = self.cfg.fast_base_url if tier == "fast" else self.cfg.api_base_url
+        resolved = resolve(model, self.cfg)
         thinking_off = role in THINKING_OFF_ROLES or role in self.cfg.thinking_disabled_roles
-        request_buffer = (0 if thinking_off else self.cfg.reasoning_buffer) if "bigmodel" in endpoint else self.cfg.external_reasoning_buffer
+        extra_body, buffer = request_policy(resolved, thinking_off, self.cfg.reasoning_effort)
         key = self._cache_key(model, messages, temperature, max_tokens, json_mode,
-                              endpoint=endpoint, thinking_off=thinking_off, request_buffer=request_buffer)
+                              base_url=resolved.base_url, extra_body=extra_body)
         cache_file = self.cfg.cache_dir / namespace / f"{key}.json"
 
         async with self._budget_lock:
@@ -125,25 +127,16 @@ class LLMClient:
                 pass  # 缓存损坏则重打
 
         last_err: Exception | None = None
-        use_client = (self._client_fast if self.cfg.tier_for(role) == "fast"
-                      else self._client)
-        use_sem = (self._sem_fast if self.cfg.tier_for(role) == "fast"
-                   else self._sem)
-        is_glm_endpoint = "bigmodel" in str(getattr(use_client, "base_url", "") or "")
+        use_client, use_sem = self._site_for(model)
         for attempt in range(self.cfg.max_retries):
             try:
                 async with use_sem:
                     t0 = time.time()
-                    # glm-5.3 系列为思考型模型：reasoning_content 消耗 completion 预算，
-                    # 请求侧加 reasoning 余量，保证正文拿满 max_tokens；
-                    # 已关思考的角色不需要余量；无法关思考的外部模型给大余量
-                    if is_glm_endpoint:
-                        buffer = 0 if thinking_off else self.cfg.reasoning_buffer
-                    else:
-                        buffer = self.cfg.external_reasoning_buffer
                     kwargs: dict[str, Any] = dict(
                         model=model, messages=messages,
                         temperature=temperature,
+                        # 推理模型的 reasoning 与正文共享补全预算：缓冲来自注册表
+                        # （offable 已关→disabled_buffer；effort/forced→reasoning_buffer）
                         max_tokens=max_tokens + buffer,
                         stream=True,                          # 流式：防 TUN 代理掐长连接
                         stream_options={"include_usage": True},
@@ -151,13 +144,8 @@ class LLMClient:
                     )
                     if json_mode:
                         kwargs["response_format"] = {"type": "json_object"}
-                    if thinking_off and model.startswith(tuple(self.cfg.thinking_disabled_models)):
-                        # 思考开关按模型判定（智谱 glm 系支持）；不支持的模型忽略该参数
-                        kwargs["extra_body"] = {"thinking": {"type": "disabled"}}
-                    if self.cfg.reasoning_effort and model.startswith(tuple(self.cfg.reasoning_effort_models)):
-                        # 按模型判定：仅声明支持思考深度调节的模型发送（MiniMax-M3.1-Flash
-                        # 强制思考、disabled 会 400，唯一旋钮是 reasoning_effort）。
-                        kwargs["extra_body"] = {"reasoning_effort": self.cfg.reasoning_effort}
+                    if extra_body:
+                        kwargs["extra_body"] = extra_body
                     # 流式聚合（本地 TUN 代理会挂起非流式长请求）
                     parts: list[str] = []
                     usage: dict = {}
@@ -206,7 +194,7 @@ class LLMClient:
             await asyncio.sleep(backoff)
 
         raise RuntimeError(
-            f"LLM 调用在 {self.cfg.max_retries} 次重试后仍失败: {role=} {last_err=!r}"
+            f"LLM 调用在 {self.cfg.max_retries} 次重试后仍失败: {role=} {last_err!r}"
         )
 
     def chat_sync(self, **kwargs) -> LLMResult:
@@ -218,9 +206,8 @@ class LLMClient:
         atomic_json(self._budget_path, self._ns_calls)
 
     async def aclose(self) -> None:
-        await self._client.close()
-        if self._client_fast is not self._client:
-            await self._client_fast.close()
+        for client, _ in self._sites.values():
+            await client.close()
 
     async def __aenter__(self):
         return self
@@ -281,15 +268,15 @@ class LLMClient:
     # ---------- 缓存 ----------
     @staticmethod
     def _cache_key(model, messages, temperature, max_tokens, json_mode, *,
-                   endpoint="", thinking_off=False, request_buffer=None) -> str:
+                   base_url="", extra_body=None) -> str:
+        # 缓存随「有效传输策略」失效：站点 + 实际发送的参数。推理缓冲是
+        # (模型注册档, 参数) 的确定函数，不必单独入键。
         value = {
             "m": model, "msg": messages, "t": temperature,
-            "mt": max_tokens, "j": json_mode, "endpoint": endpoint,
-            "thinking_off": thinking_off, "transport_version": 2,
+            "mt": max_tokens, "j": json_mode, "base_url": base_url,
+            "extra_body": extra_body or {},
+            "transport_version": 3, "registry_version": REGISTRY_VERSION,
         }
-        default_buffer = (0 if thinking_off else REASONING_BUFFER) if "bigmodel" in endpoint else REASONING_BUFFER_EXTERNAL
-        if request_buffer is not None and request_buffer != default_buffer:
-            value["request_buffer"] = request_buffer
         blob = json.dumps(value, ensure_ascii=False, sort_keys=True)
         return hashlib.sha256(blob.encode()).hexdigest()
 

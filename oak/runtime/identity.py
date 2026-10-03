@@ -27,7 +27,7 @@ def transport_identity(client):
     if cfg is None: return {'transport':type(client).__name__}
     fields=('api_base_url','fast_base_url','model_strong','model_fast','role_tiers','namespace_limits',
             'thinking_disabled_roles','empty_response_passthrough_roles','max_concurrency',
-            'fast_max_concurrency','max_retries','reasoning_buffer','external_reasoning_buffer')
+            'fast_max_concurrency','max_retries','reasoning_effort')
     result={}
     for field in fields:
         if hasattr(cfg,field):
@@ -35,4 +35,7 @@ def transport_identity(client):
             result[field]=sorted(value) if isinstance(value,set) else value
     # Detect credential changes without publishing credentials or reversible hints.
     result['credential_identity']=digest([getattr(cfg,'api_key',''),getattr(cfg,'fast_api_key','')])
+    # 注册表结构版本：模型参数/站点语义变化时随之失效（函数内导入避免环）
+    from ..llm.registry import REGISTRY_VERSION
+    result['registry_version']=REGISTRY_VERSION
     return result
