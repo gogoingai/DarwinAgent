@@ -25,7 +25,7 @@ DATA_CAPABILITIES = frozenset({'nodes', 'search', 'traverse', 'project', 'aggreg
 BUILTINS = {'len': len, 'min': min, 'max': max, 'sum': sum, 'sorted': sorted, 'set': set,
             'dict': dict, 'list': list, 'tuple': tuple, 'str': str, 'int': int, 'float': float,
             'round': round, 'abs': abs, 'enumerate': enumerate, 'zip': zip, 'range': range,
-            'bool': bool, 'any': any, 'all': all, 'ceil': math.ceil}
+            'bool': bool, 'any': any, 'all': all, 'ceil': math.ceil, 'isinstance': isinstance}
 METHODS = {'get', 'keys', 'values', 'items', 'lower', 'upper', 'strip', 'split', 'rsplit', 'splitlines',
            'join', 'startswith', 'endswith', 'replace', 'isdigit', 'count', 'append', 'extend', 'add'}
 ALLOWED_NODES = {ast.Module, ast.FunctionDef, ast.arguments, ast.arg, ast.Return, ast.Assign,

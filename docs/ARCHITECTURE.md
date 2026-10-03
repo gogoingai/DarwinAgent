@@ -152,7 +152,7 @@ flowchart LR
 | C | 候选/证据快照 -> `{ok, issues}` | 改写候选、关闭固定检查、决定采纳 |
 | P | 固定角色的文本模板与登记插槽 | 注册工具、扩预算、跳阶段、扩可见输入 |
 
-F/C 由正向 AST 解释器执行，没有 `exec/eval/compile` 或普通模块执行回退。允许局部计算、分支、容器和有界遍历；禁止导入、反射、动态调用、全局写入、输入修改、文件网络与任意流程调用。执行步数、期限、容器和结果大小均有上限。基础算子 `nodes/search/traverse/project/aggregate/order_by/date_difference` 逐项登记；原来的 `extract_runtime_slots` 不在能力表。
+F/C 由正向 AST 解释器执行，没有 `exec/eval/compile` 或普通模块执行回退。允许局部计算、分支、容器、有界遍历与只读谓词 `isinstance`；禁止导入、`type()`/其余反射、动态调用、全局写入、输入修改、文件网络与任意流程调用。执行步数、期限、容器和结果大小均有上限。基础算子 `nodes/search/traverse/project/aggregate/order_by/date_difference` 逐项登记；原来的 `extract_runtime_slots` 不在能力表。
 
 F 仅获得声明参数和只读数据能力，C 仅获得不可写候选快照，两者都拿不到图写接口、配置、模型、评测器或 Pipeline。来源由框架读操作追踪，函数不能靠自己返回几个来源 ID 获得出处。工具结果封装成数据，不能驱动阶段切换。固定检查使用 `fixed.*` 保留名字空间，资产无法覆盖。
 

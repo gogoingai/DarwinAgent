@@ -10,6 +10,8 @@ ASSET_PROTOCOL='''Generate a task asset package, not framework code. Return JSON
 Every asset has id (stable safe identifier), kind F/C/P, content string, input_contract, output_contract,
 schema_dependencies [] (filled by the framework), role (P only), stage (C only graph/answer), description,
 trial_inputs (F only, at least one actual parameter object, otherwise []).
+Field rules: every C MUST set "stage" to "graph" or "answer"; every P MUST set "role" to one of
+extract/tools/answer/review; F and C MUST NOT set role or stage.
 The schema S is FIXED and supplied as fixed_schema; do not generate, extend or patch it.
 Provide exactly one P for each of extract/tools/answer/review; at least one F and one C.
 No H, paths, imports, permissions, pipeline, model calls or postprocessing.
@@ -19,6 +21,7 @@ declared entity classes, name); Value (dtype, canonical string value); Time (raw
 optional start/end ISO, anchor_source_id); EvidenceSpan (source_id, verbatim quote, start_offset, end_offset);
 Source (kind, document_id, location, speaker, date). Relations: subject, object_entity, object_value,
 occurrence_time, evidence, locates, time_anchor.
+Value fields hold canonical strings: convert with int()/float() before arithmetic; compare dates as ISO text.
 F content is restricted Python syntax: one def run(params): with primitive local computation, if, for, comprehensions.
 No imports, while, reflection, subscript/attribute assignment, global writes, nested functions or dynamic calls.
 Only data capabilities: nodes(entity_type='',filters={},limit=100), search(terms,entity_type='',limit=40),
@@ -26,7 +29,8 @@ traverse(node_ids,relation,direction='out'), project(rows,fields), aggregate(row
 order_by(rows,field,descending=False), date_difference(left_iso,right_iso).
 Rows include node_id, entity_type, the node attributes above, source_ids. Fact rows expose text/predicate/
 polarity/modality; entity rows expose class and name; time rows expose raw/precision/start/end/anchor_source_id.
-Allowed builtins len,min,max,sum,sorted,set,dict,list,tuple,str,int,float,round,abs,enumerate,zip,range,bool,any,all,ceil.
+Allowed builtins len,min,max,sum,sorted,set,dict,list,tuple,str,int,float,round,abs,enumerate,zip,range,bool,any,all,ceil,isinstance.
+type() is not registered; use isinstance(x, str/int/float/bool) for type checks.
 Allowed methods get,keys,values,items,lower,upper,strip,split,splitlines,join,startswith,endswith,replace,isdigit,count,append,extend,add.
 Inputs/operator values are immutable; append/extend only on newly created local lists. No mutation of dictionaries.
 C content is one def check(candidate): returning exactly {"ok":bool,"issues":[nonempty strings]}, ok equals not issues.
