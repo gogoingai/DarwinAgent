@@ -48,10 +48,80 @@ def recover_facts(graph) -> list[dict]:
     return sorted(rows, key=lambda x: x['id'])
 
 
-def anchoring_invariants(graph, sources: Mapping, expected_fingerprint: str | None = None) -> list[str]:
+def materialization_plan(facts, schema):
+    """Deterministic view derivation shared by assembly and validation: typed rows rebuilt
+    from positive-statement fact predicates. Returns ({view_node_id: (etype, key, attrs,
+    frozenset(fact_ids))}, skipped_count)."""
+    views = schema.meta.get('materialized') or {}
+    if not isinstance(views, dict):
+        raise ValueError('materialized 声明必须是 {视图类型: {entity_class: 类别}}')
+    if views and 'materialized_from' not in {r.name for r in schema.relations}:
+        raise ValueError('物化视图需要声明 materialized_from 关系（视图 -> AtomicFact）')
+    from oak.kg.graph import _typed
+    plan = {}; skipped = 0
+    for view_type, declaration in sorted(views.items()):
+        view_spec = schema.entity(view_type)
+        if view_spec is None or not isinstance(declaration, dict) or 'entity_class' not in declaration:
+            raise ValueError(f'物化视图声明不完整: {view_type}')
+        dtypes = {a.name: a.dtype for a in view_spec.attributes}
+        subjects = {}
+        for fact in sorted(facts, key=lambda f: f.id):
+            # Only unconditional positive statements materialize into typed views:
+            # negation, plans and hypotheses stay as facts and never overwrite attributes.
+            if fact.object_value is None or fact.polarity != 'positive' or fact.modality != 'statement':
+                continue
+            subjects.setdefault(node_id('Entity', {'class': fact.subject.cls, 'name': fact.subject.name}), []).append(fact)
+        for entity_nid in sorted(subjects):
+            head = subjects[entity_nid][0]
+            if head.subject.cls != declaration['entity_class']:
+                continue
+            collected = {}
+            for fact in subjects[entity_nid]:
+                if fact.predicate not in dtypes:
+                    continue
+                try:
+                    value = _typed(fact.object_value.value, dtypes[fact.predicate])
+                except Exception:
+                    skipped += 1; continue
+                collected.setdefault(fact.predicate, []).append((fact, value))
+            attrs = {}; contributing = []
+            for predicate, pairs in sorted(collected.items()):
+                if len({v for _, v in pairs}) > 1:
+                    skipped += 1  # conflicting evidenced values: no silent pick
+                    continue
+                attrs[predicate] = pairs[0][1]
+                contributing.extend(f for f, _ in pairs)
+            if not attrs or not contributing:
+                continue
+            key = {k: attrs.get(k) for k in view_spec.primary_key}
+            if any(v is None or v == '' for v in key.values()):
+                skipped += 1; continue
+            plan[node_id(view_type, key)] = (view_type, key, attrs, frozenset(f.id for f in contributing))
+    return plan, skipped
+
+
+def anchoring_invariants(graph, sources: Mapping, expected_fingerprint: str | None = None,
+                         schema=None) -> list[str]:
     errors = []
     facts = []
+    fact_objs = []
     fact_out_relations = ('subject', 'object_entity', 'object_value', 'occurrence_time', 'evidence')
+    # Edge label integrity: the multigraph key and the relation attribute that queries read
+    # must name the same relation on every edge, or structure checks and traversal diverge.
+    for h, t, key, ed in graph.edges(keys=True, data=True):
+        if ed.get('relation') != key:
+            errors.append(f'边标签不一致: key={key!r} 而 relation 属性为 {ed.get("relation")!r}')
+    # Source node content must match the registered corpus metadata exactly.
+    by_ref = {(b.source.kind, b.source.document_id, b.source.location): b for b in sources.values()}
+    for nid, nd in graph.nodes(data=True):
+        if nd.get('etype') != 'Source':
+            continue
+        block = by_ref.get((nd.get('kind'), nd.get('document_id'), nd.get('location')))
+        if block is None:
+            errors.append(f'来源节点 {nid[:48]} 未注册于语料')
+        elif (nd.get('speaker') != str(block.metadata.get('speaker', ''))
+              or nd.get('date') != str(block.metadata.get('date', ''))):
+            errors.append(f'来源节点 {nid[:48]} 的说话人/日期与语料元数据不一致')
     for nid, nd in graph.nodes(data=True):
         if nd.get('etype') != 'AtomicFact':
             continue
@@ -81,7 +151,7 @@ def anchoring_invariants(graph, sources: Mapping, expected_fingerprint: str | No
                                                                         'start': ev.start, 'end': ev.end})})
                                  for ev in fact.evidence}}
         for relation in fact_out_relations:
-            actual = {t for _, t, key in graph.out_edges(nid, keys=True) if key == relation}
+            actual = {target for _, target, ed in graph.out_edges(nid, data=True) if ed.get('relation') == relation}
             if actual != expected[relation]:
                 errors.append(f'事实节点 {nid} 的 {relation} 连边与其定义不一致')
         time_nid = node_id('Time', {'id': digest(fact.time.to_dict())})
@@ -92,13 +162,13 @@ def anchoring_invariants(graph, sources: Mapping, expected_fingerprint: str | No
                                  ('anchor_source_id', fact.time.anchor_source_id)):
                 if tnd.get(field) != value:
                     errors.append(f'时间节点 {time_nid[:48]} 的 {field} 与事实定义不一致')
-            if fact.time.anchor_source_id:
-                block = sources.get(fact.time.anchor_source_id)
-                want = node_id('Source', {'kind': block.source.kind, 'document_id': block.source.document_id,
-                                          'location': block.source.location})
-                got = {t for _, t, key in graph.out_edges(time_nid, keys=True) if key == 'time_anchor'}
-                if got != {want}:
-                    errors.append(f'时间节点锚点连边与事实定义不一致')
+            block = sources.get(fact.time.anchor_source_id)
+            want = ({node_id('Source', {'kind': block.source.kind, 'document_id': block.source.document_id,
+                                        'location': block.source.location})}
+                    if fact.time.anchor_source_id else set())
+            got = {target for _, target, ed in graph.out_edges(time_nid, data=True) if ed.get('relation') == 'time_anchor'}
+            if got != want:
+                errors.append(f'时间节点锚点连边与事实定义不一致')
         for ev in fact.evidence:
             span_nid = node_id('EvidenceSpan', {'id': digest({'source_id': ev.source_id, 'quote': ev.quote,
                                                               'start': ev.start, 'end': ev.end})})
@@ -110,12 +180,34 @@ def anchoring_invariants(graph, sources: Mapping, expected_fingerprint: str | No
                 block = sources.get(ev.source_id)
                 want = node_id('Source', {'kind': block.source.kind, 'document_id': block.source.document_id,
                                           'location': block.source.location})
-                got = {t for _, t, key in graph.out_edges(span_nid, keys=True) if key == 'locates'}
+                got = {target for _, target, ed in graph.out_edges(span_nid, data=True) if ed.get('relation') == 'locates'}
                 if got != {want}:
                     errors.append(f'证据定位连边与事实定义不一致')
         facts.append(fact.to_dict())
+        fact_objs.append(fact)
     if not facts:
         errors.append('图中没有记忆节点')
+    if schema is not None and schema.meta.get('materialized'):
+        plan, _ = materialization_plan(fact_objs, schema)
+        view_types = set(schema.meta['materialized'])
+        actual_views = {nid: nd for nid, nd in graph.nodes(data=True) if nd.get('etype') in view_types}
+        from oak.kg.graph import node_view
+        for nid in sorted(set(plan) | set(actual_views)):
+            if nid not in actual_views:
+                errors.append(f'物化视图缺失: {nid[:64]}'); continue
+            if nid not in plan:
+                errors.append(f'物化视图不可由事实推导: {nid[:64]}'); continue
+            _, key, attrs, fact_ids = plan[nid]
+            values = node_view(actual_views[nid])
+            for field, value in {**key, **attrs}.items():
+                if values.get(field) != value:
+                    errors.append(f'物化视图 {nid[:64]} 的 {field} 与事实推导不一致')
+            want_edges = {node_id('AtomicFact', {'id': fid}) for fid in fact_ids}
+            got_edges = {target for _, target, ed in graph.out_edges(nid, data=True)
+                         if ed.get('relation') == 'materialized_from'}
+            if got_edges != want_edges:
+                errors.append(f'物化视图 {nid[:64]} 的 materialized_from 连边与事实不一致')
+
     undirected = nx.Graph()
     undirected.add_nodes_from(graph.nodes)
     undirected.add_edges_from((h, t) for h, t in graph.edges(keys=False))
@@ -163,6 +255,8 @@ class GraphAssembler:
         def source_node(block):
             return node('Source', {'kind': block.source.kind, 'document_id': block.source.document_id,
                                    'location': block.source.location},
+                        kind=block.source.kind, document_id=block.source.document_id,
+                        location=block.source.location,
                         speaker=str(block.metadata.get('speaker', '')),
                         date=str(block.metadata.get('date', '')))
 
@@ -207,57 +301,16 @@ class GraphAssembler:
                 src = source_node(block); touch(src, [ev.source_id]); link(span, src, 'locates')
 
         # Declared materialized views: typed rows rebuilt from fact predicates, traceable to facts.
-        views = schema.meta.get('materialized') or {}
-        if views and not isinstance(views, dict):
-            raise ValueError('materialized 声明必须是 {视图类型: {entity_class: 类别}}')
-        from oak.kg.graph import _typed
-        skipped_views = 0
-        for view_type, declaration in sorted(views.items()):
-            view_spec = schema.entity(view_type)
-            if view_spec is None or not isinstance(declaration, dict) or 'entity_class' not in declaration:
-                raise ValueError(f'物化视图声明不完整: {view_type}')
-            if 'materialized_from' not in {r.name for r in schema.relations}:
-                raise ValueError('物化视图需要声明 materialized_from 关系（视图 -> AtomicFact）')
-            dtypes = {a.name: a.dtype for a in view_spec.attributes}
-            subjects = {}
-            for fact in sorted(memory.facts, key=lambda f: f.id):
-                # Only unconditional positive statements materialize into typed views:
-                # negation, plans and hypotheses stay as facts and never overwrite attributes.
-                if fact.object_value is None or fact.polarity != 'positive' or fact.modality != 'statement':
-                    continue
-                subjects.setdefault(node_id('Entity', {'class': fact.subject.cls, 'name': fact.subject.name}), []).append(fact)
-            for entity_nid in sorted(subjects):
-                entity = g.nodes.get(entity_nid)
-                if entity is None or entity.get('class') != declaration['entity_class']:
-                    continue
-                collected = {}; contributing = []
-                for fact in subjects[entity_nid]:
-                    if fact.predicate not in dtypes:
-                        continue
-                    try:
-                        value = _typed(fact.object_value.value, dtypes[fact.predicate])
-                    except Exception:
-                        skipped_views += 1; continue
-                    collected.setdefault(fact.predicate, []).append((fact, value))
-                attrs = {}
-                for predicate, pairs in sorted(collected.items()):
-                    if len({v for _, v in pairs}) > 1:
-                        skipped_views += 1  # conflicting evidenced values: no silent pick
-                        continue
-                    attrs[predicate] = pairs[0][1]
-                    contributing.extend(f for f, _ in pairs)
-                if not attrs or not contributing:
-                    continue
-                key = {k: attrs.get(k) for k in view_spec.primary_key}
-                if any(v is None or v == '' for v in key.values()):
-                    skipped_views += 1; continue
-                view_nid = node(view_type, key, **attrs)
-                touch(view_nid, sorted({ev.source_id for f in contributing for ev in f.evidence}))
-                for fact in contributing:
-                    link(view_nid, node_id('AtomicFact', {'id': fact.id}), 'materialized_from')
+        plan, skipped_views = materialization_plan(sorted(memory.facts, key=lambda f: f.id), schema)
+        for view_nid, (view_type, key, attrs, fact_ids) in sorted(plan.items()):
+            view_nid = node(view_type, key, **attrs)
+            touch(view_nid, sorted({ev.source_id for f in memory.facts if f.id in fact_ids
+                                    for ev in f.evidence}))
+            for fid in sorted(fact_ids):
+                link(view_nid, node_id('AtomicFact', {'id': fid}), 'materialized_from')
         for nid, nd in g.nodes(data=True):
             counts[nd['etype']] = counts.get(nd['etype'], 0) + 1
-        violations = anchoring_invariants(g, memory.corpus, memory.fingerprint)
+        violations = anchoring_invariants(g, memory.corpus, memory.fingerprint, schema)
         if violations:
             raise ValueError('装配违反事实锚定不变量: ' + '; '.join(violations))
         diagnostics = ({'stage': 'assembled', 'memory_fingerprint': memory.fingerprint,

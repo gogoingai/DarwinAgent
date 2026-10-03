@@ -142,3 +142,12 @@ glm-5.3-flash 同站与 strong 档共享并发池（单网关并发红线），�
 - campaign 验收假通过修复：模拟评测器如实计入 execution_error 为生成故障；同时发现并修复测试录制仍为事实格式导致 legacy 任务全量 execution_error 而旧桩放行的假通过。
 - 口径披露：冻结判分 V1 上下文含 observation/event_summary/图片说明，宽于生成输入（仅原文/说话人/日期）；判分实现未动，差异如实披露于 datasets/locomo/README。
 - 实验层当前边界如实记录：每集合单会话（协议设计）、指标键名沿用评测器口径、预检身份绑定属通用契约缺口——留待后续版本。
+
+### 评审修复轮三（2026-10-03，校验面三项 + 变量泄漏自查）
+
+- 边标签一致性：multigraph key 与查询读取的 relation 属性必须处处同名（防「key=subject、relation=object_entity」的结构/查询分叉）；结构比对统一改按 relation 属性。
+- Source 节点内容与语料元数据逐项核对（kind/document_id/location/speaker/date）；Source 键同时落为可查询属性。
+- 锚点边无条件比对：事实无锚点时不得挂 time_anchor 边。
+- 物化视图与事实重推导核对：物化推导提为共享 materialization_plan（装配与校验同源），视图节点集/属性/materialized_from 连边必须与计划完全一致（改 City.state、增删视图、挪回溯边均拦）。
+- 自查修复：集合推导式变量泄漏（外层循环残留 t 被引用）导致新校验在正常图上误报——已改显式绑定。
+- 新增四项反例测试；全量 118+11+10 绿。

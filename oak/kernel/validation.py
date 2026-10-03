@@ -83,7 +83,7 @@ def validate_graph(result: GraphResult,schema,expected_memory_fingerprint=None):
     errors=instance_checks(g,schema)
     if errors: raise ValueError(str(errors))
     if anchored:
-        violations=anchoring_invariants(g,result.sources,expected_memory_fingerprint)
+        violations=anchoring_invariants(g,result.sources,expected_memory_fingerprint,schema)
         if violations: raise ValueError('事实锚定不变量被违反: '+str(violations))
     if not entities: raise ValueError('Empty graph cannot enter inference')
 
