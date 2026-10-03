@@ -31,6 +31,7 @@ class CampaignController:
         self.frozen_files = tuple(frozen_files)
         self.frozen = snapshot_files([Path(__file__).resolve().parents[1], *frozen_files])
         self._injected_client = client_factory
+        self.bootstrap_context = None  # 快照结构样本，由数据集装配层注入（冷启动 G1 用）
 
     def verify(self):
         assert_files(self.frozen)
@@ -181,7 +182,7 @@ class CampaignController:
                 self._register('train', case_id, row['asset_version'], len(row['answers']))
 
     # ---- orchestration ---------------------------------------------------------
-    async def run(self, task_spec, resume=False, rounds=None):
+    async def run(self, task_spec, resume=False, rounds=None, scope=()):
         self.root.mkdir(parents=True, exist_ok=True)
         declaration = {'experiment_spec': self.spec.declaration(), 'task': task_spec.declaration(),
                        'config': self.config.to_dict(),
@@ -225,12 +226,12 @@ class CampaignController:
         set_phase('train')
         runner = ExperimentRunner(self.adapter, self.evaluator_factory, self.connection_config,
                                   self.config, self.spec.adoption, self.root / 'train', self.frozen_files,
-                                  client_factory=self._injected_client)
+                                  client_factory=self._injected_client, bootstrap_context=self.bootstrap_context)
         def b0_gate(scores):
             return scores.completed == scores.total and scores.generation_faults == 0 and scores.evaluation_faults == 0
         train_summary = await runner.run(train_cases, task_spec,
                                          rounds=self.spec.rounds if rounds is None else rounds,
-                                         resume=resume, stop_file=self.root / 'STOP', b0_gate=b0_gate,
+                                         resume=resume, stop_file=self.root / 'STOP', b0_gate=b0_gate, scope=scope,
                                          stage_gate=lambda name: self._reserve(
                                              f'train/{name}', '+'.join(train_cases), train_questions))
         self._settle_train_from_decisions()

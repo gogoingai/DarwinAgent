@@ -11,6 +11,23 @@ from .spec import validate_value
 FIXED_CHECK_IDS = ('fixed.input','fixed.schema','fixed.source','fixed.type','fixed.status','fixed.publish')
 
 
+def atomic_memory_errors(schema):
+    """Hard minimum for tasks requiring an atomic-memory kernel: meta.atomic_memory_type
+    names a declared node type carrying 编号 (memory id) and 陈述 (statement). Everything
+    else about S stays free; this is the only frozen floor."""
+    name = schema.meta.get('atomic_memory_type')
+    if not name:
+        return ['S 必须在 meta.atomic_memory_type 声明原子记忆节点类型']
+    entity = schema.entity(str(name))
+    if entity is None:
+        return [f'meta.atomic_memory_type 指向未声明类型: {name}']
+    attrs = {a.name for a in entity.attributes}
+    missing = {'编号', '陈述'} - attrs
+    if missing:
+        return [f'原子记忆类型 {name} 缺属性: {sorted(missing)}']
+    return []
+
+
 def validate_bundle(bundle, forbidden_questions=()):
     from .functions import FunctionRegistry
     from .checks import CheckRegistry
@@ -22,6 +39,9 @@ def validate_bundle(bundle, forbidden_questions=()):
         # Only tasks that declare the fact-anchoring hook must carry the anchoring vocabulary.
         anchor=anchoring_errors(schema)
         if anchor: raise ValueError('Schema 事实锚定声明不完整: '+str(anchor))
+    if schema.meta.get('atomic_memory_type'):
+        problems=atomic_memory_errors(schema)
+        if problems: raise ValueError('Schema 原子记忆声明不完整: '+str(problems))
     from oak.schema.owlcheck import static_checks
     findings=static_checks(schema)
     if findings: raise ValueError(str([f.render() for f in findings]))

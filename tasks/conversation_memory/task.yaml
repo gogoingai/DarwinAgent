@@ -1,12 +1,11 @@
 name: conversation_memory
 description: >-
-  从有日期和说话人的原始对话中抽取可追溯的原子事实记忆，装配事实锚定图，
-  回答事实、时间、集合和关系问题。区分已经发生、计划、假设和否定；保持主体和时间精度。
-  不能得到语料支持时语义拒答。
+  从有日期和说话人的原始对话记忆回答事实、时间、集合和关系问题。记忆以原子记忆单元
+  为内核（编号/陈述），一切结构从原子记忆派生；区分已经发生、计划、假设和否定；
+  保持主体和时间精度。不能得到记忆支持时语义拒答。
 source_kinds: [message_text]
 metadata_keys: [speaker, date]
 parameter_contract: {type: object, properties: {}}
 answer_format: text
 answer_contract: {type: string}
-seed:
-  S: assets/S/schema.yaml
+requirements: [atomic_memory]

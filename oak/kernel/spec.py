@@ -54,6 +54,8 @@ class TaskSpec:
     answer_contract: Mapping = field(default_factory=lambda: {"type": "string"})
     bundle: object | None = None
     seed_s: str = ""
+    # 任务级硬约束（如 atomic_memory）：S 必须声明至少一个原子记忆节点类型，准入冻结。
+    requirements: tuple = ()
 
     def __post_init__(self):
         if not self.name or not self.description or not self.source_kinds:
@@ -62,6 +64,7 @@ class TaskSpec:
             raise ValueError("Unknown answer format")
         object.__setattr__(self, "parameter_contract", freeze(self.parameter_contract))
         object.__setattr__(self, "answer_contract", freeze(self.answer_contract))
+        object.__setattr__(self, "requirements", tuple(self.requirements))
         if not isinstance(self.seed_s, str):
             raise ValueError("Seed schema must be text")
         if any(callable(x) for x in self.__dict__.values()):
@@ -72,7 +75,8 @@ class TaskSpec:
         return {"name": self.name, "description": self.description, "source_kinds": list(self.source_kinds),
                 "metadata_keys": list(self.metadata_keys), "parameter_contract": plain(self.parameter_contract),
                 "answer_format": self.answer_format, "answer_contract": plain(self.answer_contract),
-                "seed_s_fingerprint": digest(self.seed_s) if self.seed_s else ""}
+                "seed_s_fingerprint": digest(self.seed_s) if self.seed_s else "",
+                "requirements": list(self.requirements)}
 
     @classmethod
     def load(cls, path: Path, bundle=None):

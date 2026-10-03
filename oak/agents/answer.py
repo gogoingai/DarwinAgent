@@ -1,6 +1,8 @@
 """Fixed collect -> generate -> check -> review -> retry -> publish flow."""
 from __future__ import annotations
 
+import asyncio
+
 from oak.contracts import AnswerResult, plain
 from oak.kernel.functions import DataCapabilities
 from oak.kernel.validation import validate_candidate, validate_published
@@ -17,23 +19,37 @@ class AnswerAgent:
         session=ModelSession(self.client,self.config,f'{self.namespace}_q_{digest(question.id)[:12]}',self.config.calls_per_question)
         caps=DataCapabilities(graph)
         visible=set();tool_results=[];feedback=[];trace=[]
+        vector_once=self.config.retrieval_mode=='vector_once'
         try:
             for attempt in range(self.config.answer_attempts):
-                for step in range(self.config.tool_steps):
-                    def valid_tool(obj):
-                        if obj=={'action':'ready'}: return obj
-                        if set(obj)!={'action','asset_id','parameters'} or obj['action']!='call' or obj['asset_id'] not in self.runtime.functions.functions:
-                            raise ValueError('Unregistered tool or invalid control action')
-                        return obj
-                    action=await session.request(self.config.tools_role,
-                        TOOLS_PROTOCOL+'\n任务工具指引：\n'+self.runtime.prompt('tools'),
-                        {'question':question.text,'parameters':plain(question.parameters),
-                         'tools':self.runtime.functions.descriptions(),'previous_results':tool_results,
-                         'feedback':feedback},valid_tool)
-                    if action['action']=='ready': break
-                    result=self.runtime.call(action['asset_id'],action['parameters'],graph)
-                    visible.update(result['node_ids']);tool_results.append(result)
-                    trace.append({'stage':'tool','attempt':attempt,'step':step,**result})
+                if vector_once:
+                    # V0 纯向量基线：一次确定性检索即全部证据预算——无工具循环，检索后冻结；
+                    # 作答/检查/审查流程与 G1 完全共享。
+                    rows=await asyncio.to_thread(caps.semantic_search,question.text,
+                                                 limit=self.config.vector_k)
+                    visible={r['node_id'] for r in rows}
+                    tool_results=[{'asset_id':'vector_once','asset_fingerprint':'',
+                                   'data':rows,'node_ids':sorted(visible),
+                                   'source_ids':sorted({s for r in rows for s in r['source_ids']}),
+                                   'read_operations':caps.read_operations}]
+                    trace.append({'stage':'retrieval','mode':'vector_once','k':self.config.vector_k,
+                                  'rows':len(rows)})
+                else:
+                    for step in range(self.config.tool_steps):
+                        def valid_tool(obj):
+                            if obj=={'action':'ready'}: return obj
+                            if set(obj)!={'action','asset_id','parameters'} or obj['action']!='call' or obj['asset_id'] not in self.runtime.functions.functions:
+                                raise ValueError('Unregistered tool or invalid control action')
+                            return obj
+                        action=await session.request(self.config.tools_role,
+                            TOOLS_PROTOCOL+'\n任务工具指引：\n'+self.runtime.prompt('tools'),
+                            {'question':question.text,'parameters':plain(question.parameters),
+                             'tools':self.runtime.functions.descriptions(),'previous_results':tool_results,
+                             'feedback':feedback},valid_tool)
+                        if action['action']=='ready': break
+                        result=self.runtime.call(action['asset_id'],action['parameters'],graph)
+                        visible.update(result['node_ids']);tool_results.append(result)
+                        trace.append({'stage':'tool','attempt':attempt,'step':step,**result})
                 candidate=await session.request(self.config.answer_role,
                     ANSWER_PROTOCOL+'\n任务作答指引：\n'+self.runtime.prompt('answer'),
                     {'question':question.text,'parameters':plain(question.parameters),'answer_format':self.spec.answer_format,
@@ -55,6 +71,13 @@ class AnswerAgent:
                 review_inputs=[]
                 if candidate['status']=='answered':
                     review_inputs=[{'candidate':snapshot,'sources':[graph.sources[s].to_dict() for s in sorted(source_ids)]}]
+                elif vector_once:
+                    # 纯向量臂能力隔离：拒答审计只看已检索证据，不得借审计绕过检索读全图。
+                    rows=[caps.rows[x] for x in sorted(visible)]
+                    ids={s for row in rows for s in row['source_ids']}
+                    review_inputs=[{'candidate':{**snapshot,'visible_evidence':rows},
+                                    'refusal_audit':{'covers_full_graph':False,'mode':'vector_once'},
+                                    'sources':[graph.sources[s].to_dict() for s in sorted(ids)]}]
                 else:
                     import json
                     chunks=[];batch=[];size=0

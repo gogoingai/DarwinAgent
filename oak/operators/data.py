@@ -15,6 +15,7 @@ class DataCapabilities:
         self.actual_ids = {}
         self.read_ids = set()
         self.read_operations = 0
+        self._memory_rows = None  # lazy: 原子记忆 id -> row_id（首次 semantic_search 时构建）
         for index, (nid, nd) in enumerate(sorted(graph_result.graph.nodes(data=True))):
             rid = f'n{index:06d}'
             self.actual_ids[rid] = nid
@@ -93,6 +94,50 @@ class DataCapabilities:
     @staticmethod
     def date_difference(left, right):
         return (date.fromisoformat(left)-date.fromisoformat(right)).days
+
+    def semantic_search(self, query='', subject='', limit=8):
+        """Cosine retrieval over the frozen vector index attached to the graph; hits resolve
+        back to atomic-memory rows by the index id field, keeping read lineage row-level."""
+        self.read_operations += 1
+        if not isinstance(query, str) or not query.strip():
+            raise ValueError('semantic_search requires a query string')
+        if type(limit) is not int or not 1 <= limit <= 200:
+            raise ValueError('semantic_search limit must be 1..200')
+        index = getattr(self.graph_result, 'vector', None)
+        if index is None:
+            raise ValueError('semantic_search 不可用：本图未挂载冻结向量索引')
+        if self._memory_rows is None:
+            self._memory_rows = {str(r.get(index.id_field)): rid
+                                 for rid, r in self.rows.items() if r.get(index.id_field) is not None}
+        hits = index.search(query.strip(), top_k=max(8, limit * 3))
+        picked = []
+        for memory_id, score, _meta in hits:
+            rid = self._memory_rows.get(str(memory_id))
+            if rid is None:
+                continue
+            row = dict(self.rows[rid])
+            row['score'] = round(float(score), 4)
+            if subject and str(subject) not in str(row.get('主体', '')):
+                continue
+            picked.append(row)
+            if len(picked) >= limit:
+                break
+        return self._read(picked)
+
+    @staticmethod
+    def relative_date(anchor_iso='', expression=''):
+        """Deterministic Chinese relative-date resolution against an ISO anchor date."""
+        from .dates import resolve_relative
+        try:
+            anchor = date.fromisoformat(str(anchor_iso).strip())
+        except ValueError:
+            raise ValueError('relative_date 需要 ISO 锚日期（YYYY-MM-DD）') from None
+        expr = str(expression or '').strip()
+        if not expr:
+            raise ValueError('relative_date 需要相对时间表达')
+        resolved, granularity = resolve_relative(anchor, expr)
+        return {'anchor': anchor.isoformat(), 'expression': expr,
+                'resolved': resolved, 'granularity': granularity}
 
     def registry(self):
         return {name:getattr(self,name) for name in DATA_CAPABILITIES}

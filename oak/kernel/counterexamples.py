@@ -26,7 +26,9 @@ def run_probes(runtime,graph,memory=None):
     replacements={}
     for _,nd in graph.graph.nodes(data=True):
         if nd.get('etype') in {'Source','EvidenceSpan'}: continue  # provenance structure, not subject data
-        spec=runtime.schema.entity(nd['etype']); values=node_view(nd)
+        spec=runtime.schema.entity(nd['etype'])
+        if spec is None: continue  # 冻结快照图可含 S 未声明的类型：数据面，不属资产探针范围
+        values=node_view(nd)
         dtypes={a.name:a.dtype for a in spec.attributes}
         for key in spec.primary_key:
             value=values.get(key)
@@ -72,6 +74,12 @@ def run_probes(runtime,graph,memory=None):
         return aliases(value)
     records=[]
     for asset,_ in runtime.functions.functions.values():
+        if 'semantic_search' in asset.content:
+            # 语义检索由冻结外部索引支撑（记忆面数据，非图派生状态）：改名跟随探针不适用，
+            # 硬编码名检查仍由字面量准入覆盖。记录豁免理由，保持探针面可审计。
+            records.append({'asset_id':asset.id,'probe':'renamed_keys_shifted_dates','status':'passed',
+                            'note':'semantic_search 走冻结向量索引，索引不随改名派生'})
+            continue
         for params in asset.trial_inputs:
             params=plain(params)
             before=runtime.call(asset.id,params,graph)

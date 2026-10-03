@@ -48,11 +48,14 @@ class AssetPatch:
 
 
 class AssetRevisionService:
-    def propose(self,base,patches,target: Path,training_ids,forbidden_questions=()):
+    def propose(self,base,patches,target: Path,training_ids,forbidden_questions=(),allowed_kinds=()):
         base.verify()
         target=Path(target)
         if target.exists(): raise ValueError('Candidate version already exists')
         if not patches or len({p.asset.id for p in patches})!=len(patches): raise ValueError('Empty or duplicate patch')
+        if allowed_kinds:
+            outside=sorted({p.asset.kind for p in patches}-set(allowed_kinds))
+            if outside: raise ValueError(f'本轮迭代范围外资产类型: {outside}（允许: {sorted(set(allowed_kinds))}）')
         assets={a.id:a for a in base.assets.assets}
         for p in patches:
             # Evidence must decode to a real (case, question) pair before it can count:
@@ -70,10 +73,18 @@ class AssetRevisionService:
         # The graph mode is frozen at initialization: an S patch may extend the anchored
         # vocabulary but must not add, remove or alter the meta.anchoring declaration.
         from oak.schema.model import Schema
-        base_anchor=Schema.from_yaml(next(a.content for a in base.assets.assets if a.kind=='S')).meta.get('anchoring')
-        cand_anchor=Schema.from_yaml(next(a.content for a in assets.values() if a.kind=='S')).meta.get('anchoring')
-        if base_anchor!=cand_anchor:
+        base_s=next(a.content for a in base.assets.assets if a.kind=='S')
+        cand_s=next(a.content for a in assets.values() if a.kind=='S')
+        base_schema,cand_schema=Schema.from_yaml(base_s),Schema.from_yaml(cand_s)
+        if base_schema.meta.get('anchoring')!=cand_schema.meta.get('anchoring'):
             raise ValueError('meta.anchoring 在初始化后冻结：不可通过补丁增删或改动（不可切换抽取模式）')
+        if base_schema.meta.get('atomic_memory_type'):
+            # 原子记忆内核冻结：声明的类型名不可换，且换后的 S 必须仍满足硬下限。
+            from .validation import atomic_memory_errors
+            if cand_schema.meta.get('atomic_memory_type')!=base_schema.meta.get('atomic_memory_type'):
+                raise ValueError('meta.atomic_memory_type 在初始化后冻结：不可更换原子记忆节点类型')
+            problems=atomic_memory_errors(cand_schema)
+            if problems: raise ValueError('原子记忆内核不合规: '+str(problems))
         target.parent.mkdir(parents=True,exist_ok=True)
         staging=Path(tempfile.mkdtemp(prefix='.candidate-',dir=target.parent))
         try:

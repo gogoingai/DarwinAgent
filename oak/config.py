@@ -42,6 +42,10 @@ class RunConfig:
     function_steps: int = 30000
     function_timeout_s: float = 2.0
     result_bytes: int = 180000
+    # 双臂检索模式：'agentic'＝tools 步循环里模型自主选图/向量工具；'vector_once'＝V0
+    # 纯向量一次检索基线（确定性 top-K 后冻结证据，跳过工具循环，拒答审计不读全图）。
+    retrieval_mode: str = "agentic"
+    vector_k: int = 30
     extraction_role: str = "extraction"
     tools_role: str = "tools"
     answer_role: str = "answer"
@@ -52,9 +56,11 @@ class RunConfig:
     def __post_init__(self):
         for key in ("concurrency", "extraction_batch_chars", "extraction_bisect_depth", "extraction_max_tokens",
                     "protocol_attempts", "answer_attempts",
-                    "tool_steps", "calls_per_question", "max_tokens", "function_steps", "result_bytes"):
+                    "tool_steps", "calls_per_question", "max_tokens", "function_steps", "result_bytes", "vector_k"):
             if type(getattr(self, key)) is not int or getattr(self, key) <= 0:
                 raise ValueError(f"{key} must be a positive integer")
+        if self.retrieval_mode not in ("agentic", "vector_once"):
+            raise ValueError("retrieval_mode must be 'agentic' or 'vector_once'")
         if self.function_timeout_s <= 0 or not 0 <= self.temperature <= 2 or not 0 <= self.extraction_temperature <= 2:
             raise ValueError("Invalid execution limits")
 

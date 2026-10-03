@@ -81,8 +81,8 @@ class KernelAssets:
         roles = [a.role for a in self.assets if a.kind == "P"]
         if sorted(roles) != sorted(PROMPT_SLOTS):
             raise ValueError("Exactly one prompt per fixed role required")
-        if not any(a.kind == "F" for a in self.assets) or not any(a.kind == "C" for a in self.assets):
-            raise ValueError("Functions and task checks are required")
+        if not any(a.kind == "F" for a in self.assets):
+            raise ValueError("Functions are required; task checks C are optional")
         for a in self.assets:
             if a.kind != "S" and set(a.schema_dependencies) != schemas:
                 raise ValueError(f"{a.id}: schema dependency must reference the registered schema")

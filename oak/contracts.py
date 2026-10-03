@@ -343,6 +343,9 @@ class GraphResult:
     sources: Mapping[str, CorpusBlock]
     raw_outputs: tuple[str, ...] = ()
     diagnostics: tuple[Mapping[str, Any], ...] = ()
+    # Frozen vector index attached to the graph (agentic rounds): semantic_search resolves
+    # hits back to graph rows so read lineage and evidence attribution stay row-level.
+    vector: Any = None
 
 
 @dataclass(frozen=True)

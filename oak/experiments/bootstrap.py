@@ -22,7 +22,9 @@ F content is restricted Python syntax: one def run(params): with primitive local
 No imports, while, reflection, subscript/attribute assignment, global writes, nested functions or dynamic calls.
 Only data capabilities: nodes(entity_type='',filters={},limit=100), search(terms,entity_type='',limit=40),
 traverse(node_ids,relation,direction='out'), project(rows,fields), aggregate(rows,field='',operation='count/sum/min/max'),
-order_by(rows,field='',descending=False), date_difference(left_iso,right_iso).
+order_by(rows,field='',descending=False), date_difference(left_iso,right_iso),
+semantic_search(query,subject='',limit=8) when the graph carries a frozen vector index,
+relative_date(anchor_iso,expression) resolving Chinese relative dates against an ISO anchor.
 Rows include node_id, entity_type, node attributes, source_ids. Allowed builtins
 len,min,max,sum,sorted,set,dict,list,tuple,str,int,float,round,abs,enumerate,zip,range,bool,any,all,ceil,isinstance.
 type() is not registered; use isinstance(x, str/int/float/bool) for type checks. The top-level snapshot is a frozen mapping: isinstance(snapshot, dict) is False; test keys with .get() or 'in', never with dict type checks.
@@ -61,13 +63,19 @@ _BOOTSTRAP_ANCHORED_HEADER=_BOOTSTRAP_ASSETS_OUTPUT+'''Every asset has id (stabl
 schema_dependencies [] (filled by the framework), role (P only), stage (C only graph/answer), description,
 trial_inputs: F MUST list at least one real, working parameter object; C and P use [].
 The schema S is FIXED and supplied as fixed_schema; do not generate, extend or patch it.
-Provide exactly one P for each of extract/tools/answer/review; at least one F and one C.
+Provide exactly one P for each of extract/tools/answer/review; at least one F. C (task checks) is optional.
 '''
 
 _BOOTSTRAP_LEGACY_HEADER=_BOOTSTRAP_ASSETS_OUTPUT+'''Every asset has id (stable safe identifier), kind S/F/C/P, content string, input_contract, output_contract,
 schema_dependencies [schema id] (S has []), role (P only), stage (C only graph/answer), description,
 trial_inputs (F only, at least one actual parameter object, otherwise []). Exactly one S and one P for each of extract/tools/answer/review;
-at least one F and one C.
+at least one F. C (task checks) is optional.
+'''
+
+_ATOMIC_MEMORY_CLAUSE='''Hard minimum for this task's schema S: declare at least one atomic-memory node type and name it in
+meta.atomic_memory_type; that type MUST carry at least the attributes 编号 (memory id) and 陈述 (statement).
+Everything else about S is yours to design from the memory structure sample: additional attributes, other node
+types, relation types and axioms as the task needs. The declared atomic-memory type is frozen after admission.
 '''
 
 _REVISION_OUTPUT='''This is one revision, not a fresh bootstrap. Return JSON only, shaped {"patches":[{"asset":a complete asset
@@ -107,7 +115,8 @@ def revision_protocol(base):
 
 
 class AssetBootstrapper:
-    async def initialize(self, cases, spec, client, config, target, seed_schema=None):
+    async def initialize(self, cases, spec, client, config, target, seed_schema=None,
+                         structure_sample=None):
         if isinstance(cases, tuple) and len(cases) == 1:
             cases = cases[0]
         if not isinstance(cases, (list, tuple)):
@@ -116,6 +125,7 @@ class AssetBootstrapper:
         questions = [q for case in cases for q in case.questions]
         seed_schema = seed_schema if seed_schema is not None else spec.seed_s
         anchored = bool(seed_schema and seed_schema.strip())
+        atomic_required = 'atomic_memory' in tuple(getattr(spec, 'requirements', ()))
         session = ModelSession(client, config, 'bootstrap', limit=6)
         # Deterministic raw-data sampling, without labels, categories, graph caches or historical assets.
         blocks = []; size = 0
@@ -128,6 +138,10 @@ class AssetBootstrapper:
                    'corpus_fingerprint': digest([b.to_dict() for b in corpus_blocks])}
         if anchored:
             payload['fixed_schema'] = seed_schema
+        if structure_sample:
+            # 冻结记忆快照的结构样本（无标签）：原子记忆行样本＋节点/边类型清单——让从零
+            # 生成的 S/F 匹配真实数据面。快照本体永不进提示词。
+            payload['memory_structure'] = plain(structure_sample)
 
         def valid(obj):
             if set(obj) != {'assets'} or not isinstance(obj['assets'], list):
@@ -159,10 +173,15 @@ class AssetBootstrapper:
             from oak.operators.sandbox import admit
             schema = Schema.from_yaml(next(a.content for a in assets.assets if a.kind == 'S'))
             if schema.validate(): raise ValueError(str(schema.validate()))
+            if atomic_required:
+                from oak.kernel.validation import atomic_memory_errors
+                problems = atomic_memory_errors(schema)
+                if problems: raise ValueError('S 原子记忆内核不合规: ' + str(problems))
             for a in assets.assets:
                 if a.kind in {'F', 'C'}: admit(a.content, a.kind, [q.text for q in questions])
             return assets
-        protocol = ASSET_PROTOCOL if anchored else LEGACY_ASSET_PROTOCOL
+        protocol = ASSET_PROTOCOL if anchored else (
+            LEGACY_ASSET_PROTOCOL + ('\n' + _ATOMIC_MEMORY_CLAUSE if atomic_required else ''))
         try:
             assets = await session.request(config.bootstrap_role, protocol, payload, valid, max_tokens=14000)
         finally:

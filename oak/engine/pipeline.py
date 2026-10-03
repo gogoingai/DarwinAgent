@@ -24,8 +24,13 @@ from oak.runtime.identity import assert_files, snapshot_files, transport_identit
 
 
 class Pipeline:
-    def __init__(self,client,work_dir):
+    def __init__(self,client,work_dir,frozen_snapshot=None,embedder_factory=None):
+        # frozen_snapshot: 共享冻结记忆快照目录（graph/facts/vector＋manifest）。注入时
+        # 抽取与构图全部跳过——图是指纹校验的冻结输入数据，臂间唯一差异是资产。
+        # embedder_factory: 查询嵌入端点注入（默认读 EMBEDDING_* 环境变量）。
         self.client,self.work_dir=client,Path(work_dir)
+        self.frozen_snapshot=Path(frozen_snapshot) if frozen_snapshot is not None else None
+        self.embedder_factory=embedder_factory
 
     async def run(self,case,spec,config: RunConfig):
         if not isinstance(config,RunConfig) or spec.bundle is None:
@@ -34,8 +39,11 @@ class Pipeline:
         runtime=KernelRuntime(spec.bundle,config,tuple(q.text for q in case.questions))
         framework=snapshot_files([Path(__file__).resolve().parents[1]])
         transport=transport_identity(self.client)
+        from oak.experiments.snapshots import snapshot_manifest
+        snapshot_identity=snapshot_manifest(self.frozen_snapshot) if self.frozen_snapshot is not None else None
         identity=digest({'case':case.to_dict(),'task':spec.declaration(),'config':config.to_dict(),
-                         'assets':runtime.bundle.version,'framework':framework,'transport':transport})
+                         'assets':runtime.bundle.version,'framework':framework,'transport':transport,
+                         'snapshot':None if snapshot_identity is None else snapshot_identity['snapshot_digest']})
         root=self.work_dir/case.id
         root.mkdir(parents=True,exist_ok=True)
         identity_path=root/'identity.json'
@@ -53,8 +61,9 @@ class Pipeline:
         anchored=bool(runtime.schema.meta.get('anchoring'))
 
         # Stage one (anchored tasks only): atomic-fact memory, checkpointed independently.
+        # A frozen snapshot replaces BOTH extraction stages: memory and graph are frozen input.
         memory=None;memory_failure=None;raw=()
-        if anchored:
+        if anchored and self.frozen_snapshot is None:
             if (root/'memory.failure.json').exists():
                 failure=json.loads((root/'memory.failure.json').read_text())
                 memory_failure=failure['error'];raw=tuple(failure.get('raw_outputs',[]))
@@ -97,10 +106,20 @@ class Pipeline:
             graph=GraphResult(nx.freeze(load_graph(graph_path)),MappingProxyType(corpus),
                               (),tuple(completion['diagnostics']))
             graph_fingerprint=completion['digest']
-            runtime.validate_graph(graph,memory.fingerprint if memory is not None else None)
+            if self.frozen_snapshot is None:
+                runtime.validate_graph(graph,memory.fingerprint if memory is not None else None)
+            else:
+                from oak.experiments.snapshots import attach_vector
+                attach_vector(graph,self.frozen_snapshot,embedder_factory=self.embedder_factory)
         else:
             try:
-                if anchored:
+                if self.frozen_snapshot is not None:
+                    # 冻结快照图：指纹校验的输入数据。质量门＝F 试跑（真图实参）＋反例探针＋
+                    # 任务图 C；类型重查/claims/锚定不变量不适用（词汇由 bootstrap 依结构样本生成）。
+                    from oak.experiments.snapshots import attach_vector, load_frozen_graph
+                    graph=load_frozen_graph(self.frozen_snapshot,case.corpus)
+                    attach_vector(graph,self.frozen_snapshot,embedder_factory=self.embedder_factory)
+                elif anchored:
                     graph=GraphAssembler.build(memory,spec,runtime.schema)
                     # Unified validation on first assembly too, not only on resume:
                     # typed schema, instance axioms, task graph C and the anchoring invariants.
@@ -113,10 +132,16 @@ class Pipeline:
                 atomic_json(root/'function-trials.json',trials)
                 from oak.kernel.counterexamples import run_probes
                 atomic_json(root/'counterexamples.json',run_probes(runtime,graph,memory))
+                if self.frozen_snapshot is not None:
+                    opinions=runtime.checks.run('graph',runtime.graph_snapshot(graph))
+                    failures=[x for x in opinions if not x['ok']]
+                    if failures: raise ValueError(f'Task graph checks rejected graph: {failures}')
+                else:
+                    runtime.validate_graph(graph,memory.fingerprint if memory is not None else None)
                 save_graph(graph.graph,root/'graph.json')
                 graph_fingerprint=digest(json.loads((root/'graph.json').read_text()))
                 atomic_json(root/'graph.complete.json',{'digest':graph_fingerprint,
-                            'memory_fingerprint':'' if memory is None else memory.fingerprint,'raw_outputs':[],
+                            'memory_fingerprint':('' if memory is None else memory.fingerprint) if self.frozen_snapshot is None else snapshot_identity['facts_digest'],'raw_outputs':[],
                             'diagnostics':list(graph.diagnostics)})
             except Exception as exc:
                 verify()
@@ -150,7 +175,8 @@ class Pipeline:
         result=RunResult(case.id,identity,runtime.bundle.version,answers,
                          0 if graph is None else graph.graph.number_of_nodes(),
                          ({'status':'execution_error','error':graph_failure},) if graph_failure else graph.diagnostics,
-                         0 if memory is None else len(memory.facts),
-                         '' if memory is None else memory.fingerprint,graph_fingerprint)
+                         (0 if memory is None else len(memory.facts)) if self.frozen_snapshot is None else snapshot_identity['n_facts'],
+                         ('' if memory is None else memory.fingerprint) if self.frozen_snapshot is None else snapshot_identity['facts_digest'],
+                         graph_fingerprint)
         atomic_json(root/'result.json',result.to_dict())
         return result

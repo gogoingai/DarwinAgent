@@ -21,7 +21,7 @@ class SandboxError(ValueError):
     pass
 
 
-DATA_CAPABILITIES = frozenset({'nodes', 'search', 'traverse', 'project', 'aggregate', 'order_by', 'date_difference'})
+DATA_CAPABILITIES = frozenset({'nodes', 'search', 'traverse', 'project', 'aggregate', 'order_by', 'date_difference', 'semantic_search', 'relative_date'})
 BUILTINS = {'len': len, 'min': min, 'max': max, 'sum': sum, 'sorted': sorted, 'set': set,
             'dict': dict, 'list': list, 'tuple': tuple, 'str': str, 'int': int, 'float': float,
             'round': round, 'abs': abs, 'enumerate': enumerate, 'zip': zip, 'range': range,

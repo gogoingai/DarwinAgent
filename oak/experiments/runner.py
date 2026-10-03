@@ -103,13 +103,16 @@ def _per_case_feedback_facts(root, name, cases):
     return rows
 
 class ExperimentRunner:
-    def __init__(self,adapter,evaluator_factory,connection_config,run_config,policy,work_dir,frozen_files=(),client_factory=None):
+    def __init__(self,adapter,evaluator_factory,connection_config,run_config,policy,work_dir,
+                 frozen_files=(),client_factory=None,bootstrap_context=None):
         self.adapter,self.evaluator_factory=adapter,evaluator_factory
         self.connection_config,self.config,self.policy=connection_config,run_config,policy
         self.root=Path(work_dir)
         self.frozen=snapshot_files([Path(__file__).resolve().parents[1],*frozen_files])
         self.revisions=AssetRevisionService()
         self._injected_client=client_factory
+        # bootstrap_context: 冻结快照结构样本（无标签），随冷启动 bootstrap 载荷进提示词。
+        self.bootstrap_context=bootstrap_context
 
     def _stage_health(self):
         """Stage-level execution faults from the on-disk stage records. A candidate rejected
@@ -167,9 +170,11 @@ class ExperimentRunner:
             return results,aggregated
         finally: await client.aclose()
 
-    async def run(self,case_ids,spec,rounds=2,resume=False,stop_file=None,b0_gate=None,stage_gate=None):
+    async def run(self,case_ids,spec,rounds=2,resume=False,stop_file=None,b0_gate=None,stage_gate=None,
+                  scope=()):
         """case_ids: one conversation id or a tuple; every case runs fully each round on the
-        same candidate bundle. rounds=None iterates until stop_file appears."""
+        same candidate bundle. rounds=None iterates until stop_file appears. scope limits
+        which asset kinds a round may patch (P first; F/S open by attribution later)."""
         if isinstance(case_ids,str): case_ids=(case_ids,)
         if not case_ids:
             raise ValueError('Training split needs at least one case')
@@ -182,6 +187,7 @@ class ExperimentRunner:
                      'task':spec.declaration(),'config':self.config.to_dict(),
                      'connection':transport_identity(type('Connection',(),{'cfg':self.connection_config})()),
                      'policy':asdict(self.policy),'frozen_files':self.frozen,'rounds':rounds,'seed_assets':[],
+                     'scope':list(scope or ()),
                      'source_layers':sorted({b.source.kind for case in cases for b in case.corpus})}
         declaration=json.loads(json.dumps(declaration,ensure_ascii=False))
         experiment_path=self.root/'experiment.json'
@@ -194,7 +200,8 @@ class ExperimentRunner:
             if (bundle_path/'manifest.json').exists(): bundle=KernelBundle(bundle_path)
             else:
                 client=self._client('B0')
-                try: bundle=await AssetBootstrapper().initialize(cases,spec,client,self.config,bundle_path)
+                try: bundle=await AssetBootstrapper().initialize(cases,spec,client,self.config,bundle_path,
+                                                                 structure_sample=self.bootstrap_context)
                 finally: await client.aclose()
             if stage_gate is not None: stage_gate('B0')
             results,baseline=await self._stage('B0',cases,spec.with_bundle(bundle))
@@ -247,7 +254,8 @@ class ExperimentRunner:
                         patches=await ProposalGenerator().propose(adopted,cases,feedback,client,self.config,stage/'proposal-call.json',questions)
                         training_ids=[tid for case in cases for tid in question_identity(case)]
                         forbidden=[q.text for case in cases for q in case.questions]
-                        candidate=self.revisions.propose(adopted,patches,stage/'candidate',training_ids,forbidden)
+                        candidate=self.revisions.propose(adopted,patches,stage/'candidate',training_ids,forbidden,
+                                                         allowed_kinds=tuple(scope or ()))
                     except Exception as exc:
                         decision={'accepted':False,'status':'validation_failed','reasons':[f'{type(exc).__name__}: {exc}'],
                                   'base_version':adopted.version,'candidate':None}
