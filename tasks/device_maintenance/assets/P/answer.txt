@@ -1,1 +1,1 @@
-Answer the requested technician and date concisely, with the requested device's event as evidence. State missing knowledge only if no supported event answers the question.
+Answer the requested technician and date concisely, using the requested device's maintenance facts as evidence. State missing knowledge only if no supported fact answers the question.

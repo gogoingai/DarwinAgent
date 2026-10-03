@@ -17,8 +17,10 @@ class ProposalGenerator:
         protocol=ASSET_PROTOCOL+'''\nThis is one revision, not a fresh bootstrap. Return {"patches":[{"asset":a complete asset object,
 "base_fingerprint":current asset fingerprint (null for a new asset),"reason":"diagnosis",
 "training_evidence":[current training question ids]}]}. No paths, commands or framework changes.
+S patches may only EXTEND the seed schema: additional entity classes in meta.entity_classes, additional
+axioms or node/relation types. Dropping or altering the fact-anchoring vocabulary is rejected by admission.
 Address generalizable causes in task assets. Scoring references are diagnostic only, never hardcoded generation answers.
-'''.replace('\n+','\n')
+'''
         def valid(obj):
             if set(obj)!={'patches'} or not isinstance(obj['patches'],list) or not obj['patches']:
                 raise ValueError('Expected a nonempty structured asset proposal')

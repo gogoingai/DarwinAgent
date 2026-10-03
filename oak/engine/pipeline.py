@@ -1,4 +1,8 @@
-"""The single fixed generation pipeline; datasets do not supply execution callbacks."""
+"""The single fixed generation pipeline; datasets do not supply execution callbacks.
+
+Extraction and assembly are two separate stages: the ExtractionAgent yields an
+independent MemoryResult of atomic facts, and the GraphAssembler deterministically
+builds the fact-anchored graph from that memory without model calls."""
 from __future__ import annotations
 
 import asyncio
@@ -10,10 +14,11 @@ import networkx as nx
 
 from oak.agents import AnswerAgent, ExtractionAgent
 from oak.config import RunConfig
-from oak.contracts import AnswerResult, GraphResult, RunResult
+from oak.contracts import AnswerResult, GraphResult, MemoryResult, RunResult, plain
+from oak.kg.assembler import GraphAssembler
+from oak.kg.graph import load_graph, save_graph
 from oak.kernel.execution import KernelRuntime
 from oak.kernel.validation import validate_case, validate_published
-from oak.kg.graph import load_graph, save_graph
 from oak.runtime.artifacts import atomic_json, digest
 from oak.runtime.identity import assert_files, snapshot_files, transport_identity
 
@@ -42,21 +47,56 @@ class Pipeline:
             runtime.bundle.verify();assert_files(framework)
             if transport_identity(self.client)!=transport: raise ValueError('Frozen model route/config changed')
         verify()
-        graph=None;graph_failure=None;raw=()
-        if (root/'graph.failure.json').exists():
+        corpus={b.source.id:b for b in case.corpus}
+
+        # Stage one: atomic-fact memory, checkpointed independently of the graph.
+        memory=None;memory_failure=None;raw=()
+        if (root/'memory.failure.json').exists():
+            failure=json.loads((root/'memory.failure.json').read_text())
+            memory_failure=failure['error'];raw=tuple(failure.get('raw_outputs',[]))
+        elif (root/'memory.complete.json').exists():
+            completion=json.loads((root/'memory.complete.json').read_text())
+            payload=json.loads((root/'memory.json').read_text())
+            if digest(payload)!=completion['digest']:
+                raise ValueError('Saved memory changed')
+            memory=MemoryResult.from_dict(payload,corpus)
+            if memory.fingerprint!=completion['fingerprint']:
+                raise ValueError('Saved memory fingerprint mismatch')
+        else:
+            try:
+                memory=await ExtractionAgent(runtime,self.client,config,identity[:16]).extract(case.corpus)
+                verify()
+                payload=memory.to_dict()
+                atomic_json(root/'memory.json',payload)
+                atomic_json(root/'memory.complete.json',{'digest':digest(payload),'fingerprint':memory.fingerprint,
+                            'facts':len(memory.facts),'raw_outputs':len(memory.raw_outputs),
+                            'diagnostics':plain(memory.diagnostics)})
+            except Exception as exc:
+                verify()
+                memory_failure=f'{type(exc).__name__}: {exc}'
+                raw=tuple(getattr(exc,'raw_outputs',()))
+                atomic_json(root/'memory.failure.json',{'error':memory_failure,'raw_outputs':list(raw)})
+
+        # Stage two: deterministic fact-anchored assembly from the memory.
+        graph=None;graph_failure=None;graph_fingerprint=''
+        if memory_failure:
+            graph_failure=f'extraction failed: {memory_failure}'
+        elif (root/'graph.failure.json').exists():
             failure=json.loads((root/'graph.failure.json').read_text())
-            graph_failure=failure['error'];raw=tuple(failure.get('raw_outputs',[]))
+            graph_failure=failure['error'];raw=tuple(failure.get('raw_outputs',[])) or raw
         elif (root/'graph.complete.json').exists():
             completion=json.loads((root/'graph.complete.json').read_text())
             graph_path=root/'graph.json'
-            if digest(json.loads(graph_path.read_text()))!=completion['digest']:
+            graph_payload=json.loads(graph_path.read_text())
+            if digest(graph_payload)!=completion['digest']:
                 raise ValueError('Saved graph changed')
-            graph=GraphResult(nx.freeze(load_graph(graph_path)),MappingProxyType({b.source.id:b for b in case.corpus}),
-                              tuple(completion['raw_outputs']),tuple(completion['diagnostics']))
-            runtime.validate_graph(graph)
+            graph=GraphResult(nx.freeze(load_graph(graph_path)),MappingProxyType(corpus),
+                              (),tuple(completion['diagnostics']))
+            graph_fingerprint=completion['digest']
+            runtime.validate_graph(graph,memory.fingerprint)
         else:
             try:
-                graph=await ExtractionAgent(runtime,self.client,config,identity[:16]).extract(case.corpus)
+                graph=GraphAssembler.build(memory,spec,runtime.schema)
                 verify()
                 # Trial every admitted F against the actual graph before inference can call it.
                 trials=runtime.functions.trial(graph,{a.id:list(a.trial_inputs) for a in runtime.bundle.assets.assets if a.kind=='F'})
@@ -64,13 +104,16 @@ class Pipeline:
                 from oak.kernel.counterexamples import run_probes
                 atomic_json(root/'counterexamples.json',run_probes(runtime,graph))
                 save_graph(graph.graph,root/'graph.json')
-                atomic_json(root/'graph.complete.json',{'digest':digest(json.loads((root/'graph.json').read_text())),
-                            'raw_outputs':list(graph.raw_outputs),'diagnostics':list(graph.diagnostics)})
+                graph_fingerprint=digest(json.loads((root/'graph.json').read_text()))
+                atomic_json(root/'graph.complete.json',{'digest':graph_fingerprint,
+                            'memory_fingerprint':memory.fingerprint,'raw_outputs':[],
+                            'diagnostics':list(graph.diagnostics)})
             except Exception as exc:
                 verify()
                 graph_failure=f'{type(exc).__name__}: {exc}'
-                raw=tuple(getattr(exc,'raw_outputs',())) or (() if graph is None else graph.raw_outputs)
+                raw=tuple(getattr(exc,'raw_outputs',())) or (() if graph is None else ())
                 atomic_json(root/'graph.failure.json',{'error':graph_failure,'raw_outputs':list(raw)})
+
         agent=AnswerAgent(runtime,self.client,config,spec,identity[:16])
         sem=asyncio.Semaphore(config.concurrency)
         async def one(question):
@@ -94,7 +137,10 @@ class Pipeline:
                 return answer
         answers=tuple(await asyncio.gather(*(one(q) for q in case.questions)))
         verify()
-        result=RunResult(case.id,identity,runtime.bundle.version,answers,0 if graph is None else graph.graph.number_of_nodes(),
-                         ({'status':'execution_error','error':graph_failure},) if graph_failure else graph.diagnostics)
+        result=RunResult(case.id,identity,runtime.bundle.version,answers,
+                         0 if graph is None else graph.graph.number_of_nodes(),
+                         ({'status':'execution_error','error':graph_failure},) if graph_failure else graph.diagnostics,
+                         0 if memory is None else len(memory.facts),
+                         '' if memory is None else memory.fingerprint,graph_fingerprint)
         atomic_json(root/'result.json',result.to_dict())
         return result

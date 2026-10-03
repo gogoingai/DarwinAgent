@@ -141,6 +141,202 @@ class AnswerResult:
         return cls(**{**data, "evidence": tuple(SourceRef(**x) for x in data.get("evidence", []))})
 
 
+FACT_POLARITIES = frozenset({"positive", "negative", "uncertain"})
+FACT_MODALITIES = frozenset({"statement", "plan", "hypothesis", "uncertain"})
+FACT_PRECISIONS = frozenset({"day", "month", "year", "unknown"})
+FACT_VALUE_DTYPES = frozenset({"string", "int", "float", "bool", "date"})
+
+
+def _fold_text(value: str) -> str:
+    return " ".join(str(value).split())
+
+
+def _iso_date_or_empty(value: str) -> str:
+    if not value:
+        return ""
+    from datetime import date
+    return date.fromisoformat(str(value)).isoformat()
+
+
+@dataclass(frozen=True)
+class EntityRef:
+    """A typed reference to one entity; normalization folds whitespace only."""
+
+    cls: str
+    name: str
+
+    def __post_init__(self):
+        if not all(type(x) is str and x.strip() for x in (self.cls, self.name)):
+            raise ValueError("Entity reference requires a class and a name")
+        object.__setattr__(self, "cls", _fold_text(self.cls))
+        object.__setattr__(self, "name", _fold_text(self.name))
+
+    def to_dict(self):
+        return {"class": self.cls, "name": self.name}
+
+
+@dataclass(frozen=True)
+class FactValue:
+    """A typed scalar carried as canonical text; F converts when computing."""
+
+    dtype: str
+    value: str
+
+    def __post_init__(self):
+        if self.dtype not in FACT_VALUE_DTYPES or type(self.value) is not str or not self.value.strip():
+            raise ValueError("Fact value requires a declared dtype and canonical text")
+
+    def to_dict(self):
+        return {"dtype": self.dtype, "value": self.value}
+
+
+@dataclass(frozen=True)
+class FactTime:
+    raw: str
+    precision: str = "unknown"
+    start: str = ""
+    end: str = ""
+    anchor_source_id: str = ""
+
+    def __post_init__(self):
+        if type(self.raw) is not str or not self.raw.strip():
+            raise ValueError("Fact time requires the original expression")
+        if self.precision not in FACT_PRECISIONS:
+            raise ValueError("Unknown time precision")
+        object.__setattr__(self, "start", _iso_date_or_empty(self.start))
+        object.__setattr__(self, "end", _iso_date_or_empty(self.end))
+        if not all(type(x) is str for x in (self.anchor_source_id,)):
+            raise ValueError("Invalid time anchor")
+
+    def to_dict(self):
+        return {"raw": self.raw, "precision": self.precision, "start": self.start,
+                "end": self.end, "anchor_source_id": self.anchor_source_id}
+
+
+@dataclass(frozen=True)
+class FactEvidence:
+    source_id: str
+    quote: str
+    start: int
+    end: int
+
+    def __post_init__(self):
+        if not all(type(x) is str and x.strip() for x in (self.source_id, self.quote)):
+            raise ValueError("Evidence requires a registered source and a verbatim quote")
+        if type(self.start) is not int or type(self.end) is not int or not 0 <= self.start < self.end:
+            raise ValueError("Evidence offsets must bracket the quote")
+
+    def to_dict(self):
+        return {"source_id": self.source_id, "quote": self.quote, "start": self.start, "end": self.end}
+
+
+@dataclass(frozen=True)
+class AtomicFact:
+    """One judging proposition with its provenance; the id is derived, never supplied."""
+
+    id: str
+    text: str
+    subject: EntityRef
+    predicate: str
+    object_entity: EntityRef | None = None
+    object_value: FactValue | None = None
+    polarity: str = "positive"
+    modality: str = "statement"
+    time: FactTime = field(default_factory=lambda: FactTime("未注明"))
+    evidence: tuple[FactEvidence, ...] = ()
+
+    def __post_init__(self):
+        if not isinstance(self.subject, EntityRef):
+            raise ValueError("Fact requires a typed subject")
+        if not all(type(x) is str and x.strip() for x in (self.text, self.predicate)):
+            raise ValueError("Fact requires complete proposition text and a predicate")
+        if self.polarity not in FACT_POLARITIES or self.modality not in FACT_MODALITIES:
+            raise ValueError("Unknown polarity or modality")
+        if not isinstance(self.time, FactTime):
+            raise ValueError("Fact requires a time record")
+        object.__setattr__(self, "evidence", tuple(self.evidence))
+        if not self.evidence or not all(isinstance(x, FactEvidence) for x in self.evidence):
+            raise ValueError("Facts require at least one located evidence span")
+        if self.object_entity is not None and self.object_value is not None:
+            raise ValueError("A fact object is either an entity or a value, not both")
+        if self.object_entity is not None and not isinstance(self.object_entity, EntityRef):
+            raise ValueError("Invalid object entity")
+        if self.object_value is not None and not isinstance(self.object_value, FactValue):
+            raise ValueError("Invalid object value")
+        if type(self.id) is not str or not self.id:
+            raise ValueError("Fact identity is framework-derived")
+
+    def content(self):
+        """Normalized body without the identity; the id material."""
+        return {"text": self.text, "subject": self.subject.to_dict(), "predicate": self.predicate,
+                "object_entity": self.object_entity.to_dict() if self.object_entity else None,
+                "object_value": self.object_value.to_dict() if self.object_value else None,
+                "polarity": self.polarity, "modality": self.modality, "time": self.time.to_dict(),
+                "evidence": [e.to_dict() for e in self.evidence]}
+
+    def derived_id(self):
+        from .runtime.artifacts import digest
+        return digest({"sources": sorted({e.source_id for e in self.evidence}), "fact": self.content()})
+
+    @classmethod
+    def create(cls, **fields):
+        probe = cls("0", fields["text"], fields["subject"], fields["predicate"],
+                    fields.get("object_entity"), fields.get("object_value"),
+                    fields.get("polarity", "positive"), fields.get("modality", "statement"),
+                    fields.get("time") or FactTime("未注明"), tuple(fields.get("evidence") or ()))
+        return cls(probe.derived_id(), probe.text, probe.subject, probe.predicate,
+                   probe.object_entity, probe.object_value, probe.polarity, probe.modality,
+                   probe.time, probe.evidence)
+
+    def to_dict(self):
+        return {"id": self.id, **self.content()}
+
+    @classmethod
+    def from_dict(cls, data):
+        def ref(x):
+            return EntityRef(x["class"], x["name"]) if x else None
+        fact = cls(data["id"], data["text"], ref(data["subject"]), data["predicate"],
+                   ref(data["object_entity"]),
+                   FactValue(**data["object_value"]) if data["object_value"] else None,
+                   data["polarity"], data["modality"], FactTime(**data["time"]),
+                   tuple(FactEvidence(**e) for e in data["evidence"]))
+        if fact.id != fact.derived_id():
+            raise ValueError("Fact identity does not match its content")
+        return fact
+
+
+@dataclass(frozen=True)
+class MemoryResult:
+    """Validated atomic facts with raw responses and per-batch diagnostics."""
+
+    corpus: Mapping[str, CorpusBlock]
+    facts: tuple[AtomicFact, ...]
+    raw_outputs: tuple[str, ...] = ()
+    diagnostics: tuple[Mapping[str, Any], ...] = ()
+
+    def __post_init__(self):
+        object.__setattr__(self, "corpus", MappingProxyType(dict(self.corpus)))
+        object.__setattr__(self, "facts", tuple(self.facts))
+        object.__setattr__(self, "raw_outputs", tuple(self.raw_outputs))
+        object.__setattr__(self, "diagnostics", tuple(freeze(x) for x in self.diagnostics))
+        if not all(isinstance(x, AtomicFact) for x in self.facts):
+            raise ValueError("Memory holds atomic facts only")
+
+    @property
+    def fingerprint(self):
+        from .runtime.artifacts import digest
+        return digest([f.to_dict() for f in sorted(self.facts, key=lambda x: x.id)])
+
+    def to_dict(self):
+        return {"facts": [f.to_dict() for f in self.facts], "raw_outputs": list(self.raw_outputs),
+                "diagnostics": plain(self.diagnostics)}
+
+    @classmethod
+    def from_dict(cls, data, corpus):
+        return cls(corpus, tuple(AtomicFact.from_dict(x) for x in data["facts"]),
+                   tuple(data.get("raw_outputs", ())), tuple(data.get("diagnostics", ())))
+
+
 @dataclass(frozen=True)
 class GraphResult:
     graph: Any
@@ -157,11 +353,15 @@ class RunResult:
     answers: tuple[AnswerResult, ...]
     graph_nodes: int
     graph_diagnostics: tuple[Mapping[str, Any], ...] = ()
+    memory_count: int = 0
+    memory_fingerprint: str = ""
+    graph_fingerprint: str = ""
 
     def to_dict(self):
         return {"case_id": self.case_id, "identity": self.identity, "asset_version": self.asset_version,
                 "answers": [x.to_dict() for x in self.answers], "graph_nodes": self.graph_nodes,
-                "graph_diagnostics": plain(self.graph_diagnostics)}
+                "graph_diagnostics": plain(self.graph_diagnostics), "memory_count": self.memory_count,
+                "memory_fingerprint": self.memory_fingerprint, "graph_fingerprint": self.graph_fingerprint}
 
 
 @dataclass(frozen=True)

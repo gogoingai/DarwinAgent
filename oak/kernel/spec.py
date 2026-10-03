@@ -53,6 +53,7 @@ class TaskSpec:
     answer_format: str = "text"
     answer_contract: Mapping = field(default_factory=lambda: {"type": "string"})
     bundle: object | None = None
+    seed_s: str = ""
 
     def __post_init__(self):
         if not self.name or not self.description or not self.source_kinds:
@@ -61,18 +62,27 @@ class TaskSpec:
             raise ValueError("Unknown answer format")
         object.__setattr__(self, "parameter_contract", freeze(self.parameter_contract))
         object.__setattr__(self, "answer_contract", freeze(self.answer_contract))
+        if not isinstance(self.seed_s, str):
+            raise ValueError("Seed schema must be text")
         if any(callable(x) for x in self.__dict__.values()):
             raise ValueError("Task cannot contain execution callbacks")
 
     def declaration(self):
+        from oak.runtime.artifacts import digest
         return {"name": self.name, "description": self.description, "source_kinds": list(self.source_kinds),
                 "metadata_keys": list(self.metadata_keys), "parameter_contract": plain(self.parameter_contract),
-                "answer_format": self.answer_format, "answer_contract": plain(self.answer_contract)}
+                "answer_format": self.answer_format, "answer_contract": plain(self.answer_contract),
+                "seed_s_fingerprint": digest(self.seed_s) if self.seed_s else ""}
 
     @classmethod
     def load(cls, path: Path, bundle=None):
-        data = yaml.safe_load(Path(path).read_text())
-        return cls(**data, bundle=bundle)
+        path = Path(path)
+        data = yaml.safe_load(path.read_text())
+        seed = data.pop("seed", None) or {}
+        seed_s = ""
+        if isinstance(seed, Mapping) and seed.get("S"):
+            seed_s = (path.parent / str(seed["S"])).read_text()
+        return cls(**data, bundle=bundle, seed_s=seed_s)
 
     def with_bundle(self, bundle):
         from dataclasses import replace

@@ -1,8 +1,9 @@
-# device_maintenance S：事实锚定核心 + 设备维护实体分类（框架校验锚定词表不可删）
+# conversation_memory 初始 S（方案规定的固定种子；优化只可扩展，不可删锚定结构）
+# 事实锚定约束（框架校验）：六类节点与七类关系必须原样保留；实体分类经 meta.entity_classes 扩展。
 meta:
-  task: device_maintenance
+  task: conversation_memory
   anchoring: fact-centric-v1
-  entity_classes: [device, person]
+  entity_classes: [person, object, place, organization, activity, topic]
 entity_types:
   AtomicFact:
     description: 记忆节点——一条独立可判断的原子命题，节点完整携带事实定义（__fact__）
@@ -14,19 +15,19 @@ entity_types:
       - {name: polarity, dtype: string}
       - {name: modality, dtype: string}
   Entity:
-    description: 主体或对象实体；class 取 meta.entity_classes 之一
+    description: 主体或对象实体；class 取 meta.entity_classes 之一，name 为空白折叠后的规范化名
     primary_key: [class, name]
     attributes:
       - {name: class, dtype: string}
       - {name: name, dtype: string}
   Value:
-    description: 有类型的标量值（规范字符串）
+    description: 有类型的标量值，以规范字符串保存（F 计算时自行转换类型）
     primary_key: [dtype, value]
     attributes:
       - {name: dtype, dtype: string}
       - {name: value, dtype: string}
   Time:
-    description: 时间记录——原文表达、精度、可选 ISO 范围与相对锚点
+    description: 时间记录——原文表达、精度、可选 ISO 范围与相对时间锚点（会话日期来源）
     primary_key: [id]
     attributes:
       - {name: id, dtype: string}
@@ -36,7 +37,7 @@ entity_types:
       - {name: end, dtype: string}
       - {name: anchor_source_id, dtype: string}
   EvidenceSpan:
-    description: 逐字证据片段及其在来源原文中的字符偏移
+    description: 逐字证据片段及其在来源原文中的字符偏移；不改写标点
     primary_key: [id]
     attributes:
       - {name: id, dtype: string}
@@ -45,7 +46,7 @@ entity_types:
       - {name: start_offset, dtype: int}
       - {name: end_offset, dtype: int}
   Source:
-    description: 注册来源记录
+    description: 注册来源消息，携带说话人与会话日期（相对时间的锚点）
     primary_key: [kind, document_id, location]
     attributes:
       - {name: kind, dtype: string}
@@ -59,6 +60,6 @@ relation_types:
   object_value: {domain: AtomicFact, range: Value, description: 事实的对象值}
   occurrence_time: {domain: AtomicFact, range: Time, description: 事实的发生时间}
   evidence: {domain: AtomicFact, range: EvidenceSpan, description: 事实的逐字证据}
-  locates: {domain: EvidenceSpan, range: Source, description: 证据定位到来源记录}
-  time_anchor: {domain: Time, range: Source, description: 相对时间锚点来源}
+  locates: {domain: EvidenceSpan, range: Source, description: 证据定位到来源消息}
+  time_anchor: {domain: Time, range: Source, description: 相对时间的锚点来源（会话日期）}
 axioms: []

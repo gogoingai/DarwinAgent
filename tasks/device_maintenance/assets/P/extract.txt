@@ -1,1 +1,1 @@
-Preserve device serial, maintenance date and technician from each maintenance record. Do not combine different events or add unsourced technicians. The schema is ${schema}.
+Extract one atomic fact per maintenance statement: who maintained which device and when. Preserve device identity, dates and technician attribution exactly; keep negated or planned maintenance as separate facts with matching polarity and modality. Each fact cites a verbatim quote from its record. The schema is ${schema}.

@@ -1,26 +1,23 @@
-import asyncio
 import tempfile
 import time
 import unittest
 from dataclasses import replace
 from pathlib import Path
 
-from oak.agents import ExtractionAgent
 from oak.config import RunConfig
-from oak.kernel.assets import KernelAssets
+from oak.kernel.assets import Asset, KernelAssets
 from oak.kernel.execution import KernelRuntime
 from oak.kernel.counterexamples import run_probes
 from oak.kernel.validation import validate_graph
 from oak.operators.sandbox import Interpreter, Limits, SandboxError, admit
-from tests.fixtures import case,client,spec
+from tests.fixtures import case, client, memory_and_graph, spec
 
 
 class RuntimeGuardTests(unittest.TestCase):
     def setup_graph(self):
         td=tempfile.TemporaryDirectory();self.addCleanup(td.cleanup)
-        root=Path(td.name);c=case();s=spec(root/'assets');config=RunConfig()
-        runtime=KernelRuntime(s.bundle,config)
-        graph=asyncio.run(ExtractionAgent(runtime,client(c),config,'test').extract(c.corpus))
+        root=Path(td.name);c=case();s=spec(root/'assets')
+        runtime,memory,graph=memory_and_graph(c,s)
         return root,c,s,runtime,graph
 
     def test_wrong_function_result_type(self):
@@ -42,14 +39,14 @@ class RuntimeGuardTests(unittest.TestCase):
     def test_actual_graph_type_contract_and_source_checks(self):
         root,c,s,runtime,graph=self.setup_graph()
         nd=next(iter(graph.graph.nodes.values()))
-        for key,value in [('__key__','{"serial":"D-17","date":"invalid-date"}'),('__sources__',['forged'])]:
+        for key,value in [('id','mismatched'),('__sources__',['forged'])]:
             old=nd[key];nd[key]=value
             with self.assertRaises(ValueError): validate_graph(graph,runtime.schema)
             nd[key]=old
 
     def test_behavior_probe_rejects_subject_lookup_constant(self):
         root,c,s,runtime,graph=self.setup_graph()
-        assets=[replace(a,content="def run(params):\n return nodes('Maintenance', {'serial':'D-17'}, limit=20)") if a.kind=='F' else a for a in s.bundle.assets.assets]
+        assets=[replace(a,content="def run(params):\n return nodes('Entity', {'class':'device','name':'D-17'}, limit=20)") if a.kind=='F' else a for a in s.bundle.assets.assets]
         rt=KernelRuntime(KernelAssets(tuple(assets)).export(root/'constant'),RunConfig())
         with self.assertRaises(ValueError): run_probes(rt,graph)
 
@@ -63,5 +60,4 @@ class RuntimeGuardTests(unittest.TestCase):
 
     def test_prompt_does_not_expand_visible_inputs(self):
         root,c,s,runtime,graph=self.setup_graph()
-        from oak.kernel.assets import Asset
         with self.assertRaises(ValueError): Asset('prompt','P','${evaluator}',role='answer')

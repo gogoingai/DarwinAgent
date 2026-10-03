@@ -15,18 +15,21 @@ from oak.runtime.artifacts import digest
 
 
 def run_probes(runtime,graph):
-    """Rename key values and shift dates. Parameterized F must transform with the input.
+    """Rename subject data values and shift declared dates. Parameterized F must transform with the input.
 
+    Entity classes are schema vocabulary (like type names), not subject data: values declared in
+    meta.entity_classes are exempt from renaming so class-scoped filters stay valid.
     This checks dependence on actual data, not semantic correctness of arbitrary tasks;
     independent C fixtures and source review cover those separately.
     """
+    vocabulary=set(runtime.schema.meta.get('entity_classes') or [])
     replacements={}
     for _,nd in graph.graph.nodes(data=True):
         spec=runtime.schema.entity(nd['etype']); values=node_view(nd)
         dtypes={a.name:a.dtype for a in spec.attributes}
         for key in spec.primary_key:
             value=values.get(key)
-            if dtypes[key]=='string' and isinstance(value,str) and 1<=len(value)<=48:
+            if dtypes[key]=='string' and isinstance(value,str) and 1<=len(value)<=48 and value not in vocabulary:
                 replacements[value]='cf_'+digest(value)[:12]
         for key,kind in dtypes.items():
             value=values.get(key)

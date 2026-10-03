@@ -65,7 +65,8 @@ class DatasetBoundary(unittest.TestCase):
 
     def test_no_preseeded_conversation_assets(self):
         files=[p for p in (ROOT/'tasks/conversation_memory').rglob('*') if p.is_file()]
-        self.assertEqual([p.name for p in files],['task.yaml'])
+        # Only the task declaration and its fixed seed schema; no generated F/C/P seeds.
+        self.assertEqual(sorted(p.name for p in files),['schema.yaml','task.yaml'])
 
     def test_generation_contract_rejects_evaluation_metadata(self):
         from oak.contracts import CaseInput,CorpusBlock,SourceRef

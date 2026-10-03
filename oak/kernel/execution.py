@@ -31,8 +31,8 @@ class KernelRuntime:
     def graph_snapshot(self,graph):
         return {'nodes':list(DataCapabilities(graph).rows.values()),'stage':'graph'}
 
-    def validate_graph(self,graph):
-        validate_graph(graph,self.schema)
+    def validate_graph(self,graph,expected_memory_fingerprint=None):
+        validate_graph(graph,self.schema,expected_memory_fingerprint)
         opinions=self.checks.run('graph',self.graph_snapshot(graph))
         failures=[x for x in opinions if not x['ok']]
         if failures: raise ValueError(f'Task graph checks rejected graph: {failures}')

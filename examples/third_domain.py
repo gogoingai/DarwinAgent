@@ -33,8 +33,12 @@ async def run(task_root,work_dir):
     bundle=load_assets(task_root).export(work_dir/'assets')
     spec=TaskSpec.load(task_root/'task.yaml',bundle)
     transport=RecordedClient({
-        'extraction':[{'entities':[{'type':'Maintenance','key':{'serial':'D-17','date':'2026-09-01'},
-                                  'properties':{'technician':'林'},'source_id':case.corpus[0].source.id,'quote':case.corpus[0].text}], 'relations':[]}],
+        'extraction':[{'facts':[{'text':'设备 D-17 于 2026-09-01 由林维护',
+                                  'subject':{'class':'device','name':'D-17'},'predicate':'维护',
+                                  'object':{'entity':{'class':'person','name':'林'}},
+                                  'polarity':'positive','modality':'statement',
+                                  'time':{'raw':'2026-09-01','precision':'day','start':'2026-09-01','end':'','relative':False},
+                                  'evidence':[{'source_id':case.corpus[0].source.id,'quote':case.corpus[0].text}]}]}],
         'tools':[{'action':'call','asset_id':'device_lookup','parameters':{'serial':'D-17'}},{'action':'ready'}],
         'answer':[{'status':'answered','answer':'林于 2026-09-01 维护了设备 D-17。','node_ids':['n000000']}],
         'review':[{'accepted':True,'supported':True,'subject_correct':True,'consistent':True,'complete':True,

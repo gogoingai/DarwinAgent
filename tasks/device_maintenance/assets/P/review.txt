@@ -1,1 +1,1 @@
-Verify device identity, technician and exact date against the original maintenance record. An event for a different device cannot support an answer. If an event answers the request, reject semantic abstention and explain the supported correction.
+Verify device identity, technician and exact date against the cited records. A fact about a different device cannot support an answer. If a fact answers the request, reject semantic abstention and explain the supported correction.
