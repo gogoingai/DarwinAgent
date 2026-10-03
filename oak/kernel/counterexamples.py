@@ -14,7 +14,7 @@ from oak.operators.data import DataCapabilities
 from oak.runtime.artifacts import digest
 
 
-def run_probes(runtime,graph):
+def run_probes(runtime,graph,memory=None):
     """Rename subject data values and shift declared dates. Parameterized F must transform with the input.
 
     Entity classes are schema vocabulary (like type names), not subject data: values declared in
@@ -87,4 +87,67 @@ def run_probes(runtime,graph):
     if [(c['check_id'],c['ok']) for c in original]!=[(c['check_id'],c['ok']) for c in shifted]:
         raise ValueError('Graph C depends on training names/dates rather than a declared invariant')
     records.append({'probe':'graph_check_renaming','status':'passed'})
+    if memory is not None:
+        records.extend(run_fact_probes(runtime,memory))
+    return records
+
+
+def run_fact_probes(runtime,memory):
+    """Fixed synthetic fact mutations: negation, plan, duplicates, add/delete, renames and
+    date shifts must land as separate preserved facts whose identity follows their content."""
+    from dataclasses import replace as _replace
+    from oak.contracts import AtomicFact, EntityRef, MemoryResult
+    from oak.kg.assembler import GraphAssembler
+    facts=list(memory.facts)
+    if not facts: return []
+    base=facts[0]
+
+    def rebuild(fact,**changes):
+        fields={'text':fact.text,'subject':fact.subject,'predicate':fact.predicate,
+                'object_entity':fact.object_entity,'object_value':fact.object_value,
+                'polarity':fact.polarity,'modality':fact.modality,'time':fact.time,
+                'evidence':fact.evidence}
+        fields.update(changes)
+        return AtomicFact.create(**fields)
+
+    def assemble(mutated):
+        merged=MemoryResult(memory.corpus,tuple({f.id:f for f in mutated}.values()))
+        return GraphAssembler.build(merged,None,runtime.schema),merged
+
+    def fact_nodes(result):
+        return sum(1 for _,nd in result.graph.nodes(data=True) if nd.get('etype')=='AtomicFact')
+
+    records=[]
+    # Negation and plan flips stay separate facts; nothing merges them away.
+    flipped=[rebuild(base,polarity='negative' if base.polarity!='negative' else 'positive'),
+             rebuild(base,modality='plan' if base.modality!='plan' else 'statement')]
+    graph,merged=assemble(facts+flipped)
+    if fact_nodes(graph)!=len(merged.facts):
+        raise ValueError('Fact probe failed: polarity/modality flips were merged away')
+    records.append({'probe':'negation_and_plan_preserved','status':'passed','facts':len(merged.facts)})
+    # Exact duplicates collapse; different-source statements never merge.
+    graph,merged=assemble(facts+[base])
+    if fact_nodes(graph)!=len({f.id for f in facts}):
+        raise ValueError('Fact probe failed: duplicate handling is not identity-based')
+    records.append({'probe':'duplicate_identity','status':'passed'})
+    # Adding and deleting a fact changes the graph exactly and keeps anchoring valid.
+    synthetic=rebuild(base,text='探测用追加事实 '+base.text,subject=EntityRef(base.subject.cls,'cf_probe_'+base.subject.name))
+    graph,merged=assemble(facts+[synthetic])
+    if fact_nodes(graph)!=len({f.id for f in facts+[synthetic]}):
+        raise ValueError('Fact probe failed: added fact did not materialize')
+    if len(facts)>1:
+        graph,merged=assemble(facts[1:])
+        if fact_nodes(graph)!=len({f.id for f in facts[1:]}):
+            raise ValueError('Fact probe failed: deleted fact left residue')
+    records.append({'probe':'add_delete_follow_memory','status':'passed'})
+    # Identity follows content: renamed subjects and shifted dates change the derived id.
+    renamed=rebuild(base,subject=EntityRef(base.subject.cls,'cf_'+base.subject.name))
+    if renamed.id==base.id:
+        raise ValueError('Fact probe failed: identity ignores subject content')
+    if base.time.start:
+        from datetime import date,timedelta
+        shifted=rebuild(base,time=_replace(base.time,start=(date.fromisoformat(base.time.start)+timedelta(days=17)).isoformat()))
+        if shifted.id==base.id:
+            raise ValueError('Fact probe failed: identity ignores dates')
+    records.append({'probe':'identity_follows_content','status':'passed'})
     return records

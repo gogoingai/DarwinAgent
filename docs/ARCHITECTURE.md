@@ -1,4 +1,4 @@
-# Oak 0.3.2：固定框架与 S/F/C/P 资产
+# Oak 0.4.0：固定框架与 S/F/C/P 资产（原子事实两阶段与三集合迭代）
 
 框架掌握执行流程，数据集实现输入适配和独立评测，优化器只能提交符合契约的 S/F/C/P 资产补丁。H、任务执行回调、数据集私有 Agent/Pipeline 和 `oak_domains` 已退出活动实现和发行包。S/F 来自 OaK 内核思想；C/P 是本项目的工程扩展，不宣称为论文原有机制。
 
@@ -12,7 +12,7 @@ oak/                              # wheel 仅发行这个包
   config.py                       # 冻结 RunConfig；连接配置单独装配
   engine/pipeline.py              # 唯一 Pipeline，身份、恢复、产物
   agents/
-    extraction.py                # 通用 ExtractionAgent
+    extraction.py                # 通用 ExtractionAgent（原子事实 -> MemoryResult）
     answer.py                    # 通用 AnswerAgent
     protocol.py                  # 固定协议、解析、调用预算、反馈重试
   kernel/
@@ -26,10 +26,11 @@ oak/                              # wheel 仅发行这个包
     counterexamples.py           # 固定改名、日期平移等行为反例
     revision.py                  # 独立候选、原子发布
   experiments/
-    bootstrap.py                 # 通用提示现场生成 S/F/C/P
+    bootstrap.py                 # 按任务种子 S 现场生成 F/C/P
     proposal.py                  # 当前训练反馈 -> 一个结构化提案
-    runner.py                    # B0 -> R1 -> R2，有界采纳控制器
-    policy.py                    # 冻结指标采纳规则
+    runner.py                    # B0 -> Rn 采纳控制器（支持无限轮次与 STOP 叫停）
+    campaign.py                  # 三集合 campaign：B0 门 -> 迭代 -> 锁定 -> 验证 -> 选版 -> 一次性测试
+    policy.py / spec.py          # 冻结采纳规则 / ExperimentSpec 与选版策略
   schema/                        # 声明解析、静态检查、图实例公理检查
   kg/                            # 类型图与来源
   operators/{data.py,sandbox.py}  # 只读算子、正向 AST 解释器
@@ -73,7 +74,14 @@ classDiagram
     run(CaseInput, TaskSpec, RunConfig) RunResult
   }
   class ExtractionAgent {
-    extract(corpus) GraphResult
+    extract(corpus) MemoryResult
+  }
+  class GraphAssembler {
+    <<static>>
+    build(memory, spec, schema) GraphResult
+  }
+  class CampaignController {
+    run(task_spec, resume) summary
   }
   class AnswerAgent {
     answer(question, graph) AnswerResult
@@ -98,9 +106,12 @@ classDiagram
   ExperimentRunner --> ProposalGenerator
   ExperimentRunner --> AssetRevisionService
   Pipeline *-- ExtractionAgent
+  Pipeline *-- GraphAssembler
   Pipeline *-- AnswerAgent
   Pipeline *-- KernelRuntime
   ExtractionAgent --> KernelRuntime
+  GraphAssembler ..> MemoryResult : 锚定不变量
+  CampaignController --> ExperimentRunner
   AnswerAgent --> KernelRuntime
   KernelRuntime --> KernelBundle
   KernelRuntime --> FunctionRegistry
@@ -112,8 +123,10 @@ classDiagram
 
 ```mermaid
 flowchart LR
-  A[标准语料和来源] --> E[ExtractionAgent]
-  E --> G[S / 来源 / 图实例公理 / 任务 C]
+  A[标准语料和来源] --> E[ExtractionAgent 原子事实]
+  E --> M[MemoryResult 独立记忆产物]
+  M --> GA[GraphAssembler 确定性装配]
+  GA --> G[S / 来源 / 图实例公理 / 任务 C]
   G --> T[F 准入 / 真实图试跑 / 固定反例]
   T --> Q[AnswerAgent 收集工具数据]
   Q --> D[生成候选]
@@ -149,9 +162,22 @@ P 仅支持 `extract/tools/answer/review` 四个角色；`${schema}` 可用于�
 
 编译/试跑通过不能证明语义正确。准入检查完整问题和题号常量，固定反例检查改名与日期变化，独立任务测试改变请求预算、人数、方向和日期。真实答案还要结合原始来源做语义审查。首版执行的是封闭 S 文法和图实例公理；没有启用外部 HermiT 的运行不会宣称已获得完整 OWL 形式证明。
 
+
+## 事实锚定与两阶段生成（0.4.0）
+
+抽取与构图是两个独立阶段：`ExtractionAgent.extract(corpus)` 只产出 `MemoryResult`（不可变原子事实 + 原始响应 + 逐批诊断 + 指纹），`GraphAssembler.build(memory, spec, schema)` 按任务 S 声明的映射确定性构图，不调用模型。框架冻结三条锚定不变量并在装配与校验双侧强制：
+
+1. **图来自记忆**：图的全部结构由记忆装配而来，S 只能声明映射（核心六类型 + 七关系 + 实体分类 + 语义约束 + 可选物化视图），删除锚定词表的 S 无法通过准入。
+2. **图准确复原记忆**：每条原子事实是图中一等公民的记忆节点（`__fact__` 完整定义）；图上复原事实的指纹必须等于记忆指纹（round-trip 校验）。
+3. **一切回溯记忆节点**：任何非事实节点（实体、值、时间、证据、来源、物化视图）都与事实节点连通，游离结构直接拒绝。
+
+抽取按消息边界分批（批正文 ≤2000 字符），超长消息独立成批并保留原文偏移；明确截断触发固定二分（最多两层）；逐条校验错误必须指明事实、字段与来源；引文必须是逐字子串，框架只记录偏移、不改写。会话日期是相对时间的锚点，只有原文支持时才转换为发生时间，精度保留到原文允许的程度。
+
+初始 S 由任务声明的固定种子（`tasks/<task>/assets/S/`）给定，冷启动只生成 F/C/P；提案可以只增不删地扩展 S。训练侧无限迭代由操作者 `--stop` 叫停后锁定候选（B0 + 全部采纳版本），统一完整运行验证集选版（原始严格 > B0 且宽松 ≥ B0、零故障；同分取更早版本），测试集一次性运行 B0 与选定版本（指纹相同只跑一次）。题次逐题记账，可选安全上限；验证与测试的逐题诊断在封存前不进入提案。
+
 ## 数据集实现的职责
 
-LoCoMo 适配器转换 `message_text/observation/event_summary`，记录日期、说话人和来源层可靠性，只传问题文本。图片说明、gold、QA evidence、类别和陷阱答案不进入生成接口。独立评测保留原始/修订 gold × 宽松/精准四种口径，完整中英语料的评测格式与已冻结实现一致。
+LoCoMo 适配器只转换 `message_text`，携带说话人与会话日期；observation、event_summary、图片说明、gold、QA evidence、类别和陷阱答案一律不进入生成接口。训练 conv-26 用原始/修订 gold × 宽松/精准四口径（修订 gold 仅 conv-26 存在），验证 conv-47 与测试 conv-49 用原始 gold 严格+宽松两口径；判分实现与 11 文件 SHA256 锁保持冻结。
 
 TravelPlanner 适配器读取每题 reference 表及已经允许的环境表（城市州、餐饮、住宿、景点、距离），按该请求范围登记来源，保留官方缺值过滤语义。运行时没有隐藏官方 CSV 查库或覆盖图属性。旅行查询、人数房间费用计算、连续入住和计划条件归入受限 F/C/P；官方评测桥接仍位于原 `pipeline/eval/`。
 

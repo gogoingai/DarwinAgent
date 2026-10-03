@@ -31,6 +31,7 @@ class RunConfig:
     concurrency: int = 4
     extraction_batch_chars: int = 2000
     extraction_bisect_depth: int = 2
+    extraction_max_tokens: int = 4000
     protocol_attempts: int = 3
     answer_attempts: int = 3
     tool_steps: int = 5
@@ -48,7 +49,8 @@ class RunConfig:
     proposal_role: str = "proposal"
 
     def __post_init__(self):
-        for key in ("concurrency", "extraction_batch_chars", "extraction_bisect_depth", "protocol_attempts", "answer_attempts",
+        for key in ("concurrency", "extraction_batch_chars", "extraction_bisect_depth", "extraction_max_tokens",
+                    "protocol_attempts", "answer_attempts",
                     "tool_steps", "calls_per_question", "max_tokens", "function_steps", "result_bytes"):
             if type(getattr(self, key)) is not int or getattr(self, key) <= 0:
                 raise ValueError(f"{key} must be a positive integer")

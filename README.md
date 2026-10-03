@@ -16,7 +16,7 @@ tags:
 
 ## 目录结构
 
-当前固定框架为 **0.3.2**：数据集实现输入适配和独立评测，生成与迭代由 `oak` 统一执行，只优化有能力边界的 S/F/C/P 资产。活动 H、`oak_domains` 与私有生成流程已移除，发行 wheel 只包含 `oak`。
+当前固定框架为 **0.4.0**（抽取/构图两阶段 + 事实锚定图 + 三集合 campaign）：数据集实现输入适配和独立评测，生成与迭代由 `oak` 统一执行，只优化有能力边界的 S/F/C/P 资产。活动 H、`oak_domains` 与私有生成流程已移除，发行 wheel 只包含 `oak`。
 
 ```text
 oak/                         # 固定框架
@@ -52,7 +52,7 @@ third_party/                 # 已允许的 TravelPlanner 环境数据
 
 [架构、类图与能力边界](docs/ARCHITECTURE.md) · [接入与运行](docs/PORTABLE-USAGE.md) · [实施和验收](docs/PORTABILITY-PLAN.md)。框架实现验收与模型成绩分开记录；冷启动结果以对应运行目录产物为准，不能用离线录制响应代替真实实验。
 
-0.3.2 当前通过 98 项离线检查和仓库外 wheel 验收。LoCoMo 冷启动两轮失败，没有有效评分基线或被采纳修订，详见[修复与实验记录](docs/FRAMEWORK-REPAIR-LOG.md)。下表为历史任务成绩。
+0.4.0 通过 119 项离线检查（核心/接入/控制器/三集合 campaign 98 + 冻结评测与旅行资产 21）和仓库外 wheel 验收；抽取按消息边界分批（≤2000 字符）+ 截断二分 + 定位化错误反馈，图由原子记忆确定性装配并做 round-trip 校验。0.3.2 的真实冷启动失败记录与归因见[修复与实验记录](docs/FRAMEWORK-REPAIR-LOG.md)。下表为历史任务成绩。
 
 ## 成绩（严格口径，详见各任务目录）
 
@@ -78,8 +78,10 @@ cp .env.example .env          # 填 ZHIPU_API_KEY（locomo 另可配 LOCOMO_FAST
 uv sync --extra benchmarks
 uv run python -m datasets.travelplanner.run --split train --index 0 --output datasets/travelplanner/runs/my_framework_case
 
-# LoCoMo 中文
-uv run python -m datasets.locomo.run --experiment --output datasets/locomo/runs/my_cold_start  # conv-26，B0/R1/R2
+# LoCoMo 中文（三集合：train=conv-26 / validation=conv-47 / test=conv-49）
+uv run python -m datasets.locomo.scripts.precheck --output datasets/locomo/runs/atomic_v1   # 真实模型预检（campaign 的启动门）
+uv run python -m datasets.locomo.run --campaign --output datasets/locomo/runs/atomic_v1     # B0 -> Rn 无限迭代（--rounds 可设上限）
+uv run python -m datasets.locomo.run --campaign --output datasets/locomo/runs/atomic_v1 --stop  # 叫停：当前轮完成后锁定候选并进入验证/测试
 
 # 框架、接入与控制器检查，及显式录制响应的第三任务示例
 uv run python -m unittest discover -s tests

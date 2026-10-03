@@ -199,7 +199,7 @@ class ExtractionAgent:
                         facts = await session.request(self.config.extraction_role,
                             FACT_EXTRACT_PROTOCOL + '\n任务抽取指引：\n' + self.runtime.prompt('extract'),
                             payload, _make_validator(segments, classes),
-                            max_tokens=max(self.config.max_tokens, 4000))
+                            max_tokens=self.config.extraction_max_tokens)
                         collected[slot] = (facts, session.raw, session.events)
                         raw.extend(session.raw)
                         diagnostics.append({'batch': slot, 'depth': depth, 'status': 'ok', 'facts': len(facts),

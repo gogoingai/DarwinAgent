@@ -1,4 +1,4 @@
-# Oak 0.3.2 使用与仓库外接入
+# Oak 0.4.0 使用与仓库外接入
 
 发行包只包含 `oak`。每个数据集实现 `DatasetAdapter.generation_input(case_id)` 与 `Evaluator.evaluate(RunResult)` 两个接口，资产和 TaskSpec 由声明文件加载。
 
@@ -67,4 +67,4 @@ PYTHONHASHSEED=0 .venv/bin/python -B -u -m datasets.locomo.run --experiment --ou
 uv build --wheel
 ```
 
-已验证 wheel 位于 `dist/oak_repro-0.3.2-py3-none-any.whl`。安装和复制任务资产后，普通应用直接调用 Pipeline；只有初始化与训练迭代才调用 ExperimentRunner。
+0.4.0 wheel 重建于 `dist/oak_repro-0.4.0-py3-none-any.whl`（0.3.2 旧 wheel 保留在 dist/）。安装和复制任务资产后，普通应用直接调用 Pipeline；只有初始化与训练迭代才调用 ExperimentRunner。

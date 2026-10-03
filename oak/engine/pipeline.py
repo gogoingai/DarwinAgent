@@ -102,7 +102,7 @@ class Pipeline:
                 trials=runtime.functions.trial(graph,{a.id:list(a.trial_inputs) for a in runtime.bundle.assets.assets if a.kind=='F'})
                 atomic_json(root/'function-trials.json',trials)
                 from oak.kernel.counterexamples import run_probes
-                atomic_json(root/'counterexamples.json',run_probes(runtime,graph))
+                atomic_json(root/'counterexamples.json',run_probes(runtime,graph,memory))
                 save_graph(graph.graph,root/'graph.json')
                 graph_fingerprint=digest(json.loads((root/'graph.json').read_text()))
                 atomic_json(root/'graph.complete.json',{'digest':graph_fingerprint,
