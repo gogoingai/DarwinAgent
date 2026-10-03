@@ -59,3 +59,4 @@ datasets/locomo/runs/**/*.console.log
 # ---- 构建产物与本地参考资料 ----
 dist/
 papers/
+datasets/locomo/runs/agentic_v1/
