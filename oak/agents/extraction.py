@@ -62,6 +62,23 @@ def looks_truncated(raw):
         return 'Unterminated string' in (exc.msg or '') or (exc.pos is not None and exc.pos >= len(body) - 1)
 
 
+def _quote_diagnostic(text, quote):
+    """Classify why a quote missed, without ever repairing it: the feedback teaches verbatim copying."""
+    import re as _re
+    if _re.sub(r'\s+', '', quote) in _re.sub(r'\s+', '', text):
+        return '（差异仅空白：请逐字复制，不要增删空格）'
+    table = str.maketrans({'，': ',', '。': '.', '；': ';', '：': ':', '？': '?', '！': '!',
+                           '（': '(', '）': ')', '「': '"', '」': '"', '『': '"', '』': '"'})
+    if _re.sub(r'\s+', '', quote.translate(table)) in _re.sub(r'\s+', '', text.translate(table)):
+        return '（标点全角/半角不一致：请逐字复制原文标点，不得转换）'
+    head = quote[:6]
+    m = _re.search(_re.escape(head), text)
+    if m:
+        start = max(0, m.start() - 8)
+        return f'（原文此处为：…{text[start:start + 42]}… 请从中逐字复制）'
+    return ''
+
+
 def _canonical_value(where, obj):
     if set(obj) != {'dtype', 'value'}:
         raise ValueError(f'{where}.value: 必须是 {{dtype, value}}')
@@ -162,7 +179,9 @@ def _make_validator(segments, classes):
                     raise ValueError(f'{ewhere}.quote: 引文不能为空')
                 local = seg_text(seg).find(quote)
                 if local < 0:
-                    raise ValueError(f"{ewhere}.quote: 引文不是来源 {ev['source_id']} 原文的逐字子串（不得改写标点或增删字符）")
+                    raise ValueError(f"{ewhere}.quote: 引文不是来源 {ev['source_id']} 原文的逐字子串"
+                                     f"{_quote_diagnostic(seg_text(seg), quote)}（不得改写标点或增删字符；"
+                                     f"只修正被点名的事实，其余事实原样返回）")
                 evidence.append(FactEvidence(seg.block.source.id, quote, seg.start + local, seg.start + local + len(quote)))
             anchor = evidence[0].source_id if t['relative'] is True else ''
             try:
