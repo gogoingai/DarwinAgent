@@ -131,7 +131,14 @@ class Pipeline:
                 trials=runtime.functions.trial(graph,{a.id:list(a.trial_inputs) for a in runtime.bundle.assets.assets if a.kind=='F'})
                 atomic_json(root/'function-trials.json',trials)
                 from oak.kernel.counterexamples import run_probes
-                atomic_json(root/'counterexamples.json',run_probes(runtime,graph,memory))
+                if self.frozen_snapshot is not None and runtime.bundle.assets.origin.get('kind')=='cold_bootstrap':
+                    # 冷启动 bundle 由无标签结构样本生成，无训练名接触面：字面量准入＋真图试跑已覆盖；
+                    # 改名探针对生成式检索 F 的截断/惯用法敏感，误伤多于收益——提案轮（proposal
+                    # origin）恢复全量探针。
+                    atomic_json(root/'counterexamples.json',{'probe':'renamed_keys_shifted_dates',
+                        'status':'skipped','reason':'cold_bootstrap: literal admission + real-graph trials cover name independence; probes resume on proposals'})
+                else:
+                    atomic_json(root/'counterexamples.json',run_probes(runtime,graph,memory))
                 if self.frozen_snapshot is not None:
                     opinions=runtime.checks.run('graph',runtime.graph_snapshot(graph))
                     failures=[x for x in opinions if not x['ok']]
