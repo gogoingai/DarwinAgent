@@ -29,9 +29,10 @@ MODEL_ROLES: dict[str, str] = {
 class RunConfig:
     """Engineering policy, frozen before a baseline; never an optimization asset."""
     concurrency: int = 4
-    extraction_batch_chars: int = 2000
+    extraction_batch_chars: int = 400
     extraction_bisect_depth: int = 2
     extraction_max_tokens: int = 8000
+    extraction_temperature: float = 0.0
     protocol_attempts: int = 3
     answer_attempts: int = 3
     tool_steps: int = 5
@@ -54,7 +55,7 @@ class RunConfig:
                     "tool_steps", "calls_per_question", "max_tokens", "function_steps", "result_bytes"):
             if type(getattr(self, key)) is not int or getattr(self, key) <= 0:
                 raise ValueError(f"{key} must be a positive integer")
-        if self.function_timeout_s <= 0 or not 0 <= self.temperature <= 2:
+        if self.function_timeout_s <= 0 or not 0 <= self.temperature <= 2 or not 0 <= self.extraction_temperature <= 2:
             raise ValueError("Invalid execution limits")
 
     def to_dict(self):

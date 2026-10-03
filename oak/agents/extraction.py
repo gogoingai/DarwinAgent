@@ -207,6 +207,10 @@ class ExtractionAgent:
         if not classes:
             raise ProtocolError('S 未声明实体类别（meta.entity_classes）', ())
         batches = plan_batches(corpus, self.config.extraction_batch_chars)
+        # Extraction copies verbatim: zero temperature and the frozen batch ceiling are engineering
+        # identity; quoting drift grows with facts per call, so batches stay small.
+        from dataclasses import replace as _replace
+        session_config = _replace(self.config, temperature=self.config.extraction_temperature)
         queue: asyncio.Queue = asyncio.Queue()
         slots = 0
         for index, batch in enumerate(batches):
@@ -222,7 +226,7 @@ class ExtractionAgent:
                 try: slot, segments, depth = queue.get_nowait()
                 except asyncio.QueueEmpty: return
                 async with sem:
-                    session = ModelSession(self.client, self.config, f'{self.namespace}_extract_{slot}')
+                    session = ModelSession(self.client, session_config, f'{self.namespace}_extract_{slot}')
                     payload = {'schema': {'entity_classes': sorted(classes)},
                                'sources': [{'source_id': f'm{index}', 'text': seg_text(s),
                                             'metadata': plain(s.block.metadata)}
