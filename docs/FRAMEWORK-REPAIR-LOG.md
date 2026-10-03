@@ -179,3 +179,11 @@ glm-5.3-flash 同站与 strong 档共享并发池（单网关并发红线），�
 - **P2 反馈预算以完整序列化载荷为准**：预算护栏从「逐条记录自身长度累计」改为「最终完整反馈对象（骨架+字段名+分隔符+统计字段+全部保留行）的序列化长度」——诊断→生成故障→图诊断按优先级逐行试探进入，任一行使完整载荷超限即止。验收收紧为严格 ≤ 上限（撤销 +4000 宽限），大量短记录（3000×60 字符）、少量长记录（8×20k，恰留 1 条）、三类混合（诊断截断+故障截断）三种场景全部受控。
 - **P2 训练身份编码去碰撞**：`f'{case}::{q}'` 拼接对含 "::" 的合法 id 存在碰撞（("case-a::part","q1") 与 ("case-a","part::q1") 同串）；改为长度前缀编码 `training_id = f'{len(case)}:{case}::{q}'`（kernel/revision.py 提供 training_id/parse_training_id 可逆对），贯穿提案问题清单、缺省问题构造与准入校验（依据先解析出 (case, question) 再比对训练集合，不可解析/可解析但不存在均拒绝）。评审给出的两个碰撞输入产生不同身份且各自精确还原。
 - 新增 ReviewRoundSeven 七项回归；连带更新 test_assets/test_experiment/test_campaign 的依据 id 至新编码。全量 138+11+10 绿；examples/third_domain.py 复跑通过。
+
+### 评审修复轮八（2026-10-04，训练故障汇总/报告封存顺序/骨架超限/协议模式一致性）
+
+- **P1 训练评测失败进入总状态**：runner 新增 `_stage_health`（读各阶段 stage.json：未完成/生成故障/评测故障即记入 `unhealthy_stages`），`summary.status` 汇总之——正常评分后的拒绝仍可 complete，评分无法完成必须 failed；campaign `_stage_statuses` 纳入 train（`train/<轮>/stage.json`），campaign unhealthy_stages 与总状态同步训练阶段故障。
+- **P2 报告持久化先于封存**：`_finalize` 改为先写 `campaign-summary.json` 再 `set_phase('done')`；报告与总装抽取为共享 `_assemble_summary`（finalize 与重建同源）；phase==done 但报告缺失 → `_rebuild_summary` 从磁盘产物（train summary/selected.json/逐 case stage.json 聚合/台账）重建报告，不重新执行任何阶段；报告存在则维持封存拒绝。
+- **P2 评分骨架超限明确报错**：`training_feedback` 骨架（scores+统计）序列化超预算时 `raise ValueError`（含实际长度与上限），不再原样返回超限载荷——评分字段不可截断，超限即拒绝提案。
+- **P2 提案协议按真实图模式生成**：bootstrap 协议重构为「阶段头（输出格式+S 边界+包形状）＋图模式段（anchored/legacy）＋共享核心规则」三段组合；新增 `revision_protocol(base)` 按 bundle 的 S（meta.anchoring）分支——legacy bundle 不再收到 AtomicFact/fact-anchored 指令；每个协议只含一种输出格式（bootstrap=assets、revision=patches）；消除「S 固定不可改 vs S 可扩展」矛盾（anchored 修订=EXTEND-only+锚定声明冻结；legacy 修订=S 可改但须维持既有 F/C 可运行，准入重跑 trial）；`propose()` 把实际协议文本写入 proposal-call.json 供审计与测试。
+- 新增 ReviewRoundEight 七项回归（故障入总状态、campaign 训练阶段汇总、报告先落盘+丢失重建+台账不变、骨架超限 ValueError、anchored/legacy 修订协议一致性、bootstrap 单一输出格式、全流程协议无原子图硬编码）。全量 145+11+10 绿；examples/third_domain.py 复跑通过。此后框架冻结（0.5.0-dev），进入 Agentic 图＋向量接入轮。

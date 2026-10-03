@@ -63,19 +63,22 @@ def training_feedback(cases, results, case_diagnostics, baseline):
     # A row is admitted only if the whole serialized object stays within budget. Priority is
     # diagnostics, then generation failures, then graph diagnostics; earlier sections stay
     # fixed while a later one fills. Prefix semantics: a row that no longer fits ends its
-    # section. The empty skeleton (scores + stats) is irreducible; if it alone exceeds the
-    # budget the payload is returned as-is rather than silently dropping scores.
+    # section. The irreducible skeleton (scores + stats) may not exceed the budget either:
+    # an oversized scores block refuses the proposal instead of shipping over-budget.
     def fits(counts):
         return len(json.dumps(payload(counts), ensure_ascii=False)) <= FEEDBACK_BUDGET_CHARS
 
+    skeleton = len(json.dumps(payload((0, 0, 0)), ensure_ascii=False))
+    if skeleton > FEEDBACK_BUDGET_CHARS:
+        raise ValueError(f'反馈骨架（scores+统计字段）序列化后 {skeleton} 字符，超过预算 '
+                         f'{FEEDBACK_BUDGET_CHARS}：评分载荷本身超限，拒绝生成提案')
     counts = [0, 0, 0]
-    if fits((0, 0, 0)):
-        for idx, limit in enumerate((len(rows), len(failures), len(graph_rows))):
-            while counts[idx] < limit:
-                trial = counts[:]; trial[idx] += 1
-                if not fits(trial):
-                    break
-                counts = trial
+    for idx, limit in enumerate((len(rows), len(failures), len(graph_rows))):
+        while counts[idx] < limit:
+            trial = counts[:]; trial[idx] += 1
+            if not fits(trial):
+                break
+            counts = trial
     return payload(counts)
 
 
@@ -107,6 +110,21 @@ class ExperimentRunner:
         self.frozen=snapshot_files([Path(__file__).resolve().parents[1],*frozen_files])
         self.revisions=AssetRevisionService()
         self._injected_client=client_factory
+
+    def _stage_health(self):
+        """Stage-level execution faults from the on-disk stage records. A candidate rejected
+        after complete scoring is a normal outcome; a stage that could not finish scoring is
+        a fault and must surface in the run status."""
+        health={}
+        for path in sorted(self.root.glob('*/stage.json')):
+            row=json.loads(path.read_text());scores=row.get('scores',{})
+            faults={'status':row.get('status'),'completed':scores.get('completed'),
+                    'total':scores.get('total'),'generation_faults':scores.get('generation_faults'),
+                    'evaluation_faults':scores.get('evaluation_faults')}
+            if (row.get('status')!='complete' or faults['completed']!=faults['total']
+                    or faults['generation_faults'] or faults['evaluation_faults']):
+                health[path.parent.name]=faults
+        return health
 
     def _client(self,stage):
         if self._injected_client is not None:
@@ -247,7 +265,10 @@ class ExperimentRunner:
                     evidence=name  # 后续提案的诊断跟随新采纳版本
                 print(json.dumps({'stage':name,'accepted':decision['accepted'],'reasons':decision['reasons']},ensure_ascii=False),flush=True)
             self.verify()
-            summary={'status':'complete' if all(d.get('status')!='validation_failed' for d in decisions) else 'failed',
+            # 汇总训练阶段执行/评测故障：正常评分后的拒绝可完成，评分未完成必须报失败
+            unhealthy=self._stage_health()
+            summary={'status':'complete' if not unhealthy and all(d.get('status')!='validation_failed' for d in decisions) else 'failed',
+                     'unhealthy_stages':unhealthy,
                      'stopped_by_operator':stopped,'rounds':decisions,'adopted_version':adopted.version,
                      'adopted_scores':baseline.to_dict()}
             atomic_json(self.root/'summary.json',summary)

@@ -194,7 +194,10 @@ class CampaignController:
             if not resume or state['declaration'] != declaration:
                 raise ValueError('Existing campaign requires explicit resume with exactly the same identity')
             if state.get('phase') == 'done':
-                raise ValueError('Campaign sealed: the test split is unblinded and the campaign is final; start a new root')
+                if (self.root / 'campaign-summary.json').exists():
+                    raise ValueError('Campaign sealed: the test split is unblinded and the campaign is final; start a new root')
+                # 封存先于报告落盘的旧事故现场：只重建报告，不重新执行任何阶段
+                return self._rebuild_summary()
             if state.get('phase') == 'blocked_b0':
                 raise ValueError('Campaign blocked at the B0 gate; the run identity is unchanged so resume cannot change the outcome')
         else:
@@ -243,8 +246,20 @@ class CampaignController:
         return await self._finalize(task_spec, train_summary)
 
     def _stage_statuses(self):
-        """Per-case stage records live at <phase>/<version>/<case>/stage.json."""
+        """Validation/test keep per-case records at <phase>/<version>/<case>/stage.json;
+        training keeps one aggregated record per round at train/<round>/stage.json. Both
+        surface in the campaign status: a faulted training stage is not a normal rejection."""
         statuses = {}
+        for path in sorted((self.root / 'train').glob('*/stage.json')):
+            row = json.loads(path.read_text())
+            scores = row.get('scores', {})
+            failed = (row.get('status') != 'complete'
+                      or scores.get('completed') != scores.get('total')
+                      or scores.get('generation_faults') or scores.get('evaluation_faults'))
+            statuses[f'train/{path.parent.name}'] = {
+                'status': 'failed' if failed else 'complete',
+                'version': row.get('asset_version'),
+                'case': '+'.join(row.get('cases', [])), 'phase': 'train'}
         for phase in ('validation', 'test'):
             for path in sorted((self.root / phase).glob('*/*/stage.json')):
                 row = json.loads(path.read_text())
@@ -298,7 +313,14 @@ class CampaignController:
             self._settle(f'test/{version}', sum(len(r.answers) for r in results))
             test[version] = scores.to_dict()
 
+        # 报告先持久化，封存后置：写失败时 phase 仍可恢复，不会出现「已封存但无报告」
+        summary = self._assemble_summary(train_summary, chain, validation, decision, selected, test)
         set_phase('done')
+        return summary
+
+    def _assemble_summary(self, train_summary, chain, validation, decision, selected, test):
+        """Build AND persist the final report; both the finalize path and the rebuild path
+        land here so the two can never drift."""
         stage_statuses = self._stage_statuses()
         healthy = (train_summary.get('status') == 'complete'
                    and all(v['status'] == 'complete' for v in stage_statuses.values())
@@ -315,3 +337,28 @@ class CampaignController:
                    'operator_stopped': train_summary.get('stopped_by_operator', False)}
         atomic_json(self.root / 'campaign-summary.json', summary)
         return summary
+
+    def _rebuild_summary(self):
+        """The campaign reached done but the report never landed: rebuild it from on-disk
+        artifacts. Nothing re-executes — training stays locked and the test split stays
+        sealed; only the missing report is recovered."""
+        train_summary = json.loads((self.root / 'train' / 'summary.json').read_text())
+        chain = self._candidate_chain()
+        selected_record = json.loads((self.root / 'selected.json').read_text())
+
+        def phase_scores(phase):
+            out = {}
+            for candidate in chain:
+                version = candidate['version']
+                split = self.root / phase / version
+                if not split.exists():
+                    continue
+                scores = [EvaluationResult(**json.loads(p.read_text())['scores'])
+                          for p in sorted(split.glob('*/stage.json'))]
+                if scores:
+                    out[version] = aggregate_scores(scores).to_dict()
+            return out
+
+        return self._assemble_summary(train_summary, chain, phase_scores('validation'),
+                                      selected_record['decision'], selected_record['selected'],
+                                      phase_scores('test'))
