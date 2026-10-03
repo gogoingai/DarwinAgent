@@ -31,7 +31,7 @@ class RunConfig:
     concurrency: int = 4
     extraction_batch_chars: int = 2000
     extraction_bisect_depth: int = 2
-    extraction_max_tokens: int = 4000
+    extraction_max_tokens: int = 8000
     protocol_attempts: int = 3
     answer_attempts: int = 3
     tool_steps: int = 5

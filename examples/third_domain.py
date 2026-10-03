@@ -38,7 +38,7 @@ async def run(task_root,work_dir):
                                   'object':{'entity':{'class':'person','name':'林'}},
                                   'polarity':'positive','modality':'statement',
                                   'time':{'raw':'2026-09-01','precision':'day','start':'2026-09-01','end':'','relative':False},
-                                  'evidence':[{'source_id':case.corpus[0].source.id,'quote':case.corpus[0].text}]}]}],
+                                  'evidence':[{'source_id':'m0','quote':case.corpus[0].text}]}]}],
         'tools':[{'action':'call','asset_id':'device_lookup','parameters':{'serial':'D-17'}},{'action':'ready'}],
         'answer':[{'status':'answered','answer':'林于 2026-09-01 维护了设备 D-17。','node_ids':['n000000']}],
         'review':[{'accepted':True,'supported':True,'subject_correct':True,'consistent':True,'complete':True,

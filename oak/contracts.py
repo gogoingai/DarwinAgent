@@ -143,7 +143,7 @@ class AnswerResult:
 
 FACT_POLARITIES = frozenset({"positive", "negative", "uncertain"})
 FACT_MODALITIES = frozenset({"statement", "plan", "hypothesis", "uncertain"})
-FACT_PRECISIONS = frozenset({"day", "month", "year", "unknown"})
+FACT_PRECISIONS = frozenset({"day", "week", "month", "year", "hour", "unknown"})
 FACT_VALUE_DTYPES = frozenset({"string", "int", "float", "bool", "date"})
 
 

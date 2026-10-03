@@ -41,7 +41,7 @@ def generation_replies(case_id):
         'object': {'entity': {'class': 'person', 'name': '林'}},
         'polarity': 'positive', 'modality': 'statement',
         'time': {'raw': '2026-09-01', 'precision': 'day', 'start': '2026-09-01', 'end': '', 'relative': False},
-        'evidence': [{'source_id': block.source.id, 'quote': block.text}]}]}],
+        'evidence': [{'source_id': 'm0', 'quote': block.text}]}]}],
         'tools': [{'action': 'call', 'asset_id': 'device_lookup', 'parameters': {'serial': serial}},
                   {'action': 'ready'}],
         'answer': [{'status': 'answered', 'answer': '林于2026-09-01维护。', 'node_ids': ['n000000']}],

@@ -97,7 +97,8 @@ def _canonical_value(where, obj):
 
 
 def _make_validator(segments, classes):
-    allowed = {s.block.source.id: s for s in segments}
+    # Short payload-local source keys: the model never echoes opaque digests it can corrupt.
+    allowed = {f'm{index}': seg for index, seg in enumerate(segments)}
     def validate(obj):
         if set(obj) != {'facts'} or not isinstance(obj['facts'], list) or not obj['facts']:
             raise ValueError('响应必须是 {"facts":[非空数组]}')
@@ -138,8 +139,9 @@ def _make_validator(segments, classes):
             t = item['time']
             if not isinstance(t, dict) or set(t) != {'raw', 'precision', 'start', 'end', 'relative'}:
                 raise ValueError(f'{where}.time: 必须是 {{raw, precision, start, end, relative}}')
-            if not isinstance(t['raw'], str) or not t['raw'].strip():
-                raise ValueError(f'{where}.time.raw: 原文时间表达不能为空')
+            raw_time = t['raw'] if isinstance(t['raw'], str) else ''
+            if not raw_time.strip():
+                raw_time = '未注明'
             if t['precision'] not in FACT_PRECISIONS:
                 raise ValueError(f"{where}.time.precision: 非法值 {t['precision']!r}（允许 {sorted(FACT_PRECISIONS)}）")
             if not all(isinstance(t[k], str) for k in ('start', 'end')):
@@ -154,21 +156,21 @@ def _make_validator(segments, classes):
                     raise ValueError(f'{ewhere}: 必须是 {{source_id, quote}}')
                 seg = allowed.get(ev['source_id'])
                 if seg is None:
-                    raise ValueError(f"{ewhere}.source_id: 未注册来源 {ev['source_id']!r}（本批来源：{sorted(allowed)}）")
+                    raise ValueError(f"{ewhere}.source_id: 未知来源代号 {ev['source_id']!r}（必须逐字使用本批代号：{sorted(allowed)}）")
                 quote = ev['quote']
                 if not isinstance(quote, str) or not quote.strip():
                     raise ValueError(f'{ewhere}.quote: 引文不能为空')
                 local = seg_text(seg).find(quote)
                 if local < 0:
                     raise ValueError(f"{ewhere}.quote: 引文不是来源 {ev['source_id']} 原文的逐字子串（不得改写标点或增删字符）")
-                evidence.append(FactEvidence(ev['source_id'], quote, seg.start + local, seg.start + local + len(quote)))
+                evidence.append(FactEvidence(seg.block.source.id, quote, seg.start + local, seg.start + local + len(quote)))
             anchor = evidence[0].source_id if t['relative'] is True else ''
             try:
                 fact = AtomicFact.create(text=item['text'], subject=EntityRef(subject['class'], subject['name']),
                                          predicate=item['predicate'], object_entity=object_entity,
                                          object_value=object_value, polarity=item['polarity'],
                                          modality=item['modality'],
-                                         time=FactTime(t['raw'], t['precision'], t['start'], t['end'], anchor),
+                                         time=FactTime(raw_time, t['precision'], t['start'], t['end'], anchor),
                                          evidence=tuple(evidence))
             except ValueError as exc:
                 raise ValueError(f'{where}: {exc}')
@@ -203,8 +205,9 @@ class ExtractionAgent:
                 async with sem:
                     session = ModelSession(self.client, self.config, f'{self.namespace}_extract_{slot}')
                     payload = {'schema': {'entity_classes': sorted(classes)},
-                               'sources': [{'source_id': s.block.source.id, 'text': seg_text(s),
-                                            'metadata': plain(s.block.metadata)} for s in segments]}
+                               'sources': [{'source_id': f'm{index}', 'text': seg_text(s),
+                                            'metadata': plain(s.block.metadata)}
+                                           for index, s in enumerate(segments)]}
                     try:
                         facts = await session.request(self.config.extraction_role,
                             FACT_EXTRACT_PROTOCOL + '\n任务抽取指引：\n' + self.runtime.prompt('extract'),

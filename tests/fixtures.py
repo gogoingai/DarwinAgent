@@ -23,7 +23,7 @@ def extraction(c):
                       'object':{'entity':{'class':'person','name':'林'}},
                       'polarity':'positive','modality':'statement',
                       'time':{'raw':'2026-09-01','precision':'day','start':'2026-09-01','end':'','relative':False},
-                      'evidence':[{'source_id':c.corpus[0].source.id,'quote':c.corpus[0].text}]}]}
+                      'evidence':[{'source_id':'m0','quote':c.corpus[0].text}]}]}
 
 
 def review(accepted=True,status='answered'):

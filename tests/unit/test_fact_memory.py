@@ -177,11 +177,11 @@ class ExtractionTests(unittest.TestCase):
     def test_valid_reply_yields_memory_with_offsets(self):
         b1 = block('1', '我下周修打印机。')
         import asyncio
-        sid = b1.source.id
-        memory, client = asyncio.run(self.run_extract([b1], [fact_reply(sid, '我下周修打印机')]))
+        memory, client = asyncio.run(self.run_extract([b1], [fact_reply('m0', '我下周修打印机')]))
         self.assertEqual(len(memory.facts), 1)
         fact = memory.facts[0]
         self.assertEqual(fact.evidence[0].start, 0)
+        self.assertEqual(fact.evidence[0].source_id, b1.source.id)
         self.assertEqual(b1.text[fact.evidence[0].start:fact.evidence[0].end], fact.evidence[0].quote)
         self.assertEqual(fact.time.anchor_source_id, b1.source.id)
         self.assertEqual(fact.object_entity.name, '打印机')
@@ -189,20 +189,19 @@ class ExtractionTests(unittest.TestCase):
 
     def test_pointed_feedback_then_correction(self):
         b1 = block('1', '我下周修打印机。')
-        sid = b1.source.id
-        bad = fact_reply(sid, '我下周修打印机')
+        bad = fact_reply('m0', '我下周修打印机')
         bad['facts'][0]['evidence'][0]['quote'] = '我下周修打印机，'  # punctuation rewritten
         import asyncio
-        memory, client = asyncio.run(self.run_extract([b1], [bad, fact_reply(sid, '我下周修打印机')]))
+        memory, client = asyncio.run(self.run_extract([b1], [bad, fact_reply('m0', '我下周修打印机')]))
         self.assertEqual(len(memory.facts), 1)
         feedback = client.calls[1]['messages'][-1]['content']
         self.assertIn('facts[0].evidence[0].quote', feedback)
         self.assertIn('逐字', feedback)
-        self.assertIn(b1.source.id, feedback)
+        self.assertIn('m0', feedback)
 
     def test_unknown_class_rejected_with_allowed_list(self):
         b1 = block('1', '我下周修打印机。')
-        bad = fact_reply(b1.source.id, '我下周修打印机')
+        bad = fact_reply('m0', '我下周修打印机')
         bad['facts'][0]['subject']['class'] = 'human'
         import asyncio
         with self.assertRaises(Exception):
@@ -210,7 +209,7 @@ class ExtractionTests(unittest.TestCase):
 
     def test_final_batch_failure_raises(self):
         b1 = block('1', '我下周修打印机。')
-        bad = fact_reply(b1.source.id, '不存在')
+        bad = fact_reply('m0', '不存在')
         import asyncio
         with self.assertRaises(Exception) as ctx:
             asyncio.run(self.run_extract([b1], [bad, bad, bad]))
@@ -223,7 +222,7 @@ class ExtractionTests(unittest.TestCase):
                             'predicate': '身高', 'object': {'value': {'dtype': 'float', 'value': 1.8}},
                             'polarity': 'positive', 'modality': 'statement',
                             'time': {'raw': '未注明', 'precision': 'unknown', 'start': '', 'end': '', 'relative': False},
-                            'evidence': [{'source_id': b1.source.id, 'quote': '乙身高一米八'}]}]}
+                            'evidence': [{'source_id': 'm0', 'quote': '乙身高一米八'}]}]}
         memory, _ = asyncio.run(self.run_extract([b1], [reply]))
         self.assertEqual(memory.facts[0].object_value, FactValue('float', '1.8'))
 
