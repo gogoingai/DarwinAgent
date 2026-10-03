@@ -118,3 +118,7 @@
 - 尝试 2（atomic_v1_b0_blocked1）：引导一次通过；抽取阶段失败——模型抄错 64 位哈希 source_id 一字符、modality 用枚举外 wish、time.raw 空串、precision week 越界、deepseek 空正文耗尽 5 次传输重试。修复：载荷改短代号 m0/m1（框架映射回真实来源）、枚举补 week/hour、raw 空归一"未注明"、愿望→plan 映射提示、max_tokens 8000。
 - 尝试 3（atomic_v1_b0_blocked2）：引导再败于新规则类——字典项赋值（result['k']=v）、某 F 空 trial_inputs、一次随机 JSON 双转义。修复：协议禁容器内/属性赋值、F 试跑参数必须非空。
 - 尝试 4（atomic_v1，进行中）：引导通过（bundle 95f2c622）；抽取部分批次完成后 **fast 档(commandcode) 周配额 429 用尽**（限额 2026-10-04T02:47:55 重置）。B0 门拦截 blocked_b0。处置：按方案不换模型；等待配额重置后清理 B0 失败标记（memory.failure.json/answers/result/evaluation/stage，保留 identity 与缓存）同身份断点续跑——已完成抽取批次命中生成缓存，重试成本低。
+
+### 路由变更（2026-10-03，用户拍板）
+
+commandcode fast 档周配额耗尽（重置 2026-10-04T02:47:55Z）阻塞第四次尝试后，用户决定 fast 档切回智谱 glm-5.3-flash（同端点同凭据、共享 strong 并发池；上一轮 iter_v2 的抽取即此配置，有先例）。按冻结规则：`.env` 注释 LOCOMO_FAST_* 三项，transport 身份变更 → atomic_v1 更名 atomic_v1_quota_blocked 保留，新根 atomic_v2 重新预检后重建 B0。
