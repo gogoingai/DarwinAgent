@@ -1,3 +1,5 @@
+> 历史版本说明：本文记录 0.2 阶段。当前生成和资产边界以 docs/ARCHITECTURE.md 与两个数据集的 run.py 为准；本文不再是活动生成流程的实施依据。
+
 # OaK 收口设计（DESIGN-closeout）
 
 > 配套 `docs/ARCHITECTURE.md`（框架四部件）。本文定义收口的目标、判定规则、迭代协议与冻结清单。

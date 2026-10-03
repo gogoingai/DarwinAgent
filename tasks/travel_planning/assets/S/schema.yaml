@@ -1,0 +1,21 @@
+entity_types:
+  Flight:
+    primary_key: [Flight Number, FlightDate]
+    attributes: [{name: Flight Number, dtype: string}, {name: FlightDate, dtype: date}, {name: Price, dtype: float}, {name: OriginCityName, dtype: string}, {name: DestCityName, dtype: string}, {name: DepTime, dtype: string}, {name: ArrTime, dtype: string}, {name: ActualElapsedTime, dtype: string}]
+  Accommodation:
+    primary_key: [NAME, city]
+    attributes: [{name: NAME, dtype: string}, {name: city, dtype: string}, {name: room type, dtype: string}, {name: price, dtype: float}, {name: minimum nights, dtype: float}, {name: maximum occupancy, dtype: int}, {name: house_rules, dtype: string}]
+  Restaurant:
+    primary_key: [Name, City]
+    attributes: [{name: Name, dtype: string}, {name: City, dtype: string}, {name: Cuisines, dtype: string}, {name: Average Cost, dtype: float}]
+  Attraction:
+    primary_key: [Name, City]
+    attributes: [{name: Name, dtype: string}, {name: City, dtype: string}, {name: Address, dtype: string}]
+  City:
+    primary_key: [city]
+    attributes: [{name: city, dtype: string}, {name: state, dtype: string}]
+  Distance:
+    primary_key: [origin, destination]
+    attributes: [{name: origin, dtype: string}, {name: destination, dtype: string}, {name: cost, dtype: float}, {name: duration, dtype: string}, {name: distance, dtype: string}]
+relation_types: {}
+axioms: []

@@ -194,9 +194,6 @@ class LLMClient:
                 last_err = e
                 if e.status_code not in (429, 500, 502, 503, 504):
                     raise                      # 4xx（除 429）不重试
-                if e.status_code == 429 and json_mode:
-                    # 有些网关不支持 json_object 参数 → 降级纯 prompt 约束后重试一次
-                    json_mode = False
             # 指数退避 + 抖动（429 首次退避从 8s 起，避免反复撞限流）
             base = 8.0 if (isinstance(last_err, APIStatusError)
                            and getattr(last_err, "status_code", None) == 429) else 1.0

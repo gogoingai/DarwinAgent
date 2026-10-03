@@ -1,0 +1,98 @@
+"""Framework-owned, read-only data operators and capability registry."""
+from __future__ import annotations
+
+from datetime import date
+from types import MappingProxyType
+from oak.contracts import plain
+from oak.kg.graph import node_view
+from .sandbox import DATA_CAPABILITIES
+
+
+class DataCapabilities:
+    def __init__(self, graph_result):
+        self.graph_result = graph_result
+        self.rows = {}
+        self.actual_ids = {}
+        self.read_ids = set()
+        self.read_operations = 0
+        for index, (nid, nd) in enumerate(sorted(graph_result.graph.nodes(data=True))):
+            rid = f'n{index:06d}'
+            self.actual_ids[rid] = nid
+            self.rows[rid] = {'node_id': rid, 'entity_type': nd['etype'], **node_view(nd),
+                             'source_ids': list(nd.get('__sources__', [])),
+                             'claims': plain(nd.get('__claims__', []))}
+
+    def _read(self, rows):
+        self.read_ids.update(r['node_id'] for r in rows)
+        return rows
+
+    def nodes(self, entity_type='', filters=None, limit=100):
+        self.read_operations += 1
+        if not isinstance(entity_type, str) or type(limit) is not int or not 1 <= limit <= 5000:
+            raise ValueError('Invalid data query')
+        filters = filters or {}
+        if not isinstance(filters, (dict, MappingProxyType)):
+            raise ValueError('Filters must be an object')
+        rows = [r for r in self.rows.values() if (not entity_type or r['entity_type'] == entity_type)
+                and all(r.get(k) == v for k,v in filters.items())]
+        return self._read(rows[:limit])
+
+    def search(self, terms, entity_type='', limit=40):
+        self.read_operations += 1
+        if isinstance(terms, str): terms = [terms]
+        if not isinstance(terms, (list,tuple)) or not all(isinstance(x,str) and 0 < len(x) <= 100 for x in terms) or len(terms) > 30:
+            raise ValueError('Search requires short text terms')
+        if type(limit) is not int or not 1 <= limit <= 200:
+            raise ValueError('Search limit must be 1..200')
+        ranked = []
+        import json
+        for r in self.rows.values():
+            if entity_type and r['entity_type'] != entity_type: continue
+            text = json.dumps(r,ensure_ascii=False).lower()
+            score = sum(1 for term in terms if term.lower() in text)
+            if score: ranked.append((score,r['node_id'],r))
+        ranked.sort(key=lambda x:(-x[0],x[1]))
+        return self._read([r for _,_,r in ranked[:limit]])
+
+    def traverse(self, node_ids, relation, direction='out'):
+        self.read_operations += 1
+        if isinstance(node_ids,str): node_ids=[node_ids]
+        if direction not in {'out','in'} or len(node_ids)>100:
+            raise ValueError('Invalid traversal')
+        g=self.graph_result.graph
+        rev={v:k for k,v in self.actual_ids.items()}
+        found=set()
+        for rid in node_ids:
+            if rid not in self.actual_ids: raise ValueError('Unknown graph node')
+            self.read_ids.add(rid)
+            nid=self.actual_ids[rid]
+            edges=g.out_edges(nid,data=True) if direction=='out' else g.in_edges(nid,data=True)
+            for head,tail,attrs in edges:
+                if attrs.get('relation')==relation: found.add(rev[tail if direction=='out' else head])
+        return self._read([self.rows[r] for r in sorted(found)])
+
+    @staticmethod
+    def project(rows, fields):
+        # Lineage is kept out of the function's control by the capability read log.
+        return [{k:r.get(k) for k in fields} for r in rows]
+
+    @staticmethod
+    def aggregate(rows, field='', operation='count'):
+        if operation=='count': return len(rows)
+        values=[r[field] for r in rows if r.get(field) is not None]
+        if not all(type(x) in (float,int) for x in values): raise ValueError('Aggregation requires numbers')
+        if operation=='sum': return sum(values)
+        if operation=='min': return min(values) if values else None
+        if operation=='max': return max(values) if values else None
+        raise ValueError('Unregistered aggregation')
+
+    @staticmethod
+    def order_by(rows, field, descending=False):
+        return sorted(rows,key=lambda r:(r.get(field) is None,r.get(field)),reverse=descending)
+
+    @staticmethod
+    def date_difference(left, right):
+        return (date.fromisoformat(left)-date.fromisoformat(right)).days
+
+    def registry(self):
+        return {name:getattr(self,name) for name in DATA_CAPABILITIES}

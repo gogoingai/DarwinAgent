@@ -1,65 +1,57 @@
-"""Offline installed-package example: a third domain without benchmark imports."""
+"""Offline external-task acceptance. Two interfaces, task assets, the common Pipeline."""
 from __future__ import annotations
 
+import argparse
 import asyncio
-import json
-import tempfile
 from pathlib import Path
+import tempfile
 
-from oak.engine import BuildEngine, InferenceEngine
-from oak.contracts import AnswerResult, SourceRef
-from oak.kernel import Harness, KernelAssets, KernelBundle
-from oak.kernel.execution import KernelRuntime
-from oak.kg.graph import EntityCandidate, RelationCandidate, build_graph, node_id
-from oak.runtime import atomic_json
-from oak.schema.model import Schema
-
-SCHEMA = """entity_types:
-  Device:
-    primary_key: [serial, revision]
-    attributes: [{name: serial, dtype: string}, {name: revision, dtype: int}]
-  Technician:
-    primary_key: [name]
-    attributes: [{name: name, dtype: string}]
-relation_types:
-  maintained_by: {domain: Device, range: Technician}
-"""
+from oak.config import RunConfig
+from oak.contracts import CaseInput, CorpusBlock, EvaluationResult, QuestionInput, SourceRef
+from oak.engine import Pipeline
+from oak.kernel import TaskSpec
+from oak.kernel.registration import load_assets
+from oak.llm.recorded import RecordedClient
 
 
-async def main():
-    with tempfile.TemporaryDirectory() as tmp:
-        root = Path(tmp)
-        (root / "schema.yaml").write_text(SCHEMA)
-        atomic_json(root / "harness.json", Harness().to_dict())
-        (root / "maintainers.py").write_text('''def maintainers(device_id):
-    return project_properties(traverse_relations(device_id, "maintained_by"), ["name"])
-''')
-        (root / "answer.txt").write_text("Return only technicians connected to the requested device.")
-        assets = KernelAssets(schema_path=root / "schema.yaml", harness_path=root / "harness.json",
-                              function_paths=[root / "maintainers.py"],
-                              prompt_paths={"answer": root / "answer.txt"})
-        assets.export(root / "bundle")
-        (root / "bundle").rename(root / "relocated")
-        bundle = KernelBundle.load(root / "relocated")
-        runtime = KernelRuntime(bundle)
-        async def builder():
-            entities = [EntityCandidate("Device", {"serial": "A|B=1", "revision": 2}, {}, "manual:1"),
-                        EntityCandidate("Technician", {"name": "林"}, {}, "manual:2"),
-                        EntityCandidate("Technician", {"name": "王"}, {}, "manual:3")]
-            relations = [RelationCandidate("maintained_by", ("Device", {"serial": "A|B=1", "revision": 2}),
-                                           ("Technician", {"name": "林"}))]
-            return build_graph(entities, relations, bundle.schema())
-        graph = await BuildEngine(builder, lambda: bundle.manifest).run()
-        async def answer(question):
-            rows = runtime.call("0", graph, {"device_id": node_id("Device", {"serial": "A|B=1", "revision": 2})})
-            return AnswerResult("q1", "answered", "、".join(row["name"] for row in rows),
-                                (SourceRef("manual", "device-record", "maintained_by:1"),))
-        answers = await InferenceEngine(answer, lambda: bundle.manifest).run(["谁维护设备？"])
-        assert answers[0].answer == "林"
-        assert bundle.path("prompts", "answer").read_text().startswith("Return only")
-        print(json.dumps({"third_domain": "device_maintenance", "passed": True,
-                          "nodes": len(graph), "harness": bundle.harness().version}, ensure_ascii=False))
+class MaintenanceAdapter:
+    def generation_input(self,case_id):
+        return CaseInput(case_id,(CorpusBlock(SourceRef('maintenance_record',case_id,'row-1'),
+            '设备 D-17 于 2026-09-01 由林维护。'),),
+            (QuestionInput('q1','谁在什么时候维护了 D-17？',{'serial':'D-17'}),))
 
 
-if __name__ == "__main__":
-    asyncio.run(main())
+class MaintenanceEvaluator:
+    async def evaluate(self,result):
+        passed=sum(a.status=='answered' and '林' in a.answer and '2026-09-01' in a.answer for a in result.answers)
+        return EvaluationResult({'correct':passed},len(result.answers),len(result.answers),
+                                sum(a.status=='execution_error' for a in result.answers),0)
+
+
+async def run(task_root,work_dir):
+    case=MaintenanceAdapter().generation_input('device-example')
+    bundle=load_assets(task_root).export(work_dir/'assets')
+    spec=TaskSpec.load(task_root/'task.yaml',bundle)
+    transport=RecordedClient({
+        'extraction':[{'entities':[{'type':'Maintenance','key':{'serial':'D-17','date':'2026-09-01'},
+                                  'properties':{'technician':'林'},'source_id':case.corpus[0].source.id,'quote':case.corpus[0].text}], 'relations':[]}],
+        'tools':[{'action':'call','asset_id':'device_lookup','parameters':{'serial':'D-17'}},{'action':'ready'}],
+        'answer':[{'status':'answered','answer':'林于 2026-09-01 维护了设备 D-17。','node_ids':['n000000']}],
+        'review':[{'accepted':True,'supported':True,'subject_correct':True,'consistent':True,'complete':True,
+                   'abstention_valid':False,'feedback':'记录支持该设备、人员和日期。'}]})
+    result=await Pipeline(transport,work_dir/'generation').run(case,spec,RunConfig())
+    score=await MaintenanceEvaluator().evaluate(result)
+    if score.metrics['correct']!=1: raise RuntimeError(str(result.to_dict()))
+    print(result.answers[0].answer)
+    print('Common ExtractionAgent + AnswerAgent + Pipeline; offline recorded transport, S/F/C/P executed.')
+    return result
+
+
+if __name__=='__main__':
+    p=argparse.ArgumentParser()
+    p.add_argument('--task-root',type=Path,default=Path(__file__).resolve().parents[1]/'tasks/device_maintenance')
+    p.add_argument('--work-dir',type=Path)
+    args=p.parse_args()
+    if args.work_dir: asyncio.run(run(args.task_root,args.work_dir))
+    else:
+        with tempfile.TemporaryDirectory() as td: asyncio.run(run(args.task_root,Path(td)))

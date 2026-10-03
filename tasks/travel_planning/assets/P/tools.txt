@@ -1,0 +1,1 @@
+Use parameterized queries to collect actual alternatives in each requested city and date. Check prices, occupancy, stay restrictions and cuisine before composing a candidate. Use the cost function on selected rows. Do not publish or amend plans through a tool. A failed choice requires a new candidate and normal checks.

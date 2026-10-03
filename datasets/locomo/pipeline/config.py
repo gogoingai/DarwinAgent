@@ -14,7 +14,6 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from oak.config import Config
-from oak.kernel.harness import Harness
 
 LOCOMO_ROOT = Path(__file__).resolve().parent          # datasets/locomo/pipeline
 LOCOMO_TASK_DIR = LOCOMO_ROOT.parent                        # datasets/locomo
@@ -33,7 +32,6 @@ class LocomoConfig:
     dataset_path: Path
     anchor_id: str = "conv-26"
     react_max_steps: int = 10
-    harness: Harness = field(default_factory=Harness)
     evaluation_concurrency: int = 1
     audit_extract: bool = True         # 建图后二道完整性审计
 

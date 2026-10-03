@@ -31,7 +31,7 @@ def node_view(nd: dict) -> dict:
         view.update(json.loads(nd.get("__key__", "{}")))
     except Exception:
         pass
-    view.update({k: v for k, v in nd.items() if not k.startswith("__")})
+    view.update({k: v for k, v in nd.items() if not k.startswith("__") and k != "etype"})
     return view
 
 
@@ -232,17 +232,6 @@ def derive_relations(g: nx.MultiDiGraph, schema) -> nx.MultiDiGraph:
                 if not g.has_edge(nid, tid, key=rel.name):
                     g.add_edge(nid, tid, key=rel.name, relation=rel.name, derived=True)
     return g
-
-
-
-def __getattr__(name):
-    # Compatibility for previous users; production adapters import their domain.
-    if name in {"augment_graph_with_official", "enrich_city_nodes", "covered_cities", "programmatic_distance_entities"}:
-        import warnings
-        from oak_domains.travel_planning import graph as travel_graph
-        warnings.warn("Travel graph helpers moved to oak_domains.travel_planning.graph", DeprecationWarning, stacklevel=2)
-        return getattr(travel_graph, name)
-    raise AttributeError(name)
 
 
 def graph_stats(g: nx.MultiDiGraph) -> dict:

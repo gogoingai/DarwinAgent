@@ -1,0 +1,94 @@
+"""Mandatory engineering checks; assets cannot edit, override or disable these."""
+from __future__ import annotations
+
+import json
+
+from oak.contracts import AnswerResult, CaseInput, GraphResult, plain
+from oak.kg.graph import EntityCandidate, RelationCandidate, build_graph, node_view, node_id
+from oak.schema.model import Schema
+from .spec import validate_value
+
+FIXED_CHECK_IDS = ('fixed.input','fixed.schema','fixed.source','fixed.type','fixed.status','fixed.publish')
+
+
+def validate_bundle(bundle, forbidden_questions=()):
+    from .functions import FunctionRegistry
+    from .checks import CheckRegistry
+    bundle.verify()
+    schema=Schema.from_yaml(next(a.content for a in bundle.assets.assets if a.kind=='S'))
+    if schema.validate(): raise ValueError(str(schema.validate()))
+    from oak.schema.owlcheck import static_checks
+    findings=static_checks(schema)
+    if findings: raise ValueError(str([f.render() for f in findings]))
+    reserved={'node_id','entity_type','source_ids','claims','etype'}
+    if any(a.name in reserved or a.name.startswith('__') for e in schema.entities for a in e.attributes):
+        raise ValueError('Schema cannot redefine runtime metadata')
+    FunctionRegistry(bundle,forbidden_questions=forbidden_questions)
+    CheckRegistry(bundle,forbidden_questions=forbidden_questions)
+    return schema
+
+
+def validate_graph(result: GraphResult,schema):
+    if not isinstance(result,GraphResult): raise ValueError('Invalid graph result type')
+    entities=[]; relations=[]
+    g=result.graph
+    for nid,nd in g.nodes(data=True):
+        sources=nd.get('__sources__',[])
+        claims=nd.get('__claims__',[])
+        if not sources or set(sources)-set(result.sources) or not claims:
+            raise ValueError('Graph node requires authentic registered sources and claims')
+        for claim in claims:
+            block=result.sources.get(claim.get('source_id'))
+            if block is None or not claim.get('quote') or claim['quote'] not in block.text:
+                raise ValueError('Forged source or unsupported quotation')
+        entity=schema.entity(nd.get('etype'))
+        if entity is None: raise ValueError('Undeclared graph type')
+        values=node_view(nd)
+        key={k:values[k] for k in entity.primary_key}
+        if nid!=node_id(entity.name,key): raise ValueError('Graph identity differs from typed primary key')
+        props={k:v for k,v in values.items() if k not in key}
+        entities.append(EntityCandidate(entity.name,key,props,sources[0]))
+    for h,t,ed in g.edges(data=True):
+        hv,tv=node_view(g.nodes[h]),node_view(g.nodes[t])
+        he,te=schema.entity(g.nodes[h]['etype']),schema.entity(g.nodes[t]['etype'])
+        relations.append(RelationCandidate(ed['relation'],(he.name,{k:hv[k] for k in he.primary_key}),
+                                           (te.name,{k:tv[k] for k in te.primary_key})))
+    build_graph(entities,relations,schema) # Recheck the actual saved graph, not just extraction candidates.
+    from oak.schema.graphcheck import instance_checks
+    errors=instance_checks(g,schema)
+    if errors: raise ValueError(str(errors))
+    if not entities: raise ValueError('Empty graph cannot enter inference')
+
+
+def validate_candidate(candidate,visible_nodes,spec):
+    if not isinstance(candidate,dict) or set(candidate)!={'status','answer','node_ids'}:
+        raise ValueError('Candidate requires status, answer and node_ids only')
+    if candidate['status'] not in {'answered','abstained'} or not isinstance(candidate['answer'],str) or not candidate['answer'].strip():
+        raise ValueError('Invalid candidate status/text')
+    ids=candidate['node_ids']
+    if not isinstance(ids,list) or not all(isinstance(x,str) for x in ids) or len(ids)!=len(set(ids)):
+        raise ValueError('Invalid candidate evidence ids')
+    if candidate['status']=='answered':
+        if not ids or set(ids)-set(visible_nodes): raise ValueError('Candidate evidence must have been visible')
+        value=json.loads(candidate['answer']) if spec.answer_format=='json' else candidate['answer']
+        validate_value(value,spec.answer_contract,'answer')
+    elif ids:
+        raise ValueError('Abstention cannot cite answer evidence')
+
+
+def validate_published(answer,question,graph_result):
+    if not isinstance(answer,AnswerResult) or answer.question_id!=question.id:
+        raise ValueError('Invalid published answer type/id')
+    known={b.source.id for b in graph_result.sources.values()}
+    if any(s.id not in known for s in answer.evidence): raise ValueError('Unknown published source')
+    if answer.status=='answered' and not answer.node_ids: raise ValueError('Published answer lacks graph lineage')
+
+
+def validate_case(case,spec):
+    if not isinstance(case,CaseInput): raise ValueError('Invalid case type')
+    spec.validate_input(case)
+    banned={'gold','answer','evidence','category','adversarial_answer','level','has_answer','answer_session_ids'}
+    if banned & set(spec.metadata_keys) or banned & set(spec.parameter_contract.get('properties',{})):
+        raise ValueError('Evaluation fields cannot be declared as generation fields')
+    for b in case.corpus:
+        if banned & set(b.metadata): raise ValueError('Evaluation metadata in corpus')

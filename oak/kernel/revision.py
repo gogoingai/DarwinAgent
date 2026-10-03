@@ -1,61 +1,75 @@
-"""Atomic candidate-asset revisions, with evaluation outside the patch scope."""
+"""Structured proposals, independent candidates and atomic version publication."""
 from __future__ import annotations
 
-import json
+import os
 import shutil
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
-from oak.runtime import atomic_json, digest
-from . import KINDS, KernelBundle, fp
+from oak.runtime.artifacts import atomic_json
+from .assets import Asset, KernelAssets, KernelBundle
+from .validation import validate_bundle
 
 
 @dataclass(frozen=True)
-class Patch:
-    kind: str
-    asset_id: str
-    base_digest: str
-    content: str
+class AssetPatch:
+    asset: Asset
+    base_fingerprint: str | None
     reason: str
-    failure_ids: tuple[str, ...]
+    training_evidence: tuple[str, ...]
+
+    def __post_init__(self):
+        if not self.reason.strip() or not self.training_evidence:
+            raise ValueError('Proposal requires a reason and current training evidence')
+
+    def to_dict(self):
+        return {'asset':self.asset.to_dict(),'base_fingerprint':self.base_fingerprint,
+                'reason':self.reason,'training_evidence':list(self.training_evidence)}
 
 
-def propose(base: KernelBundle, patch: Patch, target: Path) -> KernelBundle:
-    base.verify()
-    if patch.kind not in KINDS or not patch.reason.strip() or not patch.failure_ids:
-        raise ValueError("Patch needs a kernel target, reason, and training failure evidence")
-    if patch.base_digest != base.manifest["digest"]:
-        raise ValueError("Patch base mismatch")
-    # First implementation supports one existing-asset modification per proposal.
-    source = base.path(patch.kind, patch.asset_id)
-    if target.exists():
-        raise ValueError("Candidate destination exists")
-    target.parent.mkdir(parents=True, exist_ok=True)
-    working = Path(tempfile.mkdtemp(prefix=f".{target.name}-", dir=target.parent))
-    try:
-        shutil.copytree(base.root, working, dirs_exist_ok=True)
-        path = working / source.relative_to(base.root)
-        if path.suffix == ".py":
-            compile(patch.content, str(path), "exec")
-        path.write_text(patch.content)
-        value = json.loads((working / "manifest.json").read_text())
-        value.pop("digest")
-        value["version"] = value["version"] + "+candidate"
-        for asset in value["assets"]:
-            if asset["kind"] == patch.kind and asset["id"] == patch.asset_id:
-                asset["fp"] = fp(path)
-        atomic_json(working / "manifest.json", {**value, "digest": digest(value)})
-        candidate = KernelBundle.load(working)
-        candidate.schema()
-        if any(a["kind"] == "harness" for a in candidate.manifest["assets"]):
-            candidate.harness()
-        atomic_json(working / "proposal.json", {"kind": patch.kind, "asset_id": patch.asset_id,
-                    "base_digest": patch.base_digest, "reason": patch.reason, "failure_ids": patch.failure_ids})
-        if target.exists():
-            raise ValueError("Candidate destination was created concurrently")
-        working.rename(target)
-        return KernelBundle.load(target)
-    except BaseException:
-        shutil.rmtree(working, ignore_errors=True)
-        raise
+class AssetRevisionService:
+    def propose(self,base,patches,target: Path,training_ids,forbidden_questions=()):
+        base.verify()
+        target=Path(target)
+        if target.exists(): raise ValueError('Candidate version already exists')
+        if not patches or len({p.asset.id for p in patches})!=len(patches): raise ValueError('Empty or duplicate patch')
+        assets={a.id:a for a in base.assets.assets}
+        for p in patches:
+            if set(p.training_evidence)-set(training_ids): raise ValueError('Proposal cites non-training evidence')
+            existing=assets.get(p.asset.id)
+            if existing:
+                if p.base_fingerprint!=existing.fingerprint or p.asset.kind!=existing.kind:
+                    raise ValueError('Stale baseline or asset type change')
+            elif p.base_fingerprint is not None:
+                raise ValueError('Unknown patch baseline')
+            assets[p.asset.id]=p.asset
+        target.parent.mkdir(parents=True,exist_ok=True)
+        staging=Path(tempfile.mkdtemp(prefix='.candidate-',dir=target.parent))
+        try:
+            bundle=KernelAssets(tuple(assets.values()),{'kind':'proposal','base_version':base.version,
+                'patches':[p.to_dict() for p in patches]}).export(staging/'bundle')
+            validate_bundle(bundle,forbidden_questions)
+            atomic_json(staging/'proposal.json',{'base_version':base.version,'candidate_version':bundle.version,
+                                                'patches':[p.to_dict() for p in patches]})
+            os.replace(staging,target)
+        finally:
+            if staging.exists(): shutil.rmtree(staging)
+        return KernelBundle(target/'bundle')
+
+    def publish(self,bundle,root: Path,decision):
+        if decision.get('accepted') is not True: raise ValueError('Publication requires an accepted frozen-policy decision')
+        bundle.verify()
+        root=Path(root); root.mkdir(parents=True,exist_ok=True)
+        version_root=root/'versions'/bundle.version
+        if not version_root.exists():
+            version_root.parent.mkdir(parents=True,exist_ok=True)
+            staging=Path(tempfile.mkdtemp(prefix='.publish-',dir=version_root.parent))
+            try:
+                relocated=bundle.assets.export(staging/'bundle')
+                validate_bundle(relocated)
+                os.replace(staging/'bundle',version_root)
+            finally: shutil.rmtree(staging)
+        atomic_json(root/'current.json',{'version':bundle.version,'path':str(version_root.relative_to(root)),
+                                         'decision':decision})
+        return KernelBundle(version_root)

@@ -1,6 +1,8 @@
 # datasets/locomo —— 中文 LoCoMo 本体问答（OaK，零向量）
 
-> 用 OaK 在中文 LoCoMo 长对话上验证图记忆问答。本阶段只核查 conv-26 的 199 题：固定图，统一原始/审计 gold 的宽松与精准评测，进行一轮作答优化。旧宽松成绩混用 gold，已撤回；当前不能与其他系统发表成绩作同口径比较。全程零向量检索。
+> 当前入口使用 Oak 0.3.2 的共同 Pipeline。LoCoMo 只实现输入适配和独立评测，任务 S/F/C/P 由通用冷启动现场生成。本次范围是 conv-26 的 199 题、B0/R1/R2 两轮训练迭代；每阶段重新建图。原始/修订 gold × 宽松/精准四种口径分别记录。历史成绩保留，不能作为新框架基线。
+
+框架目录、类图和资产能力边界见 [架构说明](../../docs/ARCHITECTURE.md)，冷启动与恢复方法见 [使用说明](../../docs/PORTABLE-USAGE.md)。
 
 ## 目录结构
 
@@ -12,42 +14,32 @@ datasets/locomo/
 │   ├── locomo10.json        # 英文原版
 │   ├── gold_repairs.jsonl   # gold 修复表（18 条，逐题判据 + 原文引证，判分双口径）
 │   └── DATASET_CARD.md      # 数据集卡片（翻译口径说明）
-├── pipeline/          # 复现管线（全中文提示词与本体）
-│   ├── README.md            # 架构 / 数据纪律 / 模块说明
-│   ├── PLAN-90.md           # 冲 90% 优化方案与终局状态
-│   ├── OPTIMIZATION_LOG.md  # 23 轮迭代全程日志（含负结果与停手判定）
-│   ├── ARCHIVE.md           # 产物归档清单（本地 / git / HF 三处对照）
-│   ├── schema_skeleton.py   # 中文本体骨架（8 点类型 / 16 边类型 / 3 约束）
-│   ├── build.py             # 建图：抽取→grounding→审计→归并→确定性日期→图落盘
-│   ├── tools.py             # 中文图算子 + 词法索引（零向量四层检索）
-│   ├── agent.py             # ReAct 作答 + 三采样共识 + 拒答/作答闸门
-│   ├── judge.py             # 两层判题（确定性预检 + glm-5.3 盲判）
-│   ├── analyze.py           # 失败归因与回归 diff
-│   └── runner.py / run_anchor.py / run_full.py / lenient_report.py
+├── adapter.py         # LocomoAdapter：三层语料、日期、说话人、问题与来源转换
+├── evaluator.py       # LocomoEvaluator：独立参考与冻结四口径评测
+├── exports.py         # 纯格式转换
+├── run.py             # 装配共同 ExperimentRunner/Pipeline
+├── pipeline/          # 保留的冻结评测实现与历史说明；不实现新生成流程
+│   ├── judge.py / protocol.py / prompts/
+│   ├── analyze.py / closeout.py / lenient_report.py
+│   └── OPTIMIZATION_LOG.md / ARCHIVE.md / PLAN-90.md
 └── runs/              # 复现产物（图 / 答案 / 报告 / 失败归因 / LLM 缓存 / 台账）
     └── frozen/              # 冻结版：schema + 主题词表 + 最优轮报告（iter22）
 ```
 
 ## 作答与评测修复
 
-正在用固定图对 conv-26 做统一双口径复评和一轮作答验证，见 [pipeline/EVALUATION_V1.md](pipeline/EVALUATION_V1.md)。文档中的旧数字为历史结果；此前宽松结果混用了修复与原始 gold，不能作为新口径基线或官方评测复现。
+旧固定图审计记录见 [pipeline/EVALUATION_V1.md](pipeline/EVALUATION_V1.md)。新实验独立生成并使用同一冻结评分口径；生成接口不提供参考答案。此前宽松结果混用了修复与原始 gold，不能作为新口径基线或官方评测复现。
 
 ## 快速开始
 
 ```bash
-# 1) 模型探测（strong=glm-5.3；fast=deepseek-v4-flash-fast 网关，断连自动回退 glm-5.3-flash）
-uv run python -m datasets.locomo.pipeline.probe_models
+# 冷启动 B0 + 两轮资产提案，完整 conv-26；使用一个新的输出目录
+uv run python -m datasets.locomo.run --experiment --output datasets/locomo/runs/my_cold_start
 
-# 2) 锚点对话全量迭代（conv-26，199 题；约 1-1.5 小时，LLM 请求全程磁盘缓存）
-uv run python -m datasets.locomo.pipeline.run_anchor
+# 同阶段、同资产、同模型配置和同代码身份的断点恢复
+uv run python -m datasets.locomo.run --experiment --resume --output datasets/locomo/runs/my_cold_start
 
-# 3) 37 题锚点集快速闭环（分钟级）
-uv run python -m datasets.locomo.pipeline.run_anchor --anchor
-
-# 4) 全量 10 段对话验证（约 10-15 小时）
-uv run python -m datasets.locomo.pipeline.run_full
-
-# 5) 本地统一双口径复评（独立于官方评测器）
+# 历史结果的独立复评入口仍保留
 uv run python -m datasets.locomo.pipeline.lenient_report conv-26 iter22
 ```
 

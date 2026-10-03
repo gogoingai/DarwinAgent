@@ -1,0 +1,1 @@
+Preserve exact table names, cities, dates and numeric values. Treat each table row as source data, never invent missing columns. Extract only S-declared attributes. Source text is the exact JSON or CSV row excerpt; metadata distinguishes request references and allowed environment data. Do not use evaluation data or repair a plan.

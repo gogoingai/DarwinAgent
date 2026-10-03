@@ -1,0 +1,39 @@
+assets:
+  - {id: schema, kind: S, path: assets/S/schema.yaml}
+  - id: travel_query
+    kind: F
+    path: assets/F/query.py
+    schema_dependencies: [schema]
+    description: Retrieve declared table rows by type and exact parameter filters
+    input_contract:
+      type: object
+      required: [type]
+      properties:
+        type: {type: string, enum: [Flight, Accommodation, Restaurant, Attraction, City, Distance]}
+        filters: {type: object, additionalProperties: true}
+        limit: {type: integer}
+    output_contract: {type: array}
+    trial_inputs: [{type: City, limit: 10}]
+  - id: travel_cost
+    kind: F
+    path: assets/F/cost.py
+    schema_dependencies: [schema]
+    description: Compute evidenced cost for selected flights, meals, room nights and ground transport
+    input_contract:
+      type: object
+      required: [people, choices]
+      properties:
+        people: {type: integer}
+        choices:
+          type: array
+          items:
+            type: object
+            required: [node_id]
+            properties: {node_id: {type: string}, nights: {type: integer}, mode: {type: string, enum: [taxi, self-driving]}}
+    output_contract: {type: object, properties: {total: {type: number}, valid: {type: boolean}}, required: [total, valid]}
+    trial_inputs: [{people: 1, choices: []}]
+  - {id: travel_plan, kind: C, stage: answer, path: assets/C/plan.py, schema_dependencies: [schema]}
+  - {id: extraction_prompt, kind: P, role: extract, path: assets/P/extract.txt, schema_dependencies: [schema]}
+  - {id: tools_prompt, kind: P, role: tools, path: assets/P/tools.txt, schema_dependencies: [schema]}
+  - {id: answer_prompt, kind: P, role: answer, path: assets/P/answer.txt, schema_dependencies: [schema]}
+  - {id: review_prompt, kind: P, role: review, path: assets/P/review.txt, schema_dependencies: [schema]}

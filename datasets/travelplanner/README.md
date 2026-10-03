@@ -19,6 +19,8 @@ pretty_name: OaK × TravelPlanner Reproduction
 
 **怎么复现的（从零到成绩的每一步）→ `REPRODUCTION.md`；优化全程留痕 → `OPTIMIZATION_LOG.md`。**
 
+当前代码入口已迁移到 Oak 0.3.2：`TravelPlannerAdapter` 转换请求与已登记环境数据，`TravelPlannerEvaluator` 连接原官方评测实现；生成直接使用框架的两个通用 Agent 和唯一 Pipeline。旅行查询、成本计算、约束和提示位于 `tasks/travel_planning/assets/`，没有数据集私有生成循环或终答修补。目录与类图见 [架构说明](../../docs/ARCHITECTURE.md)。以下旧分数和运行档案属于历史复现，不是新框架的评分结果。
+
 ## 数据集内容（HF Hub 上的完整运行产物）
 
 本仓库同时作为复现结果的**公开档案**发布。除源码外，包含：
@@ -72,18 +74,19 @@ reasonable_visiting_city 2、is_not_absent(gated) 2、room rule/type 2。
 
 ```bash
 cp .env.example .env        # 填 ZHIPU_API_KEY（JAVA_HOME 已配置则保留）
-uv sync
+uv sync --extra benchmarks  # 包括原官方评测导入所需的 gradio
 bash datasets/travelplanner/scripts/setup_env.sh   # HF 数据落盘 + 分组抽样（third_party 见下）
-uv run python -m datasets.travelplanner.pipeline.pipeline.build_loop --rounds 5     # 5 轮构建（断点续跑）
-uv run python -m datasets.travelplanner.pipeline.pipeline.inference --limit 50      # 推理 + 评测
-uv run python -m unittest tests.test_gate_a             # 终态层单测（离线）
-uv run python datasets/travelplanner/scripts/replay_plans.py                   # 旧计划离线重放（不调 LLM）
-uv run python -m datasets.travelplanner.pipeline.pipeline.inference --anchor        # anchor 9 题快速闭环
+uv run python -m datasets.travelplanner.run --split train --index 0 --output datasets/travelplanner/runs/framework_case_0
+uv run python -m unittest datasets.travelplanner.tests.test_gate_a   # 旅行 F/C 资产行为反例
 ```
 
 前置：`third_party/TravelPlanner/`（clone 自 OSU-NLP-Group/TravelPlanner）+ `database/`（HF Space osunlp/TravelPlannerEnvironment 下载）+ `.jdk/`（Adoptium 17，HermiT 依赖，见 .env JAVA_HOME）。
 
-## 架构
+## 当前架构
+
+`run.py → Pipeline → ExtractionAgent / AnswerAgent → KernelRuntime`。适配器只转换允许输入，导出只序列化答案，评测器独立加载官方参考。任务代码资产通过统一受限解释器运行；固定检查与模型语义审查通过后才发布答案。详见 [使用说明](../../docs/PORTABLE-USAGE.md)。
+
+## 历史架构（已被当前框架替代）
 
 ```
 oak/
@@ -122,7 +125,7 @@ oak/
    （`.lower()` 等被 AST 白名单误杀导致 search_flights 等生成失败）
 9. 距离矩阵大块 LLM 抽取反复截断 → 程序化直建（csv → 实体，derive 补边）
 
-## 断点续跑
+## 历史断点续跑
 
 LLM 请求级磁盘缓存（runs/cache/llm/<ns>/）+ stage 级 state.json + react 按题 + inference 每 5 题 checkpoint；崩溃重跑不重复计费。
 

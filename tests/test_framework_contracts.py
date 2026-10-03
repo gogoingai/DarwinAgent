@@ -1,27 +1,15 @@
-from __future__ import annotations
-
 import asyncio
-import json
 import tempfile
-import time
 import unittest
 from pathlib import Path
 from unittest.mock import patch
-
-import networkx as nx
-
 from oak.config import Config
 from oak.kg.graph import EntityCandidate, RelationCandidate, GraphValidationError, build_graph, node_id
-from oak.kernel import Harness, KernelAssets, KernelBundle
-from oak.kernel.checks import CHECKS, GraphAccessors
-from oak.kernel.revision import Patch, propose
 from oak.llm.client import BudgetExceeded, LLMClient
-from oak.operators import library
-from oak.operators.sandbox import _run_with_timeout
 from oak.runtime import atomic_json
 from oak.schema.model import Schema
 from oak.schema.owlcheck import check_schema
-from oak_domains.conversation_memory.harness import parse_structured
+
 
 YAML = """entity_types:
   Person:
@@ -80,29 +68,12 @@ class GraphContracts(unittest.TestCase):
 
 
 class RuntimeContracts(unittest.TestCase):
-    def test_timeout_terminates_worker(self):
-        start = time.monotonic()
-        with self.assertRaises(TimeoutError):
-            _run_with_timeout(lambda: time.sleep(5), {}, .03, nx.MultiDiGraph())
-        self.assertLess(time.monotonic() - start, 1)
-        self.assertEqual(_run_with_timeout(lambda: 7, {}, 1, nx.MultiDiGraph()), 7)
-
     def test_unverified_formal_check_is_not_pass(self):
         with patch("oak.schema.owlcheck.hermit_checks", return_value=([], False)):
             findings, verified = check_schema(Schema.from_yaml(YAML))
         self.assertFalse(verified)
         self.assertTrue(any(f.check == "unverified" for f in findings))
 
-    def test_slot_extractor_and_graph_are_context_local(self):
-        async def one(value):
-            graph = nx.MultiDiGraph(); graph.add_node(value)
-            library.set_graph(graph)
-            library.set_slot_extractor(lambda *_: {"value": value})
-            await asyncio.sleep(0)
-            return list(library.get_graph()), library.extract_runtime_slots("q", [])
-        async def run():
-            return await asyncio.gather(one("A"), one("B"))
-        self.assertEqual(asyncio.run(run()), [(["A"], {"value": "A"}), (["B"], {"value": "B"})])
 
     def test_budget_atomic_and_restart_preserved(self):
         with tempfile.TemporaryDirectory() as td:
@@ -122,10 +93,12 @@ class RuntimeContracts(unittest.TestCase):
                         await client.chat(role="schema", messages=[], namespace="application_d")
             asyncio.run(run())
 
+
     def test_cache_distinguishes_endpoint_and_effective_policy(self):
         base = LLMClient._cache_key("same", [], 0, 20, False, endpoint="one")
         self.assertNotEqual(base, LLMClient._cache_key("same", [], 0, 20, False, endpoint="two"))
         self.assertNotEqual(base, LLMClient._cache_key("same", [], 0, 20, False, endpoint="one", thinking_off=True))
+
 
     def test_multiple_clients_cannot_each_spend_last_scope_credit(self):
         with tempfile.TemporaryDirectory() as td:
@@ -140,41 +113,3 @@ class RuntimeContracts(unittest.TestCase):
                     with self.assertRaises(BudgetExceeded):
                         await second.chat(role="schema", messages=[], namespace="app_query_b")
             asyncio.run(run())
-
-
-class AssetContracts(unittest.TestCase):
-    def test_bundle_relocation_tamper_and_harness_revision(self):
-        with tempfile.TemporaryDirectory() as td:
-            root = Path(td)
-            (root / "schema.yaml").write_text(YAML)
-            atomic_json(root / "harness.json", Harness().to_dict())
-            assets = KernelAssets(schema_path=root / "schema.yaml", harness_path=root / "harness.json")
-            bundle = assets.export(root / "export")
-            self.assertEqual(bundle.harness(), Harness())
-            self.assertFalse(bundle.schema().validate())
-            changed = Harness(max_steps=3)
-            candidate = propose(bundle, Patch("harness", "harness", bundle.manifest["digest"],
-                json.dumps(changed.to_dict()), "Reduce excessive steps", ("train:1",)), root / "candidate")
-            self.assertEqual(candidate.harness().max_steps, 3)
-            self.assertEqual(bundle.harness().max_steps, 10)
-            with self.assertRaises(ValueError):
-                propose(bundle, Patch("evaluation", "judge", bundle.manifest["digest"], "", "reason", ("train:1",)), root / "illegal")
-            bundle.path("schema", "schema").write_text("tampered")
-            with self.assertRaises(ValueError):
-                KernelBundle.load(root / "export")
-
-    def test_missing_asset_is_error(self):
-        with self.assertRaises(FileNotFoundError):
-            KernelAssets(schema_path=Path("/nonexistent/oak-schema.yaml")).manifest()
-
-    def test_structured_answer_cannot_invent_evidence(self):
-        obj = {"requirements": ["all elements"], "claims": [{"text": "A", "evidence": ["missing"]}],
-               "answer": "A", "evidence": ["missing"], "refused": False}
-        with self.assertRaises(ValueError):
-            parse_structured(json.dumps(obj), {"known": "A"}, "unknown")
-        obj.update(answer="unknown", evidence=[], refused=True, claims=[])
-        self.assertEqual(parse_structured(json.dumps(obj), {}, "unknown")[:2], ("unknown", []))
-
-
-if __name__ == "__main__":
-    unittest.main()

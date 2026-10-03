@@ -1,7 +1,7 @@
 [project]
 name = "oak-repro"
-version = "0.2.0"
-description = "Portable ontology-kernel framework with versioned inference harnesses"
+version = "0.3.2"
+description = "Fixed agent pipeline with bounded S/F/C/P asset capabilities"
 requires-python = ">=3.11"
 dependencies = [
     "openai>=1.40",
@@ -19,6 +19,8 @@ benchmarks = [
     "datasets>=2.20",
     "tqdm>=4.66",
     "rich>=13.0",
+    "gradio>=6.0.0",
+    "requests>=2.31",
 ]
 
 [tool.uv]
@@ -29,4 +31,4 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["oak", "oak_domains"]
+packages = ["oak"]

@@ -16,28 +16,43 @@ tags:
 
 ## 目录结构
 
+当前固定框架为 **0.3.2**：数据集实现输入适配和独立评测，生成与迭代由 `oak` 统一执行，只优化有能力边界的 S/F/C/P 资产。活动 H、`oak_domains` 与私有生成流程已移除，发行 wheel 只包含 `oak`。
+
+```text
+oak/                         # 固定框架
+├── contracts.py             # DatasetAdapter / Evaluator 与标准输入输出
+├── config.py                # 冻结 RunConfig
+├── engine/pipeline.py       # 共同 Pipeline：身份、恢复、产物
+├── agents/                  # ExtractionAgent / AnswerAgent / 固定协议
+├── kernel/                  # 登记、Runtime、F/C、固定验证、反例、原子版本
+├── experiments/             # 通用冷启动、提案、两轮控制器、采纳策略
+├── schema/                  # 本体解析、静态与图实例公理验证
+├── kg/                      # 类型图和来源
+├── operators/               # 只读算子 + 受限 AST 解释器
+├── llm/                     # 模型通信和连接装配
+└── runtime/                 # 身份、预算、原子持久化
+
+tasks/                       # 声明及资产，不实现执行流程
+├── conversation_memory/     # 仅 task.yaml，无历史 LoCoMo 种子
+├── travel_planning/         # task.yaml + assets/{S,F,C,P}
+└── device_maintenance/      # 第三任务声明和资产
+
+datasets/
+├── locomo/                  # adapter.py / evaluator.py / exports.py / run.py
+└── travelplanner/           # 同样两个接入类；共用 Pipeline
+    # 两者保留 data/、runs/、冻结评测及原路径兼容代码
+
+examples/third_domain.py      # 两个接口 + 任务资产，在仓库外跑共同 Pipeline
+tests/{unit,integration,portability}/
+docs/                        # 架构、类图、资产能力边界和使用入口
+dist/                        # 新 wheel 仅包含 oak；旧发行物保留
+mem0/                        # 独立的只-ADD 中文记忆基线
+third_party/                 # 已允许的 TravelPlanner 环境数据
 ```
-oak/
-├── oak/                    # OaK 框架核心（任务无关，两任务共享）
-│   ├── config.py           #   模型路由（role→强/快档）/并发/限额/缓存路径
-│   ├── llm/                #   LLMClient：流式/重试/磁盘缓存/成本台账（全项目唯一出口）
-│   ├── schema/             #   本体 Schema 数据结构 + OWL/HermiT 检查
-│   ├── kg/                 #   图构建（键签名折叠/派生边）+ 实体候选契约
-│   ├── operators/          #   九件套通用算子 + AST 白名单沙箱
-├── datasets/
-│   ├── travelplanner/      # 任务一：TravelPlanner（英文基准）
-│   │   ├── data/           #   queries 落盘 + 固定抽样索引
-│   │   ├── pipeline/       #   复现管线（P1-P6 全流程 + 终态层 + 官方评测适配）
-│   │   ├── runs/           #   复现产物（5 轮构建轨迹/推理/缓存/台账）
-│   │   └── *.md            #   README / REPRODUCTION / OPTIMIZATION_LOG / ARCHIVE
-│   └── locomo/             # 任务二：LoCoMo 中文版（零向量，纯本体）
-│       ├── data/           #   locomo10_zh.json（全量中文化数据集）
-│       ├── pipeline/       #   复现管线（中文本体/抽取/审计/ReAct/严格判题）
-│       └── runs/           #   复现产物（图/答案/报告/失败归因/判分缓存）
-├── mem0/                   # 只-ADD 记忆基线核心（中文；mem0 2.1.0 V3 加法管线蒸馏）
-├── third_party/            # TravelPlanner 官方仓库 + 环境数据库（不入 git/HF）
-└── README.md               # 本文件
-```
+
+[架构、类图与能力边界](docs/ARCHITECTURE.md) · [接入与运行](docs/PORTABLE-USAGE.md) · [实施和验收](docs/PORTABILITY-PLAN.md)。框架实现验收与模型成绩分开记录；冷启动结果以对应运行目录产物为准，不能用离线录制响应代替真实实验。
+
+0.3.2 当前通过 98 项离线检查和仓库外 wheel 验收。LoCoMo 冷启动两轮失败，没有有效评分基线或被采纳修订，详见[修复与实验记录](docs/FRAMEWORK-REPAIR-LOG.md)。下表为历史任务成绩。
 
 ## 成绩（严格口径，详见各任务目录）
 
@@ -48,7 +63,7 @@ oak/
 | LoCoMo 中文 conv-26 | 历史混合 gold 宽松评分（已停用） | **89.4%** | 不作跨系统同口径比较 |
 | LoCoMo 中文 conv-44 | 严格 exact（旧版栈零调参首跑） | **68.3%** | — |
 
-conv-26 正在固定图上进行原始/审计 gold × 宽松/精准的完整复评，见[独立实验报告](datasets/locomo/runs/experiments/conv26_dual_v4/REPORT.md)。旧评分不代表本轮基线或系统上限，未验证全量十段。
+conv-26 既有固定图的原始/审计 gold × 宽松/精准复评见[独立实验报告](datasets/locomo/runs/experiments/conv26_dual_v4/REPORT.md)。旧评分不代表本轮基线或系统上限，未验证全量十段。
 
 > 历史上限审计与旧评分记录见 `datasets/locomo/pipeline/OPTIMIZATION_LOG.md` 与 `PLAN-90.md`；
 > 它们不能证明 90% 可达或不可达。当前结论须依据统一判分与逐要素诊断。
@@ -59,14 +74,16 @@ conv-26 正在固定图上进行原始/审计 gold × 宽松/精准的完整复�
 uv sync
 cp .env.example .env          # 填 ZHIPU_API_KEY（locomo 另可配 LOCOMO_FAST_* 双档）
 
-# TravelPlanner（需先准备官方环境，见 datasets/travelplanner/REPRODUCTION.md）
-uv run python -m datasets.travelplanner.pipeline.pipeline.build_loop --rounds 5
-uv run python -m datasets.travelplanner.pipeline.pipeline.inference --limit 50
+# TravelPlanner（需先准备原官方环境和评测依赖）
+uv sync --extra benchmarks
+uv run python -m datasets.travelplanner.run --split train --index 0 --output datasets/travelplanner/runs/my_framework_case
 
 # LoCoMo 中文
-uv run python -m datasets.locomo.pipeline.run_anchor            # conv-26 全量迭代
-uv run python -m datasets.locomo.pipeline.run_anchor --anchor   # 37 题锚点快速闭环
-uv run python -m datasets.locomo.pipeline.run_full              # 全量 10 段
+uv run python -m datasets.locomo.run --experiment --output datasets/locomo/runs/my_cold_start  # conv-26，B0/R1/R2
+
+# 框架、接入与控制器检查，及显式录制响应的第三任务示例
+uv run python -m unittest discover -s tests
+uv run python examples/third_domain.py
 
 # mem0 只-ADD 基线（自测）
 uv run python -c "from mem0.memory_core import Mem0AdditiveCore; print('ok')"
@@ -76,9 +93,10 @@ uv run python -c "from mem0.memory_core import Mem0AdditiveCore; print('ok')"
 
 | 档 | 模型 | 用途 |
 |---|---|---|
-| strong | glm-5.3（智谱） | 本体起草 / 终答 / 判题 / 评判器 |
-| fast | deepseek-v4-flash-fast（commandcode 网关，独立 `LOCOMO_FAST_*`） | 抽取 / ReAct 步骤 / 审计 |
-| fast 兜底 | glm-5.3-flash（探测自动切换） | 网关不可用时 |
+| strong | glm-5.3（智谱） | 资产初始化 / 提案 / 终答 / 语义审查 / LoCoMo 独立评分 |
+| fast | deepseek-v4-flash-fast（commandcode 网关，独立 `LOCOMO_FAST_*`） | 抽取 / 工具选择 |
+
+真实实验提前冻结模型路由；变更路由需重新冻结工程基线并使用新目录。
 
 ## HF 归档
 

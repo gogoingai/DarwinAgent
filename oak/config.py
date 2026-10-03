@@ -12,6 +12,8 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 # Framework roles; application-specific roles are injected by adapters.
 MODEL_ROLES: dict[str, str] = {
+    "extraction": "fast", "tools": "fast", "answer": "strong", "review": "strong",
+    "bootstrap": "strong", "proposal": "strong",
     "schema": "strong",      # P1 需求分析 / P2 模式草拟
     "func_gen": "strong",    # P4 函数生成（含能力规划）
     "judicator": "strong",   # P6 评判器
@@ -21,6 +23,40 @@ MODEL_ROLES: dict[str, str] = {
     "plan_repair": "fast",   # 计划格式修复 / salvage
 
 }
+
+
+@dataclass(frozen=True)
+class RunConfig:
+    """Engineering policy, frozen before a baseline; never an optimization asset."""
+    concurrency: int = 4
+    extraction_batch_chars: int = 8500
+    protocol_attempts: int = 3
+    answer_attempts: int = 3
+    tool_steps: int = 5
+    calls_per_question: int = 32
+    max_tokens: int = 4096
+    temperature: float = 0.2
+    function_steps: int = 30000
+    function_timeout_s: float = 2.0
+    result_bytes: int = 180000
+    extraction_role: str = "extraction"
+    tools_role: str = "tools"
+    answer_role: str = "answer"
+    review_role: str = "review"
+    bootstrap_role: str = "bootstrap"
+    proposal_role: str = "proposal"
+
+    def __post_init__(self):
+        for key in ("concurrency", "extraction_batch_chars", "protocol_attempts", "answer_attempts",
+                    "tool_steps", "calls_per_question", "max_tokens", "function_steps", "result_bytes"):
+            if type(getattr(self, key)) is not int or getattr(self, key) <= 0:
+                raise ValueError(f"{key} must be a positive integer")
+        if self.function_timeout_s <= 0 or not 0 <= self.temperature <= 2:
+            raise ValueError("Invalid execution limits")
+
+    def to_dict(self):
+        from dataclasses import asdict
+        return asdict(self)
 
 
 @dataclass

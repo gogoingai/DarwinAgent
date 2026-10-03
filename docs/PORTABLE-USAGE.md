@@ -1,33 +1,70 @@
-# Oak 0.2 移植与兼容说明
+# Oak 0.3.2 使用与仓库外接入
 
-本轮已经验证：Python 3.11、macOS 下独立安装 wheel，仓库外运行第三领域，搬迁内核后执行受控函数。尚未验证跨机器和 Windows；生成函数的可靠超时当前要求 `fork`。进程超时与 AST 检查不等于任意不可信 Python 的安全隔离。
+发行包只包含 `oak`。每个数据集实现 `DatasetAdapter.generation_input(case_id)` 与 `Evaluator.evaluate(RunResult)` 两个接口，资产和 TaskSpec 由声明文件加载。
 
-## 接入方式
+```python
+from pathlib import Path
+from oak.config import RunConfig
+from oak.engine import Pipeline
+from oak.kernel import TaskSpec
+from oak.kernel.registration import load_assets
 
-核心发行包包含 `oak` 与 `oak_domains`，不包含 `datasets`。通用依赖与基准依赖分开；形式推理按需安装 `formal` extra。源码中的基准入口仍从本仓库运行，不能把它们当作已经独立发行的领域应用。
+bundle = load_assets(Path("my_task")).export(Path("run/assets"))
+spec = TaskSpec.load(Path("my_task/task.yaml"), bundle)
+case = adapter.generation_input("case-1")
+result = await Pipeline(model_client, Path("run/generation")).run(case, spec, RunConfig())
+scores = await evaluator.evaluate(result)
+```
 
-- 输入使用 `CaseInput / CorpusBlock / QuestionInput`，参考答案由适配器保留在评测侧。
-- 用 `Schema` 声明类型、主键、属性及关系；`build_graph` 默认拒绝非法候选。显式选择 `on_invalid="isolate"` 时，必须检查 `graph.graph["validation_errors"]`。
-- 用 `KernelAssets` 登记 S/F/C/P/H、检查实现和依赖，导出 `KernelBundle`；搬迁后重新装载并校验摘要。
-- `BuildEngine` 与 `InferenceEngine` 提供固定身份的阶段编排，具体领域能力通过回调注入。这两个入口尚不是完整的自动 B1—B4 学习控制器。
-- 对受控的单函数 Python 资产，使用 `KernelRuntime` 执行已登记的 F。其他含包内相对导入的领域模块，目前只支持资产保存和摘要验证，尚不能保证脱离应用包执行。
-- `Patch` 只允许 S/F/C/P/H 的现有资产修改，候选在独立目录验证后发布；当前不支持自动增加/删除资产及自动评分采纳。
+适配器返回标准 `CaseInput/CorpusBlock/SourceRef/QuestionInput`，请求参数符合 TaskSpec 的封闭契约；不能带评测字段或调用模型。框架固定选择两个 Agent、工具收集、候选、检查、审查、反馈重试和发布。不能提供 builder/answerer 回调或通过继承换掉数据集执行流程。
 
-可运行示例为 [`examples/third_domain.py`](../examples/third_domain.py)：设备具有联合主键，图中有两位技师，内核搬迁后只返回与目标设备存在维修关系的技师。这个示例不读取基准或 gold。
+`AnswerResult.status` 只有 `answered/abstained/execution_error`。执行错误不携带答案；正常答案必须有真实来源和图节点出处。结果转换不会修补语义内容。
 
-## 与旧代码的区别
+## 仓库内入口
 
-1. 默认产物目录是调用者当前目录下的 `runs`，应用应显式设置 `Config.work_dir`。
-2. 领域模型角色由 `Config.role_tiers` 注入；LoCoMo 的角色登记位于其适配配置，核心不登记基准角色。未指定 fast 服务时继承主服务。
-3. 思考开关、思考余量和空输出处理由配置指定。更换提供商时显式设置这些策略，不将评测角色的请求策略混入生成调参。
-4. 节点身份使用有类型的结构序列化。旧图不能通过更改文件名升级；新运行需按新的依赖身份重新构图。
-5. 旅行图扩展从 `oak_domains.travel_planning.graph` 导入。旧的 `oak.kg.graph` 名称保留带弃用警告的兼容入口。
-6. `answer-evidence-integrity` 只保证引用完整性，不宣称已经证明答案的全部语义；语义支持需要领域审查。执行失败与语义拒答分开表示。
-7. 预算登记在 `Config.namespace_limits`，同时约束匹配的所有 scope；持久计数按逻辑调用预留，跨客户端及进程锁定。实际请求重试与 token 用量在台账中保留，不能把逻辑调用额度理解成费用上限。
-8. HermiT 未完成属于 `UNVERIFIED`；要求形式校验的运行不会把它当作通过。
+离线第三任务（明确使用录制响应，验证框架执行，不代表真实模型性能）：
 
-## 已验证范围
+```sh
+.venv/bin/python -B examples/third_domain.py
+```
 
-仓库内 26 个新增测试、16 个原 LoCoMo 测试和 28 个原旅行规划测试通过。独立安装环境下，15 个通用契约测试、3 个函数/关系执行测试以及第三领域示例通过。
+TravelPlanner 共用 Pipeline：
 
-LoCoMo 的真实效果单独记录在 `FRAMEWORK-REPAIR-LOG.md` 及 campaign 结果中。安装和契约通过不代表达到评测外错题率 <3%。
+```sh
+uv sync --extra benchmarks  # 原官方评测需要 gradio/pandas/numpy 等依赖
+.venv/bin/python -B -m datasets.travelplanner.run --split train --index 0 --output datasets/travelplanner/runs/v032-smoke
+```
+
+LoCoMo 从已有新契约资产包运行：
+
+```sh
+.venv/bin/python -B -m datasets.locomo.run --case conv-26 --assets /absolute/path/to/bundle --output datasets/locomo/runs/v032-run
+```
+
+LoCoMo 无历史种子的完整两轮实验：
+
+```sh
+PYTHONHASHSEED=0 .venv/bin/python -B -u -m datasets.locomo.run --experiment --output datasets/locomo/runs/framework_v032_cold_20261003
+```
+
+同一阶段、同一代码/数据/模型/资产/预算身份恢复需要追加 `--resume`。变更身份必须使用新目录，不能沿用缓存。旧 0.2 的带 H bundle 和旧生成入口不适用于新 Runtime；历史运行及冻结代码保留。
+
+上面的真实实验已经按两轮上限停止，结果为失败。B0/R1 各有 199 条执行错误，R2 提案准入失败，没有有效评分基线。该目录只用于查看原始记录；本次末尾清理了兼容数据类型文件的空行，精确原源码及输入保存在该目录的 `frozen_code/`，不在当前工作区强行恢复旧身份。新实验使用新目录。
+
+## 资产格式与约束
+
+`tasks/<task>/assets/index.yaml` 登记资产 ID、类型、源码位置、S 依赖、契约和 F 试跑参数。位置由框架解析，优化提案不含路径。Schema 是 YAML 声明；函数必须 `def run(params):`；检查必须 `def check(candidate):` 并返回 `{ok: bool, issues: [str]}`；提示只有固定角色和插槽。受限语法与能力列表见 [架构](ARCHITECTURE.md)。不支持的源码会拒绝，不能放宽权限让旧模块直接执行。
+
+新底层算子、模型路由、预算或接入修复属于工程版本，不是资产优化。优化器只会创建候选资产版本，核心、接入代码、评测器、数据和配置指纹保持不变。
+
+## 仓库外验收
+
+实际验收在 `/private/tmp/oak-v03-portability/` 完成：独立虚拟环境安装 `oak_repro-0.3.2`，只拷贝第三任务的声明/资产和两个接口的示例，在 `python -I` 且移除 PYTHONPATH 后运行。ExtractionAgent、AnswerAgent、S/F/C/P 与固定 Pipeline 均实际执行，不依赖数据集包、仓库根或私有任务流程。
+
+重新构建：
+
+```sh
+uv build --wheel
+```
+
+已验证 wheel 位于 `dist/oak_repro-0.3.2-py3-none-any.whl`。安装和复制任务资产后，普通应用直接调用 Pipeline；只有初始化与训练迭代才调用 ExperimentRunner。

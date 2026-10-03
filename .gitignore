@@ -49,3 +49,13 @@ datasets/locomo/runs/conv-44/closeout-r*/answers.jsonl
 # 记录类产物(answers/report/failures/system_side/契约/决策/frozen_code)全部入库
 datasets/locomo/runs/**/cache/
 datasets/locomo/runs/**/graph_*/
+
+# ---- 框架冷启动实验(2026-10-03):逐题完整生成轨迹不入库 ----
+# 单题 result.json 可达 90M+(含全量推理轨迹);结论已浓缩进 acceptance/summary/decision
+datasets/locomo/runs/**/generation/
+datasets/locomo/runs/**/frozen_code/
+datasets/locomo/runs/**/*.console.log
+
+# ---- 构建产物与本地参考资料 ----
+dist/
+papers/

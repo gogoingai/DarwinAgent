@@ -1,126 +1,158 @@
-# 记忆领域 OaK 扩展版架构
+# Oak 0.3.2：固定框架与 S/F/C/P 资产
 
-> 本文是后续所有实现的依据。骨架(两阶段、四步循环、S/F 内核、键签名折叠、算子编译、HermiT 门)来自 OaK 原文(arXiv:2608.22974);**扩展部分已明确标注**,共两处:修补面增加 checks 与 prompts 两个部件,以及引入 manifest/留出集纪律。禁止在代码或文档里把扩展说成论文原有机制。
->
-> **v2 修订(2026-10-01 收口)**:①`judge`/`attr` 角色移出 prompts 修补面,归入**冻结评测器**(优化评测=作弊);②B4 修补改为**门控化原子提案**(WikiSkill 纪律:每轮一个 σ、验证段全量重跑、系统侧指标严格下降才采纳、被拒留档);③新增 **wiki 经验层**(patterns/index/log/patch-impact,永不回滚);④资产带 scope(universal/domain/dataset),任务特定词条不进通用内核。实施细节见 `docs/DESIGN-closeout.md`。
+框架掌握执行流程，数据集实现输入适配和独立评测，优化器只能提交符合契约的 S/F/C/P 资产补丁。H、任务执行回调、数据集私有 Agent/Pipeline 和 `oak_domains` 已退出活动实现和发行包。S/F 来自 OaK 内核思想；C/P 是本项目的工程扩展，不宣称为论文原有机制。
 
-## 0. 术语与论文对照
+![框架层次](images/oak-target-architecture.png)
 
-| 本文用语 | 论文对应 | 说明 |
-|---|---|---|
-| 内核(kernel) | 本体内核 | 冻结后是智能体接触数据的唯一渠道 |
-| schema S | 模式 S | 论文:限定"可表达的内容" |
-| functions F | 函数 F | 论文:限定"可计算的内容" |
-| checks C | — | **扩展**:必须成立什么(硬约束,可机器检查) |
-| prompts P | — | **扩展**:怎么驱动模型(技能指令) |
-| 通用算子库 O | 算子库 O | 实体查找、关系遍历、属性投影、约束过滤、聚合 |
-| σ = (u, a, δ, ρ) | 同 | u=改哪个部件,a∈{add,delete,modify},δ=新定义/补丁,ρ=诊断理由 |
-| 构建阶段 / 推理阶段 | 同 | 构建:训练集上循环;推理:冻结内核 + 现建图 |
+## 实际目录
 
-## 1. 内核:智能体接触数据的唯一渠道
+```text
+oak/                              # wheel 仅发行这个包
+  contracts.py                    # 输入、来源、结果、两个接入 Protocol
+  config.py                       # 冻结 RunConfig；连接配置单独装配
+  engine/pipeline.py              # 唯一 Pipeline，身份、恢复、产物
+  agents/
+    extraction.py                # 通用 ExtractionAgent
+    answer.py                    # 通用 AnswerAgent
+    protocol.py                  # 固定协议、解析、调用预算、反馈重试
+  kernel/
+    assets.py                    # Asset、KernelAssets、KernelBundle
+    spec.py                      # TaskSpec、封闭 JSON 契约
+    registration.py              # 声明式资产索引，不导入任务模块
+    execution.py                 # 两个 Agent 共享 KernelRuntime
+    functions.py                 # F 准入、真实图试跑、调用
+    checks.py                    # C 只返回检查意见
+    validation.py                # 固定输入、类型、来源、状态、发布检查
+    counterexamples.py           # 固定改名、日期平移等行为反例
+    revision.py                  # 独立候选、原子发布
+  experiments/
+    bootstrap.py                 # 通用提示现场生成 S/F/C/P
+    proposal.py                  # 当前训练反馈 -> 一个结构化提案
+    runner.py                    # B0 -> R1 -> R2，有界采纳控制器
+    policy.py                    # 冻结指标采纳规则
+  schema/                        # 声明解析、静态检查、图实例公理检查
+  kg/                            # 类型图与来源
+  operators/{data.py,sandbox.py}  # 只读算子、正向 AST 解释器
+  llm/                           # 通信、连接装配、显式离线录制传输
+  runtime/                       # 身份、预算、原子产物
 
-内核冻结后:不能命名未声明的概念、不能调用未声明的计算、不能违反已声明的约束。
+tasks/
+  conversation_memory/task.yaml # 没有历史 LoCoMo 资产种子
+  travel_planning/
+    task.yaml
+    assets/{index.yaml,S/,F/,C/,P/}
+  device_maintenance/
+    task.yaml
+    assets/{index.yaml,S/,F/,C/,P/}
 
-| 部件 | 规定什么 | 状态 |
-|---|---|---|
-| schema S | 可**表达**什么:实体类型(带主键)、属性(带类型)、关系(带 domain/range)、公理、领域词汇 | 论文 |
-| functions F | 可**计算**什么:由算子库 O 组合出的领域函数,带类型输入输出 | 论文 |
-| checks C | 必须**成立**什么:图级与答案级硬约束 | **扩展** |
-| prompts P | 怎么**驱动模型**:各角色的技能指令 | **扩展** |
+datasets/
+  locomo/{adapter.py,evaluator.py,exports.py,run.py}
+  travelplanner/{adapter.py,evaluator.py,exports.py,run.py}
+  */pipeline/                    # 评测兼容代码；旧生成流程已移除
+  */{data/,runs/}                 # 原数据、冻结代码、历史记录保持
 
-### 1.1 checks C 的内容与判据
-
-一条 check 是一句可判定的陈述 + 一段检查代码 + 违反时的报错。判据:**这条约束错了会不会悄悄毁掉结果**。会,就放 C。
-
-| 层级 | 例子 | 何时跑 | 违反时 |
-|---|---|---|---|
-| 图级 | 别名不得等于任何说话人名或其他实体的规范名 | 图实例化完成后 | 报错,污染源隔离 |
-| 图级 | 每条事实都能在原文中逐字找到出处 | 抽取合并后 | 该条丢弃并计数 |
-| 答案级 | 答案主体与支撑证据的主体一致 | 答案生成后 | 触发拒答/复核 |
-| 答案级 | 多要素标准答案缺任一要素 → 不得判为完全正确 | 判分时 | 降级为部分正确 |
-
-### 1.2 prompts P 的内容、边界与粒度
-
-**定义**:P 是所有"写给模型看的自然语言指令",按**角色**分文件管理。每个角色一个资产,带版本号。
-
-| 角色 | 职责 | 调用的模型档 | 可见数据约束 |
-|---|---|---|---|
-| `extract` | 按 schema 把一个语料块映射成带类型实体与关系候选 | fast | 只见块内原文,不得见 gold |
-| `audit` | 完整性审计:指出哪些块可能漏抽了事实 | fast | 只见块内原文 + 已有候选 |
-| `canon` | 实体归并:判断两个候选是否同一对象、别名如何映射 | fast | 只见候选与说话人列表 |
-| `act` | ReAct 步骤:选工具、构造查询 | fast | 只见工具说明与已收集证据 |
-| `answer` | 终答合成:如何从证据组织答案 | strong | 只见问题与收集到的证据 |
-
-**冻结评测器(v2,不属于 P,永不进修补面)**:`judge`(评判标准)、`attr`(失败归因)、确定性判分规则、gold 修复表、数据集本体。理由:优化评测=作弊;打分/归因与提案必须分离。每轮迭代以指纹校验其零变化。
-
-**P 的硬边界(两条)**:
-
-1. **协议不进 P**。凡规定输出格式的归引擎 + 解析器:"只输出合法 JSON"、"用 ```yaml 包裹"、"拒答时输出固定哨兵串"。协议错了会**报错**,不会悄悄变差,因此不按分数调。区分标准:输出格式 → 引擎;行为倾向 → P。
-2. **P 引用 schema,不复制 schema**。`extract` 指令里不得硬编码实体/关系白名单,必须从 S 读入。否则 S 一改、P 就漂移(骨架 8 类、指令写 7 类),本体迭代无法自动传导。
-
-**补丁粒度**:σ 的 u 指向某个角色指令的某个版本,动作:
-- `modify`:改该角色指令的文本(对应论文的"modify 实体/关系/函数")
-- `add`:在该角色指令里增加一条规则段(例:抽取时"先抽取带日期的事件")
-- `delete`:删掉该角色指令里的一条规则段
-
-每条 σ 必须带 ρ(诊断理由),并落到具体失败题号;无失败证据的 σ 不采纳。
-
-## 2. 循环
-
-```
-┌─ 构建阶段(在训练集 D^tr 上循环,每轮重采样 20%)────────────────┐
-│  B1 模式构建: 需求分析 R=Analyze(T,D_t) → 草拟 S_t=Draft(R,  ψ^S_{t-1})
-│               → HermiT(OWL(S_t)) 五类检查,失败带反例回草拟重试
-│  B2 图谱实例化: chunk → map(P_extract 按 S 抽) → merge(键签名 κ(e)=(类型,主键))
-│               → 跑 C 的图级检查
-│  B3 知识推理: Compose(O, S_t, G_t, Q_t, ψ^F_{t-1}) → F_t,逐个测过可执行才暴露
-│               → ReAct 执行(P_act 驱动),终答(P_answer),跑 C 的答案级检查
-│  B4 评估与修补: Eval(A_t) → 归因(P_attr) → 评判器出 σ=(u,a,δ,ρ)
-│               u∈S → 回 B1;u∈F → 回 B3;u∈C → 回 B2;u∈P → 回 B3
-│               直到无阻塞错误或达预算
-└──────────────────────────────────────────────────────────────┘
-┌─ 推理阶段 ──────────────────────────────────────────────────┐
-│  冻结 S*,F*,C*,P*
-│  对测试查询 q: G_q = Build(S*, C_q) → ReAct 调 F* 取证据
-│               → 按 P_answer* 作答 → C* 校验 → 答案追溯到 grounded evidence
-└──────────────────────────────────────────────────────────────┘
+examples/third_domain.py          # 两个接入类 + 共同 Pipeline
+tests/{unit,integration,portability}/
 ```
 
-## 3. 每一层怎么改、改了怎么验
+## 类关系与执行
 
-| 部件 | 修订动作 | 采纳门(全过才进下一轮) |
-|---|---|---|
-| schema | 增删改实体类型/关系/公理/词汇 | **HermiT 五类检查通过** + 指纹变化 |
-| functions | 增删改领域函数(算子组合) | **在图上可执行自测通过** |
-| checks | 增删改硬约束 | 自检必须过 + 端到端涨分 + **留出集不降** |
-| prompts | 增删改角色指令的规则段 | 端到端涨分 + **留出集类目不降** |
+![关键类](images/oak-target-classes.png)
 
-## 4. 不迭代的东西
-
-| 类别 | 内容 | 为什么不动 |
-|---|---|---|
-| 引擎 | 循环控制流、并发、缓存、断点、成本台账、模型路由、重试、**输出协议解析器**(JSON/yaml/拒答哨兵串) | 没有"效果方向":不能用涨分论证该不该改缓存。走代码评审 |
-| 适配(每数据集一份) | 数据加载、语料切分、官方评测器接线、产物目录 | 每数据集写一次,不参与迭代 |
-
-## 5. 三条架构不变量
-
-1. **补丁只落在内核四部件上**。引擎和适配器不能被 σ 修改——否则"智能体改进自己"不可信。
-2. **每条内核资产带版本 + 指纹 + 收益记录**。manifest 登记:哪个部件的哪条资产、第几轮引入、贡献多少分。这是"经验累积"的物理形态,也是回滚依据。
-3. **留出集纪律**。改动准入 = 调优集涨 **且** 留出集不降。没有留出集不叫改进,叫过拟合。
-
-## 6. 换数据集怎么走
-
+```mermaid
+classDiagram
+  class DatasetAdapter {
+    <<interface>>
+    generation_input(case_id) CaseInput
+  }
+  class Evaluator {
+    <<interface>>
+    evaluate(RunResult) EvaluationResult
+  }
+  class Pipeline {
+    run(CaseInput, TaskSpec, RunConfig) RunResult
+  }
+  class ExtractionAgent {
+    extract(corpus) GraphResult
+  }
+  class AnswerAgent {
+    answer(question, graph) AnswerResult
+  }
+  class KernelRuntime {
+    prompt(role)
+    call(asset_id, params, graph)
+    check_candidate()
+    validate_graph()
+  }
+  class ExperimentRunner {
+    run(case_id, spec, rounds=2)
+  }
+  DatasetAdapter <|.. LocomoAdapter
+  DatasetAdapter <|.. TravelPlannerAdapter
+  Evaluator <|.. LocomoEvaluator
+  Evaluator <|.. TravelPlannerEvaluator
+  ExperimentRunner --> DatasetAdapter
+  ExperimentRunner --> Pipeline
+  ExperimentRunner --> Evaluator
+  ExperimentRunner --> AssetBootstrapper
+  ExperimentRunner --> ProposalGenerator
+  ExperimentRunner --> AssetRevisionService
+  Pipeline *-- ExtractionAgent
+  Pipeline *-- AnswerAgent
+  Pipeline *-- KernelRuntime
+  ExtractionAgent --> KernelRuntime
+  AnswerAgent --> KernelRuntime
+  KernelRuntime --> KernelBundle
+  KernelRuntime --> FunctionRegistry
+  KernelRuntime --> CheckRegistry
+  AssetRevisionService --> KernelBundle
 ```
-新数据集 = 写适配层(数据/语料/评测器/目录)
-        + 选起点:搬现有内核资产 / 从零起草
-        + 跑构建循环,拿留出集数字
-经验(资产 + manifest)随框架走,不走人
+
+普通应用直接调用 `Pipeline`。需要初始化和训练迭代时调用 `ExperimentRunner`。数据集不继承、替换 Pipeline 或 Agent；入口只装配这两个接入接口、声明和资产。S/F/C/P 是两个 Agent 共享的扩展对象，不是四个顺序执行阶段。
+
+```mermaid
+flowchart LR
+  A[标准语料和来源] --> E[ExtractionAgent]
+  E --> G[S / 来源 / 图实例公理 / 任务 C]
+  G --> T[F 准入 / 真实图试跑 / 固定反例]
+  T --> Q[AnswerAgent 收集工具数据]
+  Q --> D[生成候选]
+  D --> C[固定检查和任务 C]
+  C --> R[独立语义审查]
+  R -->|通过| P[固定发布]
+  C -->|拒绝| F[反馈重新生成]
+  R -->|拒绝| F
+  F --> Q
+  F -->|预算耗尽| X[execution_error]
 ```
 
-## 7. 标注纪律
+拒答也接受语义审查：先要求实际数据查询，再分块检查完整图，能够回答就反馈重新生成。所有图块都支持拒答才发布 `abstained`。解析、工具、检查、审查故障不会被转成拒答或首候选。所有原始响应和错误轨迹保留。发布后没有关键词替换、集合补项、酒店替换或计划修补。
 
-所有对外数字必须分开标注:**哪些来自论文机制(S/F 四步闭环),哪些来自扩展(C/P 修补面)**。混报就又变成"说不清哪次改动涨的分"。
+## 资产能力边界
 
-## 8. 待验证(实施第一步)
+资产登记稳定 ID、类型、内容、输入输出契约、S 依赖、角色/阶段、试跑参数和指纹。权限来自框架能力登记，资产中没有扩权字段。
 
-把已积累的领域经验逐条试塞 S/F/C/P,统计落点分布,校准这张架构——尤其是 C/P 两个扩展面实际能承载多少经验。若多数经验能塞进 S/F,则扩展面可收窄。
+| 类型 | 允许 | 禁止 |
+|---|---|---|
+| S | 声明类型、属性、关系与支持的公理 | 代码和阶段编排 |
+| F | 只读查询、筛选、聚合、计算，返回数据或候选 | 模型、Agent、文件网络、启动流程、发布答案 |
+| C | 候选/证据快照 -> `{ok, issues}` | 改写候选、关闭固定检查、决定采纳 |
+| P | 固定角色的文本模板与登记插槽 | 注册工具、扩预算、跳阶段、扩可见输入 |
+
+F/C 由正向 AST 解释器执行，没有 `exec/eval/compile` 或普通模块执行回退。允许局部计算、分支、容器和有界遍历；禁止导入、反射、动态调用、全局写入、输入修改、文件网络与任意流程调用。执行步数、期限、容器和结果大小均有上限。基础算子 `nodes/search/traverse/project/aggregate/order_by/date_difference` 逐项登记；原来的 `extract_runtime_slots` 不在能力表。
+
+F 仅获得声明参数和只读数据能力，C 仅获得不可写候选快照，两者都拿不到图写接口、配置、模型、评测器或 Pipeline。来源由框架读操作追踪，函数不能靠自己返回几个来源 ID 获得出处。工具结果封装成数据，不能驱动阶段切换。固定检查使用 `fixed.*` 保留名字空间，资产无法覆盖。
+
+P 仅支持 `extract/tools/answer/review` 四个角色；`${schema}` 可用于各角色，`${tools}` 只可用于 tools。输出协议、可见输入和阶段顺序都在固定代码中。
+
+提案提交完整资产定义、基准指纹、理由和本轮训练依据，不提交目标路径。修订服务解析登记 ID，创建独立候选，校验后原子发布版本指针；被拒候选保持独立。核心、连接配置、RunConfig、适配器、评测器和数据在实验前后核对指纹。工程修复另发版本、重新建基线，不算资产收益。
+
+编译/试跑通过不能证明语义正确。准入检查完整问题和题号常量，固定反例检查改名与日期变化，独立任务测试改变请求预算、人数、方向和日期。真实答案还要结合原始来源做语义审查。首版执行的是封闭 S 文法和图实例公理；没有启用外部 HermiT 的运行不会宣称已获得完整 OWL 形式证明。
+
+## 数据集实现的职责
+
+LoCoMo 适配器转换 `message_text/observation/event_summary`，记录日期、说话人和来源层可靠性，只传问题文本。图片说明、gold、QA evidence、类别和陷阱答案不进入生成接口。独立评测保留原始/修订 gold × 宽松/精准四种口径，完整中英语料的评测格式与已冻结实现一致。
+
+TravelPlanner 适配器读取每题 reference 表及已经允许的环境表（城市州、餐饮、住宿、景点、距离），按该请求范围登记来源，保留官方缺值过滤语义。运行时没有隐藏官方 CSV 查库或覆盖图属性。旅行查询、人数房间费用计算、连续入住和计划条件归入受限 F/C/P；官方评测桥接仍位于原 `pipeline/eval/`。
+
+两个 `exports.py` 只序列化已发布内容。旧评测路径留下的 `agent.py/build.py` 仅保留历史记录数据类型，供冻结分析代码读取，没有执行逻辑。

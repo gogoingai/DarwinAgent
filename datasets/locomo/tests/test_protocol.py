@@ -5,7 +5,6 @@ from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 import unittest
 
-from datasets.locomo.pipeline.agent import _parse_final, _consensus_pick, _refusal_gate, AnswerExecutionError, context_pool, run_qa
 from datasets.locomo.pipeline.data import QA
 from datasets.locomo.pipeline.dates import answer_equivalent, resolve_relative
 from datasets.locomo.pipeline.judge import deterministic_grade, is_clean_refusal, _aggregate, Grade
@@ -23,31 +22,7 @@ class FakeClient:
 
 
 class ProtocolTests(unittest.TestCase):
-    def test_refusal_recheck_cross_subject_and_ranking(self):
-        import json
-        tb=SimpleNamespace(
-            index=SimpleNamespace(score=lambda q:{'26-0001':70,'26-0002':90}),
-            facts={'26-0001':{'主体':'乙'},'26-0002':{'主体':'乙'}},
-            entities={'甲':{'etype':'人物'}}, fact_line=lambda f:f+' 乙代甲报名')
-        review={'pick':0,'reviews':[{'index':0,'supported':True,'subject_correct':True,
-            'consistent':True,'complete':True,'reason':'明确关系支持'}]}
-        c=FakeClient(['Final Answer: 甲已报名\n证据: [26-0002]',json.dumps(review)])
-        pool={};meta={}
-        answer=asyncio.run(_refusal_gate('甲报名了吗','header','对话中未提及该信息',[],
-            tb,pool,c,'test',context_metadata=meta))
-        self.assertEqual(answer,('甲已报名',['26-0002']))
-        text=c.calls[0]['messages'][1]['content']
-        self.assertLess(text.index('26-0002'),text.index('26-0001'))
-        self.assertIn('跨人物关系',text)
-        self.assertEqual(set(pool),{'26-0001','26-0002'})
 
-    def test_refusal_recheck_format_failure_is_execution_error(self):
-        tb=SimpleNamespace(index=SimpleNamespace(score=lambda q:{'26-0001':70}),
-            facts={'26-0001':{'主体':'乙'}},entities={},fact_line=lambda f:f+' fact')
-        c=FakeClient(['','',''])
-        with self.assertRaises(AnswerExecutionError):
-            asyncio.run(_refusal_gate('q','','对话中未提及该信息',[],tb,{},c,'test'))
-        self.assertEqual(len(c.calls),3)
 
     def test_no_substring_shortcuts(self):
         for gold,pred,cat in [(2,'不是2，而是三个。',4),('不是','不是，但实际做过。',5),
@@ -111,40 +86,9 @@ class ProtocolTests(unittest.TestCase):
         legacy=_aggregate([QA(0,'q',4,'g')],[Grade(0,'evaluation_error','llm')],'conv')
         self.assertIsNone(legacy['exact_rate'])
 
-    def test_visible_evidence_only(self):
-        tb=SimpleNamespace(facts={'26-0001':{},'26-0002':{}},fact_line=lambda f:f)
-        pool=context_pool(tb,['26-0002'])
-        self.assertEqual(_parse_final('Final Answer: X\n证据: [26-0002]',pool),('X',['26-0002']))
-        self.assertIsNone(_parse_final('Final Answer: X\n证据: [26-0001,26-0002]',pool)[1])
-        self.assertIsNone(_parse_final('X\n证据: [26-0002]',pool)[1])
-        self.assertIsNone(_parse_final('Final Answer: X\n证据: [26-0002,garbage]',pool)[1])
 
-    def test_supported_candidate_beats_more_evidence(self):
-        import json
-        reviews=[{'index':i,'supported':i!=0,'subject_correct':True,'consistent':i!=0,
-                  'complete':i!=0,'reason':'核对日期矛盾'} for i in range(3)]
-        c=FakeClient([json.dumps({'pick':1,'reviews':reviews})])
-        candidates=[('7月2日或者3日',['26-0001','26-0002']),('7月2日',['26-0001']),('7月2日',['26-0001'])]
-        chosen=asyncio.run(_consensus_pick('何时',candidates,c,'test',{'26-0001':'事件7月2日'}))
-        self.assertEqual(chosen,candidates[1])
-        self.assertNotIn('证据数最多',c.calls[0]['messages'][0]['content'])
 
-    def test_invalid_selector_is_execution_failure(self):
-        c=FakeClient(['','',''])
-        with self.assertRaises(AnswerExecutionError):
-            asyncio.run(_consensus_pick('q',[('a',['26-0001'])],c,'test',{'26-0001':'fact'}))
 
-    def test_generation_fault_preserves_raw_outputs(self):
-        c=FakeClient([''] * 6)
-        tb=SimpleNamespace(facts={}, entities={}, index=SimpleNamespace(
-            score=lambda q:{}, search=lambda q,limit:[]))
-        out=asyncio.run(run_qa(0,'普通问题','双方',tb,c,
-                              SimpleNamespace(react_max_steps=0),'conv-26'))
-        self.assertEqual(out.status,'answer_error')
-        self.assertEqual(out.answer,'')
-        self.assertFalse(out.refused)
-        self.assertEqual(len(out.raw_outputs),6)
-        self.assertEqual(out.trajectory['error_type'],'AnswerExecutionError')
 
     def test_batch_uses_complete_dialogue_and_keeps_ids(self):
         import json

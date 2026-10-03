@@ -1,0 +1,31 @@
+name: travel_planning
+description: Produce grounded travel plans satisfying the request using only declared tables. Select candidates before publication, and preserve the published plan.
+source_kinds: [reference_table, allowed_environment]
+metadata_keys: [table, scope]
+parameter_contract:
+  type: object
+  required: [org, dest, days, date, people_number, local_constraint, budget, visiting_city_number]
+  properties:
+    org: {type: string}
+    dest: {type: string}
+    days: {type: integer}
+    date: {type: array, items: {type: string}}
+    people_number: {type: integer}
+    local_constraint: {type: object, additionalProperties: true}
+    budget: {type: number}
+    visiting_city_number: {type: integer}
+answer_format: json
+answer_contract:
+  type: array
+  items:
+    type: object
+    required: [days, current_city, transportation, breakfast, lunch, dinner, attraction, accommodation]
+    properties:
+      days: {type: integer}
+      current_city: {type: string}
+      transportation: {type: string}
+      breakfast: {type: string}
+      lunch: {type: string}
+      dinner: {type: string}
+      attraction: {type: string}
+      accommodation: {type: string}
