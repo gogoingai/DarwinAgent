@@ -5,7 +5,7 @@ from pathlib import Path
 
 from oak.config import RunConfig
 from oak.engine import Pipeline
-from oak.experiments import (AdoptionPolicy, CampaignController, ExperimentRunner, ExperimentSpec)
+from oak.experiments import (AdoptionPolicy, CampaignController, ExperimentRunner, ExperimentSpec, SelectionPolicy)
 from oak.kernel import KernelBundle, TaskSpec
 from oak.llm.client import LLMClient
 from oak.llm.settings import load_connection
@@ -33,7 +33,9 @@ async def main(args):
         print('stop signal written; the campaign will lock candidates after the current round')
         return
     if args.campaign:
-        protocol=ExperimentSpec(train=('conv-26',),validation=('conv-47',),test=('conv-49',),rounds=args.rounds)
+        protocol=ExperimentSpec(train=('conv-26',),validation=('conv-47',),test=('conv-49',),rounds=args.rounds,
+            adoption=AdoptionPolicy('repaired_precise',('original_lenient','original_precise','repaired_lenient')),
+            selection=SelectionPolicy('original_precise','original_lenient'))
         controller=CampaignController(adapter,lambda client,path:LocomoEvaluator(client,path),connection,config,
             protocol,root,frozen)
         summary=await controller.run(spec,resume=args.resume)

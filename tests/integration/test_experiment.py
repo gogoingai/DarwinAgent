@@ -22,7 +22,10 @@ class LedgerRecordedClient(RecordedClient):
 
 
 class FixtureEvaluator:
-    def __init__(self,stage): self.stage=stage
+    def __init__(self,stage):
+        stage=Path(stage)
+        name=stage.parent.name
+        self.stage=name if name=='B0' or name.startswith('R') else stage.parent.parent.name
     async def evaluate(self,result):
         assert all(a.status=='answered' for a in result.answers)
         return EvaluationResult({'precise':0 if self.stage=='B0' else 1},1,1,0,0)
@@ -33,7 +36,7 @@ class RecordedExperiment(ExperimentRunner):
     def __init__(self,root,stale=False):
         self.case=case();self.created=[];self.stage_clients=Counter();self.stale=stale
         super().__init__(type('Adapter',(),{'generation_input':lambda _,ident:self.case})(),
-            lambda transport,path:FixtureEvaluator(path.parent.name),Config(),
+            lambda transport,path:FixtureEvaluator(path),Config(),
             RunConfig(protocol_attempts=1),AdoptionPolicy('precise',()),root)
 
     def _client(self,stage):
@@ -75,7 +78,7 @@ class FullExperimentControl(unittest.TestCase):
         for stage in ['B0','R1','R2']:
             result=json.loads((root/stage/'generation'/runner.case.id/'result.json').read_text())
             self.assertEqual(result['answers'][0]['status'],'answered')
-            self.assertTrue((root/stage/'evaluation.json').exists())
+            self.assertTrue((root/stage/'evaluation'/f'{runner.case.id}.json').exists())
         second=json.loads((root/'R2/proposal-call.json').read_text())
         self.assertEqual(second['input']['base_version'],published['version'])
         self.assertEqual(second['input']['task_training_feedback']['scores']['metrics']['precise'],1)

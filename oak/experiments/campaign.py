@@ -17,7 +17,7 @@ from oak.llm.client import LLMClient
 from oak.runtime.artifacts import atomic_json
 from oak.runtime.identity import assert_files, snapshot_files, transport_identity
 from .runner import ExperimentRunner
-from .spec import ExperimentSpec
+from .spec import ExperimentSpec, aggregate_scores, precheck_identity
 
 
 class CampaignController:
@@ -92,15 +92,18 @@ class CampaignController:
         """Settle by decision order: a round whose admission failed never ran questions and
         must not stop the scan at later rounds."""
         train = self.root / 'train'
-        case_id = self.spec.train[0]
         stages = ['B0']
         n = 1
         while (train / f'R{n}' / 'decision.json').exists():
             stages.append(f'R{n}'); n += 1
         for name in stages:
-            result_path = train / name / 'generation' / case_id / 'result.json'
-            if result_path.exists():
-                self._settle(f'train/{name}', len(json.loads(result_path.read_text())['answers']))
+            total = 0
+            for case_id in self.spec.train:
+                result_path = train / name / 'generation' / case_id / 'result.json'
+                if result_path.exists():
+                    total += len(json.loads(result_path.read_text())['answers'])
+            if total:
+                self._settle(f'train/{name}', total)
 
     # ---- one case under one bundle -------------------------------------------
     def _client(self, stage_dir):
@@ -140,6 +143,14 @@ class CampaignController:
         finally:
             await client.aclose()
 
+    async def _split_stage(self, phase, case_ids, task_spec, stage_dir):
+        """Run every case of a split on the same bundle; aggregate by the frozen sum rule."""
+        results = []; scores = []
+        for case_id in case_ids:
+            result, case_scores = await self._case_stage(phase, case_id, task_spec, stage_dir / case_id)
+            results.append(result); scores.append(case_scores)
+        return results, aggregate_scores(scores)
+
     # ---- candidate chain from the training tree -------------------------------
     def _candidate_chain(self):
         train = self.root / 'train'
@@ -159,7 +170,6 @@ class CampaignController:
 
     def _register_train_runs(self):
         train = self.root / 'train'
-        case_id = self.spec.train[0]
         stages = ['B0']
         n = 1
         while (train / f'R{n}' / 'generation' / case_id / 'result.json').exists():
@@ -196,25 +206,30 @@ class CampaignController:
         precheck = self.root / 'precheck.json'
         if not precheck.exists() or not json.loads(precheck.read_text()).get('passed'):
             raise ValueError('Precheck missing or not passed: run datasets/locomo/scripts/precheck first')
+        recorded = json.loads(precheck.read_text()).get('identity')
+        expected_identity = precheck_identity(self.connection_config, self.config)
+        if recorded != expected_identity:
+            raise ValueError('Precheck identity mismatch: the record was produced by a different '
+                             'routing/config/framework and cannot authorize this campaign')
         self.verify()
 
         def set_phase(phase):
             state = json.loads(state_path.read_text())
             atomic_json(state_path, {**state, 'phase': phase})
 
-        train_case = self.spec.train[0]
-        train_questions = len(self.adapter.generation_input(train_case).questions)
+        train_cases = self.spec.train
+        train_questions = sum(len(self.adapter.generation_input(c).questions) for c in train_cases)
         set_phase('train')
         runner = ExperimentRunner(self.adapter, self.evaluator_factory, self.connection_config,
                                   self.config, self.spec.adoption, self.root / 'train', self.frozen_files,
                                   client_factory=self._injected_client)
         def b0_gate(scores):
             return scores.completed == scores.total and scores.generation_faults == 0 and scores.evaluation_faults == 0
-        train_summary = await runner.run(train_case, task_spec,
+        train_summary = await runner.run(train_cases, task_spec,
                                          rounds=self.spec.rounds if rounds is None else rounds,
                                          resume=resume, stop_file=self.root / 'STOP', b0_gate=b0_gate,
                                          stage_gate=lambda name: self._reserve(
-                                             f'train/{name}', train_case, train_questions))
+                                             f'train/{name}', '+'.join(train_cases), train_questions))
         self._settle_train_from_decisions()
         if train_summary['status'] == 'blocked_b0':
             set_phase('blocked_b0')
@@ -241,16 +256,16 @@ class CampaignController:
             atomic_json(self.root / 'campaign.json', {**state, 'phase': phase})
 
         chain = self._candidate_chain()
-        validation_case = self.spec.validation[0]
-        validation_questions = len(self.adapter.generation_input(validation_case).questions)
+        validation_cases = self.spec.validation
+        validation_questions = sum(len(self.adapter.generation_input(c).questions) for c in validation_cases)
         set_phase('validation')
         validation = {}
         for candidate in chain:
-            self._reserve(f"validation/{candidate['version']}", validation_case, validation_questions)
-            result, scores = await self._case_stage(
-                'validation', validation_case, task_spec.with_bundle(KernelBundle(candidate['path'])),
+            self._reserve(f"validation/{candidate['version']}", '+'.join(validation_cases), validation_questions)
+            results, scores = await self._split_stage(
+                'validation', validation_cases, task_spec.with_bundle(KernelBundle(candidate['path'])),
                 self.root / 'validation' / candidate['version'])
-            self._settle(f"validation/{candidate['version']}", len(result.answers))
+            self._settle(f"validation/{candidate['version']}", sum(len(r.answers) for r in results))
             validation[candidate['version']] = scores.to_dict()
 
         set_phase('selection')
@@ -264,18 +279,18 @@ class CampaignController:
             'fingerprints': {c['version']: KernelBundle(c['path']).version for c in chain},
             'sealed_before_test': True})
 
-        test_case = self.spec.test[0]
+        test_cases = self.spec.test
         test_versions = [chain[0]['version']] + ([selected] if selected != chain[0]['version'] else [])
-        test_questions = len(self.adapter.generation_input(test_case).questions)
+        test_questions = sum(len(self.adapter.generation_input(c).questions) for c in test_cases)
         set_phase('test')
         test = {}
         for version in test_versions:
             path = next(c['path'] for c in chain if c['version'] == version)
-            self._reserve(f'test/{version}', test_case, test_questions)
-            result, scores = await self._case_stage('test', test_case,
-                                                    task_spec.with_bundle(KernelBundle(path)),
-                                                    self.root / 'test' / version)
-            self._settle(f'test/{version}', len(result.answers))
+            self._reserve(f'test/{version}', '+'.join(test_cases), test_questions)
+            results, scores = await self._split_stage('test', test_cases,
+                                                      task_spec.with_bundle(KernelBundle(path)),
+                                                      self.root / 'test' / version)
+            self._settle(f'test/{version}', sum(len(r.answers) for r in results))
             test[version] = scores.to_dict()
 
         set_phase('done')

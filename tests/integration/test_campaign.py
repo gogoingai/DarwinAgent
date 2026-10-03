@@ -9,6 +9,7 @@ from collections import Counter
 from pathlib import Path
 
 from oak.config import Config, RunConfig
+from oak.experiments.spec import precheck_identity
 from oak.contracts import EvaluationResult
 from oak.experiments import AdoptionPolicy, CampaignController, ExperimentSpec, SelectionPolicy
 from oak.kernel import KernelBundle, TaskSpec
@@ -16,7 +17,7 @@ from oak.kernel.registration import load_assets
 from oak.llm.recorded import RecordedClient
 from tests.fixtures import TASK, review
 
-SERIALS = {'train-case': 'D-17', 'val-case': 'D-18', 'test-case': 'D-19'}
+SERIALS = {'train-case': 'D-17', 'train-case-2': 'D-27', 'val-case': 'D-18', 'val-case-2': 'D-28', 'test-case': 'D-19', 'test-case-2': 'D-29'}
 
 
 class StubAdapter:
@@ -83,11 +84,26 @@ class RecordedCampaign(CampaignController):
             declaration = json.loads((self.root / 'campaign.json').read_text())['declaration']['experiment_spec']
             phase = 'train' if name.startswith('R') or name == 'B0' else \
                 ('validation' if 'validation' in str(stage_dir) else 'test')
-            replies = generation_replies(declaration[phase][0])
+            if name in SERIALS:
+                # 逐 case 客户端（验证/测试）：只装载本 case 的回复
+                replies = generation_replies(name)
+            else:
+                # 训练阶段客户端：按声明顺序装载全部 case 的回复
+                replies = {}
+                for case_id in declaration[phase]:
+                    for role, values in generation_replies(case_id).items():
+                        replies.setdefault(role, []).extend(values)
         return LedgerRecordedClient(replies)
 
 
-def protocol(rounds, cap=None):
+def protocol(rounds, cap=None, multi=False):
+    if multi:
+        return ExperimentSpec(train=('train-case', 'train-case-2'),
+                              validation=('val-case', 'val-case-2'),
+                              test=('test-case', 'test-case-2'),
+                              rounds=rounds, adoption=AdoptionPolicy('precise', ('lenient',)),
+                              selection=SelectionPolicy('precise', 'lenient'),
+                              max_question_runs=cap)
     return ExperimentSpec(train=('train-case',), validation=('val-case',), test=('test-case',),
                           rounds=rounds, adoption=AdoptionPolicy('precise', ('lenient',)),
                           selection=SelectionPolicy('precise', 'lenient'),
@@ -98,7 +114,8 @@ def execute(spec, resume=False, stop=False, root=None):
     td = None
     if root is None:
         td = tempfile.TemporaryDirectory(); root = Path(td.name)
-    (root / 'precheck.json').write_text(json.dumps({'passed': True, 'checks': {}}))
+    (root / 'precheck.json').write_text(json.dumps({'passed': True, 'checks': {},
+                                                        'identity': precheck_identity(Config(), RunConfig(protocol_attempts=1))}))
     if stop: (root / 'STOP').write_text('operator stop\n')
     controller = RecordedCampaign(root, spec=spec, frozen_files=())
     task = TaskSpec.load(TASK / 'task.yaml')
@@ -146,6 +163,33 @@ class ThreeSetCampaign(unittest.TestCase):
         self.assertIn('sealed', str(caught.exception))
         # The sealed summary on disk is untouched by the refused resume.
         self.assertEqual(json.loads((root / 'campaign-summary.json').read_text()), again)
+
+    def test_multi_case_splits_aggregate_and_ledger(self):
+        root, td, summary = execute(protocol(rounds=1, multi=True))
+        self.addCleanup(td.cleanup)
+        self.assertEqual(summary['status'], 'complete')
+        self.assertEqual(len(summary['candidates']), 2)
+        self.assertNotEqual(summary['selected'], summary['candidates'][0]['version'])
+        # 每阶段 2 case × 1 题：训练 2 阶段 + 验证 2 候选 + 测试 2 版本 = 12 题次
+        self.assertEqual(summary['question_runs'], 12)
+        # 验证聚合：B0 两 case 各 0 分、候选各 1 分 → 聚合 0 vs 2
+        b0 = summary['candidates'][0]['version']
+        self.assertEqual(summary['validation'][b0]['metrics'], {'precise': 0, 'lenient': 0})
+        cand = summary['selected']
+        self.assertEqual(summary['validation'][cand]['metrics'], {'precise': 2, 'lenient': 2})
+        self.assertEqual(summary['validation'][b0]['total'], 2)
+
+    def test_precheck_wrong_identity_refused(self):
+        td = tempfile.TemporaryDirectory(); self.addCleanup(td.cleanup)
+        root = Path(td.name)
+        (root / 'precheck.json').write_text(json.dumps(
+            {'passed': True, 'checks': {},
+             'identity': {'transport': {}, 'config': 'deadbeef', 'framework': 'deadbeef'}}))
+        controller = RecordedCampaign(root, spec=protocol(rounds=1))
+        from oak.kernel import TaskSpec
+        with self.assertRaises(ValueError) as caught:
+            asyncio.run(controller.run(TaskSpec.load(TASK / 'task.yaml')))
+        self.assertIn('identity mismatch', str(caught.exception))
 
     def test_missing_precheck_refuses_to_start(self):
         td = tempfile.TemporaryDirectory(); self.addCleanup(td.cleanup)

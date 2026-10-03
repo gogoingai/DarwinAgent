@@ -11,6 +11,8 @@ from oak.contracts import AtomicFact, CorpusBlock, EntityRef, FactEvidence, Fact
 from oak.kg.assembler import GraphAssembler, anchoring_invariants
 from oak.kg.graph import node_id
 from oak.kernel.assets import Asset, KernelAssets
+from oak.experiments.spec import precheck_identity
+from oak.config import Config as _Cfg, RunConfig as _RC
 from oak.kernel.counterexamples import run_probes
 from oak.kernel.execution import KernelRuntime
 from oak.kernel.revision import AssetPatch, AssetRevisionService
@@ -200,7 +202,8 @@ class BudgetReserveBeforeExecution(unittest.TestCase):
         import tests.integration.test_campaign as tc
         td = tempfile.TemporaryDirectory(); self.addCleanup(td.cleanup)
         root = Path(td.name)
-        (root / 'precheck.json').write_text(json.dumps({'passed': True, 'checks': {}}))
+        (root / 'precheck.json').write_text(json.dumps({'passed': True, 'checks': {},
+                                                        'identity': precheck_identity(_Cfg(), _RC(protocol_attempts=1))}))
         controller = RecordedCampaign(root, spec=protocol(rounds=1, cap=1))
         from oak.kernel import TaskSpec
         with self.assertRaises(ValueError) as caught:
@@ -453,6 +456,36 @@ class ReviewRoundFour(unittest.TestCase):
         fact_rows = [r for r in rows.values() if r['entity_type'] == 'AtomicFact']
         self.assertEqual(len(fact_rows), 1)
         self.assertEqual(set(fact_rows[0]['source_ids']), {ev.source_id for ev in fact.evidence})
+
+
+
+class GenericFeedbackContract(unittest.TestCase):
+    def test_dataset_specific_diagnostics_flow_through(self):
+        from oak.experiments.runner import training_feedback
+        from oak.contracts import AnswerResult, EvaluationResult, RunResult
+        # 旅行式诊断（预算/人数/约束），框架不得丢弃或改读 LoCoMo 字段
+        rows = ({'query_id': 'q7', 'budget_exceeded': True, 'people': 3,
+                 'constraint': 'no flight', 'plan_issues': ['超预算']},)
+        ev = (SourceRef('message_text', 'c', '7'),)
+        result = RunResult('c', 'id', 'v', (AnswerResult('q7', 'answered', 'ok', evidence=ev),), 5)
+        baseline = EvaluationResult({'feasible': 0, 'budget_ok': 1}, 1, 1, 0, 0, rows)
+        feedback = training_feedback([result], baseline)
+        self.assertEqual(feedback['diagnostics'][0]['constraint'], 'no flight')
+        self.assertEqual(feedback['diagnostic_rows_total'], 1)
+        self.assertIn('feasible', feedback['scores']['metrics'])
+
+    def test_passed_rows_skipped_and_budget_capped(self):
+        from oak.experiments.runner import training_feedback, FEEDBACK_BUDGET_CHARS
+        from oak.contracts import AnswerResult, EvaluationResult, RunResult
+        rows = tuple({'i': i, 'passed': True, 'payload': 'x'} for i in range(3)) + \
+               ({'i': 9, 'payload': 'y' * 100},)
+        big = {'i': 10, 'payload': 'z' * (FEEDBACK_BUDGET_CHARS + 10)}
+        rows = rows + (big,)
+        result = RunResult('c', 'id', 'v', (), 0)
+        baseline = EvaluationResult({'m': 0}, 0, 0, 0, 0, rows)
+        feedback = training_feedback([result], baseline)
+        self.assertEqual([r['i'] for r in feedback['diagnostics']], [9])
+        self.assertEqual(feedback['diagnostic_rows_total'], 5)
 
 if __name__ == '__main__':
     unittest.main()

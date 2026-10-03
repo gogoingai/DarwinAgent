@@ -23,6 +23,7 @@ from oak.llm.settings import load_connection
 from oak.schema.model import Schema
 
 from datasets.locomo.adapter import LocomoAdapter
+from oak.experiments.spec import precheck_identity
 
 ROOT = Path(__file__).resolve().parents[3]
 SEED = ROOT / 'tasks/conversation_memory/assets/S/schema.yaml'
@@ -128,6 +129,7 @@ async def main(args):
         ledger = client.ledger_summary()
     passed = all(entry.get('ok') for entry in checks.values())
     record = {'passed': passed, 'checks': checks, 'ledger': ledger,
+              'identity': precheck_identity(connection, config),
               'elapsed_s': round(time.time() - started, 1), 'ts': time.time()}
     (out / 'precheck.json').write_text(json.dumps(record, ensure_ascii=False, indent=2))
     print(json.dumps({'passed': passed, 'checks': {k: v.get('ok') for k, v in checks.items()}},

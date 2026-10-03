@@ -1,15 +1,22 @@
-"""Frozen three-set experiment protocol: fixed splits, open-ended rounds and selection policy."""
+"""Frozen experiment protocol: multi-case splits, generic metrics and selection policy.
+
+The framework never hardcodes dataset metric names: the experiment declaration supplies
+the adoption policy (metric names come from the independent Evaluator), the aggregation
+rule is frozen (counts and faults sum across cases), and splits may hold any number of
+complete conversations as long as the three splits stay disjoint."""
 from __future__ import annotations
 
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 
+from oak.contracts import EvaluationResult, plain
 from .policy import AdoptionPolicy
 
 
 @dataclass(frozen=True)
 class SelectionPolicy:
-    """Validation selection: strictly better than B0 on the primary original-gold metric,
-    not lower on the floor metric, no faults; rank by (primary, floor), exact ties to the earlier version."""
+    """Selection on aggregated validation scores: strictly better than the baseline on the
+    primary metric, not lower on the floor metric, no faults; rank by (primary, floor),
+    exact ties to the earlier version."""
 
     primary: str
     floor: str
@@ -38,27 +45,48 @@ class SelectionPolicy:
                              self.floor: c['scores'].metrics[self.floor]} for c in ranked]}
 
 
+def aggregate_scores(results):
+    """The frozen multi-case aggregation: metric counts, totals, completion and faults all
+    sum; diagnostics concatenate in case order. Metric key sets must agree across cases."""
+    results = list(results)
+    if not results:
+        raise ValueError('Nothing to aggregate')
+    key_sets = {tuple(sorted(r.metrics)) for r in results}
+    if len(key_sets) > 1:
+        raise ValueError(f'评价器指标口径不一致，无法汇总: {[list(k) for k in key_sets]}')
+    metrics = {key: sum(r.metrics.get(key, 0) for r in results) for key in results[0].metrics}
+    diagnostics = ()
+    for r in results:
+        diagnostics += tuple(r.diagnostics)
+    return EvaluationResult(metrics, sum(r.total for r in results), sum(r.completed for r in results),
+                            sum(r.generation_faults for r in results),
+                            sum(r.evaluation_faults for r in results), diagnostics)
+
+
 @dataclass(frozen=True)
 class ExperimentSpec:
-    """Complete-session splits; validation and test references never feed proposals."""
+    """Complete-conversation splits (any number of cases each, mutually disjoint); the same
+    candidate asset bundle is evaluated on every case of a round — no per-case picking."""
 
     train: tuple[str, ...]
     validation: tuple[str, ...]
     test: tuple[str, ...]
+    adoption: AdoptionPolicy
+    selection: SelectionPolicy
     rounds: int | None = None              # None: unbounded training rounds, operator stop
-    adoption: AdoptionPolicy = field(default_factory=lambda: AdoptionPolicy(
-        'repaired_precise', ('original_lenient', 'original_precise', 'repaired_lenient')))
-    selection: SelectionPolicy = field(default_factory=lambda: SelectionPolicy(
-        'original_precise', 'original_lenient'))
     max_question_runs: int | None = None   # safety cap over all question runs; None: ledger only
 
     def __post_init__(self):
         for name in ('train', 'validation', 'test'):
             value = getattr(self, name)
-            if not isinstance(value, tuple) or not value or len(value) != 1:
-                raise ValueError(f'{name} must name exactly one complete conversation in this protocol')
-        if len({self.train[0], self.validation[0], self.test[0]}) != 3:
+            if not isinstance(value, tuple) or not value or len(set(value)) != len(value):
+                raise ValueError(f'{name} must be a nonempty tuple of distinct conversations')
+        seen = [c for split in (self.train, self.validation, self.test) for c in split]
+        if len(seen) != len(set(seen)):
             raise ValueError('Splits must be disjoint conversations')
+        if not isinstance(self.adoption, AdoptionPolicy) or not isinstance(self.selection, SelectionPolicy):
+            raise ValueError('Experiment requires explicit adoption and selection policies '
+                             '(metric names belong to the dataset evaluator)')
         if self.rounds is not None and (type(self.rounds) is not int or self.rounds < 0):
             raise ValueError('rounds must be a nonnegative integer or None')
         if self.max_question_runs is not None and (type(self.max_question_runs) is not int or self.max_question_runs < 1):
@@ -66,6 +94,18 @@ class ExperimentSpec:
 
     def declaration(self):
         return {'train': list(self.train), 'validation': list(self.validation), 'test': list(self.test),
-                'rounds': self.rounds, 'adoption': asdict(self.adoption),
+                'rounds': self.rounds, 'aggregation': 'sum',
+                'adoption': asdict(self.adoption),
                 'selection': {'primary': self.selection.primary, 'floor': self.selection.floor},
                 'max_question_runs': self.max_question_runs}
+
+
+def precheck_identity(connection_config, run_config):
+    """Identity a passing precheck is bound to: model routing, frozen run config and
+    framework code. A record from any other identity cannot authorize a campaign."""
+    from oak.runtime.identity import snapshot_files, transport_identity
+    from oak.runtime.artifacts import digest
+    from pathlib import Path
+    return {'transport': transport_identity(type('Connection', (), {'cfg': connection_config})()),
+            'config': digest(run_config.to_dict()),
+            'framework': digest(snapshot_files([Path(__file__).resolve().parents[1]]))}

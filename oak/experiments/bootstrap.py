@@ -76,19 +76,25 @@ All assets must work when names, dates and request constraints change. Use param
 
 
 class AssetBootstrapper:
-    async def initialize(self, case, spec, client, config, target, seed_schema=None):
+    async def initialize(self, cases, spec, client, config, target, seed_schema=None):
+        if isinstance(cases, tuple) and len(cases) == 1:
+            cases = cases[0]
+        if not isinstance(cases, (list, tuple)):
+            cases = (cases,)
+        corpus_blocks = [b for case in cases for b in case.corpus]
+        questions = [q for case in cases for q in case.questions]
         seed_schema = seed_schema if seed_schema is not None else spec.seed_s
         anchored = bool(seed_schema and seed_schema.strip())
         session = ModelSession(client, config, 'bootstrap', limit=6)
         # Deterministic raw-data sampling, without labels, categories, graph caches or historical assets.
         blocks = []; size = 0
-        for b in case.corpus:
+        for b in corpus_blocks:
             if size + len(b.text) > 24000: break
             blocks.append(b.to_dict()); size += len(b.text)
         payload = {'task': spec.declaration(),
                    'training_corpus': blocks,
-                   'training_questions': [q.text for q in case.questions],
-                   'corpus_fingerprint': digest([b.to_dict() for b in case.corpus])}
+                   'training_questions': [q.text for q in questions],
+                   'corpus_fingerprint': digest([b.to_dict() for b in corpus_blocks])}
         if anchored:
             payload['fixed_schema'] = seed_schema
 
@@ -123,7 +129,7 @@ class AssetBootstrapper:
             schema = Schema.from_yaml(next(a.content for a in assets.assets if a.kind == 'S'))
             if schema.validate(): raise ValueError(str(schema.validate()))
             for a in assets.assets:
-                if a.kind in {'F', 'C'}: admit(a.content, a.kind, [q.text for q in case.questions])
+                if a.kind in {'F', 'C'}: admit(a.content, a.kind, [q.text for q in questions])
             return assets
         protocol = ASSET_PROTOCOL if anchored else LEGACY_ASSET_PROTOCOL
         try:
@@ -132,5 +138,5 @@ class AssetBootstrapper:
             atomic_json(target.parent / 'bootstrap-call.json', {'input_fingerprint': digest(payload),
                          'input': payload, 'raw_outputs': session.raw, 'events': session.events})
         bundle = assets.export(target)
-        validate_bundle(bundle, [q.text for q in case.questions])
+        validate_bundle(bundle, [q.text for q in questions])
         return bundle
