@@ -90,11 +90,10 @@ class FixedPipeline(unittest.TestCase):
     def test_fake_source_and_illegal_graph_fail_all_questions(self):
         for fault in ['source','quote','type']:
             c=case();t=client(c);obj=extraction(c)
-            obj['facts'][0][{'source':'evidence','quote':'evidence','type':'subject'}[fault]][
-                {'source':0,'quote':0,'type':'class'}[fault]]='forged'
+            obj['entities'][0][{'source':'source_id','quote':'quote','type':'type'}[fault]]='forged'
             from collections import deque
-            t.replies['extraction']=deque([obj,obj,obj])
-            result,_,_=self.run_case(c,t,RunConfig())
+            t.replies['extraction']=deque([obj])
+            result,_,_=self.run_case(c,t)
             self.assertEqual(result.graph_nodes,0)
             self.assertEqual(result.answers[0].status,'execution_error')
 

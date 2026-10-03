@@ -1,64 +1,6 @@
-# device_maintenance S：事实锚定核心 + 设备维护实体分类（框架校验锚定词表不可删）
-meta:
-  task: device_maintenance
-  anchoring: fact-centric-v1
-  entity_classes: [device, person]
 entity_types:
-  AtomicFact:
-    description: 记忆节点——一条独立可判断的原子命题，节点完整携带事实定义（__fact__）
-    primary_key: [id]
-    attributes:
-      - {name: id, dtype: string}
-      - {name: text, dtype: string}
-      - {name: predicate, dtype: string}
-      - {name: polarity, dtype: string}
-      - {name: modality, dtype: string}
-  Entity:
-    description: 主体或对象实体；class 取 meta.entity_classes 之一
-    primary_key: [class, name]
-    attributes:
-      - {name: class, dtype: string}
-      - {name: name, dtype: string}
-  Value:
-    description: 有类型的标量值（规范字符串）
-    primary_key: [dtype, value]
-    attributes:
-      - {name: dtype, dtype: string}
-      - {name: value, dtype: string}
-  Time:
-    description: 时间记录——原文表达、精度、可选 ISO 范围与相对锚点
-    primary_key: [id]
-    attributes:
-      - {name: id, dtype: string}
-      - {name: raw, dtype: string}
-      - {name: precision, dtype: string}
-      - {name: start, dtype: string}
-      - {name: end, dtype: string}
-      - {name: anchor_source_id, dtype: string}
-  EvidenceSpan:
-    description: 逐字证据片段及其在来源原文中的字符偏移
-    primary_key: [id]
-    attributes:
-      - {name: id, dtype: string}
-      - {name: source_id, dtype: string}
-      - {name: quote, dtype: string}
-      - {name: start_offset, dtype: int}
-      - {name: end_offset, dtype: int}
-  Source:
-    description: 注册来源记录
-    primary_key: [kind, document_id, location]
-    attributes:
-      - {name: kind, dtype: string}
-      - {name: document_id, dtype: string}
-      - {name: location, dtype: string}
-      - {name: speaker, dtype: string}
-      - {name: date, dtype: string}
-relation_types:
-  subject: {domain: AtomicFact, range: Entity, description: 事实的主体}
-  object_entity: {domain: AtomicFact, range: Entity, description: 事实的对象实体}
-  object_value: {domain: AtomicFact, range: Value, description: 事实的对象值}
-  occurrence_time: {domain: AtomicFact, range: Time, description: 事实的发生时间}
-  evidence: {domain: AtomicFact, range: EvidenceSpan, description: 事实的逐字证据}
-  locates: {domain: EvidenceSpan, range: Source, description: 证据定位到来源记录}
-  time_anchor: {domain: Time, range: Source, description: 相对时间锚点来源}
+  Maintenance:
+    primary_key: [serial, date]
+    attributes: [{name: serial, dtype: string}, {name: date, dtype: date}, {name: technician, dtype: string}]
+relation_types: {}
 axioms: []

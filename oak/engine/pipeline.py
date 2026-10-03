@@ -48,36 +48,40 @@ class Pipeline:
             if transport_identity(self.client)!=transport: raise ValueError('Frozen model route/config changed')
         verify()
         corpus={b.source.id:b for b in case.corpus}
+        # The hook before graph building: tasks declaring meta.anchoring insert the atomic-memory
+        # stage here; every other task goes straight to typed entity extraction.
+        anchored=bool(runtime.schema.meta.get('anchoring'))
 
-        # Stage one: atomic-fact memory, checkpointed independently of the graph.
+        # Stage one (anchored tasks only): atomic-fact memory, checkpointed independently.
         memory=None;memory_failure=None;raw=()
-        if (root/'memory.failure.json').exists():
-            failure=json.loads((root/'memory.failure.json').read_text())
-            memory_failure=failure['error'];raw=tuple(failure.get('raw_outputs',[]))
-        elif (root/'memory.complete.json').exists():
-            completion=json.loads((root/'memory.complete.json').read_text())
-            payload=json.loads((root/'memory.json').read_text())
-            if digest(payload)!=completion['digest']:
-                raise ValueError('Saved memory changed')
-            memory=MemoryResult.from_dict(payload,corpus)
-            if memory.fingerprint!=completion['fingerprint']:
-                raise ValueError('Saved memory fingerprint mismatch')
-        else:
-            try:
-                memory=await ExtractionAgent(runtime,self.client,config,identity[:16]).extract(case.corpus)
-                verify()
-                payload=memory.to_dict()
-                atomic_json(root/'memory.json',payload)
-                atomic_json(root/'memory.complete.json',{'digest':digest(payload),'fingerprint':memory.fingerprint,
-                            'facts':len(memory.facts),'raw_outputs':len(memory.raw_outputs),
-                            'diagnostics':plain(memory.diagnostics)})
-            except Exception as exc:
-                verify()
-                memory_failure=f'{type(exc).__name__}: {exc}'
-                raw=tuple(getattr(exc,'raw_outputs',()))
-                atomic_json(root/'memory.failure.json',{'error':memory_failure,'raw_outputs':list(raw)})
+        if anchored:
+            if (root/'memory.failure.json').exists():
+                failure=json.loads((root/'memory.failure.json').read_text())
+                memory_failure=failure['error'];raw=tuple(failure.get('raw_outputs',[]))
+            elif (root/'memory.complete.json').exists():
+                completion=json.loads((root/'memory.complete.json').read_text())
+                payload=json.loads((root/'memory.json').read_text())
+                if digest(payload)!=completion['digest']:
+                    raise ValueError('Saved memory changed')
+                memory=MemoryResult.from_dict(payload,corpus)
+                if memory.fingerprint!=completion['fingerprint']:
+                    raise ValueError('Saved memory fingerprint mismatch')
+            else:
+                try:
+                    memory=await ExtractionAgent(runtime,self.client,config,identity[:16]).extract(case.corpus)
+                    verify()
+                    payload=memory.to_dict()
+                    atomic_json(root/'memory.json',payload)
+                    atomic_json(root/'memory.complete.json',{'digest':digest(payload),'fingerprint':memory.fingerprint,
+                                'facts':len(memory.facts),'raw_outputs':len(memory.raw_outputs),
+                                'diagnostics':plain(memory.diagnostics)})
+                except Exception as exc:
+                    verify()
+                    memory_failure=f'{type(exc).__name__}: {exc}'
+                    raw=tuple(getattr(exc,'raw_outputs',()))
+                    atomic_json(root/'memory.failure.json',{'error':memory_failure,'raw_outputs':list(raw)})
 
-        # Stage two: deterministic fact-anchored assembly from the memory.
+        # Stage two: the graph — assembled from memory when anchored, extracted directly otherwise.
         graph=None;graph_failure=None;graph_fingerprint=''
         if memory_failure:
             graph_failure=f'extraction failed: {memory_failure}'
@@ -93,10 +97,13 @@ class Pipeline:
             graph=GraphResult(nx.freeze(load_graph(graph_path)),MappingProxyType(corpus),
                               (),tuple(completion['diagnostics']))
             graph_fingerprint=completion['digest']
-            runtime.validate_graph(graph,memory.fingerprint)
+            runtime.validate_graph(graph,memory.fingerprint if memory is not None else None)
         else:
             try:
-                graph=GraphAssembler.build(memory,spec,runtime.schema)
+                if anchored:
+                    graph=GraphAssembler.build(memory,spec,runtime.schema)
+                else:
+                    graph=await ExtractionAgent(runtime,self.client,config,identity[:16]).extract_entities(case.corpus)
                 verify()
                 # Trial every admitted F against the actual graph before inference can call it.
                 trials=runtime.functions.trial(graph,{a.id:list(a.trial_inputs) for a in runtime.bundle.assets.assets if a.kind=='F'})
@@ -106,7 +113,7 @@ class Pipeline:
                 save_graph(graph.graph,root/'graph.json')
                 graph_fingerprint=digest(json.loads((root/'graph.json').read_text()))
                 atomic_json(root/'graph.complete.json',{'digest':graph_fingerprint,
-                            'memory_fingerprint':memory.fingerprint,'raw_outputs':[],
+                            'memory_fingerprint':'' if memory is None else memory.fingerprint,'raw_outputs':[],
                             'diagnostics':list(graph.diagnostics)})
             except Exception as exc:
                 verify()

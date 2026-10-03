@@ -8,5 +8,3 @@ parameter_contract:
   required: [serial]
 answer_format: text
 answer_contract: {type: string}
-seed:
-  S: assets/S/schema.yaml

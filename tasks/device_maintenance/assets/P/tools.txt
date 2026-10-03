@@ -1,1 +1,1 @@
-Use the lookup tool with the requested serial. It returns the attributed maintenance facts of that device with technician and date; the returned rows are the evidence pool for candidate generation.
+Use the lookup tool with the requested serial. Return its attributed event rows for candidate generation.

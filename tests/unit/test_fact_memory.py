@@ -275,5 +275,16 @@ class MaterializedViewTests(unittest.TestCase):
         self.assertEqual(graph.diagnostics[0]['skipped_view_materializations'], 1)
 
 
+    def test_anchoring_is_opt_in_per_task(self):
+        # 事实锚定是任务级声明（S meta.anchoring）：device 未声明，不携带核心词表也合法；
+        # 一旦声明（如 locomo 种子），缺词表即被 validate_bundle 拒绝。
+        device = Schema.from_yaml((SEED.parents[3] / 'device_maintenance/assets/S/schema.yaml').read_text())
+        self.assertFalse(device.meta.get('anchoring'))
+        self.assertTrue(anchoring_errors(device))
+        declared = Schema.from_yaml(SEED.read_text().replace('axioms: []', 'axioms: []'))
+        self.assertTrue(declared.meta.get('anchoring'))
+        self.assertEqual(anchoring_errors(declared), [])
+
+
 if __name__ == '__main__':
     unittest.main()

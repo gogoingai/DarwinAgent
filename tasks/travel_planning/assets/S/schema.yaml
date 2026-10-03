@@ -1,65 +1,4 @@
-meta:
-  task: travel_planning
-  anchoring: fact-centric-v1
-  entity_classes: [flight, accommodation, restaurant, attraction, city, distance]
-  materialized:
-    Flight: {entity_class: flight}
-    Accommodation: {entity_class: accommodation}
-    Restaurant: {entity_class: restaurant}
-    Attraction: {entity_class: attraction}
-    City: {entity_class: city}
-    Distance: {entity_class: distance}
 entity_types:
-
-  AtomicFact:
-    description: 记忆节点——一条独立可判断的原子命题，节点完整携带事实定义（__fact__）
-    primary_key: [id]
-    attributes:
-      - {name: id, dtype: string}
-      - {name: text, dtype: string}
-      - {name: predicate, dtype: string}
-      - {name: polarity, dtype: string}
-      - {name: modality, dtype: string}
-  Entity:
-    description: 主体或对象实体；class 取 meta.entity_classes 之一
-    primary_key: [class, name]
-    attributes:
-      - {name: class, dtype: string}
-      - {name: name, dtype: string}
-  Value:
-    description: 有类型的标量值（规范字符串）
-    primary_key: [dtype, value]
-    attributes:
-      - {name: dtype, dtype: string}
-      - {name: value, dtype: string}
-  Time:
-    description: 时间记录——原文表达、精度、可选 ISO 范围与相对锚点
-    primary_key: [id]
-    attributes:
-      - {name: id, dtype: string}
-      - {name: raw, dtype: string}
-      - {name: precision, dtype: string}
-      - {name: start, dtype: string}
-      - {name: end, dtype: string}
-      - {name: anchor_source_id, dtype: string}
-  EvidenceSpan:
-    description: 逐字证据片段及其在来源原文中的字符偏移
-    primary_key: [id]
-    attributes:
-      - {name: id, dtype: string}
-      - {name: source_id, dtype: string}
-      - {name: quote, dtype: string}
-      - {name: start_offset, dtype: int}
-      - {name: end_offset, dtype: int}
-  Source:
-    description: 注册来源（查询请求或允许的环境数据）
-    primary_key: [kind, document_id, location]
-    attributes:
-      - {name: kind, dtype: string}
-      - {name: document_id, dtype: string}
-      - {name: location, dtype: string}
-      - {name: speaker, dtype: string}
-      - {name: date, dtype: string}
   Flight:
     primary_key: [Flight Number, FlightDate]
     attributes: [{name: Flight Number, dtype: string}, {name: FlightDate, dtype: date}, {name: Price, dtype: float}, {name: OriginCityName, dtype: string}, {name: DestCityName, dtype: string}, {name: DepTime, dtype: string}, {name: ArrTime, dtype: string}, {name: ActualElapsedTime, dtype: string}]
@@ -78,13 +17,5 @@ entity_types:
   Distance:
     primary_key: [origin, destination]
     attributes: [{name: origin, dtype: string}, {name: destination, dtype: string}, {name: cost, dtype: float}, {name: duration, dtype: string}, {name: distance, dtype: string}]
-relation_types:
-  subject: {domain: AtomicFact, range: Entity, description: 事实的主体}
-  object_entity: {domain: AtomicFact, range: Entity, description: 事实的对象实体}
-  object_value: {domain: AtomicFact, range: Value, description: 事实的对象值}
-  occurrence_time: {domain: AtomicFact, range: Time, description: 事实的发生时间}
-  evidence: {domain: AtomicFact, range: EvidenceSpan, description: 事实的逐字证据}
-  locates: {domain: EvidenceSpan, range: Source, description: 证据定位到来源}
-  time_anchor: {domain: Time, range: Source, description: 相对时间锚点来源}
-  materialized_from: {domain: [Flight, Accommodation, Restaurant, Attraction, City, Distance], range: AtomicFact, description: 类型化视图行由哪些事实物化而来}
+relation_types: {}
 axioms: []

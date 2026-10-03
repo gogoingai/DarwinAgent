@@ -126,3 +126,7 @@ commandcode fast 档周配额耗尽（重置 2026-10-04T02:47:55Z）阻塞第四
 ### 路由变更二（2026-10-03，用户拍板）
 
 glm-5.3-flash 同站与 strong 档共享并发池（单网关并发红线），用户改定 fast 档为 MiniMax-M3.1-Flash-Preview（api.minimax.cn/v1，OpenAI 兼容，独立 6 并发池；连通探测明文/JSON 双模式 ~1.1s）。`.env` LOCOMO_FAST_* 指向 MiniMax，新根 atomic_v3。用户同时明确：训练迭代无限进行，不主动叫停。
+
+### 架构修正：事实锚定改为任务级声明（2026-10-03，用户指正）
+
+用户指正：原子记忆两阶段是 conversation_memory（LoCoMo）任务线的要求，不应全任务强制。修正为「框架在建图前留口子」：S `meta.anchoring` 声明制——声明者走记忆→装配两阶段（锚定不变量强制），未声明者（travel_planning、device_maintenance）恢复原实体/关系抽取直建图路径与原资产（自基线 16ea8d38 恢复）；validate_bundle/validate_graph/Pipeline/bootstrap 均按声明分支。全量 119+1 项离线检查与仓库外验收复跑通过。

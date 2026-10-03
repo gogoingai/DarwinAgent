@@ -18,8 +18,10 @@ def validate_bundle(bundle, forbidden_questions=()):
     bundle.verify()
     schema=Schema.from_yaml(next(a.content for a in bundle.assets.assets if a.kind=='S'))
     if schema.validate(): raise ValueError(str(schema.validate()))
-    anchor=anchoring_errors(schema)
-    if anchor: raise ValueError('Schema 事实锚定声明不完整: '+str(anchor))
+    if schema.meta.get('anchoring'):
+        # Only tasks that declare the fact-anchoring hook must carry the anchoring vocabulary.
+        anchor=anchoring_errors(schema)
+        if anchor: raise ValueError('Schema 事实锚定声明不完整: '+str(anchor))
     from oak.schema.owlcheck import static_checks
     findings=static_checks(schema)
     if findings: raise ValueError(str([f.render() for f in findings]))
@@ -33,26 +35,37 @@ def validate_bundle(bundle, forbidden_questions=()):
 
 def validate_graph(result: GraphResult,schema,expected_memory_fingerprint=None):
     if not isinstance(result,GraphResult): raise ValueError('Invalid graph result type')
-    from oak.kg.assembler import anchoring_invariants
     g=result.graph
     entities=[]; relations=[]
+    anchored=bool(schema.meta.get('anchoring'))
+    if anchored:
+        from oak.kg.assembler import anchoring_invariants
     for nid,nd in g.nodes(data=True):
         sources=nd.get('__sources__',[])
         if not sources or set(sources)-set(result.sources):
             raise ValueError('Graph node requires authentic registered sources')
-        if nd.get('etype')=='AtomicFact':
-            try:
-                fact=AtomicFact.from_dict(json.loads(nd.get('__fact__','null')))
-            except Exception as exc:
-                raise ValueError(f'Fact node {nid} does not carry a complete definition: {exc}')
-            for ev in fact.evidence:
-                block=result.sources.get(ev.source_id)
-                if block is None or block.text[ev.start:ev.end]!=ev.quote:
-                    raise ValueError('Fact node evidence does not locate in its source')
-        elif nd.get('etype')=='EvidenceSpan':
-            block=result.sources.get(nd.get('source_id'))
-            if block is None or block.text[nd.get('start_offset',-1):nd.get('end_offset',-1)]!=nd.get('quote'):
-                raise ValueError('Evidence span offsets do not locate in its source')
+        if anchored:
+            if nd.get('etype')=='AtomicFact':
+                try:
+                    fact=AtomicFact.from_dict(json.loads(nd.get('__fact__','null')))
+                except Exception as exc:
+                    raise ValueError(f'Fact node {nid} does not carry a complete definition: {exc}')
+                for ev in fact.evidence:
+                    block=result.sources.get(ev.source_id)
+                    if block is None or block.text[ev.start:ev.end]!=ev.quote:
+                        raise ValueError('Fact node evidence does not locate in its source')
+            elif nd.get('etype')=='EvidenceSpan':
+                block=result.sources.get(nd.get('source_id'))
+                if block is None or block.text[nd.get('start_offset',-1):nd.get('end_offset',-1)]!=nd.get('quote'):
+                    raise ValueError('Evidence span offsets do not locate in its source')
+        else:
+            claims=nd.get('__claims__',[])
+            if not claims:
+                raise ValueError('Graph node requires extraction claims')
+            for claim in claims:
+                block=result.sources.get(claim.get('source_id'))
+                if block is None or not claim.get('quote') or claim['quote'] not in block.text:
+                    raise ValueError('Forged source or unsupported quotation')
         entity=schema.entity(nd.get('etype'))
         if entity is None: raise ValueError('Undeclared graph type')
         values=node_view(nd)
@@ -65,12 +78,13 @@ def validate_graph(result: GraphResult,schema,expected_memory_fingerprint=None):
         he,te=schema.entity(g.nodes[h]['etype']),schema.entity(g.nodes[t]['etype'])
         relations.append(RelationCandidate(ed['relation'],(he.name,{k:hv[k] for k in he.primary_key}),
                                            (te.name,{k:tv[k] for k in te.primary_key})))
-    build_graph(entities,relations,schema) # Recheck the actual saved graph, not just assembly output.
+    build_graph(entities,relations,schema) # Recheck the actual saved graph, not just extraction output.
     from oak.schema.graphcheck import instance_checks
     errors=instance_checks(g,schema)
     if errors: raise ValueError(str(errors))
-    violations=anchoring_invariants(g,result.sources,expected_memory_fingerprint)
-    if violations: raise ValueError('事实锚定不变量被违反: '+str(violations))
+    if anchored:
+        violations=anchoring_invariants(g,result.sources,expected_memory_fingerprint)
+        if violations: raise ValueError('事实锚定不变量被违反: '+str(violations))
     if not entities: raise ValueError('Empty graph cannot enter inference')
 
 
