@@ -86,9 +86,9 @@ def connection(root):
     # 用户决策：智谱端点全角色关闭深度思考——推理链吃光补全预算是 EmptyCompletion 突发
     # 的直接原因；关思考后该故障类整体消失（第三方 fast 网关自动忽略该开关）。
     conn.thinking_disabled_roles.update({'answer','review','locomo_judge'})
-    # MiniMax-M3.1-Flash 强制思考（disabled 400），唯一旋钮 reasoning_effort；实测 low
-    # 推理近零、补全 token 11→2（用户拍板先用 low 加速）。
-    conn.fast_reasoning_effort='low'
+    # MiniMax-M3.1-Flash 强制思考（disabled 400），按模型名匹配发 reasoning_effort=low
+    # （实测推理近零、补全 token 11→2；用户拍板先用 low 加速）。
+    conn.reasoning_effort='low'
     return conn
 
 
