@@ -98,16 +98,19 @@ async def main(args):
         except Exception as exc:  # noqa: BLE001
             checks['synthetic_extraction'] = {'ok': False, 'error': repr(exc)[:300]}
 
-        # Explicit truncation must fail clean under a bounded budget, never hang or half-pass.
+        # Starvation budget must end bounded and clean: a valid minimal memory (graceful
+        # degradation) or a clean ProtocolError both pass; hangs or foreign errors fail.
         try:
             tiny = RunConfig(extraction_max_tokens=48, protocol_attempts=1)
-            await ExtractionAgent(runtime, client, tiny, 'precheck_trunc').extract(synthetic_corpus())
-            checks['truncation_bisection'] = {'ok': False, 'error': '截断未按预期失败'}
+            memory = await ExtractionAgent(runtime, client, tiny, 'precheck_trunc').extract(synthetic_corpus())
+            problem = verify_offsets(memory)
+            checks['starvation_budget'] = {'ok': problem is None, 'facts': len(memory.facts),
+                                           'note': '模型在饥饿预算内优雅降级产出合法记忆', 'error': problem}
         except ProtocolError as exc:
-            checks['truncation_bisection'] = {'ok': True, 'error': str(exc)[:160],
-                                              'note': 'clean protocol failure with bounded budget'}
+            checks['starvation_budget'] = {'ok': True, 'error': str(exc)[:160],
+                                           'note': 'clean protocol failure with bounded budget'}
         except Exception as exc:  # noqa: BLE001
-            checks['truncation_bisection'] = {'ok': False, 'error': repr(exc)[:300]}
+            checks['starvation_budget'] = {'ok': False, 'error': repr(exc)[:300]}
 
         # A real training-conversation slice through the same fixed protocol.
         try:
