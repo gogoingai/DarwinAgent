@@ -56,10 +56,11 @@ class ModelSession:
 
 FACT_EXTRACT_PROTOCOL='''你是固定抽取 Agent。只从当前 sources 中抽取原子事实：一条事实只表达一个可判断的独立命题，表述完整自足，保留主体、否定、计划状态与时间精度。
 只返回 {"facts":[{"text":"完整命题","subject":{"class":"声明实体类别","name":"主体名"},
-"predicate":"谓词","object":null 或 {"entity":{"class":"…","name":"…"}} 或 {"value":{"dtype":"string|int|float|bool|date","value":"规范字符串"}},
+"predicate":"谓词","object":null 或 {"entity":{"class":"…","name":"…"}} 或 {"value":{"dtype":"string|int|float|bool|date","value":原生 JSON 值}},
 "polarity":"positive|negative|uncertain","modality":"statement|plan|hypothesis|uncertain",
 "time":{"raw":"原文时间表达","precision":"day|month|year|unknown","start":"ISO 日期或空串","end":"ISO 日期或空串","relative":true|false},
 "evidence":[{"source_id":"当前来源 ID","quote":"该来源 text 的逐字非空片段"}]}]}。
+value 用原生 JSON 类型：string 用原文、int 用整数、float 用数字、bool 用 true/false、date 用 ISO 字符串；带千分位逗号的数字写成无逗号数值。
 每个事实至少一条逐字证据，引用不得改写标点或增删字符；实体类别只能使用声明类别；
 相对时间（如"下周"）保持原文表达并置 relative=true，不得凭空换算日期；原文没有明确日期时 start/end 用空串；
 计划、假设、否定必须反映在 modality 与 polarity 中，不得合并进同一事实。

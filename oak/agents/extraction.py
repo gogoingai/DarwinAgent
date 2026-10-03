@@ -70,14 +70,24 @@ def _canonical_value(where, obj):
         if not isinstance(value, str) or not value.strip(): raise ValueError(f'{where}.value: 字符串值不能为空')
         return value
     if dtype == 'int':
-        if type(value) is not int: raise ValueError(f'{where}.value: int 值类型错误')
-        return str(value)
+        if type(value) is int: return str(value)
+        if isinstance(value, str) and value.strip():
+            digits = value.strip().replace(',', '').replace(' ', '')
+            try: return str(int(digits))
+            except ValueError: pass
+        raise ValueError(f'{where}.value: int 值须为整数或无千分位数字（得到 {value!r}）')
     if dtype == 'float':
-        if type(value) not in (int, float): raise ValueError(f'{where}.value: float 值类型错误')
-        return str(float(value))
+        if type(value) is int: return str(float(value))
+        if type(value) is float: return str(value)
+        if isinstance(value, str) and value.strip():
+            try: return str(float(value.strip().replace(',', '').replace(' ', '')))
+            except ValueError: pass
+        raise ValueError(f'{where}.value: float 值须为数字或无千分位数字（得到 {value!r}）')
     if dtype == 'bool':
-        if type(value) is not bool: raise ValueError(f'{where}.value: bool 值类型错误')
-        return 'true' if value else 'false'
+        if type(value) is bool: return 'true' if value else 'false'
+        if isinstance(value, str) and value.strip().lower() in ('true', 'false'):
+            return value.strip().lower()
+        raise ValueError(f'{where}.value: bool 值须为 true/false（得到 {value!r}）')
     if dtype == 'date':
         if not isinstance(value, str): raise ValueError(f'{where}.value: 日期须为 ISO 字符串')
         try: date.fromisoformat(value)
