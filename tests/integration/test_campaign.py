@@ -36,16 +36,13 @@ class LedgerRecordedClient(RecordedClient):
 def generation_replies(case_id):
     serial = SERIALS[case_id]
     block = StubAdapter().generation_input(case_id).corpus[0]
-    return {'extraction': [{'facts': [{'text': f'设备 {serial} 于 2026-09-01 由林维护',
-        'subject': {'class': 'device', 'name': serial}, 'predicate': '维护',
-        'object': {'entity': {'class': 'person', 'name': '林'}},
-        'polarity': 'positive', 'modality': 'statement',
-        'time': {'raw': '2026-09-01', 'precision': 'day', 'start': '2026-09-01', 'end': '', 'relative': False},
-        'evidence': [{'source_id': 'm0', 'quote': block.text}]}]}],
-        'tools': [{'action': 'call', 'asset_id': 'device_lookup', 'parameters': {'serial': serial}},
-                  {'action': 'ready'}],
-        'answer': [{'status': 'answered', 'answer': '林于2026-09-01维护。', 'node_ids': ['n000000']}],
-        'review': [review()]}
+    return {'extraction': [{'entities': [{'type': 'Maintenance', 'key': {'serial': serial, 'date': '2026-09-01'},
+                                          'properties': {'technician': '林'}, 'source_id': block.source.id,
+                                          'quote': block.text}], 'relations': []}],
+            'tools': [{'action': 'call', 'asset_id': 'device_lookup', 'parameters': {'serial': serial}},
+                      {'action': 'ready'}],
+            'answer': [{'status': 'answered', 'answer': '林于2026-09-01维护。', 'node_ids': ['n000000']}],
+            'review': [review()]}
 
 
 class VersionAwareEvaluator:
@@ -58,7 +55,8 @@ class VersionAwareEvaluator:
         b0 = json.loads((self.root / 'train' / 'B0' / 'assets' / 'manifest.json').read_text())['version']
         good = 1 if result.asset_version != b0 else 0
         n = len(result.answers)
-        return EvaluationResult({'precise': good, 'lenient': good}, n, n, 0, 0)
+        faults = sum(a.status == 'execution_error' for a in result.answers)
+        return EvaluationResult({'precise': good, 'lenient': good}, n, n - faults, faults, 0)
 
 
 class RecordedCampaign(CampaignController):

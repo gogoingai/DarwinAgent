@@ -61,7 +61,7 @@ class ExperimentRunner:
             return result,scores
         finally: await client.aclose()
 
-    async def run(self,case_id,spec,rounds=2,resume=False,stop_file=None,b0_gate=None):
+    async def run(self,case_id,spec,rounds=2,resume=False,stop_file=None,b0_gate=None,stage_gate=None):
         """rounds=None iterates until stop_file appears (operator stop) — unbounded training."""
         if rounds is not None and (type(rounds) is not int or rounds<0):
             raise ValueError('Rounds must be a nonnegative integer or None for unbounded iteration')
@@ -84,6 +84,7 @@ class ExperimentRunner:
                 client=self._client('B0')
                 try: bundle=await AssetBootstrapper().initialize(case,spec,client,self.config,bundle_path)
                 finally: await client.aclose()
+            if stage_gate is not None: stage_gate('B0')
             result,baseline=await self._stage('B0',case,spec.with_bundle(bundle))
             if b0_gate is not None and not b0_gate(baseline):
                 summary={'status':'blocked_b0','reason':'baseline gate rejected the B0 evaluation',
@@ -106,6 +107,7 @@ class ExperimentRunner:
                         adopted=KernelBundle(stage/'candidate'/'bundle')
                         baseline=EvaluationResult(**decision['candidate'])
                         # Needed as feedback for the next round even when restored.
+                        if stage_gate is not None: stage_gate(name)
                         result,_=await self._stage(name,case,spec.with_bundle(adopted))
                     continue
                 candidate_path=stage/'candidate'/'bundle'
@@ -139,6 +141,7 @@ class ExperimentRunner:
                         print(json.dumps({'stage':name,**decision},ensure_ascii=False),flush=True)
                         continue
                     finally: await client.aclose()
+                if stage_gate is not None: stage_gate(name)
                 candidate_result,candidate_scores=await self._stage(name,case,spec.with_bundle(candidate))
                 decision={**self.policy.decide(baseline,candidate_scores),'base_version':adopted.version,'candidate_version':candidate.version}
                 atomic_json(decision_path,decision);decisions.append(decision)

@@ -51,6 +51,7 @@ def recover_facts(graph) -> list[dict]:
 def anchoring_invariants(graph, sources: Mapping, expected_fingerprint: str | None = None) -> list[str]:
     errors = []
     facts = []
+    fact_out_relations = ('subject', 'object_entity', 'object_value', 'occurrence_time', 'evidence')
     for nid, nd in graph.nodes(data=True):
         if nd.get('etype') != 'AtomicFact':
             continue
@@ -67,6 +68,51 @@ def anchoring_invariants(graph, sources: Mapping, expected_fingerprint: str | No
             block = sources.get(ev.source_id)
             if block is None or block.text[ev.start:ev.end] != ev.quote:
                 errors.append(f'事实节点 {nid} 的证据偏移与来源原文不符')
+        # Structural cross-check: every core edge of the fact must point at exactly the
+        # nodes its definition names — swapped subject links or rewritten Time/EvidenceSpan
+        # content are violations even when the embedded __fact__ still matches.
+        expected = {'subject': {node_id('Entity', {'class': fact.subject.cls, 'name': fact.subject.name})},
+                    'object_entity': ({node_id('Entity', {'class': fact.object_entity.cls, 'name': fact.object_entity.name})}
+                                      if fact.object_entity else set()),
+                    'object_value': ({node_id('Value', {'dtype': fact.object_value.dtype, 'value': fact.object_value.value})}
+                                     if fact.object_value else set()),
+                    'occurrence_time': {node_id('Time', {'id': digest(fact.time.to_dict())})},
+                    'evidence': {node_id('EvidenceSpan', {'id': digest({'source_id': ev.source_id, 'quote': ev.quote,
+                                                                        'start': ev.start, 'end': ev.end})})
+                                 for ev in fact.evidence}}
+        for relation in fact_out_relations:
+            actual = {t for _, t, key in graph.out_edges(nid, keys=True) if key == relation}
+            if actual != expected[relation]:
+                errors.append(f'事实节点 {nid} 的 {relation} 连边与其定义不一致')
+        time_nid = node_id('Time', {'id': digest(fact.time.to_dict())})
+        if graph.has_node(time_nid):
+            tnd = graph.nodes[time_nid]
+            for field, value in (('raw', fact.time.raw), ('precision', fact.time.precision),
+                                 ('start', fact.time.start), ('end', fact.time.end),
+                                 ('anchor_source_id', fact.time.anchor_source_id)):
+                if tnd.get(field) != value:
+                    errors.append(f'时间节点 {time_nid[:48]} 的 {field} 与事实定义不一致')
+            if fact.time.anchor_source_id:
+                block = sources.get(fact.time.anchor_source_id)
+                want = node_id('Source', {'kind': block.source.kind, 'document_id': block.source.document_id,
+                                          'location': block.source.location})
+                got = {t for _, t, key in graph.out_edges(time_nid, keys=True) if key == 'time_anchor'}
+                if got != {want}:
+                    errors.append(f'时间节点锚点连边与事实定义不一致')
+        for ev in fact.evidence:
+            span_nid = node_id('EvidenceSpan', {'id': digest({'source_id': ev.source_id, 'quote': ev.quote,
+                                                              'start': ev.start, 'end': ev.end})})
+            if graph.has_node(span_nid):
+                snd = graph.nodes[span_nid]
+                if (snd.get('source_id'), snd.get('quote'), snd.get('start_offset'), snd.get('end_offset')) != \
+                        (ev.source_id, ev.quote, ev.start, ev.end):
+                    errors.append(f'证据节点内容与事实定义不一致')
+                block = sources.get(ev.source_id)
+                want = node_id('Source', {'kind': block.source.kind, 'document_id': block.source.document_id,
+                                          'location': block.source.location})
+                got = {t for _, t, key in graph.out_edges(span_nid, keys=True) if key == 'locates'}
+                if got != {want}:
+                    errors.append(f'证据定位连边与事实定义不一致')
         facts.append(fact.to_dict())
     if not facts:
         errors.append('图中没有记忆节点')

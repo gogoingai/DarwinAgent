@@ -194,5 +194,100 @@ class ProbeRenameScope(unittest.TestCase):
         self.assertTrue(all(r.get('status') == 'passed' for r in records if r.get('probe')))
 
 
+class BudgetReserveBeforeExecution(unittest.TestCase):
+    def test_cap_refuses_next_round_before_it_runs(self):
+        from tests.integration.test_campaign import RecordedCampaign, protocol, SERIALS
+        import tests.integration.test_campaign as tc
+        td = tempfile.TemporaryDirectory(); self.addCleanup(td.cleanup)
+        root = Path(td.name)
+        (root / 'precheck.json').write_text(json.dumps({'passed': True, 'checks': {}}))
+        controller = RecordedCampaign(root, spec=protocol(rounds=1, cap=1))
+        from oak.kernel import TaskSpec
+        with self.assertRaises(ValueError) as caught:
+            asyncio.run(controller.run(TaskSpec.load(Path(__file__).resolve().parents[2] / 'tasks/device_maintenance/task.yaml')))
+        self.assertIn('cap exceeded', str(caught.exception))
+        # R1 never generated: the refusal happened before execution, B0 is settled at 1.
+        self.assertFalse((root / 'train' / 'R1' / 'generation').exists())
+        ledger = (root / 'question_runs.jsonl').read_text()
+        self.assertIn('train/B0', ledger)
+        self.assertNotIn('train/R1', ledger)
+
+    def test_reserve_is_idempotent_and_settle_does_not_recharge(self):
+        from tests.integration.test_campaign import RecordedCampaign, protocol
+        td = tempfile.TemporaryDirectory(); self.addCleanup(td.cleanup)
+        root = Path(td.name)
+        controller = RecordedCampaign(root, spec=protocol(rounds=1))
+        controller._reserve('validation/v1', 'val-case', 190)
+        controller._reserve('validation/v1', 'val-case', 190)  # cache resume
+        controller._settle('validation/v1', 190)
+        controller._reserve('validation/v1', 'val-case', 190)  # resume after settle
+        self.assertEqual(controller._ledger_total(), 190)
+        self.assertEqual(controller._ledger_rows()['validation/v1']['state'], 'settled')
+
+    def test_decision_scan_skips_resultless_rounds(self):
+        from tests.integration.test_campaign import RecordedCampaign, protocol
+        td = tempfile.TemporaryDirectory(); self.addCleanup(td.cleanup)
+        root = Path(td.name)
+        controller = RecordedCampaign(root, spec=protocol(rounds=1))
+        train = root / 'train'
+        (train / 'B0' / 'generation' / 'train-case').mkdir(parents=True)
+        (train / 'B0' / 'generation' / 'train-case' / 'result.json').write_text(json.dumps({'answers': [{}], 'asset_version': 'b0'}))
+        (train / 'R1').mkdir(parents=True)  # admission failed: decision but no generation
+        (train / 'R1' / 'decision.json').write_text(json.dumps({'accepted': False, 'status': 'validation_failed'}))
+        (train / 'R2' / 'generation' / 'train-case').mkdir(parents=True)
+        (train / 'R2' / 'generation' / 'train-case' / 'result.json').write_text(json.dumps({'answers': [{}], 'asset_version': 'r2'}))
+        (train / 'R2' / 'decision.json').write_text(json.dumps({'accepted': True, 'candidate_version': 'r2'}))
+        controller._settle_train_from_decisions()
+        rows = controller._ledger_rows()
+        self.assertIn('train/B0', rows)
+        self.assertIn('train/R2', rows)
+        self.assertNotIn('train/R1', rows)
+
+
+class StructuralEdgeIntegrity(unittest.TestCase):
+    def build_two_facts(self):
+        schema = Schema.from_yaml(SEED.read_text())
+        b1 = block('1', '甲修打印机。乙去了巴黎。')
+        def mk(text, name, cls, quote):
+            start = b1.text.find(quote)
+            return AtomicFact.create(text=text, subject=EntityRef(cls, name), predicate='行动',
+                                     time=FactTime('未注明'), evidence=(FactEvidence(b1.source.id, quote, start, start + len(quote)),))
+        f1 = mk('甲修打印机', '甲', 'person', '甲修打印机')
+        f2 = mk('乙去了巴黎', '乙', 'person', '乙去了巴黎')
+        memory = MemoryResult({b1.source.id: b1}, (f1, f2))
+        graph = GraphAssembler.build(memory, None, schema)
+        return graph, memory, f1, f2
+
+    def test_swapped_subject_edges_rejected(self):
+        import networkx as nx
+        graph, memory, f1, f2 = self.build_two_facts()
+        broken = nx.MultiDiGraph(graph.graph)
+        n1 = node_id('AtomicFact', {'id': f1.id}); n2 = node_id('AtomicFact', {'id': f2.id})
+        e1 = [e for e in broken.out_edges(n1, keys=True) if e[2] == 'subject'][0]
+        e2 = [e for e in broken.out_edges(n2, keys=True) if e[2] == 'subject'][0]
+        broken.remove_edge(n1, e1[1], key='subject'); broken.remove_edge(n2, e2[1], key='subject')
+        broken.add_edge(n1, e2[1], key='subject', relation='subject')
+        broken.add_edge(n2, e1[1], key='subject', relation='subject')
+        self.assertTrue(any('subject 连边' in e for e in anchoring_invariants(broken, memory.corpus)))
+
+    def test_rewritten_time_node_rejected(self):
+        import networkx as nx
+        graph, memory, f1, f2 = self.build_two_facts()
+        broken = nx.MultiDiGraph(graph.graph)
+        t = node_id('Time', {'id': digest(f1.time.to_dict())})
+        broken.nodes[t]['raw'] = '被改写的时间'
+        self.assertTrue(any('时间节点' in e and '不一致' in e for e in anchoring_invariants(broken, memory.corpus)))
+
+    def test_moved_evidence_edge_rejected(self):
+        import networkx as nx
+        graph, memory, f1, f2 = self.build_two_facts()
+        broken = nx.MultiDiGraph(graph.graph)
+        n1 = node_id('AtomicFact', {'id': f1.id}); n2 = node_id('AtomicFact', {'id': f2.id})
+        s2 = node_id('EvidenceSpan', {'id': digest({'source_id': f2.evidence[0].source_id, 'quote': f2.evidence[0].quote,
+                                                    'start': f2.evidence[0].start, 'end': f2.evidence[0].end})})
+        broken.add_edge(n1, s2, key='evidence', relation='evidence')
+        self.assertTrue(any('evidence 连边' in e for e in anchoring_invariants(broken, memory.corpus)))
+
+
 if __name__ == '__main__':
     unittest.main()

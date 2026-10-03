@@ -35,38 +35,72 @@ class CampaignController:
     def verify(self):
         assert_files(self.frozen)
 
-    # ---- question-run ledger -------------------------------------------------
+    # ---- question-run ledger: reserve before execution, settle by actual count -------
     def _ledger_path(self):
         return self.root / 'question_runs.jsonl'
 
-    def _ledger_total(self):
+    def _ledger_rows(self):
         if not self._ledger_path().exists():
-            return 0
-        seen = {}
+            return {}
+        rows = {}
         for line in self._ledger_path().read_text().splitlines():
             if not line.strip():
                 continue
             row = json.loads(line)
-            seen[(row['phase'], row['case_id'], row['version'])] = row['questions']
-        return sum(seen.values())
+            rows[row['phase_stage']] = row
+        return rows
 
-    def _register(self, phase, case_id, version, questions):
-        key = json.dumps({'phase': phase, 'case_id': case_id, 'version': version, 'questions': questions},
-                         ensure_ascii=False)
-        existing = set()
-        if self._ledger_path().exists():
-            existing = {line.strip() for line in self._ledger_path().read_text().splitlines() if line.strip()}
-        if key not in existing:
+    def _ledger_total(self):
+        return sum(row['questions'] for row in self._ledger_rows().values())
+
+    def _write_ledger(self, rows):
+        path = self._ledger_path()
+        body = ''.join(json.dumps(rows[k], ensure_ascii=False, sort_keys=True) + '\n'
+                       for k in sorted(rows))
+        tmp = path.with_suffix('.tmp')
+        tmp.write_text(body)
+        tmp.replace(path)
+
+    def _reserve(self, phase_stage, case_id, questions):
+        rows = self._ledger_rows()
+        if phase_stage in rows:
+            return  # idempotent: checkpoint resumes never charge twice
+        if self.spec.max_question_runs is not None and self._ledger_total() + questions > self.spec.max_question_runs:
+            raise ValueError(f'Question-run cap exceeded before {phase_stage}: {self._ledger_total()}'
+                             f'+{questions} > {self.spec.max_question_runs}')
+        rows[phase_stage] = {'phase_stage': phase_stage, 'case_id': case_id,
+                             'questions': questions, 'state': 'reserved'}
+        self._write_ledger(rows)
+
+    def _settle(self, phase_stage, questions):
+        rows = self._ledger_rows()
+        row = rows.get(phase_stage)
+        if row is None:
+            # A stage produced results without a reservation (crash before the gate):
+            # count it honestly rather than letting it ride free.
             if self.spec.max_question_runs is not None and self._ledger_total() + questions > self.spec.max_question_runs:
-                raise ValueError(f'Question-run cap exceeded at registration: {self._ledger_total()}+{questions}'
-                                 f' > {self.spec.max_question_runs} ({phase}/{version})')
-            with self._ledger_path().open('a') as handle:
-                handle.write(key + '\n')
+                raise ValueError(f'Question-run cap exceeded while settling {phase_stage}: '
+                                 f'{self._ledger_total()}+{questions} > {self.spec.max_question_runs}')
+            rows[phase_stage] = {'phase_stage': phase_stage, 'questions': questions, 'state': 'settled'}
+            self._write_ledger(rows)
+        elif row.get('state') != 'settled':
+            row['questions'] = questions
+            row['state'] = 'settled'
+            self._write_ledger(rows)
 
-    def _guard_runs(self, planned):
-        if self.spec.max_question_runs is not None and self._ledger_total() + planned > self.spec.max_question_runs:
-            raise ValueError(f'Question-run safety cap exceeded: {self._ledger_total()}+{planned}'
-                             f' > {self.spec.max_question_runs}')
+    def _settle_train_from_decisions(self):
+        """Settle by decision order: a round whose admission failed never ran questions and
+        must not stop the scan at later rounds."""
+        train = self.root / 'train'
+        case_id = self.spec.train[0]
+        stages = ['B0']
+        n = 1
+        while (train / f'R{n}' / 'decision.json').exists():
+            stages.append(f'R{n}'); n += 1
+        for name in stages:
+            result_path = train / name / 'generation' / case_id / 'result.json'
+            if result_path.exists():
+                self._settle(f'train/{name}', len(json.loads(result_path.read_text())['answers']))
 
     # ---- one case under one bundle -------------------------------------------
     def _client(self, stage_dir):
@@ -169,6 +203,7 @@ class CampaignController:
             atomic_json(state_path, {**state, 'phase': phase})
 
         train_case = self.spec.train[0]
+        train_questions = len(self.adapter.generation_input(train_case).questions)
         set_phase('train')
         runner = ExperimentRunner(self.adapter, self.evaluator_factory, self.connection_config,
                                   self.config, self.spec.adoption, self.root / 'train', self.frozen_files,
@@ -177,8 +212,10 @@ class CampaignController:
             return scores.completed == scores.total and scores.generation_faults == 0 and scores.evaluation_faults == 0
         train_summary = await runner.run(train_case, task_spec,
                                          rounds=self.spec.rounds if rounds is None else rounds,
-                                         resume=resume, stop_file=self.root / 'STOP', b0_gate=b0_gate)
-        self._register_train_runs()
+                                         resume=resume, stop_file=self.root / 'STOP', b0_gate=b0_gate,
+                                         stage_gate=lambda name: self._reserve(
+                                             f'train/{name}', train_case, train_questions))
+        self._settle_train_from_decisions()
         if train_summary['status'] == 'blocked_b0':
             set_phase('blocked_b0')
             return {'status': 'blocked_b0', 'train': train_summary}
@@ -206,14 +243,14 @@ class CampaignController:
         chain = self._candidate_chain()
         validation_case = self.spec.validation[0]
         validation_questions = len(self.adapter.generation_input(validation_case).questions)
-        self._guard_runs(validation_questions * len(chain))
         set_phase('validation')
         validation = {}
         for candidate in chain:
+            self._reserve(f"validation/{candidate['version']}", validation_case, validation_questions)
             result, scores = await self._case_stage(
                 'validation', validation_case, task_spec.with_bundle(KernelBundle(candidate['path'])),
                 self.root / 'validation' / candidate['version'])
-            self._register('validation', validation_case, candidate['version'], len(result.answers))
+            self._settle(f"validation/{candidate['version']}", len(result.answers))
             validation[candidate['version']] = scores.to_dict()
 
         set_phase('selection')
@@ -230,15 +267,15 @@ class CampaignController:
         test_case = self.spec.test[0]
         test_versions = [chain[0]['version']] + ([selected] if selected != chain[0]['version'] else [])
         test_questions = len(self.adapter.generation_input(test_case).questions)
-        self._guard_runs(test_questions * len(test_versions))
         set_phase('test')
         test = {}
         for version in test_versions:
             path = next(c['path'] for c in chain if c['version'] == version)
+            self._reserve(f'test/{version}', test_case, test_questions)
             result, scores = await self._case_stage('test', test_case,
                                                     task_spec.with_bundle(KernelBundle(path)),
                                                     self.root / 'test' / version)
-            self._register('test', test_case, version, len(result.answers))
+            self._settle(f'test/{version}', len(result.answers))
             test[version] = scores.to_dict()
 
         set_phase('done')
