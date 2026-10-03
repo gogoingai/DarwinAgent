@@ -40,7 +40,12 @@ def run_probes(runtime,graph,memory=None):
         for key,kind in dtypes.items():
             value=values.get(key)
             if kind=='date' and value:
-                replacements[value]=(date.fromisoformat(value)+timedelta(days=17)).isoformat()
+                try:
+                    replacements[value]=(date.fromisoformat(value)+timedelta(days=17)).isoformat()
+                except ValueError:
+                    # 年/年月粒度日期（对话记忆常见 '2022' 这类年份值）无法按天平移：
+                    # 跳过该值，其余名称/日期替换仍生效，探针不因此崩溃。
+                    continue
     def change(value):
         # 只做整值替换（结构化字段/参数值），不做子串替换：改写原文会破坏关键词类查询的
         # 语义一致性（关键词若是实体名的子串，原文被改写后必然失配）。硬编码训练名仍会被

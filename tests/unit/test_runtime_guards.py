@@ -47,6 +47,15 @@ class RuntimeGuardTests(unittest.TestCase):
             with self.assertRaises(ValueError): validate_graph(graph,runtime.schema)
             nd[key]=old
 
+    def test_behavior_probe_tolerates_partial_dates(self):
+        # 冻结记忆含年/年月粒度日期（'2022'）：时间平移探针须跳过该值而非崩溃。
+        # 回归：R2 提案轮图阶段 199 题全灭于 fromisoformat('2022')（2026-10-04）。
+        root,c,s,runtime,graph=self.setup_graph()
+        nd=next(iter(graph.graph.nodes.values()))
+        nd['date']='2022'
+        records=run_probes(runtime,graph)
+        self.assertTrue(all(r['status']=='passed' for r in records))
+
     def test_behavior_probe_rejects_subject_lookup_constant(self):
         root,c,s,runtime,graph=self.setup_graph()
         assets=[replace(a,content="def run(params):\n return nodes('Maintenance', {'serial':'D-17'}, limit=20)") if a.kind=='F' else a for a in s.bundle.assets.assets]
