@@ -111,3 +111,10 @@
 - **三集合 campaign**：评测器去 conv-26 硬编码（conv-26 四口径、conv-47/49 原始 gold 两口径；判题实现与 11 文件锁零改动）；`ExperimentSpec` + `CampaignController`：预检门 → B0 门（全完+双故障零）→ Rn 无限迭代（`--stop` 叫停）→ 候选锁定（B0+全部采纳版）→ 统一验证 → 选版（原始严格>B0 且宽松≥、零故障、同分取早）→ 测试一次性揭盲（指纹相同单跑）；逐题台账 + 可选安全上限；验证/测试诊断封存前不进提案。
 - **反例扩充**：事实级固定反例（否定/计划分别保存、重复按身份去重、增删事实图随之确定变化、改名/换日期身份跟随内容）接入每次装配后的 run_probes。
 - 离线检查 98（根 tests）+ 11（travel）+ 10（冻结评测协议）= 119 项全绿。仓库外验收重跑于 `/private/tmp/oak-v04-portability/`：独立 venv 安装 `dist/oak_repro-0.4.0-py3-none-any.whl`（44 个包文件仅含 oak），仅拷贝第三任务声明/资产与示例，`python -I` 且清除 PYTHONPATH 后跑通 ExtractionAgent→MemoryResult→GraphAssembler→AnswerAgent 与 S/F/C/P（录制传输，不代表模型性能）。真实预检与 atomic_v1 实验记录待运行后补记于此。
+
+### atomic_v1 启动循环（2026-10-03，B0 门四次触发记录）
+
+- 尝试 1（atomic_v1_aborted1）：冷启动引导三连败——C 漏 stage 字段、F/C 用未登记的 isinstance/type。修复：沙箱放行只读谓词 isinstance（type 仍禁）、协议钉死字段规则。
+- 尝试 2（atomic_v1_b0_blocked1）：引导一次通过；抽取阶段失败——模型抄错 64 位哈希 source_id 一字符、modality 用枚举外 wish、time.raw 空串、precision week 越界、deepseek 空正文耗尽 5 次传输重试。修复：载荷改短代号 m0/m1（框架映射回真实来源）、枚举补 week/hour、raw 空归一"未注明"、愿望→plan 映射提示、max_tokens 8000。
+- 尝试 3（atomic_v1_b0_blocked2）：引导再败于新规则类——字典项赋值（result['k']=v）、某 F 空 trial_inputs、一次随机 JSON 双转义。修复：协议禁容器内/属性赋值、F 试跑参数必须非空。
+- 尝试 4（atomic_v1，进行中）：引导通过（bundle 95f2c622）；抽取部分批次完成后 **fast 档(commandcode) 周配额 429 用尽**（限额 2026-10-04T02:47:55 重置）。B0 门拦截 blocked_b0。处置：按方案不换模型；等待配额重置后清理 B0 失败标记（memory.failure.json/answers/result/evaluation/stage，保留 identity 与缓存）同身份断点续跑——已完成抽取批次命中生成缓存，重试成本低。
