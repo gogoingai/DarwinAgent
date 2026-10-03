@@ -83,6 +83,9 @@ def connection(root):
     conn=load_connection(ROOT,root/'runtime','LOCOMO')
     conn.role_tiers['locomo_judge']='strong'
     conn.empty_response_passthrough_roles.add('locomo_judge')
+    # 用户决策：智谱端点全角色关闭深度思考——推理链吃光补全预算是 EmptyCompletion 突发
+    # 的直接原因；关思考后该故障类整体消失（第三方 fast 网关自动忽略该开关）。
+    conn.thinking_disabled_roles.update({'answer','review','locomo_judge'})
     return conn
 
 

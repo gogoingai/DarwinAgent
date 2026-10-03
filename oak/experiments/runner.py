@@ -6,6 +6,7 @@ diagnostic rows travel as the evaluator produced them (opt-out flag `passed: tru
 bounded by a size budget, and only training feedback ever reaches a proposal."""
 from __future__ import annotations
 
+import asyncio
 import copy
 import json
 import time
@@ -162,14 +163,22 @@ class ExperimentRunner:
                 if faulted and not getattr(self,'_fault_retried',set()).__contains__((name,case.id)):
                     if not hasattr(self,'_fault_retried'): self._fault_retried=set()
                     self._fault_retried.add((name,case.id))
+                    # 先歇再重试：EmptyCompletion 类故障多为瞬时突发，立即原窗口整批重跑
+                    # 会撞上同一波（夜间事故实锤）——隔开突发窗口后分批小跑。
+                    await asyncio.sleep(150)
                     from oak.runtime.artifacts import digest as _digest
-                    for a in faulted:
-                        (stage/'generation'/case.id/'answers'/f'{_digest(a.question_id)}.json').unlink(missing_ok=True)
-                    result=await pipeline.run(case,spec,self.config)
-                    still=[a.question_id for a in result.answers if a.status=='execution_error']
+                    still=set()
+                    batch=list(faulted)
+                    for start in range(0,len(batch),25):
+                        for a in batch[start:start+25]:
+                            (stage/'generation'/case.id/'answers'/f'{_digest(a.question_id)}.json').unlink(missing_ok=True)
+                        result=await pipeline.run(case,spec,self.config)
+                        still|={a.question_id for a in result.answers if a.status=='execution_error'}
+                        if start+25<len(batch): await asyncio.sleep(60)
+                    still_faulted=sorted(still)
                     retries[case.id]={'questions':len(faulted),
-                                      'recovered':len(faulted)-len(still),
-                                      'still_faulted':still}
+                                      'recovered':len(faulted)-len(still_faulted),
+                                      'still_faulted':still_faulted}
                     print(json.dumps({'stage':name,'case':case.id,'fault_retry':retries[case.id]},ensure_ascii=False),flush=True)
                 scores_path=stage/'evaluation'/f'{case.id}.json'
                 if case.id in retries and retries[case.id]['recovered']:
