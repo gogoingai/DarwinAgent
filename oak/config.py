@@ -103,6 +103,8 @@ class Config:
     # 外部(非智谱)端点多为长思考模型且无思考开关：请求侧给足推理余量，正文才拿得到预算。
     # 实测 MiniMax-M3.1-Flash 抽取批推理 ~21k tokens+正文 ~5k（2026-10-03），8192 会空正文。
     external_reasoning_buffer: int = 32000
+    # 外部网关思考深度档（仅 MiniMax-M3.1-Flash 类生效；空=不发送用端点默认 max）。
+    fast_reasoning_effort: str = ""
 
     def tier_for(self, role: str) -> str:
         tier = self.role_tiers.get(role)

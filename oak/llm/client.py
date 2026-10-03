@@ -154,6 +154,10 @@ class LLMClient:
                     if thinking_off and is_glm_endpoint:
                         # thinking 开关仅智谱端点支持；第三方网关忽略
                         kwargs["extra_body"] = {"thinking": {"type": "disabled"}}
+                    if not is_glm_endpoint and self.cfg.fast_reasoning_effort:
+                        # MiniMax-M3.1-Flash 强制思考（disabled 会 400），唯一旋钮是
+                        # reasoning_effort 深度档；实测 low 把推理压到近零。
+                        kwargs["extra_body"] = {"reasoning_effort": self.cfg.fast_reasoning_effort}
                     # 流式聚合（本地 TUN 代理会挂起非流式长请求）
                     parts: list[str] = []
                     usage: dict = {}
