@@ -15,7 +15,7 @@ from pathlib import Path
 from oak.contracts import EvaluationResult, plain
 from oak.engine import Pipeline
 from oak.kernel import KernelBundle
-from oak.kernel.revision import AssetRevisionService
+from oak.kernel.revision import AssetRevisionService, training_id
 from oak.llm.client import LLMClient
 from oak.runtime.artifacts import atomic_json, digest
 from oak.runtime.identity import assert_files, snapshot_files, transport_identity
@@ -29,8 +29,8 @@ FEEDBACK_BUDGET_CHARS = 35000
 def training_feedback(cases, results, case_diagnostics, baseline):
     """Generic proposal feedback from the current training run only. Question identity is the
     composite (case_id, question_id); the evaluator's diagnostic rows keep their original
-    content, tagged with their case. One length budget covers diagnostics, generation
-    failures and graph diagnostics together."""
+    content, tagged with their case. One length budget bounds the COMPLETE serialized payload
+    — skeleton, field names, separators and stats included — never per-item sizes."""
     rows = []
     rows_total = 0
     for case_id, diagnostics in case_diagnostics:
@@ -39,46 +39,50 @@ def training_feedback(cases, results, case_diagnostics, baseline):
             if row.get('passed') is True:
                 continue
             rows.append({'case_id': case_id, 'diagnostic': row})
-    picked = []; used = 0
-    for row in rows:
-        size = len(json.dumps(row, ensure_ascii=False))
-        if used + size > FEEDBACK_BUDGET_CHARS:
-            break
-        picked.append(row); used += size
     failures = []
     for case, result in zip(cases, results):
         failures += [{'case_id': case.id, 'question_id': a.question_id, 'error': a.error}
                      for a in result.answers if a.status == 'execution_error']
-    graph_diagnostics = []
+    graph_rows = []
     for result in results:
-        graph_diagnostics += list(plain(result.graph_diagnostics))
-    remaining = FEEDBACK_BUDGET_CHARS - used
-    failures_kept = []
-    for failure in failures:
-        size = len(json.dumps(failure, ensure_ascii=False))
-        if remaining - size < 0:
-            break
-        failures_kept.append(failure); remaining -= size
-    graph_kept = []
-    for row in graph_diagnostics:
-        size = len(json.dumps(row, ensure_ascii=False))
-        if remaining - size < 0:
-            break
-        graph_kept.append(row); remaining -= size
+        graph_rows += list(plain(result.graph_diagnostics))
     score_data = baseline.to_dict()
     score_data.pop('diagnostics', None)  # 诊断单独装订，载荷不重复计费
-    return {'scores': score_data, 'diagnostics': picked,
-            'diagnostic_rows_total': rows_total, 'diagnostic_rows_in_proposal': len(picked),
-            'generation_failures': failures_kept,
-            'generation_failures_total': len(failures),
-            'generation_failures_truncated': len(failures) != len(failures_kept),
-            'graph_diagnostics': graph_kept,
-            'feedback_budget_chars': FEEDBACK_BUDGET_CHARS}
+
+    def payload(counts):
+        return {'scores': score_data,
+                'diagnostics': rows[:counts[0]],
+                'diagnostic_rows_total': rows_total,
+                'diagnostic_rows_in_proposal': counts[0],
+                'generation_failures': failures[:counts[1]],
+                'generation_failures_total': len(failures),
+                'generation_failures_truncated': counts[1] != len(failures),
+                'graph_diagnostics': graph_rows[:counts[2]],
+                'feedback_budget_chars': FEEDBACK_BUDGET_CHARS}
+
+    # A row is admitted only if the whole serialized object stays within budget. Priority is
+    # diagnostics, then generation failures, then graph diagnostics; earlier sections stay
+    # fixed while a later one fills. Prefix semantics: a row that no longer fits ends its
+    # section. The empty skeleton (scores + stats) is irreducible; if it alone exceeds the
+    # budget the payload is returned as-is rather than silently dropping scores.
+    def fits(counts):
+        return len(json.dumps(payload(counts), ensure_ascii=False)) <= FEEDBACK_BUDGET_CHARS
+
+    counts = [0, 0, 0]
+    if fits((0, 0, 0)):
+        for idx, limit in enumerate((len(rows), len(failures), len(graph_rows))):
+            while counts[idx] < limit:
+                trial = counts[:]; trial[idx] += 1
+                if not fits(trial):
+                    break
+                counts = trial
+    return payload(counts)
 
 
 def question_identity(case):
-    """Composite training identity: same-named questions in different cases stay distinct."""
-    return [f'{case.id}::{q.id}' for q in case.questions]
+    """Composite training identity: same-named questions in different cases stay distinct,
+    and '::' inside either id cannot create collisions (length-prefixed encoding)."""
+    return [training_id(case.id, q.id) for q in case.questions]
 
 
 
@@ -183,6 +187,10 @@ class ExperimentRunner:
                 print(json.dumps({'stage':'B0','status':'blocked_b0'},ensure_ascii=False),flush=True)
                 return summary
             adopted=self.revisions.publish(bundle,self.root/'published',{'accepted':True,'reasons':['initial_validated_baseline']})
+            # The stage whose evaluation currently backs `baseline`/`results`: proposals must
+            # read diagnostics from THERE, never from the round being proposed (it has not
+            # run yet). A rejected candidate leaves it unchanged.
+            evidence='B0'
             decisions=[];stopped=False
             n=0
             while True:
@@ -196,6 +204,7 @@ class ExperimentRunner:
                     if decision['accepted']:
                         adopted=KernelBundle(stage/'candidate'/'bundle')
                         baseline=EvaluationResult(**decision['candidate'])
+                        evidence=name  # 恢复同样以最后采纳版本的评测为准
                         # The publish pointer must follow the restored adoption (B0 was
                         # re-published above during resume), atomically and idempotently.
                         self.revisions.publish(adopted,self.root/'published',decision)
@@ -212,7 +221,7 @@ class ExperimentRunner:
                 if (candidate_path/'manifest.json').exists(): candidate=KernelBundle(candidate_path)
                 else:
                     client=self._client(name)
-                    feedback=training_feedback(cases,results,_per_case_feedback_facts(self.root,name,cases),baseline)
+                    feedback=training_feedback(cases,results,_per_case_feedback_facts(self.root,evidence,cases),baseline)
                     questions=[]
                     for case in cases:
                         questions+=[{'training_id':tid,'text':q.text} for tid,q in zip(question_identity(case),case.questions)]
@@ -235,6 +244,7 @@ class ExperimentRunner:
                 if decision['accepted']:
                     adopted=self.revisions.publish(candidate,self.root/'published',decision)
                     baseline=candidate_scores;results=candidate_results
+                    evidence=name  # 后续提案的诊断跟随新采纳版本
                 print(json.dumps({'stage':name,'accepted':decision['accepted'],'reasons':decision['reasons']},ensure_ascii=False),flush=True)
             self.verify()
             summary={'status':'complete' if all(d.get('status')!='validation_failed' for d in decisions) else 'failed',

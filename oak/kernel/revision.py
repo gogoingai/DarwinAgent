@@ -12,6 +12,25 @@ from .assets import Asset, KernelAssets, KernelBundle
 from .validation import validate_bundle
 
 
+def training_id(case_id, question_id):
+    """Unambiguous composite identity '<len(case_id)>:<case_id>::<question_id>': the length
+    prefix makes '::' inside either id impossible to confuse with the delimiter."""
+    return f'{len(case_id)}:{case_id}::{question_id}'
+
+
+def parse_training_id(tid):
+    """Inverse of training_id: recovers the exact (case_id, question_id) pair, or raises
+    on malformed or ambiguous identities."""
+    head, sep, rest = tid.partition(':')
+    if not sep or not head.isdigit() or not head.isascii():
+        raise ValueError(f'训练身份不可解析（应为 <len>:<case>::<question>）: {tid!r}')
+    n = int(head)
+    case_id, marker, question_id = rest[:n], rest[n:n + 2], rest[n + 2:]
+    if len(case_id) != n or marker != '::' or not question_id:
+        raise ValueError(f'训练身份不可解析（应为 <len>:<case>::<question>）: {tid!r}')
+    return case_id, question_id
+
+
 @dataclass(frozen=True)
 class AssetPatch:
     asset: Asset
@@ -36,6 +55,10 @@ class AssetRevisionService:
         if not patches or len({p.asset.id for p in patches})!=len(patches): raise ValueError('Empty or duplicate patch')
         assets={a.id:a for a in base.assets.assets}
         for p in patches:
+            # Evidence must decode to a real (case, question) pair before it can count:
+            # bare or ambiguous ids ('q1', 'a::b::q' without a length prefix) are rejected here.
+            for tid in p.training_evidence:
+                parse_training_id(tid)
             if set(p.training_evidence)-set(training_ids): raise ValueError('Proposal cites non-training evidence')
             existing=assets.get(p.asset.id)
             if existing:

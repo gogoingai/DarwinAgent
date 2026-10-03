@@ -12,6 +12,7 @@ from oak.contracts import EvaluationResult
 from oak.experiments import AdoptionPolicy,ExperimentRunner
 from oak.kernel import KernelBundle,TaskSpec
 from oak.kernel.registration import load_assets
+from oak.kernel.revision import training_id
 from oak.llm.recorded import RecordedClient
 from tests.fixtures import TASK,case,client
 
@@ -33,10 +34,10 @@ class FixtureEvaluator:
 
 class RecordedExperiment(ExperimentRunner):
     """Transport fixture only; the actual controller, agents and asset runtime execute."""
-    def __init__(self,root,stale=False):
+    def __init__(self,root,stale=False,evaluator=None):
         self.case=case();self.created=[];self.stage_clients=Counter();self.stale=stale
         super().__init__(type('Adapter',(),{'generation_input':lambda _,ident:self.case})(),
-            lambda transport,path:FixtureEvaluator(path),Config(),
+            evaluator or (lambda transport,path:FixtureEvaluator(path)),Config(),
             RunConfig(protocol_attempts=1),AdoptionPolicy('precise',()),root)
 
     def _client(self,stage):
@@ -52,7 +53,7 @@ class RecordedExperiment(ExperimentRunner):
                 replies={'proposal':[{'patches':[{'asset':updated,
                     'base_fingerprint':'f'*64 if self.stale and stage=='R2' else asset.fingerprint,
                     'reason':'General task instruction refined from this training run',
-                    'training_evidence':[f'{self.case.id}::{self.case.questions[0].id}']}]}]}
+                    'training_evidence':[training_id(self.case.id,self.case.questions[0].id)]}]}]}
         else:
             replies={role:list(values) for role,values in client(self.case).replies.items()}
         transport=LedgerRecordedClient(replies);self.created.append(transport)

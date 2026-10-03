@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from oak.agents.protocol import ModelSession
 from oak.kernel.assets import Asset
-from oak.kernel.revision import AssetPatch
+from oak.kernel.revision import AssetPatch, training_id
 from oak.runtime.artifacts import atomic_json
 from .bootstrap import ASSET_PROTOCOL
 
@@ -15,7 +15,8 @@ class ProposalGenerator:
         if not isinstance(cases, (list, tuple)):
             cases = (cases,)
         if questions is None:
-            questions = [{"training_id": q.id, "text": q.text} for case in cases for q in case.questions]
+            questions = [{"training_id": training_id(case.id, q.id), "text": q.text}
+                         for case in cases for q in case.questions]
         session = ModelSession(client, config, 'proposal', limit=6)
         payload = {'base_version': base.version,
                    'assets': [dict(a.to_dict(), fingerprint=a.fingerprint) for a in base.assets.assets],

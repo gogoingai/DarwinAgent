@@ -8,7 +8,7 @@ from pathlib import Path
 from oak.config import RunConfig
 from oak.contracts import freeze
 from oak.kernel import Asset, KernelAssets, KernelBundle, TaskSpec
-from oak.kernel.revision import AssetPatch, AssetRevisionService
+from oak.kernel.revision import AssetPatch, AssetRevisionService, training_id
 from oak.kernel.validation import validate_bundle
 from oak.operators.sandbox import Interpreter, Limits, SandboxError, admit
 from oak.kernel.registration import load_assets
@@ -36,9 +36,10 @@ class AssetBoundary(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             root=Path(td);base=load_assets(TASK).export(root/'base')
             a=base.get('answer_prompt')
-            patch=AssetPatch(replace(a,content='Be precise.'),a.fingerprint,'training feedback',('q1',))
+            ev=(training_id('case-a','q1'),)
+            patch=AssetPatch(replace(a,content='Be precise.'),a.fingerprint,'training feedback',ev)
             svc=AssetRevisionService()
-            candidate=svc.propose(base,[patch],root/'candidate',['q1'])
+            candidate=svc.propose(base,[patch],root/'candidate',list(ev))
             self.assertEqual(base.get('answer_prompt').content,a.content)
             self.assertNotEqual(candidate.version,base.version)
             with self.assertRaises(ValueError): svc.publish(candidate,root/'published',{'accepted':False})
@@ -49,9 +50,11 @@ class AssetBoundary(unittest.TestCase):
     def test_stale_patch_and_non_train_rejected(self):
         with tempfile.TemporaryDirectory() as td:
             root=Path(td);base=load_assets(TASK).export(root/'base');a=base.get('answer_prompt')
-            for fp,ids in [('bad',('q1',)),(a.fingerprint,('test-q',))]:
+            for fp,ids in [('bad',(training_id('case-a','q1'),)),
+                           (a.fingerprint,(training_id('case-a','test-q'),))]:
                 with self.assertRaises(ValueError):
-                    AssetRevisionService().propose(base,[AssetPatch(a,fp,'reason',ids)],root/'candidate',['q1'])
+                    AssetRevisionService().propose(base,[AssetPatch(a,fp,'reason',ids)],
+                                                   root/'candidate',[training_id('case-a','q1')])
             self.assertFalse((root/'candidate').exists())
 
     def test_manifest_path_escape(self):
