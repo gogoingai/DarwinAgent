@@ -13,14 +13,16 @@ for i in $(seq 1 "$MAX"); do
   phase=$(python3 -c "import json;print(json.load(open('$ROOT/campaign.json'))['phase'])" 2>/dev/null || echo none)
   train_status=$(python3 -c "import json;print(json.load(open('$ROOT/train/summary.json'))['status'])" 2>/dev/null || echo none)
   echo "[supervise] exit=$code phase=$phase train=$train_status"
-  if [ "$phase" = "blocked_b0" ] || [ "$train_status" = "failed" ]; then
-    mv "$ROOT" "${ROOT}_blocked$(date +%H%M%S)"
-    echo "[supervise] B0 未过门，换根重试（被阻根已保留）"
-    sleep 10
-    continue
-  fi
-  echo "[supervise] $ARM 完成/进入长跑，退出看护"
-  exit 0
+  # 只有明确推进（训练完成或阶段进入验证/测试/长跑）才算成功；崩溃/被阻/失败一律换根重试。
+  case "$phase:$train_status" in
+    validation:*|selection:*|test:*|done:*|*:complete)
+      echo "[supervise] $ARM 完成/进入长跑，退出看护"
+      exit 0
+      ;;
+  esac
+  mv "$ROOT" "${ROOT}_blocked$(date +%H%M%S)"
+  echo "[supervise] 未过门（phase=$phase train=$train_status），换根重试（被阻根已保留）"
+  sleep 10
 done
 echo "[supervise] $ARM 连续 $MAX 次未过 B0 门，停止（保留现场）"
 exit 1

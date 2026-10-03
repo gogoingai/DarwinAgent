@@ -8,6 +8,8 @@ graph mode, so a legacy bundle never sees fact-anchoring instructions and every 
 carries exactly one output format."""
 from __future__ import annotations
 
+from pathlib import Path
+
 from oak.agents.protocol import ModelSession
 from oak.contracts import plain
 from oak.kernel.assets import Asset, KernelAssets
