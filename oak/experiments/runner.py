@@ -19,14 +19,17 @@ from .proposal import ProposalGenerator
 
 
 class ExperimentRunner:
-    def __init__(self,adapter,evaluator_factory,connection_config,run_config,policy,work_dir,frozen_files=()):
+    def __init__(self,adapter,evaluator_factory,connection_config,run_config,policy,work_dir,frozen_files=(),client_factory=None):
         self.adapter,self.evaluator_factory=adapter,evaluator_factory
         self.connection_config,self.config,self.policy=connection_config,run_config,policy
         self.root=Path(work_dir)
         self.frozen=snapshot_files([Path(__file__).resolve().parents[1],*frozen_files])
         self.revisions=AssetRevisionService()
+        self._injected_client=client_factory
 
     def _client(self,stage):
+        if self._injected_client is not None:
+            return self._injected_client(stage)
         cfg=copy.deepcopy(self.connection_config)
         cfg.work_dir=self.root/stage/'runtime'
         return LLMClient(cfg)
@@ -58,14 +61,17 @@ class ExperimentRunner:
             return result,scores
         finally: await client.aclose()
 
-    async def run(self,case_id,spec,rounds=2,resume=False):
-        if rounds!=2: raise ValueError('This engineering controller is bounded to two rounds')
+    async def run(self,case_id,spec,rounds=2,resume=False,stop_file=None,b0_gate=None):
+        """rounds=None iterates until stop_file appears (operator stop) — unbounded training."""
+        if rounds is not None and (type(rounds) is not int or rounds<0):
+            raise ValueError('Rounds must be a nonnegative integer or None for unbounded iteration')
         self.verify();case=self.adapter.generation_input(case_id)
         self.root.mkdir(parents=True,exist_ok=True)
         declaration={'case_fingerprint':digest(case.to_dict()),'task':spec.declaration(),'config':self.config.to_dict(),
                      'connection':transport_identity(type('Connection',(),{'cfg':self.connection_config})()),
                      'policy':asdict(self.policy),'frozen_files':self.frozen,'rounds':rounds,'seed_assets':[],
                      'source_layers':sorted({b.source.kind for b in case.corpus})}
+        declaration=json.loads(json.dumps(declaration,ensure_ascii=False))
         experiment_path=self.root/'experiment.json'
         if experiment_path.exists():
             if not resume or json.loads(experiment_path.read_text())!=declaration:
@@ -79,9 +85,19 @@ class ExperimentRunner:
                 try: bundle=await AssetBootstrapper().initialize(case,spec,client,self.config,bundle_path)
                 finally: await client.aclose()
             result,baseline=await self._stage('B0',case,spec.with_bundle(bundle))
+            if b0_gate is not None and not b0_gate(baseline):
+                summary={'status':'blocked_b0','reason':'baseline gate rejected the B0 evaluation',
+                         'baseline':baseline.to_dict(),'rounds':[],'adopted_version':None}
+                atomic_json(self.root/'summary.json',summary)
+                print(json.dumps({'stage':'B0','status':'blocked_b0'},ensure_ascii=False),flush=True)
+                return summary
             adopted=self.revisions.publish(bundle,self.root/'published',{'accepted':True,'reasons':['initial_validated_baseline']})
-            decisions=[]
-            for n in range(1,rounds+1):
+            decisions=[];stopped=False
+            n=0
+            while True:
+                if rounds is not None and n>=rounds: break
+                if stop_file is not None and Path(stop_file).exists(): stopped=True; break
+                n+=1
                 self.verify();name=f'R{n}';stage=self.root/name
                 decision_path=stage/'decision.json'
                 if decision_path.exists():
@@ -132,7 +148,8 @@ class ExperimentRunner:
                 print(json.dumps({'stage':name,'accepted':decision['accepted'],'reasons':decision['reasons']},ensure_ascii=False),flush=True)
             self.verify()
             summary={'status':'complete' if all(d.get('status')!='validation_failed' for d in decisions) else 'failed',
-                     'rounds':decisions,'adopted_version':adopted.version,'adopted_scores':baseline.to_dict()}
+                     'stopped_by_operator':stopped,'rounds':decisions,'adopted_version':adopted.version,
+                     'adopted_scores':baseline.to_dict()}
             atomic_json(self.root/'summary.json',summary)
             return summary
         except Exception as exc:

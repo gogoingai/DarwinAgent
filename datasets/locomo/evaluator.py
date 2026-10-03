@@ -30,27 +30,34 @@ class LocomoEvaluator:
         context=transcript(conv)+'\n【英文原句对照】\n'+transcript(en)
         predictions={int(a.question_id):a for a in result.answers}
         if set(predictions)!={q.idx for q in conv.qas}: raise ValueError('Complete independent answer set required')
-        if result.case_id!='conv-26': raise ValueError('Audited frozen four-metric evaluation is scoped to conv-26')
-        audited=json.loads(self.audited_path.read_text())
-        if len(audited)!=len(conv.qas) or any(row['idx']!=q.idx or row['question']!=q.question for row,q in zip(audited,conv.qas)):
-            raise ValueError('Audited reference identity mismatch')
-        repaired=[replace(q,answer=row['answer']) for q,row in zip(conv.qas,audited)]
-        disputed={row['idx'] for row in audited if row['disputed']}
+        # 修订 gold 只在 conv-26 存在（审计参考按会话登记）；其余会话按原始 gold 两口径评分。
+        audited=None;disputed=set()
+        if result.case_id=='conv-26':
+            audited=json.loads(self.audited_path.read_text())
+            if len(audited)!=len(conv.qas) or any(row['idx']!=q.idx or row['question']!=q.question for row,q in zip(audited,conv.qas)):
+                raise ValueError('Audited reference identity mismatch')
+            disputed={row['idx'] for row in audited if row['disputed']}
+        golds=[('original',conv.qas)]
+        if audited is not None:
+            golds.append(('repaired',[replace(q,answer=row['answer']) for q,row in zip(conv.qas,audited)]))
         sem=asyncio.Semaphore(self.concurrency)
         async def block(gold_name,qas):
             async with sem:
                 items=[(q,predictions[q.idx].answer,'answer_error' if predictions[q.idx].status=='execution_error' else 'ok') for q in qas]
                 return await dual_grade_batch(items,self.client,context,self.work_dir/gold_name/'cache')
         reports={}
-        for name,qas in [('original',conv.qas),('repaired',repaired)]:
+        for name,qas in golds:
             parts=await asyncio.gather(*(block(name,qas[i:i+4]) for i in range(0,len(qas),4)))
             reports[name]=aggregate([r for p in parts for r in p],disputed)
             atomic_json(self.work_dir/f'{name}.json',reports[name])
         diagnostics=[]
         for idx in sorted(predictions):
             a=predictions[idx]
-            diagnostics.append({'question_id':str(idx),'question':conv.qas[idx].question,'status':a.status,'answer':a.answer,
-                'error':a.error,'original':reports['original']['grades'][idx],'repaired':reports['repaired']['grades'][idx]})
+            row={'question_id':str(idx),'question':conv.qas[idx].question,'status':a.status,'answer':a.answer,
+                'error':a.error,'original':reports['original']['grades'][idx]}
+            if audited is not None:
+                row['repaired']=reports['repaired']['grades'][idx]
+            diagnostics.append(row)
         metrics={f'{gold}_{metric}':reports[gold]['overall'][metric]['correct']
                  for gold in reports for metric in ('lenient','precise')}
         gen_faults=sum(a.status=='execution_error' for a in result.answers)

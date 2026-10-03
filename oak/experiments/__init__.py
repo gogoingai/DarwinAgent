@@ -1,4 +1,6 @@
-from .runner import ExperimentRunner
+from .campaign import CampaignController
 from .policy import AdoptionPolicy
+from .runner import ExperimentRunner
+from .spec import ExperimentSpec, SelectionPolicy
 
-__all__ = ['ExperimentRunner', 'AdoptionPolicy']
+__all__ = ['CampaignController', 'ExperimentRunner', 'AdoptionPolicy', 'ExperimentSpec', 'SelectionPolicy']

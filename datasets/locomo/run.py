@@ -1,11 +1,11 @@
-"""Thin assembly: the framework owns bootstrap, both Agents and the optimization loop."""
+"""Thin assembly: the framework owns bootstrap, both Agents, the optimization loop and the campaign."""
 import argparse
 import asyncio
 from pathlib import Path
 
 from oak.config import RunConfig
 from oak.engine import Pipeline
-from oak.experiments import AdoptionPolicy, ExperimentRunner
+from oak.experiments import (AdoptionPolicy, CampaignController, ExperimentRunner, ExperimentSpec)
 from oak.kernel import KernelBundle, TaskSpec
 from oak.llm.client import LLMClient
 from oak.llm.settings import load_connection
@@ -24,18 +24,28 @@ async def main(args):
     connection=load_connection(ROOT,root/'runtime','LOCOMO')
     connection.role_tiers['locomo_judge']='strong'
     connection.empty_response_passthrough_roles.add('locomo_judge')
-    if args.experiment:
-        frozen=[ROOT/'datasets/locomo/adapter.py',ROOT/'datasets/locomo/evaluator.py',ROOT/'datasets/locomo/exports.py',
-                ROOT/'datasets/locomo/run.py',ROOT/'datasets/locomo/pipeline',
-                ROOT/'datasets/locomo/data/locomo10_zh.json',ROOT/'datasets/locomo/data/locomo10.json',
-                ROOT/'datasets/locomo/data/gold_repairs.jsonl',AUDITED,LOCK_PATH,ROOT/'tasks/conversation_memory/task.yaml']
+    frozen=[ROOT/'datasets/locomo/adapter.py',ROOT/'datasets/locomo/evaluator.py',ROOT/'datasets/locomo/exports.py',
+            ROOT/'datasets/locomo/run.py',ROOT/'datasets/locomo/pipeline',
+            ROOT/'datasets/locomo/data/locomo10_zh.json',ROOT/'datasets/locomo/data/locomo10.json',
+            ROOT/'datasets/locomo/data/gold_repairs.jsonl',AUDITED,LOCK_PATH,ROOT/'tasks/conversation_memory']
+    if args.stop:
+        (root/'STOP').write_text('operator stop\n')
+        print('stop signal written; the campaign will lock candidates after the current round')
+        return
+    if args.campaign:
+        protocol=ExperimentSpec(train=('conv-26',),validation=('conv-47',),test=('conv-49',),rounds=args.rounds)
+        controller=CampaignController(adapter,lambda client,path:LocomoEvaluator(client,path),connection,config,
+            protocol,root,frozen)
+        summary=await controller.run(spec,resume=args.resume)
+        print(summary['status'])
+    elif args.experiment:
         runner=ExperimentRunner(adapter,lambda client,path:LocomoEvaluator(client,path),connection,config,
             AdoptionPolicy('repaired_precise',('original_lenient','original_precise','repaired_lenient')),
             root,frozen)
-        summary=await runner.run(args.case,spec,resume=args.resume)
+        summary=await runner.run(args.case,spec,rounds=args.rounds,resume=args.resume)
         print(summary['status'])
     else:
-        if not args.assets: raise ValueError('Supply a generated bundle or use --experiment for cold initialization')
+        if not args.assets: raise ValueError('Supply a generated bundle or use --experiment/--campaign')
         async with LLMClient(connection) as client:
             result=await Pipeline(client,root/'generation').run(adapter.generation_input(args.case),
                                                               spec.with_bundle(KernelBundle(Path(args.assets))),config)
@@ -51,5 +61,9 @@ if __name__=='__main__':
     p.add_argument('--output',required=True)
     p.add_argument('--assets')
     p.add_argument('--experiment',action='store_true')
+    p.add_argument('--campaign',action='store_true')
     p.add_argument('--resume',action='store_true')
+    p.add_argument('--rounds',type=int,default=None,
+                   help='训练迭代轮数上限；缺省按 ExperimentSpec（None=无限，操作者 --stop 叫停）')
+    p.add_argument('--stop',action='store_true',help='写入 STOP 叫停信号：当前轮完成后锁定候选并进入验证/测试')
     asyncio.run(main(p.parse_args()))

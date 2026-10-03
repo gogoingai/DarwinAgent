@@ -38,9 +38,10 @@ class DatasetBoundary(unittest.TestCase):
             p.write_text(json.dumps([raw],ensure_ascii=False))
             self.assertEqual(before.to_dict(),adapter.generation_input('conv-26').to_dict())
             self.assertEqual(len(before.questions),199)
-            self.assertEqual({b.source.kind for b in before.corpus},{'message_text','observation','event_summary'})
-            events=[b for b in before.corpus if b.source.kind=='event_summary']
-            self.assertTrue(any(b.metadata['date'] for b in events))
+            # 生成只见原始对话文本、说话人与会话日期；标注层与评测字段一律不进生成。
+            self.assertEqual({b.source.kind for b in before.corpus},{'message_text'})
+            self.assertTrue(all(set(b.metadata)=={'speaker','date'} for b in before.corpus))
+            self.assertTrue(any(b.metadata['date'] for b in before.corpus))
 
     def test_travel_level_cannot_change_generation_input(self):
         adapter=TravelPlannerAdapter();before=adapter.generation_input('0')

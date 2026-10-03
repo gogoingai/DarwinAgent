@@ -1,0 +1,220 @@
+"""Three-set campaign controller.
+
+B0 gate -> unbounded training rounds on the train split -> candidate lock (B0 plus every
+adopted version) -> one full validation run per candidate -> frozen selection -> one-shot
+test on B0 and the selected version. Validation and test diagnostics are recorded but never
+feed proposals; every question run lands in an append-only ledger with an optional cap."""
+from __future__ import annotations
+
+import json
+import time
+from pathlib import Path
+
+from oak.contracts import EvaluationResult
+from oak.engine import Pipeline
+from oak.kernel import KernelBundle
+from oak.llm.client import LLMClient
+from oak.runtime.artifacts import atomic_json
+from oak.runtime.identity import assert_files, snapshot_files, transport_identity
+from .runner import ExperimentRunner
+from .spec import ExperimentSpec
+
+
+class CampaignController:
+    def __init__(self, adapter, evaluator_factory, connection_config, run_config, spec: ExperimentSpec,
+                 work_dir, frozen_files=(), client_factory=None):
+        if not isinstance(spec, ExperimentSpec):
+            raise ValueError('Campaign requires a frozen ExperimentSpec')
+        self.adapter, self.evaluator_factory = adapter, evaluator_factory
+        self.connection_config, self.config, self.spec = connection_config, run_config, spec
+        self.root = Path(work_dir)
+        self.frozen_files = tuple(frozen_files)
+        self.frozen = snapshot_files([Path(__file__).resolve().parents[1], *frozen_files])
+        self._injected_client = client_factory
+
+    def verify(self):
+        assert_files(self.frozen)
+
+    # ---- question-run ledger -------------------------------------------------
+    def _ledger_path(self):
+        return self.root / 'question_runs.jsonl'
+
+    def _ledger_total(self):
+        if not self._ledger_path().exists():
+            return 0
+        seen = {}
+        for line in self._ledger_path().read_text().splitlines():
+            if not line.strip():
+                continue
+            row = json.loads(line)
+            seen[(row['phase'], row['case_id'], row['version'])] = row['questions']
+        return sum(seen.values())
+
+    def _register(self, phase, case_id, version, questions):
+        key = json.dumps({'phase': phase, 'case_id': case_id, 'version': version, 'questions': questions},
+                         ensure_ascii=False)
+        existing = set()
+        if self._ledger_path().exists():
+            existing = {line.strip() for line in self._ledger_path().read_text().splitlines() if line.strip()}
+        if key in existing:
+            return
+        with self._ledger_path().open('a') as handle:
+            handle.write(key + '\n')
+
+    def _guard_runs(self, planned):
+        if self.spec.max_question_runs is not None and self._ledger_total() + planned > self.spec.max_question_runs:
+            raise ValueError(f'Question-run safety cap exceeded: {self._ledger_total()}+{planned}'
+                             f' > {self.spec.max_question_runs}')
+
+    # ---- one case under one bundle -------------------------------------------
+    def _client(self, stage_dir):
+        if self._injected_client is not None:
+            return self._injected_client(stage_dir)
+        import copy
+        cfg = copy.deepcopy(self.connection_config)
+        cfg.work_dir = Path(stage_dir) / 'runtime'
+        return LLMClient(cfg)
+
+    async def _case_stage(self, phase, case_id, task_spec, stage_dir):
+        self.verify(); started = time.time(); stage_dir = Path(stage_dir)
+        client = self._client(stage_dir)
+        try:
+            case = self.adapter.generation_input(case_id)
+            result = await Pipeline(client, stage_dir / 'generation').run(case, task_spec, self.config)
+            scores_path = stage_dir / 'evaluation.json'
+            if scores_path.exists():
+                saved = json.loads(scores_path.read_text())
+                if saved['run_identity'] != result.identity or saved['asset_version'] != task_spec.bundle.version:
+                    raise ValueError('Evaluation checkpoint identity mismatch')
+                scores = EvaluationResult(**saved['scores'])
+            else:
+                evaluator = self.evaluator_factory(client, stage_dir / 'evaluation')
+                scores = await evaluator.evaluate(result)
+                atomic_json(scores_path, {'run_identity': result.identity,
+                                          'asset_version': task_spec.bundle.version, 'scores': scores.to_dict()})
+            self.verify()
+            atomic_json(stage_dir / 'stage.json', {
+                'phase': phase, 'case_id': case_id,
+                'status': 'complete' if scores.completed == scores.total and not scores.evaluation_faults else 'failed',
+                'run_identity': result.identity, 'asset_version': task_spec.bundle.version,
+                'memory_count': result.memory_count, 'memory_fingerprint': result.memory_fingerprint,
+                'graph_fingerprint': result.graph_fingerprint, 'scores': scores.to_dict(),
+                'calls': client.ledger_summary(), 'elapsed_s': round(time.time() - started, 2)})
+            return result, scores
+        finally:
+            await client.aclose()
+
+    # ---- candidate chain from the training tree -------------------------------
+    def _candidate_chain(self):
+        train = self.root / 'train'
+        b0_version = json.loads((train / 'B0' / 'assets' / 'manifest.json').read_text())['version']
+        chain = [{'order': 0, 'version': b0_version, 'path': train / 'published' / 'versions' / b0_version}]
+        n = 1
+        while (train / f'R{n}' / 'decision.json').exists():
+            decision = json.loads((train / f'R{n}' / 'decision.json').read_text())
+            if decision.get('accepted') and decision.get('candidate_version'):
+                version = decision['candidate_version']
+                chain.append({'order': n, 'version': version, 'path': train / 'published' / 'versions' / version})
+            n += 1
+        for candidate in chain:
+            if not (candidate['path'] / 'manifest.json').exists():
+                raise ValueError(f"Adopted bundle missing from publication tree: {candidate['version']}")
+        return chain
+
+    def _register_train_runs(self):
+        train = self.root / 'train'
+        case_id = self.spec.train[0]
+        stages = ['B0']
+        n = 1
+        while (train / f'R{n}' / 'generation' / case_id / 'result.json').exists():
+            stages.append(f'R{n}'); n += 1
+        for name in stages:
+            result_path = train / name / 'generation' / case_id / 'result.json'
+            if result_path.exists():
+                row = json.loads(result_path.read_text())
+                self._register('train', case_id, row['asset_version'], len(row['answers']))
+
+    # ---- orchestration ---------------------------------------------------------
+    async def run(self, task_spec, resume=False, rounds=None):
+        self.root.mkdir(parents=True, exist_ok=True)
+        declaration = {'experiment_spec': self.spec.declaration(), 'task': task_spec.declaration(),
+                       'config': self.config.to_dict(),
+                       'connection': transport_identity(type('Connection', (), {'cfg': self.connection_config})()),
+                       'frozen_files': self.frozen}
+        declaration = json.loads(json.dumps(declaration, ensure_ascii=False))
+        state_path = self.root / 'campaign.json'
+        if state_path.exists():
+            if not resume or json.loads(state_path.read_text())['declaration'] != declaration:
+                raise ValueError('Existing campaign requires explicit resume with exactly the same identity')
+        else:
+            atomic_json(state_path, {'declaration': declaration, 'phase': 'precheck'})
+        precheck = self.root / 'precheck.json'
+        if not precheck.exists() or not json.loads(precheck.read_text()).get('passed'):
+            raise ValueError('Precheck missing or not passed: run datasets/locomo/scripts/precheck first')
+        self.verify()
+
+        def set_phase(phase):
+            state = json.loads(state_path.read_text())
+            atomic_json(state_path, {**state, 'phase': phase})
+
+        train_case = self.spec.train[0]
+        set_phase('train')
+        runner = ExperimentRunner(self.adapter, self.evaluator_factory, self.connection_config,
+                                  self.config, self.spec.adoption, self.root / 'train', self.frozen_files,
+                                  client_factory=self._injected_client)
+        def b0_gate(scores):
+            return scores.completed == scores.total and scores.generation_faults == 0 and scores.evaluation_faults == 0
+        train_summary = await runner.run(train_case, task_spec,
+                                         rounds=self.spec.rounds if rounds is None else rounds,
+                                         resume=resume, stop_file=self.root / 'STOP', b0_gate=b0_gate)
+        self._register_train_runs()
+        if train_summary['status'] == 'blocked_b0':
+            set_phase('blocked_b0')
+            return {'status': 'blocked_b0', 'train': train_summary}
+
+        chain = self._candidate_chain()
+        validation_case = self.spec.validation[0]
+        validation_questions = len(self.adapter.generation_input(validation_case).questions)
+        self._guard_runs(validation_questions * len(chain))
+        set_phase('validation')
+        validation = {}
+        for candidate in chain:
+            result, scores = await self._case_stage(
+                'validation', validation_case, task_spec.with_bundle(KernelBundle(candidate['path'])),
+                self.root / 'validation' / candidate['version'])
+            self._register('validation', validation_case, candidate['version'], len(result.answers))
+            validation[candidate['version']] = scores.to_dict()
+
+        set_phase('selection')
+        baseline_scores = EvaluationResult(**validation[chain[0]['version']])
+        candidates = [{'order': c['order'], 'version': c['version'],
+                       'scores': EvaluationResult(**validation[c['version']])} for c in chain]
+        decision = self.spec.selection.decide(baseline_scores, candidates)
+        selected = decision['selected'] or chain[0]['version']
+        atomic_json(self.root / 'selected.json', {
+            'selected': selected, 'baseline': chain[0]['version'], 'decision': decision,
+            'fingerprints': {c['version']: KernelBundle(c['path']).version for c in chain},
+            'sealed_before_test': True})
+
+        test_case = self.spec.test[0]
+        test_versions = [chain[0]['version']] + ([selected] if selected != chain[0]['version'] else [])
+        test_questions = len(self.adapter.generation_input(test_case).questions)
+        self._guard_runs(test_questions * len(test_versions))
+        set_phase('test')
+        test = {}
+        for version in test_versions:
+            path = next(c['path'] for c in chain if c['version'] == version)
+            result, scores = await self._case_stage('test', test_case,
+                                                    task_spec.with_bundle(KernelBundle(path)),
+                                                    self.root / 'test' / version)
+            self._register('test', test_case, version, len(result.answers))
+            test[version] = scores.to_dict()
+
+        set_phase('done')
+        summary = {'status': 'complete', 'train': train_summary,
+                   'candidates': [{'order': c['order'], 'version': c['version']} for c in chain],
+                   'validation': validation, 'selection': decision, 'selected': selected,
+                   'test': test, 'question_runs': self._ledger_total(),
+                   'operator_stopped': train_summary.get('stopped_by_operator', False)}
+        atomic_json(self.root / 'campaign-summary.json', summary)
+        return summary
