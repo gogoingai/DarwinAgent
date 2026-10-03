@@ -187,7 +187,7 @@ class CampaignController:
                 self._register('train', case_id, row['asset_version'], len(row['answers']))
 
     # ---- orchestration ---------------------------------------------------------
-    async def run(self, task_spec, resume=False, rounds=None, scope=()):
+    async def run(self, task_spec, resume=False, rounds=None, scope=(), b0_gate=None):
         self.root.mkdir(parents=True, exist_ok=True)
         declaration = {'experiment_spec': self.spec.declaration(), 'task': task_spec.declaration(),
                        'config': self.config.to_dict(),
@@ -234,8 +234,9 @@ class CampaignController:
                                   client_factory=self._injected_client, bootstrap_context=self.bootstrap_context,
                                   snapshot_root=self.snapshot_root,
                                   bootstrap_trial_graph=self.bootstrap_trial_graph)
-        def b0_gate(scores):
-            return scores.completed == scores.total and scores.generation_faults == 0 and scores.evaluation_faults == 0
+        if b0_gate is None:
+            def b0_gate(scores):
+                return scores.completed == scores.total and scores.generation_faults == 0 and scores.evaluation_faults == 0
         train_summary = await runner.run(train_cases, task_spec,
                                          rounds=self.spec.rounds if rounds is None else rounds,
                                          resume=resume, stop_file=self.root / 'STOP', b0_gate=b0_gate, scope=scope,
