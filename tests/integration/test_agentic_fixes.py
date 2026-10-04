@@ -1310,3 +1310,57 @@ class RetryVarianceTests(unittest.TestCase):
         from oak.experiments import runner
         src = inspect.getsource(runner)
         self.assertIn('重试 {attempt+1}/{ADMISSION_ATTEMPTS}', src)
+
+
+class FUnitTestsTests(unittest.TestCase):
+    """用户拍板：冒烟之外必须有单测——准入试跑并入真实数据形态压力矩阵
+    （空行/图头尾/列表字段行）。容器 str() 类分支错误在准入层暴露（R7 事故：14 题）。"""
+
+    def test_container_str_fails_stress_admission(self):
+        import tempfile
+        from oak.experiments.runner import stress_trial_samples
+        from oak.experiments.snapshots import load_frozen_graph
+        from oak.kernel.assets import Asset, KernelAssets
+        from oak.kernel.functions import FunctionRegistry
+        from oak.operators.sandbox import Limits
+        from tests.integration.test_agentic_round import FakeEmbedder, build_snapshot, corpus, cold_bundle
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            snapshot, _ = build_snapshot(root)
+            graph = load_frozen_graph(snapshot, corpus())
+            # 坏 F：对输入 rows 的字段直接 str()（R7 十四连故障同款）
+            bad = Asset('f_bad', 'F',
+                        "def run(params):\n out=[]\n for r in params['rows']:\n  out.append(str(r.get('source_ids')))\n return {'rows': out}\n",
+                        {'type': 'object', 'properties': {'rows': {'type': 'array'}},
+                         'additionalProperties': True},
+                        {'type': 'object', 'properties': {'rows': {'type': 'array'}},
+                         'additionalProperties': True}, ['schema'],
+                        description='bad', trial_inputs=({'rows': [{'node_id': 'n000000'}]},))
+            bundle = KernelAssets(tuple(
+                [a for a in cold_bundle(root).assets.assets if a.kind != 'F'] + [bad])).export(root / 'b')
+            reg = FunctionRegistry(bundle, Limits(30000, 15.0, 180000))
+            samples = stress_trial_samples([{'rows': [{'node_id': 'n000000'}]}], graph)
+            self.assertTrue(samples, '压力样本应非空')
+            raised = None
+            for sample in samples:                     # 任一压力形态触发即视为单测发现
+                try:
+                    reg.call('f_bad', sample, graph)
+                except ValueError as exc:
+                    raised = exc
+                    break
+            self.assertIsNotNone(raised, '压力矩阵应触发容器 str() 错误')
+            self.assertIn('Container-to-string', str(raised))
+
+    def test_stress_samples_shapes(self):
+        import tempfile
+        from oak.experiments.runner import stress_trial_samples
+        from tests.integration.test_agentic_round import build_snapshot
+        with tempfile.TemporaryDirectory() as td:
+            snapshot, _ = build_snapshot(Path(td))
+            from oak.experiments.snapshots import load_frozen_graph
+            from tests.integration.test_agentic_round import corpus
+            graph = load_frozen_graph(snapshot, corpus())
+            base = {'rows': [{'node_id': 'n000000'}]}
+            out = stress_trial_samples([base], graph)
+            self.assertTrue(any(p['rows'] == [] for p in out), '含空行集')
+            self.assertGreater(len(out), 2, '含多形态')
