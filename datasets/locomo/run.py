@@ -157,9 +157,11 @@ async def run_arm(args):
                                   bootstrap_context=memory_structure_sample(SNAPSHOTS/'conv-26'),
                                   smoke_judge=smoke_judge)
     controller.bootstrap_trial_graph=bootstrap_trial_graph(adapter)
-    # 冷启动轮 B0 门＝「可评分基线」：完成度≥95% 即锚定迭代起点；故障如实进 unhealthy_stages，
-    # 由采纳门（零故障才可采纳）与迭代清零。框架默认门（全完+双故障零）不变，仅本轮传入放宽版。
-    cold_gate=lambda scores: scores.completed>=max(1,int(scores.total*0.95))
+    # 冷启动轮 B0 门＝「可评分基线」：完成度≥90% 即锚定迭代起点（v10：93/100 被旧 95% 门
+    # 拦出冷启动死锁——7 题确定性 F 契约故障只有 R1 修资产才能清，而 R1 要 B0 过门才开）。
+    # 故障如实进评分与 unhealthy_stages，由采纳门（零故障才可采纳）与迭代清零。
+    # 框架默认门（全完+双故障零）不变，仅本轮传入放宽版。
+    cold_gate=lambda scores: scores.completed>=max(1,int(scores.total*0.90))
     summary=await controller.run(task,resume=args.resume,scope=SCOPE[args.scope],b0_gate=cold_gate)
     print(summary['status'])
 
