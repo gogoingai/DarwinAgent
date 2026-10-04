@@ -536,8 +536,11 @@ class ExperimentRunner:
                 candidate_path=stage/'candidate'/'bundle'
                 if (candidate_path/'manifest.json').exists():
                     candidate=KernelBundle(candidate_path)
-                    # 恢复已有候选同样过预检（评审三）：不能仅凭 manifest 存在就跳过准入验证
+                    # 恢复已有候选同样过预检＋冒烟（评审三）：不能仅凭 manifest 存在就跳过验证
                     self._preflight(candidate,spec,cases[0].questions[0])
+                    if self.snapshot_root is not None:
+                        resume_smoke=await self._smoke_gate(cases,spec.with_bundle(candidate))
+                        if resume_smoke: raise ValueError('恢复候选冒烟失败: '+resume_smoke)
                 else:
                     client=self._client(name)
                     feedback=training_feedback(cases,results,_per_case_feedback_facts(self.root,evidence,cases),baseline)
@@ -567,6 +570,11 @@ class ExperimentRunner:
                                                        required_capabilities=required_caps)
                                 staged=KernelBundle(attempt_path/'bundle')
                                 self._preflight(staged,spec,cases[0].questions[0])
+                                if self.snapshot_root is not None:
+                                    # 每轮候选同样先冒烟（用户拍板）：坏补丁在 3 题内暴露并
+                                    # 回灌重试，不烧 70 分钟全量
+                                    round_smoke=await self._smoke_gate(cases,spec.with_bundle(staged))
+                                    if round_smoke: raise ValueError(round_smoke)
                                 candidate_path.parent.mkdir(parents=True,exist_ok=True)
                                 os.replace(attempt_path,candidate_path.parent)
                                 candidate=KernelBundle(candidate_path)
