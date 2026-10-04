@@ -49,6 +49,22 @@ def enforce_opinions(opinions, context=''):
     return opinions
 
 
+def synthetic_answer_variants(rows, question_text, parameters=None):
+    """良好成形候选的形态电池（评审/事故驱动）：单事实作答、列举作答、合规拒答。
+    答案阶段 C 对任一形态返回 ok=False 都视为过严/不兼容——agentic_v9 B0 事故：
+    c_answer_quality 过了单事实冒烟但对真实答案多样性全盘从严，31 题重试耗尽。"""
+    single = synthetic_answer_snapshot(rows, question_text, parameters)
+    listed = synthetic_answer_snapshot(rows[1:3] or rows, question_text, parameters)
+    listed['answer'] = f"根据记忆：1) {single['answer']}；2) 另一条相关记录。"
+    listed['node_ids'] = [r['node_id'] for r in (rows[1:3] or rows)]
+    listed['evidence'] = list(rows[1:3] or rows)
+    abstain = {'stage': 'answer', 'question': question_text, 'parameters': parameters or {},
+               'status': 'abstained', 'answer': '记忆中没有支持该问题的记录，无法回答。',
+               'node_ids': [], 'evidence': [], 'visible_evidence': list(rows[:3]),
+               'structured_answer': None}
+    return [single, listed, abstain]
+
+
 def synthetic_answer_snapshot(rows, question_text, parameters=None):
     """良好成形的答案阶段检查快照（真实记忆行＋真实问题文本）。冷启动准入用它真实执行
     答案阶段 C（agentic_v6 G1 B0 全灭事故：模型自写 C 结构不兼容、全盘否决每个候选，

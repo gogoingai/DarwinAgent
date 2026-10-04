@@ -337,14 +337,15 @@ class ExperimentRunner:
             limits=Limits(self.config.function_steps,self.config.function_timeout_s,self.config.result_bytes)
             caps=DataCapabilities(graph)
             try:
-                from oak.kernel.checks import enforce_opinions, synthetic_answer_snapshot
+                from oak.kernel.checks import enforce_opinions, synthetic_answer_variants
                 checks=CheckRegistry(exported,limits)
                 all_rows=list(caps.rows.values())
                 enforce_opinions(checks.run('graph',{'nodes':all_rows,'stage':'graph'}),'候选预检')
                 if sample_question is not None:
-                    enforce_opinions(checks.run('answer',
-                        synthetic_answer_snapshot(all_rows,sample_question.text,
-                                                  dict(sample_question.parameters))),'候选预检答案阶段')
+                    for variant in synthetic_answer_variants(all_rows,sample_question.text,
+                                                             dict(sample_question.parameters)):
+                        enforce_opinions(checks.run('answer',variant),
+                                         f'候选预检答案阶段[{variant["status"]}]')
                 records=FunctionRegistry(exported,limits).trial(graph,
                     {a.id:list(a.trial_inputs) for a in exported.assets.assets if a.kind=='F'})
             except Exception as exc:   # 含 SandboxError（ValueError 子类）：统一带上下文回灌

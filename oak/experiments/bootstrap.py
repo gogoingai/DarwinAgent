@@ -94,6 +94,14 @@ and its relation names the keys of memory_structure.relations. S MUST declare th
 (including meta.atomic_memory_type being one of them); inventing synonyms makes every query miss.
 '''
 
+_C_DISCIPLINE_CLAUSE='''C discipline (hard requirement): a C asset performs MECHANICAL structural checks only
+(required fields present, citation format consistent, status/shape valid). Semantic quality
+and factual judgment belong EXCLUSIVELY to the review stage. A C that rejects a well-formed
+answer because of style, brevity, wording or its own quality opinions will be rejected at
+admission - it runs against single-fact, list-style and valid-abstention samples. Include a
+C only if it accepts all three; omitting C entirely is always acceptable.
+'''
+
 _RETRIEVAL_FLOOR_CLAUSE='''Retrieval-tool floor for this task (hard admission requirement): the package MUST register
   - at least one semantic vector-retrieval F that calls semantic_search(...) internally (similarity
     search over the frozen memory vector index), AND
@@ -247,23 +255,26 @@ class AssetBootstrapper:
                         if problems: raise ValueError('检索底线试跑未触发: ' + str(problems))
                     # 图阶段 C 在完整真实图上执行（评审①）：预算随图规模伸缩由 CheckRegistry
                     # 负责；不合格 C 在这里反馈给模型修订，而不是等到正式运行整轮失败。
-                    from oak.kernel.checks import CheckRegistry, enforce_opinions, synthetic_answer_snapshot
+                    from oak.kernel.checks import CheckRegistry, enforce_opinions, synthetic_answer_variants
                     graph_checks = CheckRegistry(trial_bundle, Limits(config.function_steps,
                                                        config.function_timeout_s, config.result_bytes))
                     graph_caps = __import__('oak.operators.data', fromlist=['DataCapabilities']).DataCapabilities(trial_graph)
                     all_rows = list(graph_caps.rows.values())
                     enforce_opinions(graph_checks.run('graph', {'nodes': all_rows,
                                                'stage': 'graph'}), '冷启动')
-                    # 答案阶段 C 同样在准入环内真实执行（合成候选＝真实记忆行＋真实问题）：
-                    # 结构不兼容/全盘否决的 C 在这里被反馈修订，而不是 B0 阶段 199 题全灭。
-                    enforce_opinions(graph_checks.run('answer',
-                        synthetic_answer_snapshot(all_rows, questions[0].text,
-                                                  dict(questions[0].parameters))), '冷启动答案阶段')
+                    # 答案阶段 C 在准入环内对形态电池真实执行（单事实/列举/合规拒答）：
+                    # 结构不兼容或对良好成形答案过严的 C 在这里被反馈修订，
+                    # 而不是 B0 阶段重试耗尽（agentic_v9 31 题事故）。
+                    for variant in synthetic_answer_variants(all_rows, questions[0].text,
+                                                             dict(questions[0].parameters)):
+                        enforce_opinions(graph_checks.run('answer', variant),
+                                         f'冷启动答案阶段[{variant["status"]}]')
             return assets
         floor_required = bool(capability_names(getattr(spec, 'retrieval_floor', {}) or {}))
         protocol = ASSET_PROTOCOL if anchored else (
             LEGACY_ASSET_PROTOCOL + ('\n' + _ATOMIC_MEMORY_CLAUSE if atomic_required else '')
-            + ('\n' + _RETRIEVAL_FLOOR_CLAUSE if floor_required else ''))
+            + ('\n' + _RETRIEVAL_FLOOR_CLAUSE if floor_required else '')
+            + '\n' + _C_DISCIPLINE_CLAUSE)
         try:
             assets = await session.request(config.bootstrap_role, protocol, payload, valid, max_tokens=14000)
         finally:
