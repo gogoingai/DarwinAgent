@@ -1255,7 +1255,7 @@ class CrossRoundRejectionFeedbackTests(unittest.TestCase):
         from oak.experiments.runner import training_feedback
         from oak.contracts import RunResult
         result = RunResult('c', 'i', 'v', (), (), ())
-        payload = training_feedback((SimpleNamespace(id='c', questions=()),), (result,), ({},),
+        payload = training_feedback((SimpleNamespace(id='c', questions=()),), (result,), (('c', {}),),
                                     EvaluationResult({'m': 0}, 0, 0, 0, 0),
                                     active_stages={'F': '执行中'},
                                     previous_round={'round': 'R2', 'status': 'validation_failed',

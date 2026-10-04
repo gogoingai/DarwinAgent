@@ -314,6 +314,7 @@ def _per_case_feedback_facts(root, name, cases):
     return rows
 
 _DETERMINISTIC_ERRORS=frozenset({'SandboxError','ValueError','TypeError','KeyError'})
+ADMISSION_ATTEMPTS=10
 
 
 class ExperimentRunner:
@@ -615,11 +616,12 @@ class ExperimentRunner:
                     required_caps=capability_names(getattr(spec,'retrieval_floor',{}) or {})
                     try:
                         # 准入类错误（指纹回显/类型/范围/底线/预检否决）回灌提案模型重试，而非
-                        # 整轮作废后重复同类错误；三次仍不过才记 validation_failed（评审#2）。
+                        # 整轮作废后重复同类错误；用户拍板 2026-10-04：3 次改 10 次（沙箱
+                        # 规矩类死因一轮一坑，轮内多试比跨轮便宜）。仍不过才记 validation_failed。
                         # 每次尝试写独立暂存目录，全部预检通过后才确认为正式候选（评审三）——
                         # 否则首败残留的 candidate 目录让后续尝试报 already exists，掩盖真实错误。
                         admission_error=None
-                        for attempt in range(3):
+                        for attempt in range(ADMISSION_ATTEMPTS):
                             attempt_path=stage/f'.candidate-attempt-{attempt}'
                             if attempt_path.exists(): shutil.rmtree(attempt_path)
                             try:
