@@ -72,19 +72,32 @@ def main():
         if st['state'] == 'launched':
             log('已完成，退出'); return
         if st['state'] == 'armed':
-            log(f"盯 {src} 的 R1 决策…")
+            # 用户指令（循环不停＞严格 R2）：每个新决策落地时检查就绪标记——
+            # 就绪则交接；未就绪则不拦旧循环，记录顺延，继续盯下一轮边界。
+            import re as _re
+            watch_from = time.time()
+            log(f"盯 {src} 的轮次决策（首个＝R1）…")
             while True:
-                dec = src / 'train/R1/decision.json'
-                if dec.exists():
-                    d = json.loads(dec.read_text())
-                    slipped = (src / 'train/R2/proposal-call.json').exists()
-                    killed = stop_old_worker(src)
-                    save(state_file, state='holding',
-                         r1_decision={'accepted': d.get('accepted'), 'reasons': d.get('reasons')},
-                         r2_slipped_under_old_framework=slipped, stopped_pids=killed)
-                    log(f"R1 决策落地（accepted={d.get('accepted')}），旧 worker 已拦停 pid={killed}"
-                        f"{'（注意：旧框架 R2 提案已开头，作为历史保留）' if slipped else ''}")
-                    break
+                ready = Path(st['ready_marker']).exists()
+                decisions = sorted(src.glob('train/R*/decision.json'),
+                                   key=lambda p: p.stat().st_mtime)
+                fresh = [d for d in decisions if d.stat().st_mtime > watch_from]
+                if fresh:
+                    dec_file = fresh[-1]
+                    d = json.loads(dec_file.read_text())
+                    rnd = _re.search(r'R(\d+)', str(dec_file)).group(0)
+                    if ready:
+                        slipped_next = (src / f'train/R{int(rnd[1:])+1}/proposal-call.json').exists()
+                        killed = stop_old_worker(src)
+                        save(state_file, state='holding',
+                             trigger_round=rnd,
+                             trigger_decision={'accepted': d.get('accepted'), 'reasons': d.get('reasons')},
+                             next_round_slipped=slipped_next, stopped_pids=killed)
+                        log(f"{rnd} 决策落地且新框架就绪：旧 worker 拦停 pid={killed}，交接")
+                        break
+                    save(state_file, deferred_rounds=(load(state_file).get('deferred_rounds') or []) + [rnd])
+                    log(f"{rnd} 决策落地但新框架未就绪——不拦旧循环（循环不停），记录顺延，继续盯")
+                    watch_from = dec_file.stat().st_mtime
                 time.sleep(3)
         if load(state_file)['state'] == 'holding':
             log("等待新框架就绪标记…")
