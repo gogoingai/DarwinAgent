@@ -104,8 +104,24 @@ def main():
             while not Path(load(state_file)['ready_marker']).exists():
                 time.sleep(10)
             st = load(state_file)
-            log(f"新框架就绪：{st['framework_commit']}")
-            save(state_file, state='seeding')
+            marker = json.loads(Path(st['ready_marker']).read_text())
+            log(f"新框架就绪：{marker.get('commit')}")
+            # 主树合并（旧 worker 已停，冻结守卫不再约束）；失败＝复活旧循环，如实记录
+            merge = subprocess.run(['git', '-C', str(REPO), 'merge', '--no-edit',
+                                    marker.get('branch', 'agentic-v10-framework')],
+                                   capture_output=True, text=True)
+            if merge.returncode != 0:
+                subprocess.run(['git', '-C', str(REPO), 'merge', '--abort'], capture_output=True)
+                subprocess.run(['bash', '-c',
+                                f'nohup {REPO}/datasets/locomo/scripts/supervise_agentic.sh g1 '
+                                f'{st["source_root"]} 6 --scope sfcp --resume >> '
+                                f'{st["source_root"].parent}/supervise_g1.log 2>&1 &'],
+                               start_new_session=True)
+                save(state_file, state='failed',
+                     fail_reason=f'merge 失败（已复活旧循环继续迭代）: {merge.stderr[-300:]}')
+                log('merge 失败：旧循环已复活，交接失败留档')
+                return
+            save(state_file, state='seeding', framework_commit=marker.get('commit'))
         if load(state_file)['state'] in ('seeding',):
             st = load(state_file)
             marker = json.loads(Path(st['ready_marker']).read_text())
