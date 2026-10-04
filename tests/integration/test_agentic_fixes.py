@@ -1209,3 +1209,108 @@ class DecorativeCheckTests(unittest.TestCase):
         self.assertEqual(v['status'], 'answered')
         self.assertEqual(v['answer'], '')
         self.assertEqual(v['node_ids'], [])
+
+
+class EvidencePackTests(unittest.TestCase):
+    """专家规格#4：作答与审查同一份已召回证据原文包（两臂同构、范围受已召回约束）。"""
+
+    def _run(self, config):
+        import asyncio
+        from oak.engine import Pipeline
+        from oak.kernel import KernelBundle, TaskSpec
+        from oak.llm.recorded import RecordedClient
+        from oak.contracts import CaseInput, QuestionInput
+        from tests.integration.test_agentic_round import ROOT, FakeEmbedder, build_snapshot, corpus, cold_bundle
+        from tests.fixtures import review
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            snapshot, _ = build_snapshot(root)
+            case = CaseInput('c1', corpus(), (QuestionInput('q1', '甲在哪年买了游艇？'),))
+            replies = {'tools': [{'action': 'ready'}],
+                       'answer': [{'status': 'answered', 'answer': '甲于2023年买了游艇。',
+                                   'node_ids': ['n000000']}],
+                       'review': [review()]}
+            client = RecordedClient(replies)
+            result = asyncio.run(Pipeline(client, root/'gen', frozen_snapshot=snapshot,
+                                          embedder_factory=lambda: FakeEmbedder())
+                                 .run(case, TaskSpec.load(ROOT/'tasks/conversation_memory/task.yaml').with_bundle(cold_bundle(root)), config))
+            return client, result
+
+    def test_answer_and_review_share_source_pack(self):
+        from oak.config import RunConfig
+        client, result = self._run(RunConfig(protocol_attempts=1, retrieval_mode='vector_once',
+                                              vector_k=5))
+        self.assertEqual(result.answers[0].status, 'answered')
+        def pack_of(role):
+            for call in client.calls:
+                if call.get('role') != role:
+                    continue
+                for m in call.get('messages', []):
+                    text = m.get('content', '') if isinstance(m, dict) else str(m)
+                    if isinstance(text, str) and 'evidence_sources' in text:
+                        obj = json.loads(text)
+                        return obj.get('evidence_sources') if isinstance(obj, dict) else obj
+            return None
+        a_pack, r_pack = pack_of('answer'), pack_of('review')
+        self.assertTrue(a_pack, '作答输入应带原文包')
+        self.assertTrue(r_pack, '审查输入应带原文包')
+        self.assertEqual([p['source_id'] for p in a_pack], [p['source_id'] for p in r_pack])
+        self.assertTrue(all('text' in p and p['text'] for p in a_pack))
+
+    def test_agentic_arm_also_gets_pack(self):
+        from oak.config import RunConfig
+        client, result = self._run(RunConfig(protocol_attempts=1))
+        def pack_of(role):
+            for call in client.calls:
+                if call.get('role') != role:
+                    continue
+                for m in call.get('messages', []):
+                    text = m.get('content', '') if isinstance(m, dict) else str(m)
+                    if isinstance(text, str) and 'evidence_sources' in text:
+                        return json.loads(text).get('evidence_sources')
+            return None
+        self.assertIsNotNone(pack_of('answer'))   # 键存在＝两臂同构（夹具空命中允许空包）
+
+
+class ToolTelemetryTests(unittest.TestCase):
+    """专家规格#2：逐调用新增证据增量（new_node_ids）与重复调用标记（repeat_call）。"""
+
+    def test_new_ids_and_repeat_flag(self):
+        import asyncio
+        from oak.engine import Pipeline
+        from oak.kernel import KernelBundle, TaskSpec
+        from oak.llm.recorded import RecordedClient
+        from oak.contracts import CaseInput, QuestionInput
+        from tests.integration.test_agentic_round import ROOT, FakeEmbedder, build_snapshot, corpus, cold_bundle
+        from tests.fixtures import review
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            snapshot, _ = build_snapshot(root)
+            case = CaseInput('c1', corpus(), (QuestionInput('q1', '甲做了什么？'),))
+            twice = {'action': 'call', 'asset_id': 'f_semantic', 'parameters': {'query': '甲'}}
+            replies = {'tools': [twice, dict(twice), {'action': 'ready'}],
+                       'answer': [{'status': 'abstained', 'answer': '记忆中无支持。', 'node_ids': []}],
+                       'review': [review(status='abstained')]}
+            client = RecordedClient(replies)
+            result = asyncio.run(Pipeline(client, root/'gen', frozen_snapshot=snapshot,
+                                          embedder_factory=lambda: FakeEmbedder())
+                                 .run(case, TaskSpec.load(ROOT/'tasks/conversation_memory/task.yaml').with_bundle(cold_bundle(root)),
+                                     RunConfig(protocol_attempts=1)))
+            self.assertIn(result.answers[0].status, ('abstained', 'answered'))
+            tools = [t for t in result.answers[0].trace if t.get('stage') == 'tool']
+            self.assertEqual(len(tools), 2)
+            self.assertIn('new_node_ids', tools[0])
+            self.assertFalse(tools[0]['repeat_call'])
+            self.assertTrue(tools[1]['repeat_call'])
+
+
+class ActiveStagesFeedbackTests(unittest.TestCase):
+    """专家规格#5：冻结快照下 P.extract 不执行——反馈必须告知提案器「改它不进计分路径」。"""
+
+    def test_frozen_snapshot_marks_extract_skipped(self):
+        from oak.experiments.runner import pipeline_active_stages
+        frozen = pipeline_active_stages(Path('/snapshots'))
+        self.assertIn('SKIPPED', frozen['P.extract'])
+        self.assertIn('不因 S 补丁重建', frozen['S'])
+        live = pipeline_active_stages(None)
+        self.assertNotIn('SKIPPED', live['P.extract'])
