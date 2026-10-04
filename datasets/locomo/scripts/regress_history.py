@@ -33,23 +33,32 @@ def battery_errors(bundle_dir, graph, sample_cap=14):
     from oak.kernel import KernelBundle
     from oak.operators.sandbox import Limits
     bundle = FunctionRegistry(KernelBundle(bundle_dir), Limits(30000, 15.0, 180000))
+    from oak.kernel.validation import loop_carried_capability_errors
     hits = []
     for aid, (a, _fn) in bundle.functions.items():
+        if loop_carried_capability_errors(a.content):
+            hits.append((aid, 'budget exhausted(static:loop-carried)'))
         samples = stress_trial_samples(list(a.trial_inputs), graph)[:sample_cap]
         for params in samples:
             try:
                 bundle.call(aid, params, graph)
             except ValueError as exc:
-                hits.append((aid, str(exc)[:80]))
-                break                     # 每 F 记首个触发形态即可
+                hits.append((aid, str(exc)[:80]))   # 全样本全错误类（不做首错截断）
     return hits
 
 
+NOT_F_TESTABLE = ('ProtocolError', 'Feedback retries', 'Invalid isoformat')
+
+
 def normalize(err):
+    for key in NOT_F_TESTABLE:
+        if key in err:
+            return None              # 协议/模型层故障不属 F 单测职责（冒烟层兜）
     for key in ('Container-to-string', 'budget exhausted', 'expected', 'Unexpected',
                 'Unknown graph node', 'Result byte limit'):
         if key in err:
-            return key
+            return 'budget exhausted' if key == 'budget exhausted' and '(static' in err \
+                else ('budget exhausted' if key == 'budget exhausted' else key)
     return err[:40]
 
 
@@ -70,8 +79,8 @@ def main():
             if not real:
                 continue                      # 无故障轮不作数
             hits = battery_errors(cand, graph)
-            caught = {normalize(e) for _, e in hits}
-            needed = {normalize(e) for e in real}
+            caught = {normalize(e) for _, e in hits} - {None}
+            needed = {normalize(e) for e in real} - {None}
             gap = needed - caught
             status = 'PASS' if not gap else f'MISS {sorted(gap)}'
             if gap:

@@ -1371,8 +1371,10 @@ class FUnitTestsTests(unittest.TestCase):
             total = len(DataCapabilities(graph).rows)
             out = stress_trial_samples([base], graph)
             self.assertTrue(any(p['rows'] == [] for p in out), '含空行集')
-            self.assertTrue(any(len(p['rows']) == min(200, total) for p in out),
-                            '含最大规模行集（预算形态）')
+            self.assertTrue(any(len(p['rows']) == total for p in out),
+                            '含全量规模行集（预算形态穷尽）')
+            self.assertTrue(any('日期' not in r for p in out for r in p['rows'][:1]
+                                if p['rows']), '含缺字段形态')
             self.assertGreater(len(out), 2, '含多形态')
 
 

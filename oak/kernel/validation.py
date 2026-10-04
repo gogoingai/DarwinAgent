@@ -159,6 +159,27 @@ def capability_names(floor):
     return tuple(dict.fromkeys(names))
 
 
+def loop_carried_capability_errors(source):
+    """循环内逐行能力调用（历史预算故障的静态病灶，用户标准：单测/准入必须发现）：
+    for 循环体内调用 traverse/nodes/search 等数据能力＝每行一次图遍历/扫描——
+    并发负载下超时（电池静跑复现不了）。必须批量化：一次调用传全量 id。"""
+    import ast
+    tree = ast.parse(source)
+    caps = DATA_CAPABILITY_NAMES
+    errors = []
+
+    def walk(node, in_loop):
+        for child in ast.iter_child_nodes(node):
+            loop = in_loop or isinstance(child, (ast.For, ast.AsyncFor, ast.While))
+            if (isinstance(child, ast.Call) and isinstance(child.func, ast.Name)
+                    and child.func.id in caps and in_loop):
+                errors.append(f'能力调用 {child.func.id} 在循环体内（逐行调用）——'
+                              f'批量化：一次调用传全量 id/条件')
+            walk(child, loop)
+    walk(tree, False)
+    return errors
+
+
 def capability_calls(source):
     """AST 识别 F 源码中对沙箱数据能力的真实调用（ast.Call+Name）；
     注释、字符串、变量名提及都不算——评审#4：只有真实调用满足底线。"""
