@@ -43,12 +43,26 @@ input_contract must describe F params. For C/P (and S where the package includes
 Evidence surface: the rows an F RETURNS are the answerable evidence; rows read internally but not
 returned stay provenance-only (read lineage) and never reach answering. An aggregating or computing
 F must include the supporting rows (or their node_id list) in its return so computed answers stay citable.
-Structure filtering belongs in nodes(filters=...) (applied before the limit inside the capability) -
-never fetch a limited page then filter in Python (matches beyond the page are lost).
+Filter completeness (hard requirement): exact-match conditions (subject, type, theme equality) MUST go
+into nodes(filters=...) so matching happens over the WHOLE graph before any limit. Only inexact
+matching (substring, date-prefix, semantic) may post-process a fetched candidate set - and then the F
+must scan with an explicit scan budget separate from its return limit (e.g. fetch in pages or use a
+high scan limit) and include in its result a truncation note (how many rows were scanned, whether
+more remain). Never present a truncated row set as the complete set.
+Graph recall expansion: an F may chain search/nodes -> traverse(related entity or topic) -> back to
+atomic facts in ONE function (fact -> entity -> related facts), returning facts with their sources
+and the relation path, deduplicated. This retrieves facts keyword/vector search miss. Use it when the
+evidence gap is structural (missing set members, related-entity facts), not on every question.
 Frozen inputs arrive as tuples: never isinstance(...,list)-guard or reset them to []; iterate directly
 or rebuild with list(...). Output contracts must tolerate missing attributes: .get() yields None for
 absent fields, so declare nullable fields as ["string","null"] or omit them - a plain string-typed
 field rejects the whole result when a row lacks it.
+Tool-loop discipline for P.tools: choose tools by the CURRENT evidence gap - subject unclear (confirm
+name/alias, or drop the subject filter), missing set members (complementary query, structural filter,
+or relation expansion), time conflict (fetch the same event's sources and session-date anchor),
+empty or duplicate results (change the constraint, tool, or exploration direction - never re-issue
+the same query with reworded parameters). Decide stop vs continue on evidence sufficiency, not on a
+fixed retrieval order.
 Rows produced by one tool often flow into another tool's params: when a parameter takes rows (or row lists),
 declare its item objects with additionalProperties true — tool outputs carry runtime fields (node_id,
 entity_type, source_ids, score) beyond the task attributes.

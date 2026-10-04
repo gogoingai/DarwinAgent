@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 
 from oak.contracts import AnswerResult, plain
 from oak.kernel.functions import DataCapabilities
@@ -20,6 +21,20 @@ class AnswerAgent:
         caps=DataCapabilities(graph)
         visible=set();tool_results=[];feedback=[];trace=[]
         vector_once=self.config.retrieval_mode=='vector_once'
+        def source_pack(rows):
+            """已召回证据的原文包（专家规格#4，两臂同构）：范围受已召回行约束，
+            作答与审查输入同一份；不借审查读全图。"""
+            pack=[];seen=set()
+            for row in rows:
+                for sid in row.get('source_ids') or ():
+                    if sid in seen: continue
+                    seen.add(sid)
+                    src=graph.sources.get(sid)
+                    if src is None: continue
+                    pack.append({'source_id':sid,'text':str(src.source)[:400]})
+                    if len(pack)>=40: return pack
+            return pack
+        tool_call_keys=set()
         try:
             for attempt in range(self.config.answer_attempts):
                 if vector_once:
@@ -48,16 +63,25 @@ class AnswerAgent:
                              'feedback':feedback},valid_tool)
                         if action['action']=='ready': break
                         result=self.runtime.call(action['asset_id'],action['parameters'],graph)
+                        before=frozenset(visible)
                         visible.update(result['node_ids']);tool_results.append(result)
                         # 参数在真实执行点入轨迹（评审②）：协议重试中被拒的旧动作不会错配到
                         # 成功调用上；反馈摘要据此读取，不再依赖 raw_outputs 顺序配对。
+                        # 图新增遥测（专家规格#2）：逐调用新增证据增量＋重复调用标记——
+                        # 归因「图补回了什么」不再靠猜。
+                        key=(action['asset_id'],json.dumps(plain(action['parameters']),sort_keys=True,ensure_ascii=False))
                         trace.append({'stage':'tool','attempt':attempt,'step':step,
-                                      'parameters':plain(action['parameters']),**result})
+                                      'parameters':plain(action['parameters']),
+                                      'new_node_ids':sorted(frozenset(result['node_ids'])-before),
+                                      'repeat_call':key in tool_call_keys,**result})
+                        tool_call_keys.add(key)
                 candidate=await session.request(self.config.answer_role,
                     ANSWER_PROTOCOL+'\n任务作答指引：\n'+self.runtime.prompt('answer'),
                     {'question':question.text,'parameters':plain(question.parameters),'answer_format':self.spec.answer_format,
                      'answer_contract':plain(self.spec.answer_contract),'tool_results':tool_results,
-                     'visible_evidence':[caps.rows[x] for x in sorted(visible)],'feedback':feedback},
+                     'visible_evidence':[caps.rows[x] for x in sorted(visible)],
+                     'evidence_sources':source_pack([caps.rows[x] for x in sorted(visible)]),
+                     'feedback':feedback},
                     lambda obj: self._candidate(obj,visible))
                 if candidate['status']=='abstained' and not any(t['read_operations'] for t in tool_results):
                     # 拒答前必须做过实际查询：作为反馈给重试机会（与候选校验同路），
@@ -76,9 +100,11 @@ class AnswerAgent:
                 source_ids={s for nid in relevant for s in caps.rows[nid]['source_ids']}
                 # A refusal is audited against every graph node, not only the subset retrieved by F.
                 # This is fixed review behavior; it never amends an answer or changes tool permissions.
+                pack=source_pack([caps.rows[x] for x in sorted(visible)])
                 review_inputs=[]
                 if candidate['status']=='answered':
-                    review_inputs=[{'candidate':snapshot,'sources':[graph.sources[s].to_dict() for s in sorted(source_ids)]}]
+                    review_inputs=[{'candidate':snapshot,'evidence_sources':pack,
+                                    'sources':[graph.sources[s].to_dict() for s in sorted(source_ids)]}]
                 else:
                     # 拒答审计证据范围两臂统一（评审#5）：只看已召回证据及其来源，不读全图——
                     # 融合版需要补证必须显式调用登记工具（调用/返回/成本都进轨迹），
@@ -86,6 +112,7 @@ class AnswerAgent:
                     rows=[caps.rows[x] for x in sorted(visible)]
                     ids={s for row in rows for s in row['source_ids']}
                     review_inputs=[{'candidate':{**snapshot,'visible_evidence':rows},
+                                    'evidence_sources':pack,
                                     'refusal_audit':{'covers_full_graph':False,
                                                      'mode':'vector_once' if vector_once else 'agentic_retrieved'},
                                     'sources':[graph.sources[s].to_dict() for s in sorted(ids)]}]

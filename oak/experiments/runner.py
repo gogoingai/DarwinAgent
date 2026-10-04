@@ -171,7 +171,21 @@ def _retrieval_trace(answer):
     return plain(trace)
 
 
-def training_feedback(cases, results, case_diagnostics, baseline):
+def pipeline_active_stages(snapshot_root):
+    """资产职责图（专家规格#5）：让提案器明确知道每个资产在当前配置下的实际执行情况——
+    冻结快照下 P.extract 根本不执行、S 只作用于查询词表层（不重建图）；修改它们不会
+    改变本轮计分路径，不得把这类改动算作答题收益。"""
+    if snapshot_root is not None:
+        return {'P.extract': 'SKIPPED——记忆由冻结快照供给，改它不进本轮计分路径',
+                'P.tools': '执行中（检索决策）', 'P.answer': '执行中（作答）',
+                'P.review': '执行中（审查）',
+                'S': '仅查询词表层——冻结图不因 S 补丁重建，新类型在图中无数据',
+                'F': '执行中（检索函数）', 'C': '执行中（结构检查，电池准入）'}
+    return {'P.extract': '执行中（语料抽取）', 'P.tools': '执行中', 'P.answer': '执行中',
+            'P.review': '执行中', 'S': '全量生效（驱动抽取）', 'F': '执行中', 'C': '执行中'}
+
+
+def training_feedback(cases, results, case_diagnostics, baseline, active_stages=None):
     """Failure-first proposal feedback: compressed diagnostics (gold references never enter
     the payload) plus a per-question execution trace. One character budget bounds the COMPLETE
     serialized payload. With several training cases the budget rotates case by case — an early
@@ -205,6 +219,7 @@ def training_feedback(cases, results, case_diagnostics, baseline):
     def payload(case_counts, fail_count, graph_count):
         diagnostics = [row for rows, take in zip(per_case_rows, case_counts) for row in rows[:take]]
         return {'scores': score_data,
+                'pipeline_active_stages': active_stages,
                 'diagnostics': diagnostics,
                 'diagnostic_rows_total': rows_total,
                 'diagnostic_rows_in_proposal': len(diagnostics),
@@ -571,7 +586,8 @@ class ExperimentRunner:
                         if resume_smoke: raise ValueError('恢复候选冒烟失败: '+resume_smoke)
                 else:
                     client=self._client(name)
-                    feedback=training_feedback(cases,results,_per_case_feedback_facts(self.root,evidence,cases),baseline)
+                    feedback=training_feedback(cases,results,_per_case_feedback_facts(self.root,evidence,cases),baseline,
+                                      active_stages=pipeline_active_stages(self.snapshot_root))
                     questions=[]
                     for case in cases:
                         questions+=[{'training_id':tid,'text':q.text} for tid,q in zip(question_identity(case),case.questions)]
