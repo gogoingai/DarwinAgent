@@ -332,6 +332,11 @@ def stress_trial_samples(base_inputs, graph):
         out.append({**base, 'rows': [dict(r) for r in rows[-4:]]})
         if list_rows:
             out.append({**base, 'rows': [dict(r) for r in list_rows]})
+        # 规模形态（R9 事故：预算爆在输入规模上，小样本测不出）：大行集＋最宽匹配
+        # （标量过滤全置空＝运行期最宽调用），宽扫描实现在准入层即爆预算被拒。
+        out.append({**base, 'rows': [dict(r) for r in rows[:200]]})
+        broad = {k: ('' if isinstance(v, str) and k != 'rows' else v) for k, v in base.items()}
+        out.append({**broad, 'rows': [dict(r) for r in rows[:200]]})
     return out
 ADMISSION_ATTEMPTS=50
 

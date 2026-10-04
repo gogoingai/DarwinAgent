@@ -1363,4 +1363,5 @@ class FUnitTestsTests(unittest.TestCase):
             base = {'rows': [{'node_id': 'n000000'}]}
             out = stress_trial_samples([base], graph)
             self.assertTrue(any(p['rows'] == [] for p in out), '含空行集')
+            self.assertTrue(any(len(p['rows']) > 100 for p in out), '含大规模行集（预算形态）')
             self.assertGreater(len(out), 2, '含多形态')
