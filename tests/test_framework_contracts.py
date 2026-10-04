@@ -80,9 +80,10 @@ class RuntimeContracts(unittest.TestCase):
             cfg = Config(api_key="fake", work_dir=Path(td), namespace_limits={"application": 2})
             async def run():
                 async with LLMClient(cfg) as client:
-                    self.assertIs(client._client, client._client_fast)
+                    self.assertIs(client._site_for(cfg.model_strong)[0],
+                                  client._site_for(cfg.model_fast)[0])
                     key = client._cache_key(cfg.model_strong, [], .3, 4096, False,
-                        endpoint=cfg.api_base_url, thinking_off=False)
+                        base_url=cfg.api_base_url, extra_body={})
                     for namespace in ["application_a", "application_b", "application_c"]:
                         atomic_json(cfg.cache_dir / namespace / f"{key}.json", {"content": "cached", "usage": {}})
                     results = await asyncio.gather(*(client.chat(role="schema", messages=[], namespace=ns)
@@ -94,10 +95,11 @@ class RuntimeContracts(unittest.TestCase):
             asyncio.run(run())
 
 
-    def test_cache_distinguishes_endpoint_and_effective_policy(self):
-        base = LLMClient._cache_key("same", [], 0, 20, False, endpoint="one")
-        self.assertNotEqual(base, LLMClient._cache_key("same", [], 0, 20, False, endpoint="two"))
-        self.assertNotEqual(base, LLMClient._cache_key("same", [], 0, 20, False, endpoint="one", thinking_off=True))
+    def test_cache_distinguishes_site_and_effective_policy(self):
+        base = LLMClient._cache_key("same", [], 0, 20, False, base_url="one")
+        self.assertNotEqual(base, LLMClient._cache_key("same", [], 0, 20, False, base_url="two"))
+        self.assertNotEqual(base, LLMClient._cache_key("same", [], 0, 20, False, base_url="one",
+                                                       extra_body={"thinking": {"type": "disabled"}}))
 
 
     def test_multiple_clients_cannot_each_spend_last_scope_credit(self):
@@ -106,7 +108,7 @@ class RuntimeContracts(unittest.TestCase):
             async def run():
                 async with LLMClient(cfg) as first, LLMClient(cfg) as second:
                     key = first._cache_key(cfg.model_strong, [], .3, 4096, False,
-                        endpoint=cfg.api_base_url, thinking_off=False)
+                        base_url=cfg.api_base_url, extra_body={})
                     for ns in ("app_query_a", "app_query_b"):
                         atomic_json(cfg.cache_dir / ns / f"{key}.json", {"content": "cached"})
                     await first.chat(role="schema", messages=[], namespace="app_query_a")

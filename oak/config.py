@@ -99,17 +99,10 @@ class Config:
     namespace_limits: dict[str, int] = field(default_factory=dict)
     thinking_disabled_roles: set[str] = field(default_factory=set)
     empty_response_passthrough_roles: set[str] = field(default_factory=lambda: {"judicator"})
-    reasoning_buffer: int = 3072
-    # 外部(非智谱)端点多为长思考模型且无思考开关：请求侧给足推理余量，正文才拿得到预算。
-    # 实测 MiniMax-M3.1-Flash 抽取批推理 ~21k tokens+正文 ~5k（2026-10-03），8192 会空正文。
-    external_reasoning_buffer: int = 32000
-    # 思考行为按模型名决策（与挂在哪个档/端点无关）：
-    #   thinking_disabled_models  —— 支持 thinking:disabled 参数的模型（智谱 glm 系）
-    #   reasoning_effort_models  —— 仅支持思考深度档的模型（MiniMax M3.1 系；disabled 会 400）
-    #   其余思考型模型（DeepSeek reasoner 等）无法关闭，只能靠推理缓冲兜底。
+    # 思考深度的全局旋钮（effort 型模型生效；条目缺省见 oak/llm/registry.py）
     reasoning_effort: str = ""
-    reasoning_effort_models: tuple = ("MiniMax-M3.1-Flash",)
-    thinking_disabled_models: tuple = ("glm-5", "glm-4")
+    # 端点、密钥、思考开关、推理缓冲、并发池全部按模型名在注册表解析（用户决策：
+    # 跟着模型走）；本层只保留站点基础字段（api_base_url/fast_*）与角色→档映射。
 
     def tier_for(self, role: str) -> str:
         tier = self.role_tiers.get(role)
