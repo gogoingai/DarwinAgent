@@ -12,7 +12,8 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 # Framework roles; application-specific roles are injected by adapters.
 MODEL_ROLES: dict[str, str] = {
-    "extraction": "fast", "tools": "fast", "answer": "strong", "review": "strong",
+    # tools＝中间档 MiniMax（用户拍板：留现位最优）；fast＝DeepSeek 备援，暂无固定角色
+    "extraction": "middle", "tools": "middle", "answer": "strong", "review": "strong",
     "bootstrap": "strong", "proposal": "strong",
     "schema": "strong",      # P1 需求分析 / P2 模式草拟
     "func_gen": "strong",    # P4 函数生成（含能力规划）
