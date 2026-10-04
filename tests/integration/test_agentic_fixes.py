@@ -1316,7 +1316,9 @@ class FUnitTestsTests(unittest.TestCase):
     """用户拍板：冒烟之外必须有单测——准入试跑并入真实数据形态压力矩阵
     （空行/图头尾/列表字段行）。容器 str() 类分支错误在准入层暴露（R7 事故：14 题）。"""
 
-    def test_container_str_fails_stress_admission(self):
+    def test_container_str_now_safe_across_stress_shapes(self):
+        """语义更新（用户拍板根治）：容器 str() 合法化后，压力矩阵验证的是
+        「全形态不崩」——该类错误已不存在，矩阵继续拦其他形态病（None/缺字段）。"""
         import tempfile
         from oak.experiments.runner import stress_trial_samples
         from oak.experiments.snapshots import load_frozen_graph
@@ -1341,15 +1343,8 @@ class FUnitTestsTests(unittest.TestCase):
             reg = FunctionRegistry(bundle, Limits(30000, 15.0, 180000))
             samples = stress_trial_samples([{'rows': [{'node_id': 'n000000'}]}], graph)
             self.assertTrue(samples, '压力样本应非空')
-            raised = None
-            for sample in samples:                     # 任一压力形态触发即视为单测发现
-                try:
-                    reg.call('f_bad', sample, graph)
-                except ValueError as exc:
-                    raised = exc
-                    break
-            self.assertIsNotNone(raised, '压力矩阵应触发容器 str() 错误')
-            self.assertIn('Container-to-string', str(raised))
+            for sample in samples:                     # 全形态不崩＝通过（容器 str 已合法）
+                reg.call('f_bad', sample, graph)
 
     def test_stress_samples_shapes(self):
         import tempfile
