@@ -16,6 +16,16 @@ from oak.runtime.artifacts import digest
 from types import SimpleNamespace
 
 
+def _container_str_allowed():
+    from oak.operators.sandbox import Interpreter, Limits, admit
+    try:
+        fn = admit("def run(p):\n return str(p['x'])\n", 'F', ['q'])
+        Interpreter(fn, {}, Limits(1000, 5.0, 10000)).execute({'x': [1]})
+        return True
+    except Exception:
+        return False
+
+
 class BatchedFaultRetryTests(unittest.TestCase):
     def run_retry(self, script, faulted):
         from oak.experiments.runner import batched_fault_retry
@@ -1364,17 +1374,6 @@ class FUnitTestsTests(unittest.TestCase):
             self.assertTrue(any(len(p['rows']) == min(200, total) for p in out),
                             '含最大规模行集（预算形态）')
             self.assertGreater(len(out), 2, '含多形态')
-
-
-
-def _container_str_allowed():
-    from oak.operators.sandbox import Interpreter, Limits, admit
-    try:
-        fn = admit("def run(p):\n return str(p['x'])\n", 'F', ['q'])
-        Interpreter(fn, {}, Limits(1000, 5.0, 10000)).execute({'x': [1]})
-        return True
-    except Exception:
-        return False
 
 
 class ContainerStringificationTests(unittest.TestCase):
