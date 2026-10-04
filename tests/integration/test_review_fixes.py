@@ -489,8 +489,12 @@ class GenericFeedbackContract(unittest.TestCase):
         result = RunResult('c', 'id', 'v', (), 0)
         baseline = EvaluationResult({'m': 0}, 0, 0, 0, 0, rows)
         feedback = training_feedback([C()], [result], [('c', rows)], baseline)
-        self.assertEqual([r['diagnostic']['i'] for r in feedback['diagnostics']], [9])
-        self.assertEqual(feedback['diagnostic_rows_total'], 5)
+        # 新契约（评审#2）：未识别结构的超长行压缩入载（_row_truncated 前缀），总预算仍受控
+        self.assertEqual([r['diagnostic']['i'] for r in feedback['diagnostics'] if 'i' in r['diagnostic']], [9])
+        self.assertTrue(any('_row_truncated' in r['diagnostic'] for r in feedback['diagnostics']))
+        self.assertLessEqual(len(json.dumps(feedback, ensure_ascii=False)), FEEDBACK_BUDGET_CHARS)
+        # 新契约：计数只含失败行（3 条 passed 不计），9 号与压缩后的超长行共 2 条
+        self.assertEqual(feedback['diagnostic_rows_total'], 2)
 
 
 
@@ -666,8 +670,10 @@ class ReviewRoundSeven(unittest.TestCase):
         baseline = EvaluationResult({'m': 0}, 0, 0, 0, 0, rows)
         feedback = training_feedback([C()], [RunResult('c', 'id', 'v', (), 0)], [('c', rows)], baseline)
         self.assertLessEqual(len(json.dumps(feedback, ensure_ascii=False)), FEEDBACK_BUDGET_CHARS)
-        self.assertEqual(feedback['diagnostic_rows_in_proposal'], 1)  # 两条 20k 记录放不下
+        # 新契约（评审#2）：超长未识别结构行压缩入载，8 条全部可进且总预算受控
+        self.assertEqual(feedback['diagnostic_rows_in_proposal'], 8)
         self.assertEqual(feedback['diagnostic_rows_total'], 8)
+        self.assertTrue(all('_row_truncated' in r['diagnostic'] for r in feedback['diagnostics']))
 
     def test_mixed_sections_bounded_by_complete_payload(self):
         from oak.experiments.runner import training_feedback, FEEDBACK_BUDGET_CHARS

@@ -13,7 +13,7 @@ from pathlib import Path
 from oak.agents.protocol import ModelSession
 from oak.contracts import plain
 from oak.kernel.assets import Asset, KernelAssets
-from oak.kernel.validation import validate_bundle
+from oak.kernel.validation import capability_names, validate_bundle
 from oak.runtime.artifacts import atomic_json, digest
 
 _CORE_RULES='''Assign to plain local variable names or to items of dicts/lists you created locally
@@ -94,6 +94,14 @@ and its relation names the keys of memory_structure.relations. S MUST declare th
 (including meta.atomic_memory_type being one of them); inventing synonyms makes every query miss.
 '''
 
+_RETRIEVAL_FLOOR_CLAUSE='''Retrieval-tool floor for this task (hard admission requirement): the package MUST register
+  - at least one semantic vector-retrieval F that calls semantic_search(...) internally (similarity
+    search over the frozen memory vector index), AND
+  - at least one relation F that calls traverse(...) internally (graph expansion along relations).
+Keyword search (nodes/search) alone does NOT satisfy either requirement. Both F must pass trials on the
+real memory snapshot; the floor is frozen after admission — revisions may not remove the last F of a class.
+'''
+
 _REVISION_OUTPUT='''This is one revision, not a fresh bootstrap. Return JSON only, shaped {"patches":[{"asset":a complete asset
 object,"base_fingerprint":current asset fingerprint (null for a new asset),"reason":"diagnosis",
 "training_evidence":[training_id values taken from the questions list]}]}. Patches are the only accepted
@@ -116,17 +124,24 @@ ASSET_PROTOCOL=_BOOTSTRAP_ANCHORED_HEADER+_ANCHORED_DATA+_CORE_RULES
 LEGACY_ASSET_PROTOCOL=_BOOTSTRAP_LEGACY_HEADER+_LEGACY_DATA+_CORE_RULES
 
 
-def revision_protocol(base):
+def revision_protocol(base, allowed_kinds=()):
     """Revision protocol consistent with the bundle's real graph mode, assembled from the
     same segments as its bootstrap protocol: legacy bundles keep the entity/relation
     vocabulary and a revisable S; anchored bundles keep fact-anchoring with an extend-only
-    seed. Either way patches are the single output format."""
+    seed. Either way patches are the single output format. The allowed-asset scope and the
+    verbatim fingerprint rule are stated explicitly so admission rejections stay rare."""
     from oak.schema.model import Schema
     schema_yaml = next(a.content for a in base.assets.assets if a.kind == 'S')
     anchored = bool(Schema.from_yaml(schema_yaml).meta.get('anchoring'))
+    scope_line = '\n'
+    if allowed_kinds:
+        scope_line += (f'This round may only patch asset kinds {sorted(set(allowed_kinds))}; patches on other '
+                       'kinds are rejected at admission.\n')
+    scope_line += ('Every patch base_fingerprint must equal the fingerprint field of the matching asset in the '
+                   'payload, copied verbatim; a mistyped or stale fingerprint is rejected.\n')
     if anchored:
-        return _REVISION_ANCHORED_HEADER + _ANCHORED_DATA + _CORE_RULES + _REVISION_TAIL
-    return _REVISION_LEGACY_HEADER + _LEGACY_DATA + _CORE_RULES + _REVISION_TAIL
+        return _REVISION_ANCHORED_HEADER + _ANCHORED_DATA + _CORE_RULES + _REVISION_TAIL + scope_line
+    return _REVISION_LEGACY_HEADER + _LEGACY_DATA + _CORE_RULES + _REVISION_TAIL + scope_line
 
 
 
@@ -193,6 +208,11 @@ class AssetBootstrapper:
                 from oak.kernel.validation import atomic_memory_errors
                 problems = atomic_memory_errors(schema)
                 if problems: raise ValueError('S 原子记忆内核不合规: ' + str(problems))
+            floor_caps = capability_names(getattr(spec, 'retrieval_floor', {}) or {})
+            if floor_caps:
+                from oak.kernel.validation import capability_floor_errors
+                problems = capability_floor_errors(assets, floor_caps)
+                if problems: raise ValueError('检索工具底线不合规: ' + str(problems))
             if structure_sample:
                 known_types = set(structure_sample.get('node_types') or {})
                 if known_types:
@@ -220,8 +240,10 @@ class AssetBootstrapper:
                     registry.trial(trial_graph,
                                    {a.id: list(a.trial_inputs) for a in assets.assets if a.kind == 'F'})
             return assets
+        floor_required = bool(capability_names(getattr(spec, 'retrieval_floor', {}) or {}))
         protocol = ASSET_PROTOCOL if anchored else (
-            LEGACY_ASSET_PROTOCOL + ('\n' + _ATOMIC_MEMORY_CLAUSE if atomic_required else ''))
+            LEGACY_ASSET_PROTOCOL + ('\n' + _ATOMIC_MEMORY_CLAUSE if atomic_required else '')
+            + ('\n' + _RETRIEVAL_FLOOR_CLAUSE if floor_required else ''))
         try:
             assets = await session.request(config.bootstrap_role, protocol, payload, valid, max_tokens=14000)
         finally:

@@ -48,7 +48,8 @@ class AssetPatch:
 
 
 class AssetRevisionService:
-    def propose(self,base,patches,target: Path,training_ids,forbidden_questions=(),allowed_kinds=()):
+    def propose(self,base,patches,target: Path,training_ids,forbidden_questions=(),allowed_kinds=(),
+                required_capabilities=()):
         base.verify()
         target=Path(target)
         if target.exists(): raise ValueError('Candidate version already exists')
@@ -85,6 +86,11 @@ class AssetRevisionService:
                 raise ValueError('meta.atomic_memory_type 在初始化后冻结：不可更换原子记忆节点类型')
             problems=atomic_memory_errors(cand_schema)
             if problems: raise ValueError('原子记忆内核不合规: '+str(problems))
+        if required_capabilities:
+            # 检索工具底线冻结（任务声明）：向量检索/关系遍历类 F 不可被迭代删光。
+            from .validation import capability_floor_errors
+            problems=capability_floor_errors(KernelAssets(tuple(assets.values())),required_capabilities)
+            if problems: raise ValueError('检索工具底线违规: '+str(problems))
         target.parent.mkdir(parents=True,exist_ok=True)
         staging=Path(tempfile.mkdtemp(prefix='.candidate-',dir=target.parent))
         try:

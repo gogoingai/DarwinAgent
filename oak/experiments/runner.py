@@ -17,6 +17,7 @@ from oak.contracts import EvaluationResult, plain
 from oak.engine import Pipeline
 from oak.kernel import KernelBundle
 from oak.kernel.revision import AssetRevisionService, training_id
+from oak.kernel.validation import capability_names
 from oak.llm.client import LLMClient
 from oak.runtime.artifacts import atomic_json, digest
 from oak.runtime.identity import assert_files, snapshot_files, transport_identity
@@ -25,21 +26,96 @@ from .proposal import ProposalGenerator
 from .spec import aggregate_scores
 
 FEEDBACK_BUDGET_CHARS = 35000
+_DIAG_ROW_CHARS = 2200        # 未识别结构的诊断行截断上限（locomo 判分行会被结构化压缩）
+_TRACE_CHARS = 600            # 单题检索轨迹序列化上限
+
+
+def _clip(value, limit):
+    text = value if isinstance(value, str) else json.dumps(value, ensure_ascii=False)
+    return text if len(text) <= limit else text[:max(0, limit - 1)] + '…'
+
+
+def _diagnostic_failure(row):
+    """失败优先：answered 且判分 precise 通过（或显式 passed）才算成功，其余进反馈。"""
+    if not isinstance(row, dict):
+        return True
+    if row.get('passed') is True:
+        return False
+    if row.get('status') == 'answered':
+        original = row.get('original') if isinstance(row.get('original'), dict) else {}
+        if original.get('precise') is True:
+            return False
+    return True
+
+
+def _compact_diagnostic(row):
+    """压缩判分原始输出：只保留归因所需字段；金标（reference）与判题内部结构不进提案载荷。"""
+    original = row.get('original') if isinstance(row, dict) and isinstance(row.get('original'), dict) else None
+    if original is None:
+        blob = json.dumps(row, ensure_ascii=False, default=str)
+        if len(blob) <= _DIAG_ROW_CHARS:
+            return row
+        return {'_row_truncated': blob[:_DIAG_ROW_CHARS]}
+    keep = {'question_id': row.get('question_id'), 'question': _clip(row.get('question'), 120),
+            'status': row.get('status'), 'precise': original.get('precise'),
+            'lenient': original.get('lenient')}
+    if row.get('answer'):
+        keep['answer'] = _clip(row.get('answer'), 200)
+    if row.get('error'):
+        keep['error'] = _clip(row.get('error'), 200)
+    for src in ('missing_elements', 'wrong_elements', 'precision_issues'):
+        items = original.get(src) or []
+        if items:
+            keep[src] = [_clip(i, 60) for i in items[:5]]
+    return keep
+
+
+def _retrieval_trace(answer):
+    """单题检索轨迹摘要：工具调用/参数/证据规模/错误（来自答案记录的 raw_outputs）。"""
+    raw_outputs = getattr(answer, 'raw_outputs', ()) or ()
+    actions = []
+    for raw in raw_outputs:
+        try:
+            obj = json.loads(raw) if isinstance(raw, str) else raw
+        except Exception:
+            obj = None
+        if isinstance(obj, dict) and obj.get('action') == 'call':
+            actions.append({'tool': obj.get('asset_id'), 'params': _clip(obj.get('parameters'), 90)})
+        elif isinstance(obj, dict):
+            actions.append({k: obj[k] for k in ('action', 'status') if obj.get(k) is not None})
+        if len(actions) >= 8:
+            break
+    trace = {'question_id': answer.question_id, 'status': answer.status,
+             'tool_calls': len(raw_outputs),
+             'evidence_rows': len(getattr(answer, 'evidence', ()) or ()),
+             'actions': actions}
+    if getattr(answer, 'error', None):
+        trace['error'] = _clip(answer.error, 150)
+    while actions and len(json.dumps(trace, ensure_ascii=False, default=str)) > _TRACE_CHARS:
+        actions.pop()
+    return trace
 
 
 def training_feedback(cases, results, case_diagnostics, baseline):
-    """Generic proposal feedback from the current training run only. Question identity is the
-    composite (case_id, question_id); the evaluator's diagnostic rows keep their original
-    content, tagged with their case. One length budget bounds the COMPLETE serialized payload
-    — skeleton, field names, separators and stats included — never per-item sizes."""
-    rows = []
+    """Failure-first proposal feedback: compressed diagnostics (gold references never enter
+    the payload) plus a per-question retrieval trace. One character budget bounds the COMPLETE
+    serialized payload. With several training cases the budget rotates case by case — an early
+    case may not crowd the others out."""
+    answers = {a.question_id: a for r in results for a in r.answers}
+    per_case_rows = []
     rows_total = 0
     for case_id, diagnostics in case_diagnostics:
+        rows = []
         for row in plain(diagnostics):
-            rows_total += 1
-            if row.get('passed') is True:
+            if not _diagnostic_failure(row):
                 continue
-            rows.append({'case_id': case_id, 'diagnostic': row})
+            rows_total += 1
+            unit = {'case_id': case_id, 'diagnostic': _compact_diagnostic(row)}
+            answer = answers.get(row.get('question_id') if isinstance(row, dict) else None)
+            if answer is not None:
+                unit['trace'] = _retrieval_trace(answer)
+            rows.append(unit)
+        per_case_rows.append(rows)
     failures = []
     for case, result in zip(cases, results):
         failures += [{'case_id': case.id, 'question_id': a.question_id, 'error': a.error}
@@ -50,43 +126,73 @@ def training_feedback(cases, results, case_diagnostics, baseline):
     score_data = baseline.to_dict()
     score_data.pop('diagnostics', None)  # 诊断单独装订，载荷不重复计费
 
-    def payload(counts):
+    def payload(case_counts, fail_count, graph_count):
+        diagnostics = [row for rows, take in zip(per_case_rows, case_counts) for row in rows[:take]]
         return {'scores': score_data,
-                'diagnostics': rows[:counts[0]],
+                'diagnostics': diagnostics,
                 'diagnostic_rows_total': rows_total,
-                'diagnostic_rows_in_proposal': counts[0],
-                'generation_failures': failures[:counts[1]],
+                'diagnostic_rows_in_proposal': len(diagnostics),
+                'generation_failures': failures[:fail_count],
                 'generation_failures_total': len(failures),
-                'generation_failures_truncated': counts[1] != len(failures),
-                'graph_diagnostics': graph_rows[:counts[2]],
+                'generation_failures_truncated': fail_count != len(failures),
+                'graph_diagnostics': graph_rows[:graph_count],
                 'feedback_budget_chars': FEEDBACK_BUDGET_CHARS}
 
-    # A row is admitted only if the whole serialized object stays within budget. Priority is
-    # diagnostics, then generation failures, then graph diagnostics; earlier sections stay
-    # fixed while a later one fills. Prefix semantics: a row that no longer fits ends its
-    # section. The irreducible skeleton (scores + stats) may not exceed the budget either:
-    # an oversized scores block refuses the proposal instead of shipping over-budget.
-    def fits(counts):
-        return len(json.dumps(payload(counts), ensure_ascii=False)) <= FEEDBACK_BUDGET_CHARS
+    def fits(case_counts, fail_count, graph_count):
+        return len(json.dumps(payload(case_counts, fail_count, graph_count),
+                              ensure_ascii=False, default=str)) <= FEEDBACK_BUDGET_CHARS
 
-    skeleton = len(json.dumps(payload((0, 0, 0)), ensure_ascii=False))
+    zero_counts = (0,) * len(per_case_rows)
+    skeleton = len(json.dumps(payload(zero_counts, 0, 0), ensure_ascii=False, default=str))
     if skeleton > FEEDBACK_BUDGET_CHARS:
         raise ValueError(f'反馈骨架（scores+统计字段）序列化后 {skeleton} 字符，超过预算 '
                          f'{FEEDBACK_BUDGET_CHARS}：评分载荷本身超限，拒绝生成提案')
-    counts = [0, 0, 0]
-    for idx, limit in enumerate((len(rows), len(failures), len(graph_rows))):
-        while counts[idx] < limit:
-            trial = counts[:]; trial[idx] += 1
-            if not fits(trial):
+    # 轮转准入：每步从已入载行数最少的对话取一行——多对话均分预算，谁也不能先占满。
+    case_counts = [0] * len(per_case_rows)
+    progress = True
+    while progress:
+        progress = False
+        for i in sorted(range(len(per_case_rows)), key=lambda idx: case_counts[idx]):
+            if case_counts[i] >= len(per_case_rows[i]):
+                continue
+            trial = list(case_counts); trial[i] += 1
+            if fits(tuple(trial), 0, 0):
+                case_counts = trial; progress = True
                 break
-            counts = trial
-    return payload(counts)
+    fail_count = 0
+    while fail_count < len(failures) and fits(tuple(case_counts), fail_count + 1, 0):
+        fail_count += 1
+    graph_count = 0
+    while graph_count < len(graph_rows) and fits(tuple(case_counts), fail_count, graph_count + 1):
+        graph_count += 1
+    return payload(tuple(case_counts), fail_count, graph_count)
 
 
 def question_identity(case):
     """Composite training identity: same-named questions in different cases stay distinct,
     and '::' inside either id cannot create collisions (length-prefixed encoding)."""
     return [training_id(case.id, q.id) for q in case.questions]
+
+
+async def batched_fault_retry(pipeline, case, spec, config, answers_dir, faulted,
+                              sleep=asyncio.sleep, batch_size=25, lead_s=150.0, gap_s=60.0):
+    """One bounded retry pass for faulted questions: wait out the transient-burst window,
+    then delete their answer checkpoints in small batches and rerun the case (healthy
+    questions checkpoint-reuse at zero cost). The final fault set is recomputed from the
+    LAST complete answer set — never a union of per-batch snapshots: batches not yet retried
+    still carry their stale fault checkpoints, and a union would preserve those pre-retry
+    states as phantom faults (review #4, offline-reproduced)."""
+    await sleep(lead_s)
+    from oak.runtime.artifacts import digest as _digest
+    result = None
+    for start in range(0, len(faulted), batch_size):
+        for a in faulted[start:start + batch_size]:
+            (Path(answers_dir) / f'{_digest(a.question_id)}.json').unlink(missing_ok=True)
+        result = await pipeline.run(case, spec, config)
+        if start + batch_size < len(faulted):
+            await sleep(gap_s)
+    still_faulted = sorted(a.question_id for a in result.answers if a.status == 'execution_error')
+    return result, still_faulted
 
 
 
@@ -119,6 +225,7 @@ class ExperimentRunner:
         self.snapshot_root=Path(snapshot_root) if snapshot_root is not None else None
         # bootstrap_trial_graph: 冷启动 bootstrap 反馈环内的真图试跑（冻结快照图）。
         self.bootstrap_trial_graph=bootstrap_trial_graph
+        self._fault_retried=set()
 
     def _stage_health(self):
         """Stage-level execution faults from the on-disk stage records. A candidate rejected
@@ -160,29 +267,20 @@ class ExperimentRunner:
                                   frozen_snapshot=None if self.snapshot_root is None else self.snapshot_root/case.id)
                 result=await pipeline.run(case,spec,self.config)
                 faulted=[a for a in result.answers if a.status=='execution_error']
-                if faulted and not getattr(self,'_fault_retried',set()).__contains__((name,case.id)):
-                    if not hasattr(self,'_fault_retried'): self._fault_retried=set()
+                if faulted and (name,case.id) not in self._fault_retried:
                     self._fault_retried.add((name,case.id))
-                    # 先歇再重试：EmptyCompletion 类故障多为瞬时突发，立即原窗口整批重跑
-                    # 会撞上同一波（夜间事故实锤）——隔开突发窗口后分批小跑。
-                    await asyncio.sleep(150)
-                    from oak.runtime.artifacts import digest as _digest
-                    still=set()
-                    batch=list(faulted)
-                    for start in range(0,len(batch),25):
-                        for a in batch[start:start+25]:
-                            (stage/'generation'/case.id/'answers'/f'{_digest(a.question_id)}.json').unlink(missing_ok=True)
-                        result=await pipeline.run(case,spec,self.config)
-                        still|={a.question_id for a in result.answers if a.status=='execution_error'}
-                        if start+25<len(batch): await asyncio.sleep(60)
-                    still_faulted=sorted(still)
+                    # 先歇再重试：EmptyCompletion 类故障多为瞬时突发，隔窗后分批小跑；
+                    # 统计口径见 batched_fault_retry（末份答案集重算，不做批次并集）。
+                    result,still_faulted=await batched_fault_retry(
+                        pipeline,case,spec,self.config,
+                        stage/'generation'/case.id/'answers',faulted)
                     retries[case.id]={'questions':len(faulted),
                                       'recovered':len(faulted)-len(still_faulted),
                                       'still_faulted':still_faulted}
                     print(json.dumps({'stage':name,'case':case.id,'fault_retry':retries[case.id]},ensure_ascii=False),flush=True)
                 scores_path=stage/'evaluation'/f'{case.id}.json'
-                if case.id in retries and retries[case.id]['recovered']:
-                    scores_path.unlink(missing_ok=True)  # 旧检查点基于故障答案集，重评
+                if case.id in retries:
+                    scores_path.unlink(missing_ok=True)  # 重试跑过＝答案集可能已变：旧评测检查点一律作废重评
                 if scores_path.exists():
                     saved=json.loads(scores_path.read_text())
                     if saved['run_identity']!=result.identity or saved['asset_version']!=spec.bundle.version:
@@ -289,12 +387,26 @@ class ExperimentRunner:
                     questions=[]
                     for case in cases:
                         questions+=[{'training_id':tid,'text':q.text} for tid,q in zip(question_identity(case),case.questions)]
+                    required_caps=capability_names(getattr(spec,'retrieval_floor',{}) or {})
                     try:
-                        patches=await ProposalGenerator().propose(adopted,cases,feedback,client,self.config,stage/'proposal-call.json',questions)
-                        training_ids=[tid for case in cases for tid in question_identity(case)]
-                        forbidden=[q.text for case in cases for q in case.questions]
-                        candidate=self.revisions.propose(adopted,patches,stage/'candidate',training_ids,forbidden,
-                                                         allowed_kinds=tuple(scope or ()))
+                        # 准入类错误（指纹回显/类型/范围/底线）回灌提案模型重试，而非整轮作废后
+                        # 重复同类错误；三次仍不过才记 validation_failed（评审#2）。
+                        admission_error=None
+                        for _attempt in range(3):
+                            try:
+                                patches=await ProposalGenerator().propose(adopted,cases,feedback,client,self.config,
+                                    stage/'proposal-call.json',questions,
+                                    allowed_kinds=tuple(scope or ()),admission_error=admission_error)
+                                training_ids=[tid for case in cases for tid in question_identity(case)]
+                                forbidden=[q.text for case in cases for q in case.questions]
+                                candidate=self.revisions.propose(adopted,patches,stage/'candidate',training_ids,forbidden,
+                                                                 allowed_kinds=tuple(scope or ()),
+                                                                 required_capabilities=required_caps)
+                                break
+                            except ValueError as exc:
+                                admission_error=f'{type(exc).__name__}: {exc}'
+                        else:
+                            raise ValueError(admission_error)
                     except Exception as exc:
                         decision={'accepted':False,'status':'validation_failed','reasons':[f'{type(exc).__name__}: {exc}'],
                                   'base_version':adopted.version,'candidate':None}

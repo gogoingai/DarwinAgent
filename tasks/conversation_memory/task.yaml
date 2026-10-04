@@ -9,3 +9,6 @@ parameter_contract: {type: object, properties: {}}
 answer_format: text
 answer_contract: {type: string}
 requirements: [atomic_memory]
+retrieval_floor:
+  semantic_search: true
+  traversal: true

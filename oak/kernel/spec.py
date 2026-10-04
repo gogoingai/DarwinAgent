@@ -56,6 +56,9 @@ class TaskSpec:
     seed_s: str = ""
     # 任务级硬约束（如 atomic_memory）：S 必须声明至少一个原子记忆节点类型，准入冻结。
     requirements: tuple = ()
+    # 任务声明的检索工具底线（如 semantic_search/traversal）：F 集必须始终覆盖，冷启动准入
+    # 与后续修订冻结都查（意图键在任务层，能力名映射见 kernel.validation）。
+    retrieval_floor: Mapping = field(default_factory=dict)
 
     def __post_init__(self):
         if not self.name or not self.description or not self.source_kinds:
@@ -65,6 +68,7 @@ class TaskSpec:
         object.__setattr__(self, "parameter_contract", freeze(self.parameter_contract))
         object.__setattr__(self, "answer_contract", freeze(self.answer_contract))
         object.__setattr__(self, "requirements", tuple(self.requirements))
+        object.__setattr__(self, "retrieval_floor", plain(self.retrieval_floor) if self.retrieval_floor else {})
         if not isinstance(self.seed_s, str):
             raise ValueError("Seed schema must be text")
         if any(callable(x) for x in self.__dict__.values()):
@@ -76,7 +80,8 @@ class TaskSpec:
                 "metadata_keys": list(self.metadata_keys), "parameter_contract": plain(self.parameter_contract),
                 "answer_format": self.answer_format, "answer_contract": plain(self.answer_contract),
                 "seed_s_fingerprint": digest(self.seed_s) if self.seed_s else "",
-                "requirements": list(self.requirements)}
+                "requirements": list(self.requirements),
+                "retrieval_floor": plain(self.retrieval_floor)}
 
     @classmethod
     def load(cls, path: Path, bundle=None):

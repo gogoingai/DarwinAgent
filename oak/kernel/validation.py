@@ -140,3 +140,25 @@ def validate_case(case,spec):
         raise ValueError('Evaluation fields cannot be declared as generation fields')
     for b in case.corpus:
         if banned & set(b.metadata): raise ValueError('Evaluation metadata in corpus')
+
+
+# 任务检索底线 → 必须出现在 F 源码中的沙箱能力名（能力词汇属框架层，映射集中在此；
+# 任务只声明意图键——语义参数化在 task.yaml，不进内核硬编码）。
+RETRIEVAL_FLOOR_CAPABILITIES = {'semantic_search': ('semantic_search',),
+                                'traversal': ('traverse',)}
+
+
+def capability_names(floor):
+    """任务声明的检索底线 → 必备能力名元组（未知键按能力名直传）。"""
+    names = []
+    for key, wanted in (floor or {}).items():
+        if wanted:
+            names += list(RETRIEVAL_FLOOR_CAPABILITIES.get(key, (key,)))
+    return tuple(dict.fromkeys(names))
+
+
+def capability_floor_errors(assets, required):
+    """候选资产集的 F 必须仍覆盖每个必备能力（任务冻结底线：迭代不可删光向量检索/关系遍历）。"""
+    sources = [a.content or '' for a in assets.assets if a.kind == 'F']
+    return [f'F 集缺失必备能力 {cap}（至少一个 F 需调用该能力）'
+            for cap in required if not any(cap in src for src in sources)]
