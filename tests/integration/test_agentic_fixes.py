@@ -1368,3 +1368,20 @@ class FUnitTestsTests(unittest.TestCase):
             self.assertTrue(any(len(p['rows']) == min(200, total) for p in out),
                             '含最大规模行集（预算形态）')
             self.assertGreater(len(out), 2, '含多形态')
+
+
+class ContainerStringificationTests(unittest.TestCase):
+    """根治（用户拍板）：容器 str() 不再报错——三轮事故 R7/R10/R13 共 70 题故障同类。
+    纯数据容器确定性字符串化（递归限深限宽，无地址信息）。"""
+
+    def test_str_container_deterministic(self):
+        from oak.operators.sandbox import Interpreter, Limits, admit
+        src = ("def run(params):\n"
+               " return {'s': str(params['rows'][0].get('source_ids', []))}\n")
+        fn = admit(src, 'F', ['q?'])
+        from oak.operators.data import DataCapabilities
+        caps = None  # 无能力依赖
+        interp = Interpreter(fn, {}, Limits(30000, 15.0, 180000))
+        out = interp.execute({'rows': [{'source_ids': ['D1:3', 'D1:7']}]})
+        self.assertEqual(out['s'], '[D1:3;D1:7]')
+        self.assertNotIn('0x', out['s'], '不得含地址信息')
