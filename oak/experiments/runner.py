@@ -423,6 +423,26 @@ class ExperimentRunner:
             return results,aggregated
         finally: await client.aclose()
 
+    async def _smoke_gate(self,cases,spec,questions_per_case=3):
+        """B0 全量提交前的冒烟门：每个训练对话抽前 3 题走完整真实管线（临时目录、真模型、
+        ~2 分钟）。全部故障＝确定性缺陷签名（v1 探针/v3 图C/v6 答案C 全灭事故类）——分钟级
+        中止换根，不再 70-115 分钟后才发现。部分故障属正常题级方差，交由阶段内重试消化。"""
+        import dataclasses as _dc
+        import tempfile
+        client=self._client('B0-smoke')
+        try:
+            for case in cases:
+                sampled=_dc.replace(case,questions=tuple(case.questions[:questions_per_case]))
+                with tempfile.TemporaryDirectory() as td:
+                    pipeline=Pipeline(client,Path(td),
+                                      frozen_snapshot=None if self.snapshot_root is None else self.snapshot_root/case.id)
+                    result=await pipeline.run(sampled,spec,self.config)
+                faults=[a for a in result.answers if a.status=='execution_error']
+                if faults and len(faults)==len(result.answers):
+                    return str(faults[0].error)[:300]
+            return None
+        finally: await client.aclose()
+
     async def run(self,case_ids,spec,rounds=2,resume=False,stop_file=None,b0_gate=None,stage_gate=None,
                   scope=()):
         """case_ids: one conversation id or a tuple; every case runs fully each round on the
@@ -460,6 +480,13 @@ class ExperimentRunner:
                                                                  trial_graph=self.bootstrap_trial_graph)
                 finally: await client.aclose()
             if stage_gate is not None: stage_gate('B0')
+            if self.snapshot_root is not None:
+                smoke_error=await self._smoke_gate(cases,spec.with_bundle(bundle))
+                if smoke_error:
+                    summary={'status':'blocked_b0','reason':'smoke gate: 3 题全灭（确定性缺陷）',
+                             'smoke_error':smoke_error,'rounds':[],'adopted_version':None}
+                    atomic_json(self.root/'summary.json',summary)
+                    raise ValueError('冒烟门拒绝（全量提交前 3 题全灭）: '+smoke_error)
             results,baseline=await self._stage('B0',cases,spec.with_bundle(bundle))
             if b0_gate is not None and not b0_gate(baseline):
                 summary={'status':'blocked_b0','reason':'baseline gate rejected the B0 evaluation',
