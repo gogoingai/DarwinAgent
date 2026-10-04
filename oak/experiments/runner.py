@@ -424,9 +424,10 @@ class ExperimentRunner:
         finally: await client.aclose()
 
     async def _smoke_gate(self,cases,spec,questions_per_case=3):
-        """B0 全量提交前的冒烟门：每个训练对话抽前 3 题走完整真实管线（临时目录、真模型、
-        ~2 分钟）。全部故障＝确定性缺陷签名（v1 探针/v3 图C/v6 答案C 全灭事故类）——分钟级
-        中止换根，不再 70-115 分钟后才发现。部分故障属正常题级方差，交由阶段内重试消化。"""
+        """B0 全量提交前的冒烟门（用户拍板：先保证能答对，再启动跑）：每训练对话抽前 3 题
+        走完整真实管线＋冻结判题（临时目录、真模型、~3 分钟）。过门条件＝零执行错误、判题
+        完整、至少 1/3 precise 答对；任一不满足分钟级中止换根——确定性全灭（v1/v3/v6 事故类）
+        与「能跑但全答错」的弱冷启动都不再烧全量预算。"""
         import dataclasses as _dc
         import tempfile
         client=self._client('B0-smoke')
@@ -438,8 +439,15 @@ class ExperimentRunner:
                                       frozen_snapshot=None if self.snapshot_root is None else self.snapshot_root/case.id)
                     result=await pipeline.run(sampled,spec,self.config)
                 faults=[a for a in result.answers if a.status=='execution_error']
-                if faults and len(faults)==len(result.answers):
-                    return str(faults[0].error)[:300]
+                if faults:
+                    return f'冒烟存在执行错误 {len(faults)}/{len(result.answers)}: '+str(faults[0].error)[:200]
+                # 冒烟判题（训练集金标对机械门合法可见）：保证能答对，至少 1/3 precise
+                scores=await self.evaluator_factory(client,Path(td)/'eval').evaluate(result)
+                precise=scores.metrics.get('original_precise',0)
+                if scores.completed<scores.total:
+                    return f'冒烟判题未完成: {scores.completed}/{scores.total}'
+                if precise<1:
+                    return f'冒烟 3 题全错（precise=0/{scores.total}）——冷启动质量门拒绝'
             return None
         finally: await client.aclose()
 
