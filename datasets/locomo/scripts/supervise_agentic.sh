@@ -18,11 +18,10 @@ carry_into() {
   local src="$1"
   [ -n "$src" ] && [ -d "$src/train/B0/generation" ] || return 0
   [ -f "$ROOT/train/B0/assets/manifest.json" ] && return 0
-  mkdir -p "$ROOT/train/B0"
-  cp -R "$src/train/B0/assets" "$ROOT/train/B0/assets"
-  cp -R "$src/train/B0/generation" "$ROOT/train/B0/generation"
-  [ -d "$src/train/B0/evaluation" ] && cp -R "$src/train/B0/evaluation" "$ROOT/train/B0/evaluation"
-  echo "[supervise] 搬运 B0 检查点: $src -> $ROOT（不从头跑）"
+  # 搬运走 carry_rebase：复制 assets/generation/evaluation＋写 CARRIED 旁车＋答案路径预检；
+  # 框架版本差异（仅编排/评测层）不再作废答案检查点（用户指令：不要从头跑）。
+  uv run python -m datasets.locomo.scripts.carry_rebase "$ROOT" "$src" \
+    || echo "[supervise] carry_rebase 失败（答案路径不一致？），该根将冷启动"
 }
 for i in $(seq 1 "$MAX"); do
   mkdir -p "$ROOT"

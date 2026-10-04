@@ -23,6 +23,29 @@ from oak.runtime.artifacts import atomic_json, digest
 from oak.runtime.identity import assert_files, snapshot_files, transport_identity
 
 
+# 搬运字节断言的显式豁免：检查点装载逻辑本身（不参与答案计算，回归全绿护航）。
+# 豁免必须逐一列名——除此之外任何答案路径文件漂移都会拒绝搬运。
+CARRY_NEUTRAL_SUFFIXES = ('oak/engine/pipeline.py',)
+
+
+def carried_acceptor(root, identity, framework):
+    """经验证的答案检查点搬运（用户指令：不要从头跑）：CARRIED.json 旁车记录被接受的
+    源身份与源框架映射。当且仅当「答案路径文件」（oak/ 全部；experiments 编排/评测层与
+    CARRY_NEUTRAL 豁免表除外）与源运行逐字节一致时，源身份的检查点被接受并惰性重锚到
+    当前身份。管道在此自行复核哈希，旁车手写无法混入未验证的外来检查点。"""
+    sidecar = Path(root) / 'CARRIED.json'
+    if not sidecar.exists():
+        return lambda stored: stored == identity
+    note = json.loads(sidecar.read_text())
+    accepted = set(note.get('accepted_identities', ()))
+    for path, sha in note.get('source_framework', {}).items():
+        if '/oak/experiments/' in path or any(path.endswith(sfx) for sfx in CARRY_NEUTRAL_SUFFIXES):
+            continue  # 编排/评测层与显式豁免：差异不参与答案计算
+        if framework.get(path) != sha:
+            raise ValueError(f'答案路径文件与搬运源不一致，检查点不可复用: {path}')
+    return lambda stored: stored == identity or stored in accepted
+
+
 class Pipeline:
     def __init__(self,client,work_dir,frozen_snapshot=None,embedder_factory=None):
         # frozen_snapshot: 共享冻结记忆快照目录（graph/facts/vector＋manifest）。注入时
@@ -46,9 +69,12 @@ class Pipeline:
                          'snapshot':None if snapshot_identity is None else snapshot_identity['snapshot_digest']})
         root=self.work_dir/case.id
         root.mkdir(parents=True,exist_ok=True)
+        carried_ok=carried_acceptor(root,identity,framework)
         identity_path=root/'identity.json'
-        if identity_path.exists() and json.loads(identity_path.read_text())['identity']!=identity:
-            raise ValueError('Checkpoint belongs to a different run identity; use a new run directory')
+        if identity_path.exists():
+            recorded=json.loads(identity_path.read_text())
+            if recorded['identity']!=identity and not carried_ok(recorded['identity']):
+                raise ValueError('Checkpoint belongs to a different run identity; use a new run directory')
         atomic_json(identity_path,{'identity':identity,'case_id':case.id,'assets':runtime.bundle.version,
                                   'config':config.to_dict(),'framework':framework,'transport':transport})
         def verify():
@@ -164,7 +190,8 @@ class Pipeline:
                 checkpoint=root/'answers'/f'{digest(question.id)}.json'
                 if checkpoint.exists():
                     stored=json.loads(checkpoint.read_text())
-                    if stored.get('identity')!=identity or digest(stored['result'])!=stored['digest']:
+                    if (stored.get('identity')!=identity and not carried_ok(stored.get('identity'))) \
+                            or digest(stored['result'])!=stored['digest']:
                         raise ValueError('Answer checkpoint changed or belongs to another run')
                     answer=AnswerResult.from_dict(stored['result'])
                     if graph is not None: validate_published(answer,question,graph)

@@ -1008,3 +1008,79 @@ class TrimmedEvaluateTests(unittest.TestCase):
 
 async def _fake_dual_grade_batch(items, client, context, cache_dir):
     return [{'status': 'ok', 'precise': True} for _ in items]
+
+
+class CarriedCheckpointTests(unittest.TestCase):
+    """答案检查点跨框架版本搬运（用户指令：不要从头跑）：CARRIED 旁车＋答案路径逐字节复核。
+    编排/评测层（oak/experiments/）差异不影响答案计算，可重锚；答案路径漂移一律拒绝。"""
+
+    def test_no_sidecar_accepts_only_current_identity(self):
+        from oak.engine.pipeline import carried_acceptor
+        with tempfile.TemporaryDirectory() as td:
+            acc = carried_acceptor(td, 'new-id', {})
+            self.assertTrue(acc('new-id'))
+            self.assertFalse(acc('old-id'))
+
+    def test_sidecar_accepts_old_identity_when_answer_path_identical(self):
+        from oak.engine.pipeline import carried_acceptor
+        fw = {'/x/oak/operators/data.py': 'a', '/x/oak/experiments/runner.py': 'old'}
+        with tempfile.TemporaryDirectory() as td:
+            (Path(td) / 'CARRIED.json').write_text(json.dumps(
+                {'accepted_identities': ['old-id'], 'source_framework': fw}))
+            self.assertTrue(carried_acceptor(td, 'new-id', fw)('old-id'))
+            fw2 = dict(fw); fw2['/x/oak/experiments/runner.py'] = 'new'
+            self.assertTrue(carried_acceptor(td, 'new-id', fw2)('old-id'))  # 编排层差异放行
+
+    def test_sidecar_rejects_when_answer_path_changed(self):
+        from oak.engine.pipeline import carried_acceptor
+        with tempfile.TemporaryDirectory() as td:
+            (Path(td) / 'CARRIED.json').write_text(json.dumps(
+                {'accepted_identities': ['old-id'],
+                 'source_framework': {'/x/oak/operators/data.py': 'a'}}))
+            with self.assertRaisesRegex(ValueError, '答案路径文件与搬运源不一致'):
+                carried_acceptor(td, 'new-id', {'/x/oak/operators/data.py': 'changed'})
+
+    def test_carry_rebase_answer_path_drift_detected(self):
+        from datasets.locomo.scripts.carry_rebase import answer_path_ok
+        bad = answer_path_ok({'/x/oak/operators/data.py': 'a', '/x/oak/experiments/runner.py': 'old'},
+                             {'/x/oak/operators/data.py': 'b', '/x/oak/experiments/runner.py': 'new'})
+        self.assertEqual(bad, ['/x/oak/operators/data.py'])
+
+
+class SmokeThresholdTests(unittest.TestCase):
+    """冒烟门槛与 B0 冷门成比例（v10 搬运事故：1/3 低概率 F 契约绊倒≠系统性破绽）：
+    ≥2/3 执行错误或 0 有效作答才拒；单题故障由 B0 冷门（≥95% 完成度）吸收。"""
+
+    def test_single_fault_passes_double_fault_rejects(self):
+        from dataclasses import dataclass, replace as dcreplace
+        from oak.experiments.runner import ExperimentRunner
+        import oak.experiments.runner as R
+        @dataclass
+        class Q:
+            id: str; text: str = '?'; parameters: dict = None
+        @dataclass
+        class Case:
+            id: str; questions: tuple
+        gate = ExperimentRunner._smoke_gate
+        async def fake_pipeline_run(self, case, spec, config):
+            answers = []
+            for i, q in enumerate(case.questions):
+                if i < fail_count:
+                    answers.append(AnswerResult(q.id, 'execution_error', '', error='SandboxError: x'))
+                else:
+                    answers.append(AnswerResult(q.id, 'abstained', '记忆中无支持', ()))
+            from types import SimpleNamespace as NS
+            return NS(answers=tuple(answers))
+        for fail_count, expect_block in ((1, False), (2, True), (3, True)):
+            class _StubClient:
+                async def aclose(self): pass
+            runner = object.__new__(ExperimentRunner)
+            runner._client = lambda stage: _StubClient()
+            runner.snapshot_root = None
+            runner.smoke_judge = None
+            runner.config = RunConfig(protocol_attempts=1)
+            case = Case('c', tuple(Q(f'q{i}') for i in range(3)))
+            with mock.patch.object(R.Pipeline, 'run', fake_pipeline_run), \
+                 mock.patch.object(R, 'tempfile', create=True):
+                err = asyncio.run(gate(runner, [case], None))
+            self.assertEqual(expect_block, err is not None, f'fail_count={fail_count}: {err}')

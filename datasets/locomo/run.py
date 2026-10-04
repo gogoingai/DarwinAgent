@@ -39,7 +39,7 @@ async def smoke_judge(client, case, answers):
         scores=await LocomoEvaluator(client, Path(td)).evaluate(
             result, asked=tuple(int(a.question_id) for a in answers))
     return {'precise':scores.metrics['original_precise'],
-            'completed':scores.completed,'total':scores.total}
+            'completed':scores.total-scores.eval_faults,'total':scores.total}
 
 
 def arm_config(arm, vector_k=None):

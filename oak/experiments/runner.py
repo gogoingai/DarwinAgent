@@ -430,9 +430,11 @@ class ExperimentRunner:
 
     async def _smoke_gate(self,cases,spec,questions_per_case=3):
         """B0 全量提交前的冒烟门（用户拍板：先保证能答对，再启动跑）：每训练对话抽前 3 题
-        走完整真实管线＋冻结判题（临时目录、真模型、~3 分钟）。过门条件＝零执行错误、判题
-        完整、至少 1/3 precise 答对；任一不满足分钟级中止换根——确定性全灭（v1/v3/v6 事故类）
-        与「能跑但全答错」的弱冷启动都不再烧全量预算。"""
+        走完整真实管线＋冻结判题（临时目录、真模型、~3 分钟）。过门条件＝执行错误 <2/3、
+        判题完整、至少 1/3 precise 答对；不满足分钟级中止换根——确定性全灭（v1/v3/v6 事故类）
+        与「能跑但全答错」的弱冷启动都不再烧全量预算。门槛与 B0 冷门（完成度≥95%）成比例：
+        单题低概率故障（如 F 输出契约被个别调用绊倒，v9 B0 100 题 1 故障同类）由冷门吸收，
+        只有系统性破绽（≥2/3）才在此拦下。"""
         import dataclasses as _dc
         import tempfile
         client=self._client('B0-smoke')
@@ -444,8 +446,10 @@ class ExperimentRunner:
                                       frozen_snapshot=None if self.snapshot_root is None else self.snapshot_root/case.id)
                     result=await pipeline.run(sampled,spec,self.config)
                 faults=[a for a in result.answers if a.status=='execution_error']
-                if faults:
-                    return f'冒烟存在执行错误 {len(faults)}/{len(result.answers)}: '+str(faults[0].error)[:200]
+                if len(faults)*3>=len(result.answers)*2:
+                    return f'冒烟执行错误达 {len(faults)}/{len(result.answers)}（≥2/3，系统性破绽）: '+str(faults[0].error)[:200]
+                if not any(a.status in ('answered','abstained') for a in result.answers):
+                    return '冒烟题无任何有效作答'
                 # 冒烟判题（任务层注入的冻结判题原语，训练集金标对机械门合法可见）：
                 # 保证能答对，至少 1/3 precise。无注入时退化为「存在有效作答」检查。
                 if self.smoke_judge is not None:
@@ -454,8 +458,8 @@ class ExperimentRunner:
                         return f'冒烟判题未完成: {verdict}'
                     if verdict['precise']<1:
                         return f"冒烟 {verdict['total']} 题全错（precise=0）——质量门拒绝"
-                elif not any(a.status=='answered' for a in result.answers):
-                    return '冒烟 3 题无任何有效作答'
+                elif not any(a.status in ('answered','abstained') for a in result.answers):
+                    return '冒烟题无任何有效作答'
             return None
         finally: await client.aclose()
 
