@@ -80,6 +80,20 @@ def memory_structure_sample(snapshot_dir,max_facts=30):
                              '要遍历关系先用 search/nodes 取行，再把行里的 node_id 传给 traverse。'}
 
 
+def _trimmed_train_adapter(inner, train_ids, limit):
+    """训练集瘦身（用户拍板：迭代提速）：仅训练对话截取前 N 题；验证/测试/外测全量。
+    终局对比在持出对话上做，训练集大小是优化参数、不伤两臂公平。"""
+    from types import SimpleNamespace
+    ids=set(train_ids)
+    def generation_input(case_id):
+        case = inner.generation_input(case_id)
+        if case_id in ids and len(case.questions) > limit:
+            import dataclasses
+            case = dataclasses.replace(case, questions=tuple(case.questions[:limit]))
+        return case
+    return SimpleNamespace(generation_input=generation_input)
+
+
 def frozen_files():
     return [ROOT/'datasets/locomo/adapter.py',ROOT/'datasets/locomo/evaluator.py',ROOT/'datasets/locomo/exports.py',
             ROOT/'datasets/locomo/run.py',ROOT/'datasets/locomo/pipeline',
@@ -142,6 +156,8 @@ async def run_arm(args):
         summary=await runner.run(cases,task,rounds=0,resume=args.resume,scope=SCOPE[args.scope])
         print(summary['status'])
         return
+    if args.train_questions:
+        adapter=_trimmed_train_adapter(adapter,spec.train,args.train_questions)
     controller=CampaignController(adapter,lambda client,path:LocomoEvaluator(client,path),
                                   connection(root),config,spec,root,frozen_files(),snapshot_root=SNAPSHOTS,
                                   bootstrap_context=memory_structure_sample(SNAPSHOTS/'conv-26'),
@@ -208,5 +224,7 @@ if __name__=='__main__':
                    help='迭代轮数上限；v0 固定 0，g1 缺省无限（操作者 --stop 叫停）')
     p.add_argument('--scope',choices=SCOPE.keys(),default='p',
                    help='迭代开放范围：p 只 P / pf 加 F / sfcp 全开（按失败归因推进）')
+    p.add_argument('--train-questions',type=int,default=None,
+                   help='训练对话截取前 N 题加速迭代（验证/测试/外测保持全量）')
     p.add_argument('--stop',action='store_true',help='写入 STOP 叫停信号：当前轮完成后锁定候选并进入验证/测试')
     asyncio.run(main(p.parse_args()))
