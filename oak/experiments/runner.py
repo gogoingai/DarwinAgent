@@ -285,6 +285,9 @@ def _per_case_feedback_facts(root, name, cases):
         rows.append((case.id, diagnostics))
     return rows
 
+_DETERMINISTIC_ERRORS=frozenset({'SandboxError','ValueError','TypeError','KeyError'})
+
+
 class ExperimentRunner:
     def __init__(self,adapter,evaluator_factory,connection_config,run_config,policy,work_dir,
                  frozen_files=(),client_factory=None,bootstrap_context=None,snapshot_root=None,
@@ -337,7 +340,8 @@ class ExperimentRunner:
             limits=Limits(self.config.function_steps,self.config.function_timeout_s,self.config.result_bytes)
             caps=DataCapabilities(graph)
             try:
-                from oak.kernel.checks import enforce_opinions, synthetic_answer_variants
+                from oak.kernel.checks import (enforce_opinions, enforce_rejection,
+                                               synthetic_answer_variants, synthetic_invalid_answer_snapshot)
                 checks=CheckRegistry(exported,limits)
                 all_rows=list(caps.rows.values())
                 enforce_opinions(checks.run('graph',{'nodes':all_rows,'stage':'graph'}),'候选预检')
@@ -346,6 +350,9 @@ class ExperimentRunner:
                                                              dict(sample_question.parameters)):
                         enforce_opinions(checks.run('answer',variant),
                                          f'候选预检答案阶段[{variant["status"]}]')
+                    enforce_rejection(checks.run('answer',
+                                    synthetic_invalid_answer_snapshot(sample_question.text)),
+                                    '候选预检答案阶段[invalid]')
                 records=FunctionRegistry(exported,limits).trial(graph,
                     {a.id:list(a.trial_inputs) for a in exported.assets.assets if a.kind=='F'})
             except Exception as exc:   # 含 SandboxError（ValueError 子类）：统一带上下文回灌
@@ -389,6 +396,15 @@ class ExperimentRunner:
                                       'skipped_retry':'graph_stage_failure',
                                       'graph_error':str(graph_failure[0].get('error'))[:200]}
                     print(json.dumps({'stage':name,'case':case.id,'fault_retry':retries[case.id]},ensure_ascii=False),flush=True)
+                elif faulted and all(a.error.split(':',1)[0].strip() in _DETERMINISTIC_ERRORS
+                                     for a in faulted):
+                    # 确定性工具错误（评审：接口/参数错误重试不会变好）：不整题重检索，
+                    # 如实入统计与反馈，由资产修订解决（scope F）。
+                    retries[case.id]={'questions':len(faulted),'recovered':0,
+                                      'still_faulted':sorted(a.question_id for a in faulted),
+                                      'skipped_retry':'deterministic_tool_error',
+                                      'sample_errors':[str(a.error)[:150] for a in faulted[:3]]}
+                    print(json.dumps({'stage':name,'case':case.id,'fault_retry':retries[case.id]},ensure_ascii=False),flush=True)
                 elif faulted and (name,case.id) not in self._fault_retried:
                     self._fault_retried.add((name,case.id))
                     # 先歇再重试：EmptyCompletion 类故障多为瞬时突发，隔窗后分批小跑；
@@ -428,12 +444,12 @@ class ExperimentRunner:
             return results,aggregated
         finally: await client.aclose()
 
-    async def _smoke_gate(self,cases,spec,questions_per_case=3):
-        """B0 全量提交前的冒烟门（用户拍板：先保证能答对，再启动跑）：每训练对话抽前 3 题
-        走完整真实管线＋冻结判题（临时目录、真模型、~3 分钟）。过门条件＝执行错误 <2/3、
-        判题完整、至少 1/3 precise 答对；不满足分钟级中止换根——确定性全灭（v1/v3/v6 事故类）
-        与「能跑但全答错」的弱冷启动都不再烧全量预算。门槛与 B0 冷门（完成度≥95%）成比例：
-        单题低概率故障（如 F 输出契约被个别调用绊倒，v9 B0 100 题 1 故障同类）由冷门吸收，
+    async def _smoke_gate(self,cases,spec,questions_per_case=6):
+        """B0 全量提交前的冒烟门（用户拍板：先保证能答对，再启动跑；v10 追加：6 题对 2）：
+        每训练对话抽前 6 题走完整真实管线＋冻结判题（临时目录、真模型、~5 分钟）。
+        过门条件＝执行错误 <2/3、判题完整、至少 2/6 precise 答对；不满足分钟级中止换根
+        ——确定性全灭（v1/v3/v6 事故类）与「能跑但全答错」的弱冷启动都不再烧全量预算。
+        门槛与 B0 冷门成比例：单题低概率故障（如 F 输出契约被个别调用绊倒）由冷门吸收，
         只有系统性破绽（≥2/3）才在此拦下。"""
         import dataclasses as _dc
         import tempfile
@@ -456,8 +472,8 @@ class ExperimentRunner:
                     verdict=await self.smoke_judge(client,case,result.answers)
                     if verdict['completed']<verdict['total']:
                         return f'冒烟判题未完成: {verdict}'
-                    if verdict['precise']<1:
-                        return f"冒烟 {verdict['total']} 题全错（precise=0）——质量门拒绝"
+                    if verdict['precise']<2:
+                        return f"冒烟 {verdict['total']} 题对 {verdict['precise']}（需≥2）——质量门拒绝"
                 elif not any(a.status in ('answered','abstained') for a in result.answers):
                     return '冒烟题无任何有效作答'
             return None

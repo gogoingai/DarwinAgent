@@ -36,6 +36,7 @@ class SiteSpec:
     kind: str                 # 'default' | 'fast' | 'explicit'
     url: str = ''             # explicit 站点的 URL 常量
     key_env: str = ''         # explicit 站点的密钥环境变量名
+    base_env: str = ''        # URL 环境变量名（缺省按 key_env 推导）
 
 
 DEFAULT_SITE = SiteSpec('default')
@@ -60,9 +61,14 @@ REGISTRY: tuple[tuple[str, ModelProfile], ...] = (
                            reasoning_buffer=3072, disabled_buffer=768)),
     ('glm-4', ModelProfile(DEFAULT_SITE, thinking='offable',
                            reasoning_buffer=3072, disabled_buffer=768)),
-    # MiniMax M3.1 Flash（独立 fast 站点）：强制思考（disabled 400），唯一旋钮 effort，
-    # low 档实测推理近零（用户拍板）。缓冲按外部推理模型给足。
-    ('MiniMax-M3.1-Flash', ModelProfile(FAST_SITE, thinking='effort',
+    # MiniMax M3.1 Flash（中间档，用户拍板 2026-10-04：MiniMax 强于 DeepSeek、弱于 glm）：
+    # 端点自带显式 LOCOMO_FAST_*，不再占用框架 fast 槽。强制思考（disabled 400），
+    # 唯一旋钮 effort，low 档实测推理近零。缓冲按外部推理模型给足。
+    ('MiniMax-M3.1-Flash', ModelProfile(SiteSpec('explicit',
+                                                 url='https://api.minimaxi.chat/v1',
+                                                 key_env='LOCOMO_FAST_API_KEY',
+                                                 base_env='LOCOMO_FAST_API_BASE'),
+                                        thinking='effort',
                                         reasoning_buffer=EXTERNAL_REASONING_BUFFER,
                                         default_reasoning_effort='low',
                                         pool_size=6)),
@@ -105,7 +111,7 @@ def resolve(model: str, cfg) -> ResolvedModel:
     if site.kind == 'fast':
         base_url, api_key = cfg.fast_base_url, cfg.fast_api_key
     elif site.kind == 'explicit':
-        base_url = os.environ.get(site.key_env.replace('_API_KEY', '_BASE_URL'), site.url)
+        base_url = os.environ.get(site.base_env or site.key_env.replace('_API_KEY', '_BASE_URL'), site.url)
         api_key = os.environ.get(site.key_env, '')
     else:
         base_url, api_key = cfg.api_base_url, cfg.api_key

@@ -12,7 +12,8 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 # Framework roles; application-specific roles are injected by adapters.
 MODEL_ROLES: dict[str, str] = {
-    "extraction": "fast", "tools": "fast", "answer": "strong", "review": "strong",
+    # tools＝中间档 MiniMax（用户拍板：留现位最优）；fast＝DeepSeek 备援，暂无固定角色
+    "extraction": "middle", "tools": "middle", "answer": "strong", "review": "strong",
     "bootstrap": "strong", "proposal": "strong",
     "schema": "strong",      # P1 需求分析 / P2 模式草拟
     "func_gen": "strong",    # P4 函数生成（含能力规划）
@@ -79,6 +80,11 @@ class Config:
     fast_base_url: str = ""
     fast_api_key: str = ""
     model_fast: str = "glm-5.3-flash"
+    # 三档（用户拍板 2026-10-04）：强 glm / 中 MiniMax / 快 DeepSeek。middle 当前无固定
+    # 角色＝备援档；fast 槽给 tools 高频步（V0 vector_once 无 tools 环节，可比性不受影响）。
+    model_middle: str = "MiniMax-M3.1-Flash-Preview"
+    middle_base_url: str = ""
+    middle_api_key: str = ""
 
     # 并发与重试（账户有限流：8 并发触发 429，降到 4）
     max_concurrency: int = 4
@@ -114,7 +120,9 @@ class Config:
         tier = self.tier_for(role)
         if tier is None:
             raise ValueError(f"unknown LLM role: {role}")
-        return self.model_strong if tier == "strong" else self.model_fast
+        if tier == "strong": return self.model_strong
+        if tier == "middle": return self.model_middle
+        return self.model_fast
 
     # ---- 框架派生路径 ----
     @property

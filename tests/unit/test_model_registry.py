@@ -28,9 +28,11 @@ class RegistryResolution(unittest.TestCase):
         self.assertEqual(flash.pool_id, glm.pool_id)          # 同站共享池
         self.assertEqual(glm.pool_size, self.cfg.max_concurrency)
 
-        mm = resolve('MiniMax-M3.1-Flash-Preview', self.cfg)
+        env = {'LOCOMO_FAST_API_KEY': 'k-mm', 'LOCOMO_FAST_API_BASE': 'https://mm.example/v1'}
+        with mock.patch.dict(os.environ, env):
+            mm = resolve('MiniMax-M3.1-Flash-Preview', self.cfg)
         self.assertEqual((mm.profile.thinking, mm.base_url, mm.api_key, mm.pool_size),
-                         ('effort', 'https://fast.example/v1', 'k-fast', 6))
+                         ('effort', 'https://mm.example/v1', 'k-mm', 6))
 
         env = {'COMMANDCODE_API_KEY': 'k-cc', 'COMMANDCODE_BASE_URL': 'https://cc.example/v1'}
         with mock.patch.dict(os.environ, env):

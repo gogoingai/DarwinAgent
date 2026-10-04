@@ -42,7 +42,7 @@ class AnchoredPipelineChecksTaskC(unittest.TestCase):
                  else 'def check(candidate):\n return {"ok": False, "issues": ["总是拒绝"]}')
         assets = [
             Asset('schema', 'S', SEED.read_text(), {"type": "any"}, {"type": "any"}, (), description='seed'),
-            Asset('f_find', 'F', "def run(params):\n rows = nodes('AtomicFact', {'predicate': params.get('predicate','')}, limit=5)\n return [r.get('text','') for r in rows]",
+            Asset('f_find', 'F', "def run(params):\n rows = nodes('AtomicFact', {'predicate': params.get('predicate','')}, limit=5)\n return [{'node_id': r.get('node_id'), 'text': r.get('text','')} for r in rows]",
                   {"type": "object", "properties": {"predicate": {"type": "string"}}}, {"type": "array"}, ['schema'],
                   description='find facts', trial_inputs=({'predicate': '维修'},)),
             Asset('c_graph', 'C', check, stage='graph', schema_dependencies=['schema'], description='graph check'),
