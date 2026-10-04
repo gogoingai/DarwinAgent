@@ -93,7 +93,11 @@ class Embedder:
     def _flush(self) -> None:
         if self.cache_path is None:
             return
-        tmp = self.cache_path.with_suffix(".tmp")
+        # 并发写者各用唯一临时名，再原子改名——共享固定 .tmp 名会在并发缓存未命中时
+        # 互相抢文件（conv-47 外测 17 题 FileNotFoundError 事故，2026-10-04）。
+        import os, threading
+        tmp = self.cache_path.with_name(
+            f"{self.cache_path.name}.{os.getpid()}.{threading.get_ident()}.tmp")
         tmp.write_text(json.dumps(self._cache, ensure_ascii=False))
         tmp.replace(self.cache_path)
 

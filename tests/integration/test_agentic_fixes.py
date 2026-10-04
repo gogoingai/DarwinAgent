@@ -341,6 +341,35 @@ class ExternalReportTests(unittest.TestCase):
         self.assertEqual(baseline_report['micro']['generation_faults'], 5)
 
 
+class EmbedderCacheConcurrencyTests(unittest.TestCase):
+    def test_concurrent_flush_never_loses_tmp(self):
+        # conv-47 事故回归：共享固定 .tmp 名在并发缓存未命中时互相抢文件 →
+        # FileNotFoundError 记为整题故障。唯一临时名后并发 flush 必须全部成功。
+        import threading
+        from oak.vector.embedder import Embedder
+        emb = Embedder.__new__(Embedder)
+        with tempfile.TemporaryDirectory() as td:
+            emb.cache_path = Path(td) / 'embed_cache.json'
+            emb._cache = {f'q{i}': [0.1] * 8 for i in range(100)}
+            errors = []
+            barrier = threading.Barrier(8)
+            def flush_many():
+                try:
+                    barrier.wait()
+                    for _ in range(50):
+                        emb._flush()
+                except Exception as exc:
+                    errors.append(exc)
+            threads = [threading.Thread(target=flush_many) for _ in range(8)]
+            for th in threads: th.start()
+            for th in threads: th.join()
+            self.assertEqual(errors, [])
+            self.assertTrue(emb.cache_path.exists())
+            import json as _json
+            self.assertEqual(len(_json.loads(emb.cache_path.read_text())), 100)
+            self.assertEqual(list(Path(td).glob('*.tmp')), [])   # 无残留临时文件
+
+
 if __name__ == '__main__':
     unittest.main()
 
