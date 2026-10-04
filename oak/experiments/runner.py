@@ -73,68 +73,89 @@ def _compact_diagnostic(row):
 
 
 def _retrieval_trace(answer):
-    """单题执行轨迹摘要（评审#2/#3）：从结构化 AnswerResult.trace 提取——
-    工具调用（名称/参数/次数，与模型输出次数区分）、返回规模、空结果、
-    截断、候选检查与审查的拒绝原因、停止时机。证据行数来自工具返回，
-    不用最终引用来源数代替。"""
+    """单题执行轨迹摘要（评审②）：从结构化 AnswerResult.trace 提取。参数优先取工具事件里
+    执行点记录的 parameters（协议重试中被拒动作不会错配）；旧记录回退按 asset_id 顺序配对
+    成功调用。含证据摘录与来源标识、空结果、截断标记（tools_truncated）、拒绝理由。"""
+    events = plain([ev for ev in (getattr(answer, 'trace', ()) or ())])  # mappingproxy 全解包
     raw_outputs = getattr(answer, 'raw_outputs', ()) or ()
-    # 模型侧动作序列（工具决策参数与 ready 停止信号），与 trace 的工具事件按序对齐
-    actions = []
+    fallback_calls = []
+    has_ready = False
     for raw in raw_outputs:
         try:
             obj = json.loads(raw) if isinstance(raw, str) else raw
         except Exception:
             obj = None
-        if isinstance(obj, dict) and obj.get('action') in ('call', 'ready'):
-            actions.append(obj)
-    # trace 条目经 contracts.freeze 冻结为 MappingProxyType：按 Mapping 鸭子类型取用
-    tool_events = [ev for ev in (getattr(answer, 'trace', ()) or ())
-                   if isinstance(ev, Mapping) and ev.get('stage') in ('tool', 'retrieval')]
+        if isinstance(obj, dict) and obj.get('action') == 'call':
+            fallback_calls.append(obj)
+        elif isinstance(obj, dict) and obj.get('action') == 'ready':
+            has_ready = True
+    fb_index = 0
     tools = []
     returned_rows = 0
     empty_results = 0
-    call_iter = iter(a for a in actions if a.get('action') == 'call')
-    for ev in tool_events:
-        if ev['stage'] == 'retrieval':
+    for ev in events:
+        stage = ev.get('stage')
+        if stage == 'retrieval':
             rows = ev.get('rows', 0)
             tools.append({'tool': 'vector_once', 'rows': rows, 'k': ev.get('k')})
             returned_rows += rows
             if not rows:
                 empty_results += 1
             continue
-        action = next(call_iter, None)
-        params = _clip(action.get('parameters'), 90) if action else None
+        if stage != 'tool':
+            continue
+        params = ev.get('parameters')
+        if params is None:
+            while fb_index < len(fallback_calls):
+                action = fallback_calls[fb_index]; fb_index += 1
+                if action.get('asset_id') == ev.get('asset_id'):
+                    params = action.get('parameters')
+                    break
         data = ev.get('data')
-        rows = len(data) if isinstance(data, (list, tuple)) else (1 if data else 0)
+        rows = len(data) if isinstance(data, list) else (1 if data else 0)
         returned_rows += rows
         if not rows:
             empty_results += 1
+        excerpts = []
+        for row in (data or [])[:2]:
+            if not isinstance(row, Mapping):
+                continue
+            excerpts.append({'node_id': row.get('node_id'),
+                             'statement': _clip(row.get('陈述') or row.get('statement') or row.get('名称'), 60),
+                             'source_ids': list(row.get('source_ids') or ())[:2]})
         entry = {'tool': ev.get('asset_id'), 'rows': rows,
                  'capabilities': ev.get('capability_calls') or None}
-        if params:
-            entry['params'] = params
+        if params is not None:
+            entry['params'] = _clip(params, 90)
+        if excerpts:
+            entry['evidence'] = excerpts
         tools.append(entry)
     rejections = []
-    for ev in (getattr(answer, 'trace', ()) or ()):
-        if not isinstance(ev, Mapping):
-            continue
-        if ev.get('stage') == 'review' and not ev.get('accepted'):
+    for ev in events:
+        stage = ev.get('stage')
+        if stage == 'review' and not ev.get('accepted'):
             rejections.append({'by': 'review', 'reason': _clip(ev.get('feedback') or ev.get('reason'), 150)})
-        elif ev.get('stage') == 'candidate':
-            failed = [c for c in (ev.get('checks') or ()) if isinstance(c, dict) and not c.get('ok')]
-            for check in failed[:3]:
-                rejections.append({'by': 'check', 'check_id': check.get('check_id'),
-                                   'issues': _clip(check.get('issues'), 120)})
+        elif stage == 'candidate':
+            for check in (ev.get('checks') or ())[:6]:
+                if isinstance(check, Mapping) and not check.get('ok'):
+                    rejections.append({'by': 'check', 'check_id': check.get('check_id'),
+                                       'issues': _clip(check.get('issues'), 120)})
+    # 停止信号＝工具循环的收尾方式：ready 动作 vs 步数耗尽；执行错误覆盖之
+    stopped = 'ready' if has_ready else 'budget'
+    if any(ev.get('stage') == 'execution_error' for ev in events):
+        stopped = 'execution_error'
     trace = {'question_id': answer.question_id, 'status': answer.status,
-             'tool_calls': len(tool_events), 'model_calls': len(raw_outputs),
+             'tool_calls': len(tools), 'model_calls': len(raw_outputs),
              'returned_rows': returned_rows, 'empty_results': empty_results,
-             'stopped': 'ready' if any(a.get('action') == 'ready' for a in actions) else 'budget',
-             'tools': tools, 'rejections': rejections}
+             'stopped': stopped, 'tools': tools, 'rejections': rejections}
     if getattr(answer, 'error', None):
         trace['error'] = _clip(answer.error, 150)
+    truncated = 0
     while len(tools) > 2 and len(json.dumps(trace, ensure_ascii=False, default=str)) > _TRACE_CHARS:
-        tools.pop()
-    return plain(trace)  # 冻结的 mappingproxy 解包回普通 dict，载荷可序列化
+        tools.pop(); truncated += 1
+    if truncated:
+        trace['tools_truncated'] = truncated
+    return plain(trace)
 
 
 def training_feedback(cases, results, case_diagnostics, baseline):
@@ -284,6 +305,32 @@ class ExperimentRunner:
                 health[path.parent.name]=faults
         return health
 
+    def _preflight(self,candidate,spec):
+        """候选在正式逐题运行前的预检（评审①③）：完整真图上的图阶段 C 检查＋能力底线试跑。
+        不合格＝准入错误回灌提案重试；不给「源码有调用但试跑不触发」或超预算 C 混进 199 题阶段的机会。"""
+        graph=self.bootstrap_trial_graph
+        if graph is None: return
+        import tempfile
+        from oak.kernel.checks import CheckRegistry
+        from oak.kernel.functions import FunctionRegistry
+        from oak.kernel.validation import trial_capability_floor_errors
+        from oak.operators.sandbox import Limits
+        from oak.operators.data import DataCapabilities
+        with tempfile.TemporaryDirectory() as td:
+            exported=candidate.assets.export(Path(td)/'b')
+            limits=Limits(self.config.function_steps,self.config.function_timeout_s,self.config.result_bytes)
+            caps=DataCapabilities(graph)
+            try:
+                CheckRegistry(exported,limits).run('graph',
+                    {'nodes':list(caps.rows.values()),'stage':'graph'})
+                records=FunctionRegistry(exported,limits).trial(graph,
+                    {a.id:list(a.trial_inputs) for a in exported.assets.assets if a.kind=='F'})
+            except Exception as exc:   # 含 SandboxError（ValueError 子类）：统一带上下文回灌
+                raise ValueError(f'候选预检失败: {type(exc).__name__}: {exc}') from exc
+            problems=trial_capability_floor_errors(records,
+                capability_names(getattr(spec,'retrieval_floor',{}) or {}))
+            if problems: raise ValueError('候选能力试跑不合格: '+str(problems))
+
     def _client(self,stage):
         if self._injected_client is not None:
             return self._injected_client(stage)
@@ -309,7 +356,17 @@ class ExperimentRunner:
                                   frozen_snapshot=None if self.snapshot_root is None else self.snapshot_root/case.id)
                 result=await pipeline.run(case,spec,self.config)
                 faulted=[a for a in result.answers if a.status=='execution_error']
-                if faulted and (name,case.id) not in self._fault_retried:
+                graph_failure=[d for d in (result.graph_diagnostics or ())
+                               if isinstance(d,Mapping) and d.get('status')=='execution_error']
+                if faulted and graph_failure:
+                    # 图阶段全局确定性失败（评审①）：删答案检查点救不回图阶段产物，
+                    # 分批等待重试毫无意义——如实记录，不重试。
+                    retries[case.id]={'questions':len(faulted),'recovered':0,
+                                      'still_faulted':sorted(a.question_id for a in faulted),
+                                      'skipped_retry':'graph_stage_failure',
+                                      'graph_error':str(graph_failure[0].get('error'))[:200]}
+                    print(json.dumps({'stage':name,'case':case.id,'fault_retry':retries[case.id]},ensure_ascii=False),flush=True)
+                elif faulted and (name,case.id) not in self._fault_retried:
                     self._fault_retried.add((name,case.id))
                     # 先歇再重试：EmptyCompletion 类故障多为瞬时突发，隔窗后分批小跑；
                     # 统计口径见 batched_fault_retry（末份答案集重算，不做批次并集）。
@@ -444,6 +501,7 @@ class ExperimentRunner:
                                 candidate=self.revisions.propose(adopted,patches,stage/'candidate',training_ids,forbidden,
                                                                  allowed_kinds=tuple(scope or ()),
                                                                  required_capabilities=required_caps)
+                                self._preflight(candidate,spec)
                                 break
                             except ValueError as exc:
                                 admission_error=f'{type(exc).__name__}: {exc}'

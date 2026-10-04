@@ -49,7 +49,10 @@ class AnswerAgent:
                         if action['action']=='ready': break
                         result=self.runtime.call(action['asset_id'],action['parameters'],graph)
                         visible.update(result['node_ids']);tool_results.append(result)
-                        trace.append({'stage':'tool','attempt':attempt,'step':step,**result})
+                        # 参数在真实执行点入轨迹（评审②）：协议重试中被拒的旧动作不会错配到
+                        # 成功调用上；反馈摘要据此读取，不再依赖 raw_outputs 顺序配对。
+                        trace.append({'stage':'tool','attempt':attempt,'step':step,
+                                      'parameters':plain(action['parameters']),**result})
                 candidate=await session.request(self.config.answer_role,
                     ANSWER_PROTOCOL+'\n任务作答指引：\n'+self.runtime.prompt('answer'),
                     {'question':question.text,'parameters':plain(question.parameters),'answer_format':self.spec.answer_format,

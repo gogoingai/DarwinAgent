@@ -245,6 +245,14 @@ class AssetBootstrapper:
                         from oak.kernel.validation import trial_capability_floor_errors
                         problems = trial_capability_floor_errors(records, floor_caps)
                         if problems: raise ValueError('检索底线试跑未触发: ' + str(problems))
+                    # 图阶段 C 在完整真实图上执行（评审①）：预算随图规模伸缩由 CheckRegistry
+                    # 负责；不合格 C 在这里反馈给模型修订，而不是等到正式运行整轮失败。
+                    from oak.kernel.checks import CheckRegistry
+                    graph_checks = CheckRegistry(trial_bundle, Limits(config.function_steps,
+                                                       config.function_timeout_s, config.result_bytes))
+                    graph_caps = __import__('oak.operators.data', fromlist=['DataCapabilities']).DataCapabilities(trial_graph)
+                    graph_checks.run('graph', {'nodes': list(graph_caps.rows.values()),
+                                               'stage': 'graph'})
             return assets
         floor_required = bool(capability_names(getattr(spec, 'retrieval_floor', {}) or {}))
         protocol = ASSET_PROTOCOL if anchored else (

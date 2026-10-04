@@ -136,6 +136,68 @@ class TraceSummaryTests(unittest.TestCase):
         self.assertTrue(any(r['by'] == 'review' and '证据不足' in r['reason'] for r in summary['rejections']))
 
 
+class TraceGapTests(unittest.TestCase):
+    """评审②四缺口：检查理由（mappingproxy）可见；被拒调用后成功工具参数正确；
+    证据与来源可见；摘要截断可识别。"""
+
+    def _answer(self, trace_events, raw):
+        ev = (SourceRef('message_text', 'c', '1'),)
+        # AnswerResult 构造时会 freeze trace —— mappingproxy 是真实运行时形态
+        return AnswerResult('0', 'answered', 'ok', evidence=ev, raw_outputs=raw, trace=trace_events)
+
+    def test_frozen_check_reasons_visible(self):
+        from oak.experiments.runner import _retrieval_trace
+        events = ({'stage': 'candidate', 'attempt': 0,
+                   'candidate': {'status': 'answered'},
+                   'checks': ({'check_id': 'fixed.cite', 'ok': False,
+                               'issues': ['引用了不可见行']},)},)
+        answer = self._answer(events, ('{"status":"answered"}', '{"accepted":true}'))
+        summary = _retrieval_trace(answer)
+        rejected = [r for r in summary['rejections'] if r['by'] == 'check']
+        self.assertTrue(rejected)
+        self.assertIn('引用了不可见行', rejected[0]['issues'])
+
+    def test_params_come_from_execution_record_not_rejected_calls(self):
+        # 第一次动作调未登记工具被拒（raw_outputs 里留下错误参数），第二次成功——
+        # 摘要必须用工具事件内执行点记录的 parameters
+        from oak.experiments.runner import _retrieval_trace
+        raw = ('{"action":"call","asset_id":"bogus_tool","parameters":{"wrong":true}}',
+               '{"action":"call","asset_id":"f_good","parameters":{"stale":"x"}}',
+               '{"action":"ready"}')
+        events = ({'stage': 'tool', 'attempt': 0, 'step': 0, 'asset_id': 'f_good',
+                   'parameters': {'query': '正确参数'}, 'data': [{'node_id': 'n1'}],
+                   'node_ids': [], 'source_ids': [], 'read_operations': 1,
+                   'capability_calls': {'semantic_search': 1}},)
+        summary = _retrieval_trace(self._answer(events, raw))
+        self.assertEqual(summary['tools'][0]['params'], '{"query": "正确参数"}')
+        self.assertNotIn('stale', summary['tools'][0]['params'])
+
+    def test_evidence_excerpts_and_sources_visible(self):
+        from oak.experiments.runner import _retrieval_trace
+        events = ({'stage': 'tool', 'attempt': 0, 'step': 0, 'asset_id': 'f_semantic',
+                   'parameters': {'query': 'q'}, 'data': [
+                       {'node_id': 'n000001', '陈述': '甲计划下周修打印机', 'source_ids': ['s1', 's2']},
+                       {'node_id': 'n000002', '陈述': '乙觉得跑步能减压', 'source_ids': ['s3']}],
+                   'node_ids': [], 'source_ids': [], 'read_operations': 2,
+                   'capability_calls': {'semantic_search': 1}},)
+        summary = _retrieval_trace(self._answer(events, ('{"action":"ready"}',)))
+        evidence = summary['tools'][0]['evidence']
+        self.assertEqual(evidence[0]['node_id'], 'n000001')
+        self.assertIn('修打印机', evidence[0]['statement'])
+        self.assertEqual(evidence[0]['source_ids'], ['s1', 's2'])
+
+    def test_truncation_is_marked(self):
+        from oak.experiments.runner import _retrieval_trace, _TRACE_CHARS
+        events = tuple(
+            {'stage': 'tool', 'attempt': 0, 'step': i, 'asset_id': f'f_{i}',
+             'parameters': {'q': 'x' * 400}, 'data': [], 'node_ids': [], 'source_ids': [],
+             'read_operations': 1, 'capability_calls': {'search': 1}}
+            for i in range(30))
+        summary = _retrieval_trace(self._answer(events, ('{"action":"ready"}',)))
+        self.assertLess(len(summary['tools']), 30)
+        self.assertGreater(summary.get('tools_truncated', 0), 0)
+
+
 class CrossCaseTraceTests(unittest.TestCase):
     def test_same_question_id_keeps_case_local_trace(self):
         # 评审#3 反例：A、B 对话都有第 0 题，A 用 tool_A、B 用 tool_B——反馈不得串用
@@ -435,6 +497,125 @@ class FaultRetryInvalidatesEvaluationTests(unittest.TestCase):
             self.assertEqual(scores.completed, 2)
             self.assertEqual(evaluated, [['answered', 'answered']])   # 陈旧检查点已作废、恢复题被重评
             self.assertEqual(results[0].answers[0].status, 'answered')
+
+
+if __name__ == '__main__':
+    unittest.main()
+
+
+class GraphCheckBudgetTests(unittest.TestCase):
+    def _registry(self, steps=30000):
+        from oak.kernel.checks import CheckRegistry
+        from oak.operators.sandbox import Limits
+        src = ("def check(candidate):\n"
+               " issues=[]\n fact=0\n"
+               " for n in candidate.get('nodes', []):\n"
+               "  if n.get('entity_type')=='原子事实':\n"
+               "   fact=fact+1\n"
+               "   if not n.get('陈述',''):\n"
+               "    issues.append('空陈述')\n"
+               " if fact==0:\n"
+               "  issues.append('无原子事实')\n"
+               " return {'ok': not issues, 'issues': issues}\n")
+        class A: kind='C'; id='c'; fingerprint='f'; stage='graph'; content=src
+        class B:
+            assets=type('AS',(),{'assets':(A(),)})(); version='v'
+            def verify(self): pass
+        return CheckRegistry(B(), Limits(steps,15.0,180000))
+
+    def test_budget_scales_with_snapshot(self):
+        # 评审①：1100 节点的图检查需 ~40k 步 > function_steps——预算随图规模伸缩后通过，
+        # 且记录实际耗用 steps_used / step_budget
+        rows=[{'node_id':f'n{i:06d}','entity_type':'原子事实','陈述':f'事实{i}','source_ids':['s']}
+              for i in range(2200)]
+        opinions=self._registry().run('graph',{'nodes':rows,'stage':'graph'})
+        self.assertTrue(opinions[0]['ok'])
+        self.assertGreater(opinions[0]['steps_used'],30000)      # 事故的真实量级
+        self.assertLessEqual(opinions[0]['steps_used'],opinions[0]['step_budget'])
+        no_nodes=self._registry().run('graph',{'stage':'graph'})
+        self.assertEqual(no_nodes[0]['step_budget'],30000)       # 无节点不放大预算
+
+    def test_stage_skip_and_preflight(self):
+        import asyncio
+        from types import SimpleNamespace
+        from oak.experiments import runner as R
+        # (a) 图阶段全局失败：不进入分批重试（FakePipeline 只被调用一次）
+        class FakeClient:
+            async def aclose(self): pass
+            def ledger_summary(self): return {'total_calls':0}
+        ev=(SourceRef('m','c','1'),)
+        graph_failed=RunResult('c','i','v',(AnswerResult('q1','execution_error','',error='x'),),
+                               0,({'status':'execution_error','error':'SandboxError: budget'},))
+        calls=[]
+        class OncePipeline:
+            def __init__(self, client, work_dir, frozen_snapshot=None): pass
+            async def run(self, case, spec, config):
+                calls.append(1); return graph_failed
+        class C: id='c'
+        with tempfile.TemporaryDirectory() as td:
+            runner=R.ExperimentRunner(
+                type('Adapter',(),{'generation_input':staticmethod(lambda i: C())})(),
+                lambda c,p: type('E',(),{'evaluate':None})(), None, RunConfig(protocol_attempts=1),
+                None, Path(td)/'r', client_factory=lambda s: FakeClient())
+            # 图阶段全局失败：断言不进入分批重试（评测异常在此路径上必然发生，宽断言）
+            with mock.patch.object(R,'Pipeline',OncePipeline):
+                with self.assertRaises(Exception):
+                    asyncio.run(runner._stage('B0',[C()],SimpleNamespace(bundle=SimpleNamespace(version='v'))))
+        self.assertEqual(calls,[1])   # 只跑了一次，没有分批重试
+
+
+class PreflightCapabilityTests(unittest.TestCase):
+    def _runner_with_graph(self, root):
+        import asyncio
+        from oak.experiments.runner import ExperimentRunner
+        from oak.experiments.snapshots import load_frozen_graph
+        from tests.integration.test_agentic_round import FakeEmbedder, build_snapshot, corpus, cold_bundle
+        snapshot,_=build_snapshot(root)
+        from oak.experiments.snapshots import attach_vector
+        graph=load_frozen_graph(snapshot, corpus())
+        attach_vector(graph, snapshot, embedder_factory=lambda: FakeEmbedder())
+        class C: id='c'
+        runner=ExperimentRunner(
+            type('Adapter',(),{'generation_input':staticmethod(lambda i: C())})(),
+            lambda c,p: None, None, RunConfig(function_timeout_s=15.0), None, root/'r',
+            client_factory=lambda s: None, bootstrap_trial_graph=graph)
+        return runner, cold_bundle(root/'b')
+
+    def test_untriggered_capability_rejected_before_stage(self):
+        # 评审③反例：semantic_search 在未执行分支里（AST 有调用），试跑只执行 nodes
+        # ——候选预检必须拒绝
+        from dataclasses import replace
+        from oak.kernel import TaskSpec
+        from tests.integration.test_agentic_round import ROOT
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            runner,bundle=self._runner_with_graph(root)
+            spec=TaskSpec.load(ROOT/'tasks/conversation_memory/task.yaml')
+            from oak.kernel.assets import Asset
+            fake=Asset('f_semantic','F',
+                "def run(params):\n if params.get('mode')=='vec':\n  return semantic_search(params['query'], limit=4)\n return nodes('原子事实', limit=2)\n",
+                {'type':'object','properties':{'mode':{'type':'string'}}},{'type':'array'},
+                trial_inputs=({'mode':'plain'},),schema_dependencies=['schema'],description='fake')
+            traverse=Asset('f_traverse','F',
+                "def run(params):\n return traverse(params['node_id'], params['relation'])\n",
+                {'type':'object','properties':{'node_id':{'type':'string'},'relation':{'type':'string'}}},
+                {'type':'array'},
+                trial_inputs=({'node_id':'n000000','relation':'归属于'},),
+                schema_dependencies=['schema'],description='关系遍历')
+            others=[a for a in bundle.assets.assets if a.id!='f_semantic']+[traverse]
+            import tempfile as _tf
+            fake_bundle=self._export(root, tuple(others+[fake]))
+            with self.assertRaises(ValueError) as caught:
+                runner._preflight(fake_bundle, spec)
+            self.assertIn('候选能力试跑不合格', str(caught.exception))
+            # 合格候选（真实触发 semantic_search）通过
+            good=self._export(root, tuple(bundle.assets.assets)+(traverse,))
+            runner._preflight(good, spec)
+
+    def _export(self, root, assets):
+        import tempfile as _tf
+        from oak.kernel.assets import KernelAssets
+        return KernelAssets(assets).export(Path(_tf.mkdtemp(prefix='pf-'))/'exported')
 
 
 if __name__ == '__main__':
