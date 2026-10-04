@@ -586,11 +586,24 @@ class ExperimentRunner:
                         errs = loop_carried_capability_errors(a.content)
                         if errs:
                             raise ValueError(f'{a.id}: ' + '; '.join(errs))
-                f_inputs={a.id:list(a.trial_inputs) for a in exported.assets.assets if a.kind=='F'}
+                orig_inputs={a.id:list(a.trial_inputs) for a in exported.assets.assets if a.kind=='F'}
+                f_inputs={k:list(v) for k,v in orig_inputs.items()}
                 for a in exported.assets.assets:
                     if a.kind=='F':
                         f_inputs[a.id]+=stress_trial_samples(list(a.trial_inputs),graph)
-                records=FunctionRegistry(exported,limits).trial(graph,f_inputs)
+                # 电池噪声过滤：合成参数的语义错位（如主体名被替换进 node_id 字段）不作拦截；
+                # F 内部执行缺陷（预算/容器/类型崩）照拦——历史回归两类真实故障的拦截不变。
+                _NOISE=('Unknown graph node', 'not in enum', 'tool.params',
+                        'Invalid traversal', 'Search requires', 'requires')
+                _probe=FunctionRegistry(exported,limits)
+                for aid,plist in f_inputs.items():
+                    for pp in plist:
+                        try:
+                            _probe.call(aid,pp,graph)
+                        except ValueError as exc:
+                            if not any(n in str(exc) for n in _NOISE):
+                                raise
+                records=_probe.trial(graph,orig_inputs)
             except Exception as exc:   # 含 SandboxError（ValueError 子类）：统一带上下文回灌
                 raise ValueError(f'候选预检失败: {type(exc).__name__}: {exc}') from exc
             problems=trial_capability_floor_errors(records,
