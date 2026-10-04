@@ -288,7 +288,7 @@ def _per_case_feedback_facts(root, name, cases):
 class ExperimentRunner:
     def __init__(self,adapter,evaluator_factory,connection_config,run_config,policy,work_dir,
                  frozen_files=(),client_factory=None,bootstrap_context=None,snapshot_root=None,
-                 bootstrap_trial_graph=None):
+                 bootstrap_trial_graph=None,smoke_judge=None):
         self.adapter,self.evaluator_factory=adapter,evaluator_factory
         self.connection_config,self.config,self.policy=connection_config,run_config,policy
         self.root=Path(work_dir)
@@ -301,6 +301,8 @@ class ExperimentRunner:
         self.snapshot_root=Path(snapshot_root) if snapshot_root is not None else None
         # bootstrap_trial_graph: 冷启动 bootstrap 反馈环内的真图试跑（冻结快照图）。
         self.bootstrap_trial_graph=bootstrap_trial_graph
+        # smoke_judge: 任务层注入的子集判题器（冻结判题原语；框架不依赖任务模块）。
+        self.smoke_judge=smoke_judge
         self._fault_retried=set()
 
     def _stage_health(self):
@@ -441,13 +443,16 @@ class ExperimentRunner:
                 faults=[a for a in result.answers if a.status=='execution_error']
                 if faults:
                     return f'冒烟存在执行错误 {len(faults)}/{len(result.answers)}: '+str(faults[0].error)[:200]
-                # 冒烟判题（训练集金标对机械门合法可见）：保证能答对，至少 1/3 precise
-                scores=await self.evaluator_factory(client,Path(td)/'eval').evaluate(result)
-                precise=scores.metrics.get('original_precise',0)
-                if scores.completed<scores.total:
-                    return f'冒烟判题未完成: {scores.completed}/{scores.total}'
-                if precise<1:
-                    return f'冒烟 3 题全错（precise=0/{scores.total}）——冷启动质量门拒绝'
+                # 冒烟判题（任务层注入的冻结判题原语，训练集金标对机械门合法可见）：
+                # 保证能答对，至少 1/3 precise。无注入时退化为「存在有效作答」检查。
+                if self.smoke_judge is not None:
+                    verdict=await self.smoke_judge(client,case,result.answers)
+                    if verdict['completed']<verdict['total']:
+                        return f'冒烟判题未完成: {verdict}'
+                    if verdict['precise']<1:
+                        return f"冒烟 {verdict['total']} 题全错（precise=0）——质量门拒绝"
+                elif not any(a.status=='answered' for a in result.answers):
+                    return '冒烟 3 题无任何有效作答'
             return None
         finally: await client.aclose()
 

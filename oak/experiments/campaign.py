@@ -22,7 +22,8 @@ from .spec import ExperimentSpec, aggregate_scores, precheck_identity
 
 class CampaignController:
     def __init__(self, adapter, evaluator_factory, connection_config, run_config, spec: ExperimentSpec,
-                 work_dir, frozen_files=(), client_factory=None, snapshot_root=None, bootstrap_context=None):
+                 work_dir, frozen_files=(), client_factory=None, snapshot_root=None, bootstrap_context=None,
+                 smoke_judge=None):
         if not isinstance(spec, ExperimentSpec):
             raise ValueError('Campaign requires a frozen ExperimentSpec')
         self.adapter, self.evaluator_factory = adapter, evaluator_factory
@@ -33,6 +34,8 @@ class CampaignController:
         self._injected_client = client_factory
         # 快照结构样本与冻结快照根：由数据集装配层注入（两臂共用同一记忆面）。
         self.bootstrap_context = bootstrap_context
+        # 任务层注入的冒烟子集判题器（透传给训练 runner 的冒烟门）。
+        self.smoke_judge = smoke_judge
         self.snapshot_root = Path(snapshot_root) if snapshot_root is not None else None
         self.bootstrap_trial_graph = None  # 真图试跑图，由数据集装配层注入
 
@@ -233,7 +236,7 @@ class CampaignController:
                                   self.config, self.spec.adoption, self.root / 'train', self.frozen_files,
                                   client_factory=self._injected_client, bootstrap_context=self.bootstrap_context,
                                   snapshot_root=self.snapshot_root,
-                                  bootstrap_trial_graph=self.bootstrap_trial_graph)
+                                  bootstrap_trial_graph=self.bootstrap_trial_graph,smoke_judge=self.smoke_judge)
         if b0_gate is None:
             def b0_gate(scores):
                 return scores.completed == scores.total and scores.generation_faults == 0 and scores.evaluation_faults == 0

@@ -27,6 +27,27 @@ TASK_DIR=ROOT/'tasks/conversation_memory'
 SCOPE={'p':('P',),'pf':('P','F'),'sfcp':('S','F','C','P')}
 
 
+async def smoke_judge(client, case, answers):
+    """冒烟子集判题：直接用冻结判题原语（dual_grade_batch，四盲评）对抽到的题判分，
+    不走完整 evaluate（其要求全会话完整答案集）。训练集金标对机械门合法可见。"""
+    import tempfile
+    from .pipeline.data import load_conversation
+    from .pipeline.protocol import dual_grade_batch
+    from .pipeline.experiment import transcript
+    conv=load_conversation(ROOT/'datasets/locomo/data/locomo10_zh.json', case.id)
+    en=load_conversation(ROOT/'datasets/locomo/data/locomo10.json', case.id)
+    context=transcript(conv)+'\n【英文原句对照】\n'+transcript(en)
+    by_idx={int(a.question_id):a for a in answers}
+    items=[(q, by_idx[q.idx].answer,
+            'answer_error' if by_idx[q.idx].status=='execution_error' else 'ok')
+           for q in conv.qas if q.idx in by_idx]
+    with tempfile.TemporaryDirectory() as td:
+        rows=await dual_grade_batch(items, client, context, Path(td))
+    return {'precise':sum(1 for r in rows.values() if r['status']=='ok' and r['precise']),
+            'completed':sum(1 for r in rows.values() if r['status']!='evaluation_error'),
+            'total':len(items)}
+
+
 def arm_config(arm, vector_k=None):
     # function_timeout_s 放宽：F 内 semantic_search 需要走一次嵌入端点；protocol_attempts
     # 提到 5：bootstrap 长输出偶发 JSON 手误，多两次反馈重试显著降低换根率。
@@ -113,13 +134,15 @@ async def run_arm(args):
                                 connection(root),config,spec.adoption,root/'train',frozen_files(),
                                 snapshot_root=SNAPSHOTS,
                                 bootstrap_context=memory_structure_sample(SNAPSHOTS/'conv-26'),
-                                bootstrap_trial_graph=bootstrap_trial_graph(adapter))
+                                bootstrap_trial_graph=bootstrap_trial_graph(adapter),
+                                smoke_judge=smoke_judge)
         summary=await runner.run(cases,task,rounds=0,resume=args.resume,scope=SCOPE[args.scope])
         print(summary['status'])
         return
     controller=CampaignController(adapter,lambda client,path:LocomoEvaluator(client,path),
                                   connection(root),config,spec,root,frozen_files(),snapshot_root=SNAPSHOTS,
-                                  bootstrap_context=memory_structure_sample(SNAPSHOTS/'conv-26'))
+                                  bootstrap_context=memory_structure_sample(SNAPSHOTS/'conv-26'),
+                                  smoke_judge=smoke_judge)
     controller.bootstrap_trial_graph=bootstrap_trial_graph(adapter)
     # 冷启动轮 B0 门＝「可评分基线」：完成度≥95% 即锚定迭代起点；故障如实进 unhealthy_stages，
     # 由采纳门（零故障才可采纳）与迭代清零。框架默认门（全完+双故障零）不变，仅本轮传入放宽版。
