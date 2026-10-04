@@ -42,6 +42,18 @@ def main(argv):
     ev = src / 'train/B0/evaluation'
     if ev.exists() and not (dst / 'train/B0/evaluation').exists():
         shutil.copytree(ev, dst / 'train/B0/evaluation')
+        # 判分检查点带 run_identity（含完整框架图）：框架有任何变更即作废——删除身份章
+        # 文件（evaluation/<case>.json），保留 evaluation/<case>/<gold>/cache 判题缓存
+        # （按题+答案+gold 键控，身份无关）——重判走缓存命中，成本近零。v13 事故修复。
+        carried_fw = {}
+        ident_probe = next((dst / 'train/B0/generation').glob('conv-*/identity.json'), None)
+        if ident_probe is not None:
+            carried_fw = json.loads(ident_probe.read_text()).get('framework', {})
+        fw_changed = any(current.get(p) != sha for p, sha in carried_fw.items())
+        if fw_changed:
+            for case_json in (dst / 'train/B0/evaluation').glob('conv-*.json'):
+                case_json.unlink()
+            print('框架已变更：丢弃身份章判分检查点（判题缓存保留，重判近零成本）')
     carried = 0
     for case_dir in sorted((dst / 'train/B0/generation').glob('conv-*')):
         ident_file = case_dir / 'identity.json'
