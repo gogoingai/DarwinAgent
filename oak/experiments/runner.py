@@ -318,6 +318,175 @@ _DETERMINISTIC_ERRORS=frozenset({'SandboxError','ValueError','TypeError','KeyErr
 
 
 def stress_trial_samples(base_inputs, graph):
+    """F 单元测试——穷尽版（用户标准：单测应避免所有故障）。故障全部由数据形态触发，
+    而全图行的形态签名可穷举：按（字段→类型）签名分组取样＋全量规模＋标量边界。
+    今晚全部故障类（容器str／预算爆／契约违）均在此死在准入层，而非 199 题全量。"""
+    from oak.operators.data import DataCapabilities
+    rows = list(DataCapabilities(graph).rows.values())
+
+    def signature(row):
+        return tuple(sorted((k, type(v).__name__) for k, v in row.items() if k != 'node_id'))
+
+    by_sig = {}
+    for r in rows:
+        by_sig.setdefault(signature(r), r)
+    shape_rows = list(by_sig.values())          # 每种形态签名一行（通常 ≤10）
+
+    out = []
+    for base in base_inputs[:3]:
+        if not (isinstance(base, dict) and isinstance(base.get('rows'), list)):
+            continue
+        variants = [
+            [],                                  # 空行集
+            [dict(r) for r in shape_rows],       # 形态签名穷尽
+            [dict(r) for r in rows],             # 全量规模（预算类在此爆）
+        ]
+        for v in variants:
+            out.append({**base, 'rows': v})
+            if v:
+                stripped = [{k: x for k, x in r.items() if k not in ('日期', '主题', '类型')}
+                            for r in v[:40]]
+                out.append({**base, 'rows': stripped})   # 缺字段形态
+        broad = {k: ('' if isinstance(v, str) and k != 'rows' else v) for k, v in base.items()}
+        out.append({**broad, 'rows': [dict(r) for r in rows]})   # 最宽过滤×全量
+    return out
+
+
+def pipeline_active_stages(snapshot_root):
+    """资产职责图（专家规格#5）：让提案器明确知道每个资产在当前配置下的实际执行情况——
+    冻结快照下 P.extract 根本不执行、S 只作用于查询词表层（不重建图）；修改它们不会
+    改变本轮计分路径，不得把这类改动算作答题收益。"""
+    if snapshot_root is not None:
+        return {'P.extract': 'SKIPPED——记忆由冻结快照供给，改它不进本轮计分路径',
+                'P.tools': '执行中（检索决策）', 'P.answer': '执行中（作答）',
+                'P.review': '执行中（审查）',
+                'S': '仅查询词表层——冻结图不因 S 补丁重建，新类型在图中无数据',
+                'F': '执行中（检索函数）', 'C': '执行中（结构检查，电池准入）'}
+    return {'P.extract': '执行中（语料抽取）', 'P.tools': '执行中', 'P.answer': '执行中',
+            'P.review': '执行中', 'S': '全量生效（驱动抽取）', 'F': '执行中', 'C': '执行中'}
+
+
+def training_feedback(cases, results, case_diagnostics, baseline, active_stages=None,
+                      previous_round=None):
+    """Failure-first proposal feedback: compressed diagnostics (gold references never enter
+    the payload) plus a per-question execution trace. One character budget bounds the COMPLETE
+    serialized payload. With several training cases the budget rotates case by case — an early
+    case may not crowd the others out. Answer association is keyed per case (评审#3):
+    same-named question ids in different cases never share a trace."""
+    per_case_rows = []
+    rows_total = 0
+    for (case_id, diagnostics), result in zip(case_diagnostics, results):
+        answers = {a.question_id: a for a in result.answers}  # 会话内索引：同名题号跨对话不串用
+        rows = []
+        for row in plain(diagnostics):
+            if not _diagnostic_failure(row):
+                continue
+            rows_total += 1
+            unit = {'case_id': case_id, 'diagnostic': _compact_diagnostic(row)}
+            answer = answers.get(row.get('question_id') if isinstance(row, dict) else None)
+            if answer is not None:
+                unit['trace'] = _retrieval_trace(answer)
+            rows.append(unit)
+        per_case_rows.append(rows)
+    failures = []
+    for case, result in zip(cases, results):
+        failures += [{'case_id': case.id, 'question_id': a.question_id, 'error': a.error}
+                     for a in result.answers if a.status == 'execution_error']
+    graph_rows = []
+    for result in results:
+        graph_rows += list(plain(result.graph_diagnostics))
+    score_data = baseline.to_dict()
+    score_data.pop('diagnostics', None)  # 诊断单独装订，载荷不重复计费
+
+    def payload(case_counts, fail_count, graph_count):
+        diagnostics = [row for rows, take in zip(per_case_rows, case_counts) for row in rows[:take]]
+        return {'scores': score_data,
+                'pipeline_active_stages': active_stages,
+                'previous_round': previous_round,
+                'diagnostics': diagnostics,
+                'diagnostic_rows_total': rows_total,
+                'diagnostic_rows_in_proposal': len(diagnostics),
+                'generation_failures': failures[:fail_count],
+                'generation_failures_total': len(failures),
+                'generation_failures_truncated': fail_count != len(failures),
+                'graph_diagnostics': graph_rows[:graph_count],
+                'feedback_budget_chars': FEEDBACK_BUDGET_CHARS}
+
+    def fits(case_counts, fail_count, graph_count):
+        return len(json.dumps(payload(case_counts, fail_count, graph_count),
+                              ensure_ascii=False, default=str)) <= FEEDBACK_BUDGET_CHARS
+
+    zero_counts = (0,) * len(per_case_rows)
+    skeleton = len(json.dumps(payload(zero_counts, 0, 0), ensure_ascii=False, default=str))
+    if skeleton > FEEDBACK_BUDGET_CHARS:
+        raise ValueError(f'反馈骨架（scores+统计字段）序列化后 {skeleton} 字符，超过预算 '
+                         f'{FEEDBACK_BUDGET_CHARS}：评分载荷本身超限，拒绝生成提案')
+    # 轮转准入：每步从已入载行数最少的对话取一行——多对话均分预算，谁也不能先占满。
+    case_counts = [0] * len(per_case_rows)
+    progress = True
+    while progress:
+        progress = False
+        for i in sorted(range(len(per_case_rows)), key=lambda idx: case_counts[idx]):
+            if case_counts[i] >= len(per_case_rows[i]):
+                continue
+            trial = list(case_counts); trial[i] += 1
+            if fits(tuple(trial), 0, 0):
+                case_counts = trial; progress = True
+                break
+    fail_count = 0
+    while fail_count < len(failures) and fits(tuple(case_counts), fail_count + 1, 0):
+        fail_count += 1
+    graph_count = 0
+    while graph_count < len(graph_rows) and fits(tuple(case_counts), fail_count, graph_count + 1):
+        graph_count += 1
+    return payload(tuple(case_counts), fail_count, graph_count)
+
+
+def question_identity(case):
+    """Composite training identity: same-named questions in different cases stay distinct,
+    and '::' inside either id cannot create collisions (length-prefixed encoding)."""
+    return [training_id(case.id, q.id) for q in case.questions]
+
+
+async def batched_fault_retry(pipeline, case, spec, config, answers_dir, faulted,
+                              sleep=asyncio.sleep, batch_size=25, lead_s=150.0, gap_s=60.0):
+    """One bounded retry pass for faulted questions: wait out the transient-burst window,
+    then delete their answer checkpoints in small batches and rerun the case (healthy
+    questions checkpoint-reuse at zero cost). The final fault set is recomputed from the
+    LAST complete answer set — never a union of per-batch snapshots: batches not yet retried
+    still carry their stale fault checkpoints, and a union would preserve those pre-retry
+    states as phantom faults (review #4, offline-reproduced)."""
+    await sleep(lead_s)
+    from oak.runtime.artifacts import digest as _digest
+    result = None
+    for start in range(0, len(faulted), batch_size):
+        for a in faulted[start:start + batch_size]:
+            (Path(answers_dir) / f'{_digest(a.question_id)}.json').unlink(missing_ok=True)
+        result = await pipeline.run(case, spec, config)
+        if start + batch_size < len(faulted):
+            await sleep(gap_s)
+    still_faulted = sorted(a.question_id for a in result.answers if a.status == 'execution_error')
+    return result, still_faulted
+
+
+
+
+def _per_case_feedback_facts(root, name, cases):
+    """Per-case diagnostics from the stage's evaluation checkpoints: the aggregated baseline
+    loses case attribution, the per-case files keep it."""
+    rows = []
+    for case in cases:
+        path = Path(root) / name / 'evaluation' / f'{case.id}.json'
+        diagnostics = ()
+        if path.exists():
+            diagnostics = plain(json.loads(path.read_text())['scores'].get('diagnostics', ()))
+        rows.append((case.id, diagnostics))
+    return rows
+
+_DETERMINISTIC_ERRORS=frozenset({'SandboxError','ValueError','TypeError','KeyError'})
+
+
+def stress_trial_samples(base_inputs, graph):
     """F 单元测试输入（用户拍板：冒烟之外必须有单测）：以模型自带样例参数为基底，
     注入真实数据形态矩阵——空行集/图头部行/尾部行/含列表字段行。数据形态依赖的
     分支错误（如容器 str()）在准入层暴露，不再漏进 199 题全量。"""
