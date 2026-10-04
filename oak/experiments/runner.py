@@ -318,37 +318,63 @@ _DETERMINISTIC_ERRORS=frozenset({'SandboxError','ValueError','TypeError','KeyErr
 
 
 def stress_trial_samples(base_inputs, graph):
-    """F 单元测试——穷尽版（用户标准：单测应避免所有故障）。故障全部由数据形态触发，
-    而全图行的形态签名可穷举：按（字段→类型）签名分组取样＋全量规模＋标量边界。
-    今晚全部故障类（容器str／预算爆／契约违）均在此死在准入层，而非 199 题全量。"""
+    """F 单元测试——穷尽版（用户标准：单测应避免所有故障；历史回归驱动）。
+    触发面穷尽：A 行集形态（空/签名穷尽/全量/缺字段）＋B 标量边界（全空最宽＋图内真值）。
+    历史回归两大根因修复：①真实 trial_inputs 是冻结映射与元组——按 Mapping 判定并
+    plain() 解包，否则样本恒空（电池空转事故）；②自扫描型 F 不收 rows——必须扫标量
+    宽值（subject='' → 内部扫描命中全图 → 预算爆/列表字段流过 str() 当场触发）。"""
+    from collections.abc import Mapping
+    from oak.contracts import plain
     from oak.operators.data import DataCapabilities
     rows = list(DataCapabilities(graph).rows.values())
 
     def signature(row):
         return tuple(sorted((k, type(v).__name__) for k, v in row.items() if k != 'node_id'))
 
-    by_sig = {}
+    shape_rows = []
+    seen_sig = set()
     for r in rows:
-        by_sig.setdefault(signature(r), r)
-    shape_rows = list(by_sig.values())          # 每种形态签名一行（通常 ≤10）
+        sig = signature(r)
+        if sig not in seen_sig:
+            seen_sig.add(sig); shape_rows.append(r)
+
+    real_scalars = {}
+    for field in ('主体', '类型', '主题', '编号'):
+        vals = [str(r[field]) for r in rows[:120]
+                if isinstance(r.get(field), str) and r[field]]
+        if vals:
+            real_scalars[field] = list(dict.fromkeys(vals))[:4]
 
     out = []
-    for base in base_inputs[:3]:
-        if not (isinstance(base, dict) and isinstance(base.get('rows'), list)):
+    for raw_base in base_inputs[:3]:
+        if not isinstance(raw_base, Mapping):
             continue
-        variants = [
-            [],                                  # 空行集
-            [dict(r) for r in shape_rows],       # 形态签名穷尽
-            [dict(r) for r in rows],             # 全量规模（预算类在此爆）
-        ]
-        for v in variants:
-            out.append({**base, 'rows': v})
-            if v:
-                stripped = [{k: x for k, x in r.items() if k not in ('日期', '主题', '类型')}
-                            for r in v[:40]]
-                out.append({**base, 'rows': stripped})   # 缺字段形态
-        broad = {k: ('' if isinstance(v, str) and k != 'rows' else v) for k, v in base.items()}
-        out.append({**broad, 'rows': [dict(r) for r in rows]})   # 最宽过滤×全量
+        base = plain(raw_base)
+        takes_rows = isinstance(base.get('rows'), (list, tuple))
+        if takes_rows:
+            out.append({**base, 'rows': []})
+            out.append({**base, 'rows': [dict(r) for r in shape_rows]})
+            out.append({**base, 'rows': [dict(r) for r in rows]})
+            # 中等规模（历史回归：全量先撞 traverse 100 节点上限报 Invalid traversal，
+            # 运行期预算爆真实发生在 30-100 节点档——两档都要扫）
+            out.append({**base, 'rows': [dict(r) for r in rows[:60]]})
+            out.append({**base, 'rows': [dict(r) for r in rows[:100]]})
+            stripped = [{k: x for k, x in r.items()
+                         if k not in ('日期', '主题', '类型')} for r in shape_rows]
+            out.append({**base, 'rows': stripped})
+            out.append({**base, 'rows': [dict(r) for r in rows],
+                        **{k: '' for k, v in base.items()
+                           if isinstance(v, str) and k != 'rows'}})
+        else:
+            out.append({k: ('' if isinstance(v, str) else v)
+                        for k, v in base.items()})
+        for field, vals in real_scalars.items():
+            for v in vals[:2]:
+                variant = {k: (v if k == field else x) for k, x in base.items()
+                           if k != 'rows'}
+                if takes_rows:
+                    variant['rows'] = [dict(r) for r in shape_rows]
+                out.append(variant)
     return out
 
 
@@ -486,28 +512,6 @@ def _per_case_feedback_facts(root, name, cases):
 _DETERMINISTIC_ERRORS=frozenset({'SandboxError','ValueError','TypeError','KeyError'})
 
 
-def stress_trial_samples(base_inputs, graph):
-    """F 单元测试输入（用户拍板：冒烟之外必须有单测）：以模型自带样例参数为基底，
-    注入真实数据形态矩阵——空行集/图头部行/尾部行/含列表字段行。数据形态依赖的
-    分支错误（如容器 str()）在准入层暴露，不再漏进 199 题全量。"""
-    from oak.operators.data import DataCapabilities
-    rows = list(DataCapabilities(graph).rows.values())
-    list_rows = [r for r in rows if any(isinstance(v, (list, tuple)) for v in r.values())][:4]
-    out = []
-    for base in base_inputs[:3]:
-        if not (isinstance(base, dict) and isinstance(base.get('rows'), list)):
-            continue
-        out.append({**base, 'rows': []})
-        out.append({**base, 'rows': [dict(r) for r in rows[:4]]})
-        out.append({**base, 'rows': [dict(r) for r in rows[-4:]]})
-        if list_rows:
-            out.append({**base, 'rows': [dict(r) for r in list_rows]})
-        # 规模形态（R9 事故：预算爆在输入规模上，小样本测不出）：大行集＋最宽匹配
-        # （标量过滤全置空＝运行期最宽调用），宽扫描实现在准入层即爆预算被拒。
-        out.append({**base, 'rows': [dict(r) for r in rows[:200]]})
-        broad = {k: ('' if isinstance(v, str) and k != 'rows' else v) for k, v in base.items()}
-        out.append({**broad, 'rows': [dict(r) for r in rows[:200]]})
-    return out
 ADMISSION_ATTEMPTS=50
 
 
@@ -576,6 +580,12 @@ class ExperimentRunner:
                     enforce_rejection(checks.run('answer',
                                     synthetic_invalid_answer_snapshot(sample_question.text)),
                                     '候选预检答案阶段[invalid]')
+                from oak.kernel.validation import loop_carried_capability_errors
+                for a in exported.assets.assets:
+                    if a.kind=='F':
+                        errs = loop_carried_capability_errors(a.content)
+                        if errs:
+                            raise ValueError(f'{a.id}: ' + '; '.join(errs))
                 f_inputs={a.id:list(a.trial_inputs) for a in exported.assets.assets if a.kind=='F'}
                 for a in exported.assets.assets:
                     if a.kind=='F':
