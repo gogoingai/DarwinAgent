@@ -23,13 +23,19 @@ class LocomoEvaluator:
         self.dataset_path=Path(dataset_path or ROOT/'datasets/locomo/data/locomo10_zh.json')
         self.audited_path,self.concurrency=Path(audited_path),concurrency
 
-    async def evaluate(self,result):
+    async def evaluate(self,result,asked=None):
+        """asked＝本轮实际出题的 question idx 集合（训练集瘦身时是全集的前缀子集）。
+        None＝按全会话完整性要求（历史行为，验证/测试/外测全量路径不变）。
+        判题上下文永远是全量转写，评分原语不变。"""
         verify_files(ROOT,json.loads(LOCK_PATH.read_text()))
         conv=load_conversation(self.dataset_path,result.case_id)
         en=load_conversation(ROOT/'datasets/locomo/data/locomo10.json',result.case_id)
         context=transcript(conv)+'\n【英文原句对照】\n'+transcript(en)
         predictions={int(a.question_id):a for a in result.answers}
-        if set(predictions)!={q.idx for q in conv.qas}: raise ValueError('Complete independent answer set required')
+        asked_ids=None if asked is None else {int(x) for x in asked}
+        qas=conv.qas if asked_ids is None else [q for q in conv.qas if q.idx in asked_ids]
+        if set(predictions)!={q.idx for q in qas}: raise ValueError('Complete independent answer set required')
+        by_idx={q.idx:q for q in qas}
         # 修订 gold 只在 conv-26 存在（审计参考按会话登记）；其余会话按原始 gold 两口径评分。
         audited=None;disputed=set()
         if result.case_id=='conv-26':
@@ -37,9 +43,11 @@ class LocomoEvaluator:
             if len(audited)!=len(conv.qas) or any(row['idx']!=q.idx or row['question']!=q.question for row,q in zip(audited,conv.qas)):
                 raise ValueError('Audited reference identity mismatch')
             disputed={row['idx'] for row in audited if row['disputed']}
-        golds=[('original',conv.qas)]
+        golds=[('original',qas)]
         if audited is not None:
-            golds.append(('repaired',[replace(q,answer=row['answer']) for q,row in zip(conv.qas,audited)]))
+            repaired_by_idx={q.idx:replace(q,answer=row['answer'])
+                             for row,q in zip(audited,conv.qas)}
+            golds.append(('repaired',[repaired_by_idx[q.idx] for q in qas]))
         sem=asyncio.Semaphore(self.concurrency)
         async def block(gold_name,qas):
             async with sem:
@@ -53,7 +61,7 @@ class LocomoEvaluator:
         diagnostics=[]
         for idx in sorted(predictions):
             a=predictions[idx]
-            row={'question_id':str(idx),'question':conv.qas[idx].question,'status':a.status,'answer':a.answer,
+            row={'question_id':str(idx),'question':by_idx[idx].question,'status':a.status,'answer':a.answer,
                 'error':a.error,'original':reports['original']['grades'][idx]}
             if audited is not None:
                 row['repaired']=reports['repaired']['grades'][idx]
@@ -64,4 +72,4 @@ class LocomoEvaluator:
         eval_faults=sum(r['status']=='evaluation_error' for report in reports.values() for r in report['grades'])
         completed=sum(all(reports[g]['grades'][idx]['status']=='ok' for g in reports) for idx in predictions)
         verify_files(ROOT,json.loads(LOCK_PATH.read_text()))
-        return EvaluationResult(metrics,len(conv.qas),completed,gen_faults,eval_faults,tuple(diagnostics))
+        return EvaluationResult(metrics,len(qas),completed,gen_faults,eval_faults,tuple(diagnostics))

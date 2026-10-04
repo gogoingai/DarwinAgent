@@ -410,7 +410,9 @@ class ExperimentRunner:
                     case_scores=EvaluationResult(**saved['scores'])
                 else:
                     evaluator=self.evaluator_factory(client,stage/'evaluation'/case.id)
-                    case_scores=await evaluator.evaluate(result)
+                    # 完整性按本轮实际出题集核对（训练集瘦身后是前缀子集；全量时等价旧检查）
+                    case_scores=await evaluator.evaluate(result,
+                        asked=tuple(q.id for q in case.questions))
                     atomic_json(scores_path,{'run_identity':result.identity,'asset_version':spec.bundle.version,
                                              'scores':case_scores.to_dict()})
                 results.append(result);scores.append(case_scores);identities.append(result.identity)

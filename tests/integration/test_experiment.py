@@ -27,7 +27,7 @@ class FixtureEvaluator:
         stage=Path(stage)
         name=stage.parent.name
         self.stage=name if name=='B0' or name.startswith('R') else stage.parent.parent.name
-    async def evaluate(self,result):
+    async def evaluate(self,result,asked=None):
         assert all(a.status=='answered' for a in result.answers)
         return EvaluationResult({'precise':0 if self.stage=='B0' else 1},1,1,0,0)
 

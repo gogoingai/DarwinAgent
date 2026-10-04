@@ -53,7 +53,7 @@ class VersionAwareEvaluator:
     def __init__(self, client, path, root):
         self.client, self.path, self.root = client, Path(path), Path(root)
 
-    async def evaluate(self, result):
+    async def evaluate(self, result, asked=None):
         b0 = json.loads((self.root / 'train' / 'B0' / 'assets' / 'manifest.json').read_text())['version']
         good = 1 if result.asset_version != b0 else 0
         n = len(result.answers)

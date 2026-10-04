@@ -13,6 +13,7 @@ from oak.kernel import KernelBundle
 from oak.kernel.validation import capability_floor_errors, capability_names
 from oak.llm.recorded import RecordedClient
 from oak.runtime.artifacts import digest
+from types import SimpleNamespace
 
 
 class BatchedFaultRetryTests(unittest.TestCase):
@@ -246,7 +247,9 @@ class ProposalFeedbackTests(unittest.TestCase):
                                         'capability_calls': {'search': 1}},)),
                    AnswerResult('2', 'execution_error', '', error='ProtocolError: boom'))
         result = RunResult('c', 'id', 'v', answers, 5)
-        class C: id = 'c'
+        class C:
+            id = 'c'
+            questions = (QuestionInput('q1', '?'), QuestionInput('q2', '?'))
         baseline = EvaluationResult({'original_precise': 1}, 2, 3, 1, 0, rows)
         feedback = R.training_feedback([C()], [result], [('c', rows)], baseline)
         ids = [r['diagnostic']['question_id'] for r in feedback['diagnostics']]
@@ -496,7 +499,7 @@ class FaultRetryInvalidatesEvaluationTests(unittest.TestCase):
 
         class FakeEvaluator:
             def __init__(self, client, path): pass
-            async def evaluate(self, result):
+            async def evaluate(self, result, asked=None):
                 evaluated.append([a.status for a in result.answers])
                 return EvaluationResult({'m': 1}, 2, 2, 0, 0)
 
@@ -507,7 +510,9 @@ class FaultRetryInvalidatesEvaluationTests(unittest.TestCase):
             kwargs['sleep'] = fake_sleep
             return await original_retry(*args, **kwargs)
 
-        class C: id = 'c'
+        class C:
+            id = 'c'
+            questions = (QuestionInput('q1', '?'), QuestionInput('q2', '?'))
 
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
@@ -581,7 +586,9 @@ class GraphCheckBudgetTests(unittest.TestCase):
             def __init__(self, client, work_dir, frozen_snapshot=None): pass
             async def run(self, case, spec, config):
                 calls.append(1); return graph_failed
-        class C: id='c'
+        class C:
+            id='c'
+            questions=(QuestionInput('q1','?'),QuestionInput('q2','?'))
         with tempfile.TemporaryDirectory() as td:
             runner=R.ExperimentRunner(
                 type('Adapter',(),{'generation_input':staticmethod(lambda i: C())})(),
@@ -604,7 +611,9 @@ class PreflightCapabilityTests(unittest.TestCase):
         from oak.experiments.snapshots import attach_vector
         graph=load_frozen_graph(snapshot, corpus())
         attach_vector(graph, snapshot, embedder_factory=lambda: FakeEmbedder())
-        class C: id='c'
+        class C:
+            id='c'
+            questions=(QuestionInput('q1','?'),QuestionInput('q2','?'))
         runner=ExperimentRunner(
             type('Adapter',(),{'generation_input':staticmethod(lambda i: C())})(),
             lambda c,p: None, None, RunConfig(function_timeout_s=15.0), None, root/'r',
@@ -920,3 +929,82 @@ class AnswerCheckAdmissionTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class TrimmedEvaluateTests(unittest.TestCase):
+    """训练集瘦身事故（v9 B0 全灭）：evaluator 完整性检查曾硬性要求全会话答案集，
+    瘦身到 100 题后在判分入口崩溃。冒烟门走 dual_grade_batch 子集、不经过这个检查，
+    所以没拦住。asked 语义＝按本轮实际出题集核对；None 保持全会话要求。"""
+
+    def _evaluator(self, n_qas, audited=False):
+        import datasets.locomo.evaluator as ev
+        from dataclasses import dataclass, field
+        @dataclass
+        class Q:
+            idx: int
+            question: str
+            answer: str = ''
+        conv = SimpleNamespace(qas=[Q(i, f'q{i}') for i in range(n_qas)])
+        with tempfile.TemporaryDirectory() as td:
+            tdp = Path(td)
+            lock = tdp / 'lock.json'; lock.write_text('{}')
+            aud = None
+            if audited:
+                aud = tdp / 'audited.json'
+                aud.write_text(json.dumps([{'idx': i, 'question': f'q{i}', 'answer': f'g{i}',
+                                            'disputed': i == 5} for i in range(n_qas)]))
+            ev.LOCK_PATH = lock
+            evaluator = ev.LocomoEvaluator(None, tdp / 'work', audited_path=aud or tdp / 'x.json')
+            fake_aggregate = lambda rows, disputed: {
+                'overall': {'lenient': {'correct': len(rows)}, 'precise': {'correct': len(rows)}},
+                'grades': [{'idx': i, 'status': 'ok'} for i in range(n_qas)]}
+            with mock.patch.object(ev, 'verify_files'), \
+                 mock.patch.object(ev, 'load_conversation', return_value=conv), \
+                 mock.patch.object(ev, 'transcript', return_value=''), \
+                 mock.patch.object(ev, 'aggregate', fake_aggregate), \
+                 mock.patch.object(ev, 'dual_grade_batch', new=_fake_dual_grade_batch):
+                yield evaluator
+
+    def test_asked_subset_passes_and_grades_only_asked(self):
+        gen = self._evaluator(199)
+        evaluator = next(gen)
+        answers = tuple(AnswerResult(question_id=str(i), status='abstained', answer='记忆中无支持',
+                                     evidence=()) for i in range(100))
+        result = SimpleNamespace(case_id='conv-99', answers=answers)
+        scores = asyncio.run(evaluator.evaluate(result, asked=tuple(range(100))))
+        self.assertEqual(scores.total, 100)
+        self.assertEqual(scores.metrics['original_precise'], 100)
+        self.assertEqual(len(scores.diagnostics), 100)
+
+    def test_full_set_still_required_without_asked(self):
+        gen = self._evaluator(199)
+        evaluator = next(gen)
+        answers = tuple(AnswerResult(question_id=str(i), status='abstained', answer='记忆中无支持',
+                                     evidence=()) for i in range(100))
+        result = SimpleNamespace(case_id='conv-99', answers=answers)
+        with self.assertRaisesRegex(ValueError, 'Complete independent answer set'):
+            asyncio.run(evaluator.evaluate(result))
+
+    def test_missing_answer_within_asked_still_rejected(self):
+        gen = self._evaluator(199)
+        evaluator = next(gen)
+        answers = tuple(AnswerResult(question_id=str(i), status='abstained', answer='记忆中无支持',
+                                     evidence=()) for i in range(99))
+        result = SimpleNamespace(case_id='conv-99', answers=answers)
+        with self.assertRaisesRegex(ValueError, 'Complete independent answer set'):
+            asyncio.run(evaluator.evaluate(result, asked=tuple(range(100))))
+
+    def test_audited_gold_aligned_to_asked_subset(self):
+        gen = self._evaluator(199, audited=True)
+        evaluator = next(gen)
+        answers = tuple(AnswerResult(question_id=str(i), status='abstained', answer='记忆中无支持',
+                                     evidence=()) for i in range(100))
+        result = SimpleNamespace(case_id='conv-26', answers=answers)
+        scores = asyncio.run(evaluator.evaluate(result, asked=tuple(range(100))))
+        self.assertEqual(scores.total, 100)
+        self.assertIn('repaired_precise', scores.metrics)
+        self.assertTrue(all('repaired' in row for row in scores.diagnostics))
+
+
+async def _fake_dual_grade_batch(items, client, context, cache_dir):
+    return [{'status': 'ok', 'precise': True} for _ in items]

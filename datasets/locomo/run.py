@@ -28,24 +28,18 @@ SCOPE={'p':('P',),'pf':('P','F'),'sfcp':('S','F','C','P')}
 
 
 async def smoke_judge(client, case, answers):
-    """冒烟子集判题：直接用冻结判题原语（dual_grade_batch，四盲评）对抽到的题判分，
-    不走完整 evaluate（其要求全会话完整答案集）。训练集金标对机械门合法可见。"""
+    """冒烟判题＝正式判题同一入口（用户：流程为什么不一样）：走 evaluate(asked=抽到的题)，
+    与全量轮同一完整性契约、同一判题原语、同一判题器锁校验。旧旁路（dual_grade_batch
+    直调）是历史产物——当时 evaluate 硬性要求全会话答案集，3 题子集物理上进不了门；
+    asked 语义落地后旁路理由消失。训练集金标对机械门合法可见（conv-26 同时判两口径）。"""
     import tempfile
-    from .pipeline.data import load_conversation
-    from .pipeline.protocol import dual_grade_batch
-    from .pipeline.experiment import transcript
-    conv=load_conversation(ROOT/'datasets/locomo/data/locomo10_zh.json', case.id)
-    en=load_conversation(ROOT/'datasets/locomo/data/locomo10.json', case.id)
-    context=transcript(conv)+'\n【英文原句对照】\n'+transcript(en)
-    by_idx={int(a.question_id):a for a in answers}
-    items=[(q, by_idx[q.idx].answer,
-            'answer_error' if by_idx[q.idx].status=='execution_error' else 'ok')
-           for q in conv.qas if q.idx in by_idx]
+    from types import SimpleNamespace
+    result=SimpleNamespace(case_id=case.id, answers=tuple(answers))
     with tempfile.TemporaryDirectory() as td:
-        rows=await dual_grade_batch(items, client, context, Path(td))   # 返回按 items 对齐的列表
-    return {'precise':sum(1 for r in rows if r['status']=='ok' and r['precise']),
-            'completed':sum(1 for r in rows if r['status']!='evaluation_error'),
-            'total':len(items)}
+        scores=await LocomoEvaluator(client, Path(td)).evaluate(
+            result, asked=tuple(int(a.question_id) for a in answers))
+    return {'precise':scores.metrics['original_precise'],
+            'completed':scores.completed,'total':scores.total}
 
 
 def arm_config(arm, vector_k=None):
