@@ -1245,3 +1245,23 @@ class ToolTelemetryTests(unittest.TestCase):
         self.assertFalse(tools[0].get('repeat_call'))
         self.assertEqual(tools[1].get('new_node_ids'), ['n3'])   # n2 已召回不再计新增
         self.assertTrue(tools[1].get('repeat_call'))             # 同工具同参数再现
+
+
+class CrossRoundRejectionFeedbackTests(unittest.TestCase):
+    """规格#5（用户抓到的真缺口）：上一轮拒绝原因必须进下一轮提案反馈——
+    轮内重试看得到 admission_error，跨轮以前看不到，导致每轮摔新坑不带记忆。"""
+
+    def test_previous_round_rejection_enters_feedback(self):
+        from oak.experiments.runner import training_feedback
+        from oak.contracts import RunResult
+        result = RunResult('c', 'i', 'v', (), (), ())
+        payload = training_feedback((SimpleNamespace(id='c', questions=()),), (result,), ({},),
+                                    EvaluationResult({'m': 0}, 0, 0, 0, 0),
+                                    active_stages={'F': '执行中'},
+                                    previous_round={'round': 'R2', 'status': 'validation_failed',
+                                                    'accepted': False,
+                                                    'reasons': ['SandboxError: Container-to-string']})
+        import json
+        blob = json.dumps(payload, ensure_ascii=False, default=str)
+        self.assertIn('previous_round', blob)
+        self.assertIn('Container-to-string', blob)

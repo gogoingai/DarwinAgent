@@ -196,7 +196,8 @@ def pipeline_active_stages(snapshot_root):
             'P.review': '执行中', 'S': '全量生效（驱动抽取）', 'F': '执行中', 'C': '执行中'}
 
 
-def training_feedback(cases, results, case_diagnostics, baseline, active_stages=None):
+def training_feedback(cases, results, case_diagnostics, baseline, active_stages=None,
+                      previous_round=None):
     """Failure-first proposal feedback: compressed diagnostics (gold references never enter
     the payload) plus a per-question execution trace. One character budget bounds the COMPLETE
     serialized payload. With several training cases the budget rotates case by case — an early
@@ -231,6 +232,7 @@ def training_feedback(cases, results, case_diagnostics, baseline, active_stages=
         diagnostics = [row for rows, take in zip(per_case_rows, case_counts) for row in rows[:take]]
         return {'scores': score_data,
                 'pipeline_active_stages': active_stages,
+                'previous_round': previous_round,
                 'diagnostics': diagnostics,
                 'diagnostic_rows_total': rows_total,
                 'diagnostic_rows_in_proposal': len(diagnostics),
@@ -597,8 +599,16 @@ class ExperimentRunner:
                         if resume_smoke: raise ValueError('恢复候选冒烟失败: '+resume_smoke)
                 else:
                     client=self._client(name)
+                    prev_decision=self.root/f'R{n-1}'/'decision.json'
+                    previous_round=None
+                    if n>0 and prev_decision.exists():
+                        pd=json.loads(prev_decision.read_text())
+                        previous_round={'round':f'R{n-1}','status':pd.get('status'),
+                                        'accepted':pd.get('accepted'),
+                                        'reasons':(pd.get('reasons') or [])[:6]}
                     feedback=training_feedback(cases,results,_per_case_feedback_facts(self.root,evidence,cases),baseline,
-                                      active_stages=pipeline_active_stages(self.snapshot_root))
+                                      active_stages=pipeline_active_stages(self.snapshot_root),
+                                      previous_round=previous_round)
                     questions=[]
                     for case in cases:
                         questions+=[{'training_id':tid,'text':q.text} for tid,q in zip(question_identity(case),case.questions)]
