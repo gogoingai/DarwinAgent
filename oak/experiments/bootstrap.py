@@ -53,6 +53,10 @@ Graph recall expansion: an F may chain search/nodes -> traverse(related entity o
 atomic facts in ONE function (fact -> entity -> related facts), returning facts with their sources
 and the relation path, deduplicated. This retrieves facts keyword/vector search miss. Use it when the
 evidence gap is structural (missing set members, related-entity facts), not on every question.
+String conversion applies to SCALARS only: calling str() on a list/dict/tuple raises
+"Container-to-string conversion is unsupported" and kills the whole question. To build text
+from containers, loop their scalar elements and join. This rule applies to EVERY function you
+write, not only the one that failed before.
 F execution budgets (hard): at most 30000 interpreter steps, 15 seconds, and a 180KB result -
 "budget exhausted" means your F scans or loops too much: narrow it with nodes(filters=...) or
 search terms instead of scanning without a limit. No try/except and no while (restricted Python).
