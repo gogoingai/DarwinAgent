@@ -25,7 +25,8 @@ def assert_files(snapshot):
 def transport_identity(client):
     cfg=getattr(client,'cfg',None)
     if cfg is None: return {'transport':type(client).__name__}
-    fields=('api_base_url','fast_base_url','model_strong','model_fast','role_tiers','namespace_limits',
+    fields=('api_base_url','fast_base_url','middle_base_url','model_strong','model_fast','model_middle',
+            'role_tiers','namespace_limits',
             'thinking_disabled_roles','empty_response_passthrough_roles','max_concurrency',
             'fast_max_concurrency','max_retries','reasoning_effort')
     result={}
