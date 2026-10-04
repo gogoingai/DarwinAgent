@@ -285,6 +285,9 @@ def _per_case_feedback_facts(root, name, cases):
         rows.append((case.id, diagnostics))
     return rows
 
+_DETERMINISTIC_ERRORS=frozenset({'SandboxError','ValueError','TypeError','KeyError'})
+
+
 class ExperimentRunner:
     def __init__(self,adapter,evaluator_factory,connection_config,run_config,policy,work_dir,
                  frozen_files=(),client_factory=None,bootstrap_context=None,snapshot_root=None,
@@ -337,7 +340,8 @@ class ExperimentRunner:
             limits=Limits(self.config.function_steps,self.config.function_timeout_s,self.config.result_bytes)
             caps=DataCapabilities(graph)
             try:
-                from oak.kernel.checks import enforce_opinions, synthetic_answer_variants
+                from oak.kernel.checks import (enforce_opinions, enforce_rejection,
+                                               synthetic_answer_variants, synthetic_invalid_answer_snapshot)
                 checks=CheckRegistry(exported,limits)
                 all_rows=list(caps.rows.values())
                 enforce_opinions(checks.run('graph',{'nodes':all_rows,'stage':'graph'}),'候选预检')
@@ -346,6 +350,9 @@ class ExperimentRunner:
                                                              dict(sample_question.parameters)):
                         enforce_opinions(checks.run('answer',variant),
                                          f'候选预检答案阶段[{variant["status"]}]')
+                    enforce_rejection(checks.run('answer',
+                                    synthetic_invalid_answer_snapshot(sample_question.text)),
+                                    '候选预检答案阶段[invalid]')
                 records=FunctionRegistry(exported,limits).trial(graph,
                     {a.id:list(a.trial_inputs) for a in exported.assets.assets if a.kind=='F'})
             except Exception as exc:   # 含 SandboxError（ValueError 子类）：统一带上下文回灌
@@ -388,6 +395,15 @@ class ExperimentRunner:
                                       'still_faulted':sorted(a.question_id for a in faulted),
                                       'skipped_retry':'graph_stage_failure',
                                       'graph_error':str(graph_failure[0].get('error'))[:200]}
+                    print(json.dumps({'stage':name,'case':case.id,'fault_retry':retries[case.id]},ensure_ascii=False),flush=True)
+                elif faulted and all(a.error.split(':',1)[0].strip() in _DETERMINISTIC_ERRORS
+                                     for a in faulted):
+                    # 确定性工具错误（评审：接口/参数错误重试不会变好）：不整题重检索，
+                    # 如实入统计与反馈，由资产修订解决（scope F）。
+                    retries[case.id]={'questions':len(faulted),'recovered':0,
+                                      'still_faulted':sorted(a.question_id for a in faulted),
+                                      'skipped_retry':'deterministic_tool_error',
+                                      'sample_errors':[str(a.error)[:150] for a in faulted[:3]]}
                     print(json.dumps({'stage':name,'case':case.id,'fault_retry':retries[case.id]},ensure_ascii=False),flush=True)
                 elif faulted and (name,case.id) not in self._fault_retried:
                     self._fault_retried.add((name,case.id))

@@ -1100,3 +1100,112 @@ class SmokeJudgeContractTests(unittest.TestCase):
         with mock.patch.object(EV.LocomoEvaluator, 'evaluate', fake_evaluate):
             verdict = asyncio.run(R.smoke_judge(None, SimpleNamespace(id='conv-26'), answers))
         self.assertEqual(verdict, {'precise': 2, 'completed': 2, 'total': 3})
+
+
+class EvidenceBoundaryTests(unittest.TestCase):
+    """证据边界（专家实锤＋用户批准）：作答可引用证据面＝工具返回的行；内部读过未返回
+    的行只进 read_node_ids 溯源；返回行里伪造的 node_id（未读过）被剔除。"""
+
+    def test_returned_rows_only_plus_fabrication_guard(self):
+        import tempfile
+        from oak.experiments.snapshots import load_frozen_graph, attach_vector
+        from oak.kernel.functions import FunctionRegistry
+        from oak.kernel.assets import Asset, KernelAssets
+        from oak.operators.sandbox import Limits
+        from tests.integration.test_agentic_round import FakeEmbedder, build_snapshot, corpus
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            snapshot, _ = build_snapshot(root)
+            graph = load_frozen_graph(snapshot, corpus())
+            attach_vector(graph, snapshot, embedder_factory=lambda: FakeEmbedder())
+            # 读多返回少：nodes 全读 50 行，返回只留 2 行＋1 个伪造 node_id
+            src = ("def run(params):\n"
+                   " rows = nodes('原子事实', limit=50)\n"
+                   " out = [{'node_id': r['node_id'], '陈述': r.get('陈述', '')} for r in rows[:2]]\n"
+                   " out.append({'node_id': 'nFAKE999', '陈述': '伪造'})\n"
+                   " return {'rows': out}\n")
+            contract = {'type': 'object', 'properties': {'rows': {'type': 'array'}},
+                        'additionalProperties': True}
+            f = Asset('f_pick', 'F', src, {'type': 'object'}, contract, ['schema'],
+                      description='挑两行', trial_inputs=({},))
+            from tests.integration.test_agentic_round import cold_bundle
+            base = cold_bundle(root / 'b')
+            keep = [a for a in base.assets.assets if a.kind != 'F']
+            bundle = KernelAssets(tuple(keep + [f])).export(root / 'b2')
+            reg = FunctionRegistry(bundle, Limits(30000, 15.0, 180000))
+            result = reg.call('f_pick', {}, graph)
+            caps_rows = graph  # 快照图行集来自 load_frozen_graph 的 DataCapabilities
+            from oak.operators.data import DataCapabilities
+            all_read = DataCapabilities(graph).rows
+            fact_ids = [nid for nid, row in all_read.items() if row['entity_type'] == '原子事实']
+            self.assertEqual(len(result['read_node_ids']), min(50, len(fact_ids)))
+            self.assertLessEqual(len(result['node_ids']), len(result['read_node_ids']))
+            self.assertNotIn('nFAKE999', result['node_ids'])       # 伪造引用被剔除
+            for nid in result['node_ids']:
+                self.assertIn(nid, result['read_node_ids'])        # 可引用⊆真实读取
+                self.assertIn(nid, all_read)
+
+
+class DeterministicFaultTests(unittest.TestCase):
+    """确定性工具错误不整题重试（评审：接口/参数错误重试不会变好）：
+    SandboxError 类故障跳过分批重试，如实记录进 skipped_retry。"""
+
+    def test_deterministic_error_skips_retry(self):
+        import asyncio
+        from tests.integration.test_experiment import TASK
+        from oak.kernel import TaskSpec
+        import oak.experiments.runner as R
+        from tests.integration.test_agentic_round import build_snapshot, corpus
+        scripted = [RunResult('c', 'i', 'v', (
+            AnswerResult('q1', 'answered', 'a', (SourceRef('k', 'd', 'l'),)),
+            AnswerResult('q2', 'execution_error', '', error='SandboxError: Restricted execution failed'),
+        ), (), ())]
+        calls = []
+        class FakePipeline:
+            def __init__(self, client, work_dir, frozen_snapshot=None): pass
+            async def run(self, case, spec, config):
+                calls.append(1); return scripted[0]
+        class FakeEvaluator:
+            def __init__(self, client, path): pass
+            async def evaluate(self, result, asked=None):
+                return EvaluationResult({'m': 1}, 2, 2, 0, 0)
+        class StubClient:
+            async def aclose(self): pass
+            def ledger_summary(self): return {}
+        class C:
+            id = 'c'
+            questions = (QuestionInput('q1', '?'), QuestionInput('q2', '?'))
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            runner = R.ExperimentRunner(
+                type('Adapter', (), {'generation_input': staticmethod(lambda i: C())})(),
+                lambda c, p: FakeEvaluator(c, p), None, RunConfig(protocol_attempts=1), None, root,
+                client_factory=lambda s: StubClient())
+            spec = SimpleNamespace(bundle=SimpleNamespace(version='v'))
+            import contextlib, io
+            with mock.patch.object(R, 'Pipeline', FakePipeline), \
+                 mock.patch.object(R, 'batched_fault_retry',
+                                   side_effect=AssertionError('不应触发重试')) as no_retry, \
+                 contextlib.redirect_stdout(io.StringIO()) as out:
+                results, scores = asyncio.run(runner._stage('B0', [C()], spec))
+            self.assertEqual(calls, [1])          # 只跑一次：确定性错误未重试
+            self.assertIn('deterministic_tool_error', out.getvalue())
+
+
+class DecorativeCheckTests(unittest.TestCase):
+    """非法候选用例（专家缺口）：存在答案阶段 C 时，畸形候选必须被至少一个 C 拒绝；
+    装饰性 C（永远 ok）在准入被拒。"""
+
+    def test_all_ok_check_rejected_and_flagging_check_passes(self):
+        from oak.kernel.checks import enforce_rejection
+        enforce_rejection([], 'ctx')                                  # 无 C＝合法省略
+        with self.assertRaisesRegex(ValueError, '畸形候选'):
+            enforce_rejection([{'check_id': 'c1', 'ok': True, 'issues': []}], 'ctx')
+        enforce_rejection([{'check_id': 'c1', 'ok': False, 'issues': ['空答案']}], 'ctx')
+
+    def test_invalid_variant_shape(self):
+        from oak.kernel.checks import synthetic_invalid_answer_snapshot
+        v = synthetic_invalid_answer_snapshot('问？')
+        self.assertEqual(v['status'], 'answered')
+        self.assertEqual(v['answer'], '')
+        self.assertEqual(v['node_ids'], [])

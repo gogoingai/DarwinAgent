@@ -65,6 +65,19 @@ def synthetic_answer_variants(rows, question_text, parameters=None):
     return [single, listed, abstain]
 
 
+def synthetic_invalid_answer_snapshot(question_text, parameters=None):
+    """畸形候选（answered 但答案为空、零证据）：若存在答案阶段 C，它必须拒绝——
+    只放行良好成形答案的 C 是装饰品（专家缺口：缺非法候选用例）。"""
+    return {'stage':'answer','question':question_text,'parameters':parameters or {},
+            'status':'answered','answer':'','node_ids':[],'evidence':[],
+            'visible_evidence':[],'structured_answer':None}
+
+
+def enforce_rejection(opinions, context):
+    if opinions and all(o.get('ok') for o in opinions):
+        raise ValueError(f'{context}: 畸形候选未被任何 C 拒绝（装饰性 C，准入拒绝）')
+
+
 def synthetic_answer_snapshot(rows, question_text, parameters=None):
     """良好成形的答案阶段检查快照（真实记忆行＋真实问题文本）。冷启动准入用它真实执行
     答案阶段 C（agentic_v6 G1 B0 全灭事故：模型自写 C 结构不兼容、全盘否决每个候选，

@@ -1,6 +1,8 @@
 """F admission, actual-data trials and bounded invocation."""
 from __future__ import annotations
 
+from collections.abc import Mapping
+
 from oak.operators.data import DataCapabilities
 from oak.operators.sandbox import Interpreter, Limits, admit
 from oak.contracts import plain
@@ -25,10 +27,24 @@ class FunctionRegistry:
         caps=DataCapabilities(graph_result)
         result=Interpreter(fn,caps.registry(),self.limits).execute(params)
         validate_value(result,a.output_contract,'tool.result')
-        node_ids=sorted(caps.read_ids)
+        # 证据边界（专家实锤＋用户批准）：作答可引用的证据面＝工具实际「返回」的行；
+        # F 内部读过但未返回的行只进读血缘（read_node_ids，溯源用）。返回行里出现的
+        # node_id 还必须真实读过（防伪造引用）。
+        returned=set()
+        def _collect(value):
+            if isinstance(value,Mapping):
+                nid=value.get('node_id')
+                if isinstance(nid,str): returned.add(nid)
+                for item in value.values(): _collect(item)
+            elif isinstance(value,(list,tuple)):
+                for item in value: _collect(item)
+        _collect(result)
+        node_ids=sorted(returned & caps.read_ids)
+        read_node_ids=sorted(caps.read_ids)
         source_ids=sorted({s for rid in node_ids for s in caps.rows[rid]['source_ids']})
         return {'asset_id':a.id,'asset_fingerprint':a.fingerprint,'data':result,
-                'node_ids':node_ids,'source_ids':source_ids,'read_operations':caps.read_operations,
+                'node_ids':node_ids,'read_node_ids':read_node_ids,'source_ids':source_ids,
+                'read_operations':caps.read_operations,
                 'capability_calls':dict(caps.capability_calls)}
 
     def trial(self, graph_result, samples):

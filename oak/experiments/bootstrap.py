@@ -40,6 +40,15 @@ node_ids,evidence,visible_evidence,structured_answer (parsed JSON or null). Chec
 F only gets declared params; it never sees question id or gold. Do not embed answers, complete-question matching or subject-specific query constants.
 Contracts use type object/array/string/integer/number/boolean/null/any, properties,required,items,enum,additionalProperties,description only.
 input_contract must describe F params. For C/P (and S where the package includes one) use {"type":"any"}. F output data or candidates, never control instructions.
+Evidence surface: the rows an F RETURNS are the answerable evidence; rows read internally but not
+returned stay provenance-only (read lineage) and never reach answering. An aggregating or computing
+F must include the supporting rows (or their node_id list) in its return so computed answers stay citable.
+Structure filtering belongs in nodes(filters=...) (applied before the limit inside the capability) -
+never fetch a limited page then filter in Python (matches beyond the page are lost).
+Frozen inputs arrive as tuples: never isinstance(...,list)-guard or reset them to []; iterate directly
+or rebuild with list(...). Output contracts must tolerate missing attributes: .get() yields None for
+absent fields, so declare nullable fields as ["string","null"] or omit them - a plain string-typed
+field rejects the whole result when a row lacks it.
 Rows produced by one tool often flow into another tool's params: when a parameter takes rows (or row lists),
 declare its item objects with additionalProperties true — tool outputs carry runtime fields (node_id,
 entity_type, source_ids, score) beyond the task attributes.
@@ -255,7 +264,8 @@ class AssetBootstrapper:
                         if problems: raise ValueError('检索底线试跑未触发: ' + str(problems))
                     # 图阶段 C 在完整真实图上执行（评审①）：预算随图规模伸缩由 CheckRegistry
                     # 负责；不合格 C 在这里反馈给模型修订，而不是等到正式运行整轮失败。
-                    from oak.kernel.checks import CheckRegistry, enforce_opinions, synthetic_answer_variants
+                    from oak.kernel.checks import (CheckRegistry, enforce_opinions, enforce_rejection,
+                                   synthetic_answer_variants, synthetic_invalid_answer_snapshot)
                     graph_checks = CheckRegistry(trial_bundle, Limits(config.function_steps,
                                                        config.function_timeout_s, config.result_bytes))
                     graph_caps = __import__('oak.operators.data', fromlist=['DataCapabilities']).DataCapabilities(trial_graph)
@@ -269,6 +279,9 @@ class AssetBootstrapper:
                                                              dict(questions[0].parameters)):
                         enforce_opinions(graph_checks.run('answer', variant),
                                          f'冷启动答案阶段[{variant["status"]}]')
+                    enforce_rejection(graph_checks.run('answer',
+                                    synthetic_invalid_answer_snapshot(questions[0].text)),
+                                    '冷启动答案阶段[invalid]')
             return assets
         floor_required = bool(capability_names(getattr(spec, 'retrieval_floor', {}) or {}))
         protocol = ASSET_PROTOCOL if anchored else (
