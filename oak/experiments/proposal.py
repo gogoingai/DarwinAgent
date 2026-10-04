@@ -32,7 +32,18 @@ class ProposalGenerator:
         def valid(obj):
             if set(obj)!={'patches'} or not isinstance(obj['patches'],list) or not obj['patches']:
                 raise ValueError('Expected a nonempty structured asset proposal')
-            return tuple(AssetPatch(Asset(**p['asset']),p['base_fingerprint'],p['reason'],tuple(p['training_evidence'])) for p in obj['patches'])
+            import dataclasses
+            fields={f.name for f in dataclasses.fields(Asset)}
+            def _asset(item):
+                # 提案常把展示用的 fingerprint 键回显进资产对象（v13 R4 十连败死因）；
+                # 指纹属于补丁层 base_fingerprint，资产对象里多余键机械剥离——格式类
+                # 错误不再依赖模型自觉，重试预算（50 次）留给内容类问题。
+                extra=sorted(set(item)-fields-{'schema_dependencies'})
+                if extra:
+                    item={k:v for k,v in item.items() if k in fields or k=='schema_dependencies'}
+                    item['description']=str(item.get('description',''))+f' [normalize: dropped {extra}]'
+                return Asset(**item)
+            return tuple(AssetPatch(_asset(p['asset']),p['base_fingerprint'],p['reason'],tuple(p['training_evidence'])) for p in obj['patches'])
         try:
             return await session.request(config.proposal_role,protocol,payload,valid,max_tokens=14000)
         finally:

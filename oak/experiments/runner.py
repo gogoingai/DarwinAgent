@@ -314,7 +314,7 @@ def _per_case_feedback_facts(root, name, cases):
     return rows
 
 _DETERMINISTIC_ERRORS=frozenset({'SandboxError','ValueError','TypeError','KeyError'})
-ADMISSION_ATTEMPTS=10
+ADMISSION_ATTEMPTS=50
 
 
 class ExperimentRunner:
