@@ -126,21 +126,36 @@ def main():
             st = load(state_file)
             marker = json.loads(Path(st['ready_marker']).read_text())
             st['framework_commit'] = marker.get('commit')
-            # 种子＝源根「最后采纳版本」（R1 采纳则 R1 候选，否则此前采纳版）
+            # 种子＝源根「最后采纳版本」（R1 采纳则 R1 候选，否则此前采纳版）。
+            # bundle 未变（R1 拒绝）→ carry_rebase 整体搬运答案/判分检查点，B0 秒过；
+            # bundle 已变（R1 采纳）→ 检查点身份不匹配（资产版本在身份里），不得搬运，
+            # 新 bundle 全量锚定后再进 R2（等价于正常迭代的候选评测成本）。
             pub = src / 'train/published'
             cur = json.loads((pub / 'current.json').read_text())
             version = cur['version']
             (new_root / 'train/B0').mkdir(parents=True, exist_ok=True)
             subprocess.run(['cp', '-R', str(pub / 'versions' / version),
                             str(new_root / 'train/B0/assets')], check=True)
+            b0_manifest = json.loads((src / 'train/B0/assets/manifest.json').read_text())
+            unchanged = b0_manifest.get('version') == version
+            if unchanged:
+                cr = subprocess.run(['uv', 'run', 'python', '-m',
+                                     'datasets.locomo.scripts.carry_rebase',
+                                     str(new_root), str(src)],
+                                    capture_output=True, text=True, cwd=str(REPO))
+                log('检查点搬运: ' + (cr.stdout or cr.stderr).strip()[-160:])
+            else:
+                log('R1 已采纳（bundle 变更）：不搬运检查点，新 bundle 全量锚定')
             atomic_note = {
                 'provenance': '轮次边界交接（专家规格三）：种子=源根最后采纳版本',
                 'source_root': str(src), 'inherited_version': version,
                 'r1_decision': st.get('r1_decision'),
                 'framework_commit': st['framework_commit'],
-                'round_map': {'v11 B0': '旧框架重锚', 'v11 R1': '逻辑 R1（旧框架）',
-                              'v12 B0': '新框架锚定（继承资产，量框架效应，不算逻辑轮）',
-                              'v12 R1': '逻辑 R2（新框架首个提案轮）'},
+                'checkpoints_carried': unchanged,
+                'round_map': {'v11 B0': '锚定（证据边界框架）', 'v11 R1': '逻辑 R1',
+                              'v12 B0': ('检查点复用（bundle 未变）' if unchanged
+                                         else '新 bundle 锚定（R1 采纳）'),
+                              'v12 R1': '逻辑 R2（六项改进框架首个提案轮）'},
             }
             (new_root / 'train/B0/ROOT-NOTE.json').write_text(
                 json.dumps(atomic_note, ensure_ascii=False, indent=1))
