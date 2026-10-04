@@ -1071,7 +1071,7 @@ class SmokeThresholdTests(unittest.TestCase):
                     answers.append(AnswerResult(q.id, 'abstained', '记忆中无支持', ()))
             from types import SimpleNamespace as NS
             return NS(answers=tuple(answers))
-        for fail_count, expect_block in ((1, False), (2, True), (3, True)):
+        for fail_count, expect_block in ((3, False), (4, True), (6, True)):
             class _StubClient:
                 async def aclose(self): pass
             runner = object.__new__(ExperimentRunner)
@@ -1079,7 +1079,7 @@ class SmokeThresholdTests(unittest.TestCase):
             runner.snapshot_root = None
             runner.smoke_judge = None
             runner.config = RunConfig(protocol_attempts=1)
-            case = Case('c', tuple(Q(f'q{i}') for i in range(3)))
+            case = Case('c', tuple(Q(f'q{i}') for i in range(6)))
             with mock.patch.object(R.Pipeline, 'run', fake_pipeline_run), \
                  mock.patch.object(R, 'tempfile', create=True):
                 err = asyncio.run(gate(runner, [case], None))

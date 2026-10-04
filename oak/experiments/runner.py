@@ -444,12 +444,12 @@ class ExperimentRunner:
             return results,aggregated
         finally: await client.aclose()
 
-    async def _smoke_gate(self,cases,spec,questions_per_case=3):
-        """B0 全量提交前的冒烟门（用户拍板：先保证能答对，再启动跑）：每训练对话抽前 3 题
-        走完整真实管线＋冻结判题（临时目录、真模型、~3 分钟）。过门条件＝执行错误 <2/3、
-        判题完整、至少 1/3 precise 答对；不满足分钟级中止换根——确定性全灭（v1/v3/v6 事故类）
-        与「能跑但全答错」的弱冷启动都不再烧全量预算。门槛与 B0 冷门（完成度≥95%）成比例：
-        单题低概率故障（如 F 输出契约被个别调用绊倒，v9 B0 100 题 1 故障同类）由冷门吸收，
+    async def _smoke_gate(self,cases,spec,questions_per_case=6):
+        """B0 全量提交前的冒烟门（用户拍板：先保证能答对，再启动跑；v10 追加：6 题对 2）：
+        每训练对话抽前 6 题走完整真实管线＋冻结判题（临时目录、真模型、~5 分钟）。
+        过门条件＝执行错误 <2/3、判题完整、至少 2/6 precise 答对；不满足分钟级中止换根
+        ——确定性全灭（v1/v3/v6 事故类）与「能跑但全答错」的弱冷启动都不再烧全量预算。
+        门槛与 B0 冷门成比例：单题低概率故障（如 F 输出契约被个别调用绊倒）由冷门吸收，
         只有系统性破绽（≥2/3）才在此拦下。"""
         import dataclasses as _dc
         import tempfile
@@ -472,8 +472,8 @@ class ExperimentRunner:
                     verdict=await self.smoke_judge(client,case,result.answers)
                     if verdict['completed']<verdict['total']:
                         return f'冒烟判题未完成: {verdict}'
-                    if verdict['precise']<1:
-                        return f"冒烟 {verdict['total']} 题全错（precise=0）——质量门拒绝"
+                    if verdict['precise']<2:
+                        return f"冒烟 {verdict['total']} 题对 {verdict['precise']}（需≥2）——质量门拒绝"
                 elif not any(a.status in ('answered','abstained') for a in result.answers):
                     return '冒烟题无任何有效作答'
             return None
