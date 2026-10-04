@@ -1361,7 +1361,10 @@ class FUnitTestsTests(unittest.TestCase):
             from tests.integration.test_agentic_round import corpus
             graph = load_frozen_graph(snapshot, corpus())
             base = {'rows': [{'node_id': 'n000000'}]}
+            from oak.operators.data import DataCapabilities
+            total = len(DataCapabilities(graph).rows)
             out = stress_trial_samples([base], graph)
             self.assertTrue(any(p['rows'] == [] for p in out), '含空行集')
-            self.assertTrue(any(len(p['rows']) > 100 for p in out), '含大规模行集（预算形态）')
+            self.assertTrue(any(len(p['rows']) == min(200, total) for p in out),
+                            '含最大规模行集（预算形态）')
             self.assertGreater(len(out), 2, '含多形态')
