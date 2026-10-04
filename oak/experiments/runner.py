@@ -18,7 +18,8 @@ from pathlib import Path
 from collections.abc import Mapping
 
 from oak.contracts import EvaluationResult, plain
-from oak.engine import Pipeline
+from oak.agents.protocol import ProtocolError
+from oak.engine.pipeline import Pipeline
 from oak.kernel import KernelBundle
 from oak.kernel.revision import AssetRevisionService, training_id
 from oak.kernel.validation import capability_names
@@ -673,8 +674,10 @@ class ExperimentRunner:
                                 os.replace(attempt_path,candidate_path.parent)
                                 candidate=KernelBundle(candidate_path)
                                 break
-                            except ValueError as exc:
-                                # 失败暂存目录保留审计（.candidate-attempt-N），下一尝试用新目录
+                            except (ValueError, ProtocolError) as exc:
+                                # 失败暂存目录保留审计（.candidate-attempt-N），下一尝试用新目录。
+                                # ProtocolError（模型输出 JSON 手误）同为可反馈重试类——一次格式错
+                                # 不再整轮作废（R11 事故：50 次预算只用了 1 次）。
                                 admission_error=f'[重试 {attempt+1}/{ADMISSION_ATTEMPTS}] {type(exc).__name__}: {exc}'
                         else:
                             raise ValueError(admission_error)
