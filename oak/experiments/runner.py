@@ -9,6 +9,8 @@ from __future__ import annotations
 import asyncio
 import copy
 import json
+import os
+import shutil
 import time
 from dataclasses import asdict
 from pathlib import Path
@@ -111,24 +113,35 @@ def _retrieval_trace(answer):
                 if action.get('asset_id') == ev.get('asset_id'):
                     params = action.get('parameters')
                     break
+        # 工具返回类型分流（评审四）：数组取证据行；对象/数值/字符串/布尔是框架允许的
+        # 合法返回，保留有界摘要且不算空结果；None 才是空。摘要永不因合法返回类型而失败。
         data = ev.get('data')
-        rows = len(data) if isinstance(data, list) else (1 if data else 0)
-        returned_rows += rows
-        if not rows:
-            empty_results += 1
-        excerpts = []
-        for row in (data or [])[:2]:
-            if not isinstance(row, Mapping):
-                continue
-            excerpts.append({'node_id': row.get('node_id'),
-                             'statement': _clip(row.get('陈述') or row.get('statement') or row.get('名称'), 60),
-                             'source_ids': list(row.get('source_ids') or ())[:2]})
-        entry = {'tool': ev.get('asset_id'), 'rows': rows,
+        entry = {'tool': ev.get('asset_id'),
                  'capabilities': ev.get('capability_calls') or None}
+        if isinstance(data, list):
+            rows = len(data)
+            if not rows:
+                empty_results += 1
+            excerpts = []
+            for row in data[:2]:
+                if not isinstance(row, Mapping):
+                    excerpts.append({'value': _clip(row, 60)})
+                    continue
+                excerpts.append({'node_id': row.get('node_id'),
+                                 'statement': _clip(row.get('陈述') or row.get('statement') or row.get('名称'), 60),
+                                 'source_ids': list(row.get('source_ids') or ())[:2]})
+            if excerpts:
+                entry['evidence'] = excerpts
+        else:
+            rows = 1 if data is not None else 0
+            if data is None:
+                empty_results += 1
+            else:
+                entry['returns'] = _clip(data, 90)   # 合法标量/对象返回（0/False 非空）
+        entry['rows'] = rows
+        returned_rows += rows
         if params is not None:
             entry['params'] = _clip(params, 90)
-        if excerpts:
-            entry['evidence'] = excerpts
         tools.append(entry)
     rejections = []
     for ev in events:
@@ -321,8 +334,9 @@ class ExperimentRunner:
             limits=Limits(self.config.function_steps,self.config.function_timeout_s,self.config.result_bytes)
             caps=DataCapabilities(graph)
             try:
-                CheckRegistry(exported,limits).run('graph',
-                    {'nodes':list(caps.rows.values()),'stage':'graph'})
+                from oak.kernel.checks import enforce_opinions
+                enforce_opinions(CheckRegistry(exported,limits).run('graph',
+                    {'nodes':list(caps.rows.values()),'stage':'graph'}),'候选预检')
                 records=FunctionRegistry(exported,limits).trial(graph,
                     {a.id:list(a.trial_inputs) for a in exported.assets.assets if a.kind=='F'})
             except Exception as exc:   # 含 SandboxError（ValueError 子类）：统一带上下文回灌
@@ -479,7 +493,10 @@ class ExperimentRunner:
                 self.verify();name=f'R{n}';stage=self.root/name
                 decision_path=stage/'decision.json'
                 candidate_path=stage/'candidate'/'bundle'
-                if (candidate_path/'manifest.json').exists(): candidate=KernelBundle(candidate_path)
+                if (candidate_path/'manifest.json').exists():
+                    candidate=KernelBundle(candidate_path)
+                    # 恢复已有候选同样过预检（评审三）：不能仅凭 manifest 存在就跳过准入验证
+                    self._preflight(candidate,spec)
                 else:
                     client=self._client(name)
                     feedback=training_feedback(cases,results,_per_case_feedback_facts(self.root,evidence,cases),baseline)
@@ -488,22 +505,33 @@ class ExperimentRunner:
                         questions+=[{'training_id':tid,'text':q.text} for tid,q in zip(question_identity(case),case.questions)]
                     required_caps=capability_names(getattr(spec,'retrieval_floor',{}) or {})
                     try:
-                        # 准入类错误（指纹回显/类型/范围/底线）回灌提案模型重试，而非整轮作废后
-                        # 重复同类错误；三次仍不过才记 validation_failed（评审#2）。
+                        # 准入类错误（指纹回显/类型/范围/底线/预检否决）回灌提案模型重试，而非
+                        # 整轮作废后重复同类错误；三次仍不过才记 validation_failed（评审#2）。
+                        # 每次尝试写独立暂存目录，全部预检通过后才确认为正式候选（评审三）——
+                        # 否则首败残留的 candidate 目录让后续尝试报 already exists，掩盖真实错误。
                         admission_error=None
-                        for _attempt in range(3):
+                        for attempt in range(3):
+                            attempt_path=stage/f'.candidate-attempt-{attempt}'
+                            if attempt_path.exists(): shutil.rmtree(attempt_path)
                             try:
                                 patches=await ProposalGenerator().propose(adopted,cases,feedback,client,self.config,
                                     stage/'proposal-call.json',questions,
                                     allowed_kinds=tuple(scope or ()),admission_error=admission_error)
                                 training_ids=[tid for case in cases for tid in question_identity(case)]
                                 forbidden=[q.text for case in cases for q in case.questions]
-                                candidate=self.revisions.propose(adopted,patches,stage/'candidate',training_ids,forbidden,
-                                                                 allowed_kinds=tuple(scope or ()),
-                                                                 required_capabilities=required_caps)
-                                self._preflight(candidate,spec)
+                                # revisions.propose 的 target 是信封目录（内含 bundle/ 与 proposal.json）；
+                                # 暂存信封 → 预检 bundle → 全过后信封整体上位为正式 candidate。
+                                self.revisions.propose(adopted,patches,attempt_path,training_ids,forbidden,
+                                                       allowed_kinds=tuple(scope or ()),
+                                                       required_capabilities=required_caps)
+                                staged=KernelBundle(attempt_path/'bundle')
+                                self._preflight(staged,spec)
+                                candidate_path.parent.mkdir(parents=True,exist_ok=True)
+                                os.replace(attempt_path,candidate_path.parent)
+                                candidate=KernelBundle(candidate_path)
                                 break
                             except ValueError as exc:
+                                # 失败暂存目录保留审计（.candidate-attempt-N），下一尝试用新目录
                                 admission_error=f'{type(exc).__name__}: {exc}'
                         else:
                             raise ValueError(admission_error)

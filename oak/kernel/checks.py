@@ -35,3 +35,15 @@ class CheckRegistry:
                              'steps_used':interp.steps,'step_budget':limits.steps,
                              'elapsed_ms':round(1000*(_t.monotonic()-started),1),**result})
         return opinions
+
+
+def enforce_opinions(opinions, context=''):
+    """图阶段 C 的否决必须被采纳（评审二）：任一 ok=False 即拒绝准入，check_id、
+    issues 与预算信息随错误反馈给资产生成模型修订。冷启动、候选预检、外测同一条规则。"""
+    failures = [o for o in opinions if not o.get('ok')]
+    if failures:
+        detail = [{'check_id': o.get('check_id'), 'issues': o.get('issues'),
+                   'steps_used': o.get('steps_used'), 'step_budget': o.get('step_budget')}
+                  for o in failures]
+        raise ValueError(f'{context}图检查否决: {detail}')
+    return opinions

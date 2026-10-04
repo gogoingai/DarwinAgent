@@ -95,44 +95,77 @@ def aggregate_report(rows, baseline_rows=None):
     return report
 
 
-def preflight(bundle, config, task, cases):
-    """外测与冷启动/候选修订同一套能力准入（评审③③）：AST 底线＋逐对话快照真实试跑，
-    任一不合格即拒绝外测——锁定资产不因换了入口而豁免。"""
+def preflight(bundle, config, task, cases, snap_root=None, embedder_factory=None):
+    """外测与冷启动/候选修订同一套能力准入（评审①③）：AST 底线＋逐对话快照真实试跑
+    （图挂冻结向量索引）＋完整图 C 检查否决即拒。锁定资产不因换了入口而豁免。"""
     import tempfile
-    from oak.kernel.checks import CheckRegistry
+    from oak.kernel.checks import CheckRegistry, enforce_opinions
     from oak.kernel.functions import FunctionRegistry
-    from oak.kernel.validation import capability_floor_errors, trial_capability_floor_errors
+    from oak.kernel.validation import capability_floor_errors, capability_names, trial_capability_floor_errors
     from oak.operators.sandbox import Limits
     from oak.operators.data import DataCapabilities
-    from oak.experiments.snapshots import load_frozen_graph
-    from oak.runtime.identity import transport_identity
+    from oak.experiments.snapshots import attach_vector, load_frozen_graph
+    snap_root = Path(snap_root) if snap_root is not None else SNAPSHOTS
     required = capability_names(task.retrieval_floor)
     problems = capability_floor_errors(bundle.assets, required)
     if problems:
         raise SystemExit('外测预检失败（静态能力底线）: ' + str(problems))
     limits = Limits(config.function_steps, config.function_timeout_s, config.result_bytes)
-    for case in cases:
-        graph = load_frozen_graph(SNAPSHOTS / case, cases[case].corpus)
+    for case_id, case in cases.items():
+        graph = load_frozen_graph(snap_root / case_id, case.corpus)
+        attach_vector(graph, snap_root / case_id, embedder_factory=embedder_factory)
         with tempfile.TemporaryDirectory() as td:
             exported = bundle.assets.export(Path(td) / 'b')
-            records = FunctionRegistry(exported, limits).trial(graph,
-                {a.id: list(a.trial_inputs) for a in exported.assets.assets if a.kind == 'F'})
+            caps = DataCapabilities(graph)
+            try:
+                enforce_opinions(CheckRegistry(exported, limits).run(
+                    'graph', {'nodes': list(caps.rows.values()), 'stage': 'graph'}), f'外测[{case_id}]')
+                records = FunctionRegistry(exported, limits).trial(graph,
+                    {a.id: list(a.trial_inputs) for a in exported.assets.assets if a.kind == 'F'})
+            except SystemExit:
+                raise
+            except ValueError as exc:   # 图 C 否决/能力缺失等准入错误：转为入口级失败
+                raise SystemExit(f'外测预检失败（{case_id}）: {exc}') from exc
+            except Exception as exc:
+                raise SystemExit(f'外测预检失败（{case_id}）: {type(exc).__name__}: {exc}') from exc
             missing = trial_capability_floor_errors(records, required)
             if missing:
-                raise SystemExit(f'外测预检失败（{case} 试跑未触发能力）: ' + str(missing))
+                raise SystemExit(f'外测预检失败（{case_id} 试跑未触发能力）: ' + str(missing))
 
 
-def experiment_identity(bundle, config, conn, cases):
+def baseline_compatibility(mine, base):
+    """共同实验条件核对（评审五）：模型路由、作答/审查配置、判题器锁、完整快照身份。
+    两臂预期的检索方式（retrieval_mode/vector_k/tool_steps）与资产版本差异不算不兼容。"""
+    if not base:
+        return 'incompatible: baseline 缺少身份记录（旧版报告）'
+    diffs = []
+    if mine.get('transport') != base.get('transport'):
+        diffs.append('模型路由不同')
+    if mine.get('judge_lock') != base.get('judge_lock'):
+        diffs.append('判题器锁不同')
+    ANSWER_FIELDS = ('protocol_attempts', 'answer_attempts', 'temperature', 'max_tokens',
+                     'calls_per_question')
+    a, b = mine.get('run_config') or {}, base.get('run_config') or {}
+    unequal = [k for k in ANSWER_FIELDS if a.get(k) != b.get(k)]
+    if unequal:
+        diffs.append('作答/审查配置不同: ' + ','.join(unequal))
+    if mine.get('snapshots') != base.get('snapshots'):
+        diffs.append('快照身份不同')
+    return 'compatible' if not diffs else 'incompatible: ' + '；'.join(diffs)
+
+
+def experiment_identity(bundle, config, conn, cases, snap_root=None):
     """实验条件身份（评审④）：资产版本、模型路由、运行配置、各对话快照指纹、
     冻结判题器文件锁——基线比对时核对共同条件，缺失/不兼容明确报出。"""
     from oak.experiments.spec import precheck_identity
     from datasets.locomo.evaluator import AUDITED, LOCK_PATH
     from oak.runtime.artifacts import digest
     from oak.runtime.identity import snapshot_files
+    snap_root = Path(snap_root) if snap_root is not None else SNAPSHOTS
     return {'asset_version': bundle.version,
             'transport': precheck_identity(conn, config)['transport'],
             'run_config': config.to_dict(),
-            'snapshots': {c: json.loads((SNAPSHOTS / c / 'manifest.json').read_text())['snapshot_digest']
+            'snapshots': {c: json.loads((snap_root / c / 'manifest.json').read_text())['snapshot_digest']
                           for c in cases},
             'judge_lock': digest(snapshot_files([AUDITED, LOCK_PATH]))}
 
@@ -157,27 +190,24 @@ async def main(args):
         print(json.dumps(row, ensure_ascii=False), flush=True)
     baseline_rows = None
     compatibility = {}
+    delta_valid = None
     if args.baseline:
         bp = Path(args.baseline) / 'report.json'
         if not bp.exists():
             compatibility['baseline'] = 'missing: report.json 不存在，无法比对'
+            delta_valid = False
         else:
             base_report = json.loads(bp.read_text())
             baseline_rows = base_report['per_conversation']
-            base_identity = base_report.get('identity') or {}
             mine = experiment_identity(bundle, config, connection(root), cases)
-            mine_snap = mine['snapshots']; base_snap = base_identity.get('snapshots') or {}
-            mism = [c for c in cases
-                    if base_snap.get(c) not in (None, mine_snap.get(c))]
-            if mism:
-                compatibility['baseline'] = f'snapshot mismatch: {mism}（记忆面不同，差值不可比）'
-            elif base_identity.get('asset_version') is None:
-                compatibility['baseline'] = 'baseline 缺少身份记录（旧版报告）：差值仅供参考'
-            else:
-                compatibility['baseline'] = 'compatible'
+            compatibility['baseline'] = baseline_compatibility(mine, base_report.get('identity') or {})
+            delta_valid = compatibility['baseline'] == 'compatible'
     report = aggregate_report(rows, baseline_rows)
     report['identity'] = experiment_identity(bundle, config, connection(root), cases)
     report['baseline_compatibility'] = compatibility
+    if delta_valid is not None:
+        # 不兼容时差值保留作参考但标记无效，不得当作有效实验提升（评审五）
+        report['delta_valid'] = delta_valid
     atomic_json(root / 'report.json', report)
     print(json.dumps(report['macro'], ensure_ascii=False))
 

@@ -8,7 +8,8 @@ from unittest import mock
 
 from oak.config import RunConfig
 from oak.contracts import AnswerResult, CaseInput, EvaluationResult, QuestionInput, RunResult, SourceRef
-from oak.kernel.assets import Asset
+from oak.kernel.assets import Asset, KernelAssets
+from oak.kernel import KernelBundle
 from oak.kernel.validation import capability_floor_errors, capability_names
 from oak.llm.recorded import RecordedClient
 from oak.runtime.artifacts import digest
@@ -616,6 +617,238 @@ class PreflightCapabilityTests(unittest.TestCase):
         import tempfile as _tf
         from oak.kernel.assets import KernelAssets
         return KernelAssets(assets).export(Path(_tf.mkdtemp(prefix='pf-'))/'exported')
+
+
+if __name__ == '__main__':
+    unittest.main()
+
+
+class ExternalEntryTests(unittest.TestCase):
+    """评审一：真实外测入口的离线端到端——加载锁定资产、逐对话预检（挂向量索引＋图 C
+    否决＋能力试跑）到报告生成，不只测 aggregate_report。"""
+
+    def _setup(self, td, with_traverse=True, bad_c=False):
+        import asyncio
+        from oak.engine import Pipeline  # noqa: F401  确认入口依赖可导入
+        from oak.experiments.snapshots import load_frozen_graph
+        from oak.kernel import TaskSpec
+        from oak.kernel.assets import Asset, KernelAssets
+        from tests.integration.test_agentic_round import (ROOT, FakeEmbedder, build_snapshot,
+                                                          cold_bundle, corpus)
+        root = Path(td)
+        snapshot, manifest = build_snapshot(root)
+        bundle = cold_bundle(root)
+        assets = list(bundle.assets.assets)
+        if with_traverse:
+            assets.append(Asset('f_traverse', 'F',
+                "def run(params):\n return traverse(params['node_id'], params['relation'])\n",
+                {'type': 'object', 'properties': {'node_id': {'type': 'string'},
+                                                  'relation': {'type': 'string'}}},
+                {'type': 'array'}, trial_inputs=({'node_id': 'n000000', 'relation': '归属于'},),
+                schema_dependencies=['schema'], description='关系遍历'))
+        if bad_c:
+            assets.append(Asset('c_bad', 'C',
+                "def check(candidate):\n return {'ok': False, 'issues': ['图检查否决样例']}",
+                {'type': 'any'}, {'type': 'any'},
+                schema_dependencies=['schema'], stage='graph', description='坏检查'))
+        locked = KernelAssets(tuple(assets)).export(root / 'locked')
+        task = TaskSpec.load(ROOT / 'tasks/conversation_memory/task.yaml')
+        case = CaseInput('conv-x', corpus(), (QuestionInput('q1', '甲计划做什么？'),))
+        return root, snapshot, manifest, locked, task, {'conv-x': case}   # export() 已返回 KernelBundle
+
+    def test_entry_end_to_end_offline(self):
+        import tempfile
+        from datasets.locomo.scripts.external_test import (aggregate_report, baseline_compatibility,
+                                                           experiment_identity, preflight)
+        from tests.integration.test_agentic_round import FakeEmbedder
+        with tempfile.TemporaryDirectory() as td:
+            root, snapshot, manifest, bundle, task, cases = self._setup(td)
+            config = __import__('oak.config', fromlist=['RunConfig']).RunConfig(function_timeout_s=15.0)
+            # 完整入口第一段：锁定资产加载 + 逐对话预检（真向量索引挂载＋图 C＋能力试跑）
+            preflight(bundle, config, task, cases, snap_root=root / 'snapshots',
+                      embedder_factory=lambda: FakeEmbedder())
+            # 报告段：逐对话行含正确率字段，身份齐备，兼容性判定生效
+            rows = [{'case_id': 'conv-x', 'total': 1, 'completed': 1,
+                     'original_precise': 1, 'original_lenient': 1,
+                     'repaired_precise': 1, 'repaired_lenient': 1,
+                     'generation_faults': 0, 'evaluation_faults': 0}]
+            ident = experiment_identity(bundle, config, None, ['conv-x'], snap_root=root / 'snapshots')
+            self.assertEqual(ident['snapshots']['conv-x'], manifest['snapshot_digest'])
+            self.assertEqual(baseline_compatibility(ident, dict(ident)), 'compatible')
+            report = aggregate_report(rows, rows)
+            self.assertEqual(report['macro']['original_precise_rate'], 100.0)
+
+    def test_entry_rejects_missing_capability_and_bad_c(self):
+        import tempfile
+        from datasets.locomo.scripts.external_test import preflight
+        from tests.integration.test_agentic_round import FakeEmbedder
+        config = __import__('oak.config', fromlist=['RunConfig']).RunConfig(function_timeout_s=15.0)
+        with tempfile.TemporaryDirectory() as td:
+            root, _, _, bundle, task, cases = self._setup(td, with_traverse=False)
+            with self.assertRaises(SystemExit) as caught:
+                preflight(bundle, config, task, cases, snap_root=root / 'snapshots',
+                          embedder_factory=lambda: FakeEmbedder())
+            self.assertIn('静态能力底线', str(caught.exception))
+        with tempfile.TemporaryDirectory() as td:
+            root, _, _, bundle, task, cases = self._setup(td, bad_c=True)
+            with self.assertRaises(SystemExit) as caught:
+                preflight(bundle, config, task, cases, snap_root=root / 'snapshots',
+                          embedder_factory=lambda: FakeEmbedder())
+            self.assertIn('图检查否决样例', str(caught.exception))   # 评审二：否决必须被采纳
+
+
+class PreflightStagingTests(unittest.TestCase):
+    """评审三：预检失败不残留 candidate 目录；重试修好后正常准入；恢复已有候选也要过预检。"""
+
+    def test_first_preflight_failure_second_attempt_admits(self):
+        import asyncio
+        import contextlib
+        import io
+        from tests.integration.test_experiment import RecordedExperiment
+        from oak.kernel import TaskSpec
+        from tests.integration.test_experiment import TASK
+
+        class PreflightFailOnce(RecordedExperiment):
+            def __init__(self, root):
+                super().__init__(root)
+                self.preflight_calls = 0
+                real = self._preflight
+                def patched(candidate, spec):
+                    self.preflight_calls += 1
+                    if self.preflight_calls == 1:
+                        raise ValueError('候选预检失败: SandboxError: boom')
+                    return real(candidate, spec)
+                self._preflight = patched
+
+            def _client(self, stage):
+                client = super()._client(stage)
+                if stage == 'R1' and self.stage_clients[stage] == 1:
+                    client.replies['proposal'].append(client.replies['proposal'][0])
+                return client
+
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            runner = PreflightFailOnce(root)
+            with contextlib.redirect_stdout(io.StringIO()):
+                summary = asyncio.run(runner.run(runner.case.id, TaskSpec.load(TASK / 'task.yaml'), rounds=1))
+            self.assertTrue(summary['rounds'][0]['accepted'])
+            self.assertEqual(runner.preflight_calls, 2)
+            # 正式候选目录就位；首次失败的暂存目录保留审计且不阻塞
+            self.assertTrue((root / 'R1' / 'candidate' / 'bundle' / 'manifest.json').exists())
+            self.assertTrue((root / 'R1' / '.candidate-attempt-0').exists())
+            self.assertNotIn('already exists', json.dumps(summary, ensure_ascii=False))
+
+    def test_resume_revalidates_existing_candidate(self):
+        import asyncio
+        import contextlib
+        import io
+        from tests.integration.test_experiment import RecordedExperiment, TASK
+        from oak.kernel import TaskSpec
+        from tests.integration.test_agentic_round import cold_bundle
+
+        class Recording(RecordedExperiment):
+            def __init__(self, root):
+                super().__init__(root)
+                self.preflight_specs = []
+                real = self._preflight
+                def patched(candidate, spec):
+                    self.preflight_specs.append(candidate.version)
+                    return real(candidate, spec)
+                self._preflight = patched
+
+            def _client(self, stage):
+                # 恢复路径没有提案客户端：R1 的第一个客户端就是阶段评测客户端
+                if stage == 'R1' and self.stage_clients[stage] == 0:
+                    from tests.fixtures import client as fx
+                    from tests.integration.test_experiment import LedgerRecordedClient
+                    self.stage_clients[stage] += 1
+                    c = LedgerRecordedClient({r: list(v) for r, v in fx(self.case).replies.items()})
+                    self.created.append(c)
+                    return c
+                return super()._client(stage)
+
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            from oak.kernel.registration import load_assets
+            load_assets(TASK).export(root / 'seed')     # 设备任务 bundle，导出目录＝root/'seed'
+            runner = Recording(root)
+            target = root / 'R1' / 'candidate' / 'bundle'
+            target.parent.mkdir(parents=True)
+            import shutil
+            shutil.copytree(root / 'seed', target)
+            with contextlib.redirect_stdout(io.StringIO()):
+                asyncio.run(runner.run(runner.case.id, TaskSpec.load(TASK / 'task.yaml'), rounds=1))
+            self.assertTrue(runner.preflight_specs)   # 恢复路径确实执行了预检
+
+
+def _bundle_dir(bundle):
+    return Path(bundle.__dict__.get('path', bundle.assets.__dict__.get('path', str(bundle)))) \
+        if hasattr(bundle, '__dict__') else Path(str(bundle))
+
+
+class TraceReturnTypesTests(unittest.TestCase):
+    """评审四：合法的非数组工具返回不崩摘要；空结果与合法 0/False 区分。"""
+
+    def _summarize(self, data):
+        from oak.experiments.runner import _retrieval_trace
+        ev = (SourceRef('message_text', 'c', '1'),)
+        raw = ('{"action":"call","asset_id":"t","parameters":{}}', '{"action":"ready"}')
+        events = ({'stage': 'tool', 'attempt': 0, 'step': 0, 'asset_id': 't',
+                   'parameters': {}, 'data': data, 'node_ids': [], 'source_ids': [],
+                   'read_operations': 1, 'capability_calls': {'aggregate': 1}},)
+        return _retrieval_trace(AnswerResult('0', 'answered', 'ok', evidence=ev,
+                                             raw_outputs=raw, trace=events))
+
+    def test_scalar_and_object_returns(self):
+        for value, label in (({'count': 3}, 'object'), (3, 'number'), (False, 'bool'), ('文本', 'string')):
+            summary = self._summarize(value)
+            self.assertEqual(summary['empty_results'], 0, label)      # 合法值不算空
+            self.assertEqual(summary['tools'][0]['rows'], 1, label)
+            self.assertIn('returns', summary['tools'][0], label)
+        none_summary = self._summarize(None)
+        self.assertEqual(none_summary['empty_results'], 1)            # None 才是空结果
+        self.assertEqual(none_summary['tools'][0]['rows'], 0)
+
+
+class BaselineCompatibilityTests(unittest.TestCase):
+    """评审五：共同条件核对实际生效——模型/判题器/作答配置/快照任一不同即不兼容。"""
+
+    def _ident(self, **over):
+        base = {'transport': {'model_strong': 'glm-5.3'}, 'judge_lock': 'j1',
+                'run_config': {'protocol_attempts': 5, 'answer_attempts': 3, 'temperature': 0.2,
+                               'max_tokens': 4096, 'calls_per_question': 32,
+                               'retrieval_mode': 'agentic', 'vector_k': 30},
+                'snapshots': {'conv-30': 'd1'}, 'asset_version': 'v1'}
+        base.update(over)
+        return base
+
+    def test_expected_arm_differences_stay_compatible(self):
+        from datasets.locomo.scripts.external_test import baseline_compatibility
+        other_arm = self._ident(run_config={'protocol_attempts': 5, 'answer_attempts': 3,
+                                            'temperature': 0.2, 'max_tokens': 4096,
+                                            'calls_per_question': 32,
+                                            'retrieval_mode': 'vector_once', 'vector_k': 60},
+                                asset_version='v2')
+        self.assertEqual(baseline_compatibility(self._ident(), other_arm), 'compatible')
+
+    def test_real_differences_rejected(self):
+        from datasets.locomo.scripts.external_test import baseline_compatibility
+        mine = self._ident()
+        cases = {
+            '模型路由不同': (self._ident(transport={'model_strong': 'glm-4.7'}), '模型路由不同'),
+            '判题器锁不同': (self._ident(judge_lock='j2'), '判题器锁不同'),
+            '作答/审查配置不同': (self._ident(run_config={'protocol_attempts': 3, 'answer_attempts': 3,
+                                                    'temperature': 0.2, 'max_tokens': 4096,
+                                                    'calls_per_question': 32,
+                                                    'retrieval_mode': 'vector_once', 'vector_k': 60}),
+                           '作答/审查配置不同'),
+            '快照身份不同': (self._ident(snapshots={'conv-30': 'd2'}), '快照身份不同'),
+            '身份缺失': (None, '缺少身份记录'),
+        }
+        for label, (base, marker) in cases.items():
+            verdict = baseline_compatibility(mine, base)
+            self.assertTrue(verdict.startswith('incompatible'), label)
+            self.assertIn(marker, verdict, label)
 
 
 if __name__ == '__main__':
