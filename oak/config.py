@@ -112,7 +112,7 @@ class Config:
 
     def tier_for(self, role: str) -> str:
         tier = self.role_tiers.get(role)
-        if tier not in ("strong", "fast"):
+        if tier not in ("strong", "middle", "fast"):
             raise ValueError(f"unknown LLM role or tier: {role}")
         return tier
 
