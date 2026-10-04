@@ -28,7 +28,8 @@ class FunctionRegistry:
         node_ids=sorted(caps.read_ids)
         source_ids=sorted({s for rid in node_ids for s in caps.rows[rid]['source_ids']})
         return {'asset_id':a.id,'asset_fingerprint':a.fingerprint,'data':result,
-                'node_ids':node_ids,'source_ids':source_ids,'read_operations':caps.read_operations}
+                'node_ids':node_ids,'source_ids':source_ids,'read_operations':caps.read_operations,
+                'capability_calls':dict(caps.capability_calls)}
 
     def trial(self, graph_result, samples):
         records=[]

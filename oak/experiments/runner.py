@@ -13,6 +13,8 @@ import time
 from dataclasses import asdict
 from pathlib import Path
 
+from collections.abc import Mapping
+
 from oak.contracts import EvaluationResult, plain
 from oak.engine import Pipeline
 from oak.kernel import KernelBundle
@@ -71,40 +73,80 @@ def _compact_diagnostic(row):
 
 
 def _retrieval_trace(answer):
-    """单题检索轨迹摘要：工具调用/参数/证据规模/错误（来自答案记录的 raw_outputs）。"""
+    """单题执行轨迹摘要（评审#2/#3）：从结构化 AnswerResult.trace 提取——
+    工具调用（名称/参数/次数，与模型输出次数区分）、返回规模、空结果、
+    截断、候选检查与审查的拒绝原因、停止时机。证据行数来自工具返回，
+    不用最终引用来源数代替。"""
     raw_outputs = getattr(answer, 'raw_outputs', ()) or ()
+    # 模型侧动作序列（工具决策参数与 ready 停止信号），与 trace 的工具事件按序对齐
     actions = []
     for raw in raw_outputs:
         try:
             obj = json.loads(raw) if isinstance(raw, str) else raw
         except Exception:
             obj = None
-        if isinstance(obj, dict) and obj.get('action') == 'call':
-            actions.append({'tool': obj.get('asset_id'), 'params': _clip(obj.get('parameters'), 90)})
-        elif isinstance(obj, dict):
-            actions.append({k: obj[k] for k in ('action', 'status') if obj.get(k) is not None})
-        if len(actions) >= 8:
-            break
+        if isinstance(obj, dict) and obj.get('action') in ('call', 'ready'):
+            actions.append(obj)
+    # trace 条目经 contracts.freeze 冻结为 MappingProxyType：按 Mapping 鸭子类型取用
+    tool_events = [ev for ev in (getattr(answer, 'trace', ()) or ())
+                   if isinstance(ev, Mapping) and ev.get('stage') in ('tool', 'retrieval')]
+    tools = []
+    returned_rows = 0
+    empty_results = 0
+    call_iter = iter(a for a in actions if a.get('action') == 'call')
+    for ev in tool_events:
+        if ev['stage'] == 'retrieval':
+            rows = ev.get('rows', 0)
+            tools.append({'tool': 'vector_once', 'rows': rows, 'k': ev.get('k')})
+            returned_rows += rows
+            if not rows:
+                empty_results += 1
+            continue
+        action = next(call_iter, None)
+        params = _clip(action.get('parameters'), 90) if action else None
+        data = ev.get('data')
+        rows = len(data) if isinstance(data, (list, tuple)) else (1 if data else 0)
+        returned_rows += rows
+        if not rows:
+            empty_results += 1
+        entry = {'tool': ev.get('asset_id'), 'rows': rows,
+                 'capabilities': ev.get('capability_calls') or None}
+        if params:
+            entry['params'] = params
+        tools.append(entry)
+    rejections = []
+    for ev in (getattr(answer, 'trace', ()) or ()):
+        if not isinstance(ev, Mapping):
+            continue
+        if ev.get('stage') == 'review' and not ev.get('accepted'):
+            rejections.append({'by': 'review', 'reason': _clip(ev.get('feedback') or ev.get('reason'), 150)})
+        elif ev.get('stage') == 'candidate':
+            failed = [c for c in (ev.get('checks') or ()) if isinstance(c, dict) and not c.get('ok')]
+            for check in failed[:3]:
+                rejections.append({'by': 'check', 'check_id': check.get('check_id'),
+                                   'issues': _clip(check.get('issues'), 120)})
     trace = {'question_id': answer.question_id, 'status': answer.status,
-             'tool_calls': len(raw_outputs),
-             'evidence_rows': len(getattr(answer, 'evidence', ()) or ()),
-             'actions': actions}
+             'tool_calls': len(tool_events), 'model_calls': len(raw_outputs),
+             'returned_rows': returned_rows, 'empty_results': empty_results,
+             'stopped': 'ready' if any(a.get('action') == 'ready' for a in actions) else 'budget',
+             'tools': tools, 'rejections': rejections}
     if getattr(answer, 'error', None):
         trace['error'] = _clip(answer.error, 150)
-    while actions and len(json.dumps(trace, ensure_ascii=False, default=str)) > _TRACE_CHARS:
-        actions.pop()
-    return trace
+    while len(tools) > 2 and len(json.dumps(trace, ensure_ascii=False, default=str)) > _TRACE_CHARS:
+        tools.pop()
+    return plain(trace)  # 冻结的 mappingproxy 解包回普通 dict，载荷可序列化
 
 
 def training_feedback(cases, results, case_diagnostics, baseline):
     """Failure-first proposal feedback: compressed diagnostics (gold references never enter
-    the payload) plus a per-question retrieval trace. One character budget bounds the COMPLETE
+    the payload) plus a per-question execution trace. One character budget bounds the COMPLETE
     serialized payload. With several training cases the budget rotates case by case — an early
-    case may not crowd the others out."""
-    answers = {a.question_id: a for r in results for a in r.answers}
+    case may not crowd the others out. Answer association is keyed per case (评审#3):
+    same-named question ids in different cases never share a trace."""
     per_case_rows = []
     rows_total = 0
-    for case_id, diagnostics in case_diagnostics:
+    for (case_id, diagnostics), result in zip(case_diagnostics, results):
+        answers = {a.question_id: a for a in result.answers}  # 会话内索引：同名题号跨对话不串用
         rows = []
         for row in plain(diagnostics):
             if not _diagnostic_failure(row):

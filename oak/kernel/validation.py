@@ -144,6 +144,8 @@ def validate_case(case,spec):
 
 # 任务检索底线 → 必须出现在 F 源码中的沙箱能力名（能力词汇属框架层，映射集中在此；
 # 任务只声明意图键——语义参数化在 task.yaml，不进内核硬编码）。
+from ..operators.sandbox import DATA_CAPABILITIES as _CAPS
+DATA_CAPABILITY_NAMES = frozenset(_CAPS)
 RETRIEVAL_FLOOR_CAPABILITIES = {'semantic_search': ('semantic_search',),
                                 'traversal': ('traverse',)}
 
@@ -157,8 +159,38 @@ def capability_names(floor):
     return tuple(dict.fromkeys(names))
 
 
+def capability_calls(source):
+    """AST 识别 F 源码中对沙箱数据能力的真实调用（ast.Call+Name）；
+    注释、字符串、变量名提及都不算——评审#4：只有真实调用满足底线。"""
+    import ast
+    try:
+        tree = ast.parse(source or '')
+    except SyntaxError:
+        return set()
+    return {node.func.id for node in ast.walk(tree)
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+            and node.func.id in DATA_CAPABILITY_NAMES}
+
+
 def capability_floor_errors(assets, required):
-    """候选资产集的 F 必须仍覆盖每个必备能力（任务冻结底线：迭代不可删光向量检索/关系遍历）。"""
+    """候选资产集的 F 必须仍覆盖每个必备能力（任务冻结底线：迭代不可删光向量检索/关系遍历）。
+    静态层＝AST 真实调用；动态层（试跑是否真的触发能力）由 FunctionRegistry 试跑记录
+    的 capability_calls 判定，见 trial_capability_floor_errors。"""
     sources = [a.content or '' for a in assets.assets if a.kind == 'F']
-    return [f'F 集缺失必备能力 {cap}（至少一个 F 需调用该能力）'
-            for cap in required if not any(cap in src for src in sources)]
+    missing = [cap for cap in required
+               if not any(cap in capability_calls(src) for src in sources)]
+    return [f'F 集缺失必备能力 {cap}（至少一个 F 需真实调用该能力，注释/字符串提及无效）'
+            for cap in missing]
+
+
+def trial_capability_floor_errors(trial_records, required):
+    """动态底线：试跑记录必须显示每个必备能力被真实执行过（capability_calls 计数>0）。
+    空结果如实保留在记录里，但能力未触发即不合规——试跑输入必须覆盖到底线能力。"""
+    used = set()
+    for record in trial_records or ():
+        for name, count in (record.get('capability_calls') or {}).items():
+            if count:
+                used.add(name)
+    missing = [cap for cap in required if cap not in used]
+    return [f'试跑未触发必备能力 {cap}：底线 F 的 trial_inputs 必须真实调用该能力'
+            for cap in missing]

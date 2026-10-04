@@ -15,6 +15,7 @@ class DataCapabilities:
         self.actual_ids = {}
         self.read_ids = set()
         self.read_operations = 0
+        self.capability_calls = {}  # 能力名 -> 实际调用次数（准入试跑与轨迹用，注释/字符串不算）
         self._memory_rows = None  # lazy: 原子记忆 id -> row_id（首次 semantic_search 时构建）
         # 行序＝图插入序（冻结快照的 JSON 装载序，确定且在改名探针副本中保持同序；
         # 按节点 id 排序会在改名后重排，使带 limit 截断的 F 输出无法做改名跟随比对）。
@@ -142,4 +143,15 @@ class DataCapabilities:
                 'resolved': resolved, 'granularity': granularity}
 
     def registry(self):
-        return {name:getattr(self,name) for name in DATA_CAPABILITIES}
+        # 每次调用计数后透传：能力是否「真的执行过」以这里为准（评审#4），
+        # F 试跑记录与运行轨迹据此判定检索底线是否被触发。
+        registry = {}
+        for name in DATA_CAPABILITIES:
+            fn = getattr(self, name)
+            def counted(fname=name, inner=fn):
+                def call(*args, **kwargs):
+                    self.capability_calls[fname] = self.capability_calls.get(fname, 0) + 1
+                    return inner(*args, **kwargs)
+                return call
+            registry[name] = counted()
+        return registry

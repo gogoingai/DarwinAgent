@@ -237,8 +237,14 @@ class AssetBootstrapper:
                         trial_bundle,
                         Limits(config.function_steps, config.function_timeout_s, config.result_bytes),
                         [q.text for q in questions])
-                    registry.trial(trial_graph,
+                    records = registry.trial(trial_graph,
                                    {a.id: list(a.trial_inputs) for a in assets.assets if a.kind == 'F'})
+                    if floor_caps:
+                        # 动态底线：试跑必须真实触发每个必备能力（capability_calls 计数），
+                        # 仅静态出现/未触发都不合规（评审#4）。
+                        from oak.kernel.validation import trial_capability_floor_errors
+                        problems = trial_capability_floor_errors(records, floor_caps)
+                        if problems: raise ValueError('检索底线试跑未触发: ' + str(problems))
             return assets
         floor_required = bool(capability_names(getattr(spec, 'retrieval_floor', {}) or {}))
         protocol = ASSET_PROTOCOL if anchored else (

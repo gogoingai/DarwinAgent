@@ -76,27 +76,16 @@ class AnswerAgent:
                 review_inputs=[]
                 if candidate['status']=='answered':
                     review_inputs=[{'candidate':snapshot,'sources':[graph.sources[s].to_dict() for s in sorted(source_ids)]}]
-                elif vector_once:
-                    # 纯向量臂能力隔离：拒答审计只看已检索证据，不得借审计绕过检索读全图。
+                else:
+                    # 拒答审计证据范围两臂统一（评审#5）：只看已召回证据及其来源，不读全图——
+                    # 融合版需要补证必须显式调用登记工具（调用/返回/成本都进轨迹），
+                    # 不得借审计通道隐式获得未召回的全量信息，否则召回收益归因被混淆。
                     rows=[caps.rows[x] for x in sorted(visible)]
                     ids={s for row in rows for s in row['source_ids']}
                     review_inputs=[{'candidate':{**snapshot,'visible_evidence':rows},
-                                    'refusal_audit':{'covers_full_graph':False,'mode':'vector_once'},
+                                    'refusal_audit':{'covers_full_graph':False,
+                                                     'mode':'vector_once' if vector_once else 'agentic_retrieved'},
                                     'sources':[graph.sources[s].to_dict() for s in sorted(ids)]}]
-                else:
-                    import json
-                    chunks=[];batch=[];size=0
-                    for row in caps.rows.values():
-                        row_size=len(json.dumps(row,ensure_ascii=False).encode())
-                        if batch and size+row_size>self.config.result_bytes//2:
-                            chunks.append(batch);batch=[];size=0
-                        batch.append(row);size+=row_size
-                    if batch: chunks.append(batch)
-                    for index,rows in enumerate(chunks):
-                        ids={s for row in rows for s in row['source_ids']}
-                        review_inputs.append({'candidate':{**snapshot,'visible_evidence':rows},
-                            'refusal_audit':{'chunk':index,'chunks':len(chunks),'covers_full_graph':True},
-                            'sources':[graph.sources[s].to_dict() for s in sorted(ids)]})
                 rejected=None
                 for review_input in review_inputs:
                     review=await session.request(self.config.review_role,

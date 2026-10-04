@@ -42,19 +42,32 @@ async def evaluate_conversation(case_id, adapter, task, bundle, config, root):
     return row
 
 
+def _rate(row, metric):
+    """逐对话正确率＝答对题数／总题数（故障题留在分母，不得借删除故障抬高正确率）。"""
+    value, total = row.get(metric), row.get('total')
+    if isinstance(value, (int, float)) and isinstance(total, (int, float)) and total:
+        return value / total
+    return None
+
+
 def aggregate_report(rows, baseline_rows=None):
-    """宏平均＝逐对话等权（单段提升不得掩盖其他对话回退）；微求和＝按题汇总；
-    baseline 提供时附逐对话差值（本臂−基线）与差值宏平均。"""
+    """宏平均＝逐对话正确率的等权平均；按题汇总＝答对和／总题和（评审#1：不同对话题量
+    不同，答对题数的直接平均是错误统计）。差值一律用正确率，单位百分点（pp）。
+    原始答对题数、总题数、完成数与故障数逐对话保留，故障另计不折算。"""
     report = {'per_conversation': rows}
     macro = {}
-    micro = {}
-    for m in METRICS:
-        vals = [r[m] for r in rows if isinstance(r.get(m), (int, float))]
-        if vals:
-            macro[m] = round(sum(vals) / len(vals), 2)
-            micro[m + '_sum'] = sum(vals)
+    micro = {'total_sum': sum(r.get('total', 0) for r in rows)}
     for k in ('generation_faults', 'evaluation_faults'):
         micro[k] = sum(r.get(k, 0) for r in rows)
+    for m in METRICS:
+        rates = [_rate(r, m) for r in rows]
+        rates = [x for x in rates if x is not None]
+        if rates:
+            macro[m + '_rate'] = round(100 * sum(rates) / len(rates), 2)     # 宏平均：等权
+            correct = sum(r.get(m, 0) for r in rows)
+            micro[m + '_correct'] = correct
+            if micro['total_sum']:
+                micro[m + '_rate'] = round(100 * correct / micro['total_sum'], 2)  # 按题汇总
     report['macro'] = macro
     report['micro'] = micro
     if baseline_rows:
@@ -66,14 +79,15 @@ def aggregate_report(rows, baseline_rows=None):
                 continue
             d = {'case_id': r['case_id']}
             for m in METRICS:
-                if isinstance(r.get(m), (int, float)) and isinstance(b.get(m), (int, float)):
-                    d[m + '_delta'] = r[m] - b[m]
+                mine, yours = _rate(r, m), _rate(b, m)
+                if mine is not None and yours is not None:
+                    d[m + '_delta_pp'] = round(100 * (mine - yours), 2)      # 百分点
             deltas.append(d)
         report['delta_vs_baseline'] = deltas
         if deltas:
-            report['macro']['delta_vs_baseline'] = {
-                m: round(sum(d[m + '_delta'] for d in deltas) / len(deltas), 2)
-                for m in METRICS if all(m + '_delta' in d for d in deltas)}
+            report['macro']['delta_vs_baseline_pp'] = {
+                m: round(sum(d[m + '_delta_pp'] for d in deltas) / len(deltas), 2)
+                for m in METRICS if all(m + '_delta_pp' in d for d in deltas)}
     return report
 
 
