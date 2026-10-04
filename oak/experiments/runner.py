@@ -314,6 +314,25 @@ def _per_case_feedback_facts(root, name, cases):
     return rows
 
 _DETERMINISTIC_ERRORS=frozenset({'SandboxError','ValueError','TypeError','KeyError'})
+
+
+def stress_trial_samples(base_inputs, graph):
+    """F 单元测试输入（用户拍板：冒烟之外必须有单测）：以模型自带样例参数为基底，
+    注入真实数据形态矩阵——空行集/图头部行/尾部行/含列表字段行。数据形态依赖的
+    分支错误（如容器 str()）在准入层暴露，不再漏进 199 题全量。"""
+    from oak.operators.data import DataCapabilities
+    rows = list(DataCapabilities(graph).rows.values())
+    list_rows = [r for r in rows if any(isinstance(v, (list, tuple)) for v in r.values())][:4]
+    out = []
+    for base in base_inputs[:3]:
+        if not (isinstance(base, dict) and isinstance(base.get('rows'), list)):
+            continue
+        out.append({**base, 'rows': []})
+        out.append({**base, 'rows': [dict(r) for r in rows[:4]]})
+        out.append({**base, 'rows': [dict(r) for r in rows[-4:]]})
+        if list_rows:
+            out.append({**base, 'rows': [dict(r) for r in list_rows]})
+    return out
 ADMISSION_ATTEMPTS=50
 
 
@@ -382,8 +401,11 @@ class ExperimentRunner:
                     enforce_rejection(checks.run('answer',
                                     synthetic_invalid_answer_snapshot(sample_question.text)),
                                     '候选预检答案阶段[invalid]')
-                records=FunctionRegistry(exported,limits).trial(graph,
-                    {a.id:list(a.trial_inputs) for a in exported.assets.assets if a.kind=='F'})
+                f_inputs={a.id:list(a.trial_inputs) for a in exported.assets.assets if a.kind=='F'}
+                for a in exported.assets.assets:
+                    if a.kind=='F':
+                        f_inputs[a.id]+=stress_trial_samples(list(a.trial_inputs),graph)
+                records=FunctionRegistry(exported,limits).trial(graph,f_inputs)
             except Exception as exc:   # 含 SandboxError（ValueError 子类）：统一带上下文回灌
                 raise ValueError(f'候选预检失败: {type(exc).__name__}: {exc}') from exc
             problems=trial_capability_floor_errors(records,

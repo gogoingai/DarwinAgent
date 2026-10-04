@@ -277,8 +277,12 @@ class AssetBootstrapper:
                         trial_bundle,
                         Limits(config.function_steps, config.function_timeout_s, config.result_bytes),
                         [q.text for q in questions])
-                    records = registry.trial(trial_graph,
-                                   {a.id: list(a.trial_inputs) for a in assets.assets if a.kind == 'F'})
+                    f_inputs = {a.id: list(a.trial_inputs) for a in assets.assets if a.kind == 'F'}
+                    from oak.experiments.runner import stress_trial_samples
+                    for a in assets.assets:
+                        if a.kind == 'F':
+                            f_inputs[a.id] += stress_trial_samples(list(a.trial_inputs), trial_graph)
+                    records = registry.trial(trial_graph, f_inputs)
                     if floor_caps:
                         # 动态底线：试跑必须真实触发每个必备能力（capability_calls 计数），
                         # 仅静态出现/未触发都不合规（评审#4）。
