@@ -95,6 +95,8 @@ def _retrieval_trace(answer):
     tools = []
     returned_rows = 0
     empty_results = 0
+    seen_ids = set()
+    tool_keys = set()
     for ev in events:
         stage = ev.get('stage')
         if stage == 'retrieval':
@@ -142,6 +144,15 @@ def _retrieval_trace(answer):
         returned_rows += rows
         if params is not None:
             entry['params'] = _clip(params, 90)
+        # 图新增遥测（专家规格#2，反馈层事后差分——不触碰作答路径）：本调用新召回的
+        # node_id（对前一调用集合的差集）与重复调用标记（同工具同参数再现）。
+        known=set(seen_ids)
+        new_ids=[nid for nid in (ev.get('node_ids') or ()) if nid not in known]
+        seen_ids.update(ev.get('node_ids') or ())
+        entry['new_node_ids']=new_ids[:8]
+        call_key=(ev.get('asset_id'), json.dumps(params,sort_keys=True,ensure_ascii=False) if isinstance(params,Mapping) else None)
+        entry['repeat_call']= call_key in tool_keys
+        tool_keys.add(call_key)
         tools.append(entry)
     rejections = []
     for ev in events:
