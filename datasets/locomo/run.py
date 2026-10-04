@@ -42,9 +42,9 @@ async def smoke_judge(client, case, answers):
             'answer_error' if by_idx[q.idx].status=='execution_error' else 'ok')
            for q in conv.qas if q.idx in by_idx]
     with tempfile.TemporaryDirectory() as td:
-        rows=await dual_grade_batch(items, client, context, Path(td))
-    return {'precise':sum(1 for r in rows.values() if r['status']=='ok' and r['precise']),
-            'completed':sum(1 for r in rows.values() if r['status']!='evaluation_error'),
+        rows=await dual_grade_batch(items, client, context, Path(td))   # 返回按 items 对齐的列表
+    return {'precise':sum(1 for r in rows if r['status']=='ok' and r['precise']),
+            'completed':sum(1 for r in rows if r['status']!='evaluation_error'),
             'total':len(items)}
 
 
