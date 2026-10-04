@@ -1299,3 +1299,14 @@ class PatchNormalizationTests(unittest.TestCase):
         self.assertNotIn('fingerprint', cleaned)
         asset = Asset(**cleaned)
         self.assertEqual(asset.id, 'p_x')
+
+
+class RetryVarianceTests(unittest.TestCase):
+    """R5 事故：50 次重试只发生 2 次真实调用——报错字符串相同→提示词相同→LLM 缓存
+    返回首次坏补丁。重试提示词必须携带序号（缓存破坏），50 次才是真的 50 次。"""
+
+    def test_admission_error_carries_attempt_number(self):
+        import inspect
+        from oak.experiments import runner
+        src = inspect.getsource(runner)
+        self.assertIn('重试 {attempt+1}/{ADMISSION_ATTEMPTS}', src)

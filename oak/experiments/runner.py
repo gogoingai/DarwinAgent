@@ -648,7 +648,7 @@ class ExperimentRunner:
                                 break
                             except ValueError as exc:
                                 # 失败暂存目录保留审计（.candidate-attempt-N），下一尝试用新目录
-                                admission_error=f'{type(exc).__name__}: {exc}'
+                                admission_error=f'[重试 {attempt+1}/{ADMISSION_ATTEMPTS}] {type(exc).__name__}: {exc}'
                         else:
                             raise ValueError(admission_error)
                     except Exception as exc:

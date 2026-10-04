@@ -53,6 +53,11 @@ Graph recall expansion: an F may chain search/nodes -> traverse(related entity o
 atomic facts in ONE function (fact -> entity -> related facts), returning facts with their sources
 and the relation path, deduplicated. This retrieves facts keyword/vector search miss. Use it when the
 evidence gap is structural (missing set members, related-entity facts), not on every question.
+F execution budgets (hard): at most 30000 interpreter steps, 15 seconds, and a 180KB result -
+"budget exhausted" means your F scans or loops too much: narrow it with nodes(filters=...) or
+search terms instead of scanning without a limit. No try/except and no while (restricted Python).
+If F revisions keep failing admission across rounds, submit P first (P never executes in
+the sandbox) and retry the F idea later.
 Frozen inputs arrive as tuples: never isinstance(...,list)-guard or reset them to []; iterate directly
 or rebuild with list(...). Output contracts must tolerate missing attributes: .get() yields None for
 absent fields, so declare nullable fields as ["string","null"] or omit them - a plain string-typed
