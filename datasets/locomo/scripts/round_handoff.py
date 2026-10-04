@@ -146,6 +146,13 @@ def main():
                 log('检查点搬运: ' + (cr.stdout or cr.stderr).strip()[-160:])
             else:
                 log('R1 已采纳（bundle 变更）：不搬运检查点，新 bundle 全量锚定')
+            # 决策回放：源根全部 R*/decision.json 拷入新根——轮次续号＋跨根死因记忆
+            import shutil as _sh
+            for dec in sorted(src.glob('train/R*/decision.json')):
+                rnd = dec.parent.name
+                (new_root / 'train' / rnd).mkdir(parents=True, exist_ok=True)
+                _sh.copy(dec, new_root / 'train' / rnd / 'decision.json')
+            log(f'决策回放: {len(list(src.glob("train/R*/decision.json")))} 轮')
             atomic_note = {
                 'provenance': '轮次边界交接（专家规格三）：种子=源根最后采纳版本',
                 'source_root': str(src), 'inherited_version': version,
