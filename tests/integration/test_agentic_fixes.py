@@ -1084,3 +1084,19 @@ class SmokeThresholdTests(unittest.TestCase):
                  mock.patch.object(R, 'tempfile', create=True):
                 err = asyncio.run(gate(runner, [case], None))
             self.assertEqual(expect_block, err is not None, f'fail_count={fail_count}: {err}')
+
+
+class SmokeJudgeContractTests(unittest.TestCase):
+    """冒烟判题与正式判题同一入口后的接缝回归（v10 attempt1/2 秒退：字段名笔误
+    evaluation_faults 写成 eval_faults，冒烟判题一处崩溃整轮作废）。"""
+
+    def test_smoke_judge_maps_evaluation_result_fields(self):
+        import datasets.locomo.run as R
+        import datasets.locomo.evaluator as EV
+        from oak.contracts import EvaluationResult
+        async def fake_evaluate(self, result, asked=None):
+            return EvaluationResult({'original_precise': 2}, 3, 2, 0, 1)
+        answers = (AnswerResult('0', 'abstained', 'x', ()),) * 3
+        with mock.patch.object(EV.LocomoEvaluator, 'evaluate', fake_evaluate):
+            verdict = asyncio.run(R.smoke_judge(None, SimpleNamespace(id='conv-26'), answers))
+        self.assertEqual(verdict, {'precise': 2, 'completed': 2, 'total': 3})
