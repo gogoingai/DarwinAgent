@@ -54,7 +54,8 @@ def arm_config(arm, vector_k=None):
     if arm=='v0':
         return RunConfig(retrieval_mode='vector_once',vector_k=vector_k or 30,
                          function_timeout_s=15.0,protocol_attempts=5)
-    return RunConfig(function_timeout_s=15.0,protocol_attempts=5)
+    # 并发只改调度不改答案（温度/提示词/判题不变）；glm 池 6 仍低于历史 429 线 8
+    return RunConfig(function_timeout_s=15.0,protocol_attempts=5,concurrency=8)
 
 
 def memory_structure_sample(snapshot_dir,max_facts=30):
@@ -109,6 +110,8 @@ def connection(root):
     # reasoning_effort=low，关不掉的模型缓冲兜底）；这里只声明「哪些角色关思考」。
     conn.thinking_disabled_roles.update({'answer','review','locomo_judge'})
     conn.reasoning_effort='low'
+    conn.max_concurrency=6
+    conn.fast_max_concurrency=8
     return conn
 
 
