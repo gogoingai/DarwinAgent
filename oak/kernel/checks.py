@@ -47,3 +47,21 @@ def enforce_opinions(opinions, context=''):
                   for o in failures]
         raise ValueError(f'{context}图检查否决: {detail}')
     return opinions
+
+
+def synthetic_answer_snapshot(rows, question_text, parameters=None):
+    """良好成形的答案阶段检查快照（真实记忆行＋真实问题文本）。冷启动准入用它真实执行
+    答案阶段 C（agentic_v6 G1 B0 全灭事故：模型自写 C 结构不兼容、全盘否决每个候选，
+    而答案阶段 C 此前只有静态 admit、从未被执行过）。"""
+    import json as _json
+    evidence = list(rows[:1])
+    answer = str(evidence[0].get('陈述') or evidence[0].get('statement') or '记忆支持的陈述')
+    try:
+        structured = _json.loads(answer)
+    except Exception:
+        structured = None
+    return {'stage': 'answer', 'question': question_text, 'parameters': parameters or {},
+            'status': 'answered', 'answer': answer,
+            'node_ids': [r['node_id'] for r in evidence],
+            'evidence': evidence, 'visible_evidence': list(rows[:3]),
+            'structured_answer': structured}

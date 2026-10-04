@@ -318,9 +318,10 @@ class ExperimentRunner:
                 health[path.parent.name]=faults
         return health
 
-    def _preflight(self,candidate,spec):
-        """候选在正式逐题运行前的预检（评审①③）：完整真图上的图阶段 C 检查＋能力底线试跑。
-        不合格＝准入错误回灌提案重试；不给「源码有调用但试跑不触发」或超预算 C 混进 199 题阶段的机会。"""
+    def _preflight(self,candidate,spec,sample_question=None):
+        """候选在正式逐题运行前的预检（评审①③）：完整真图上的图阶段 C＋答案阶段 C
+        （合成候选快照）＋能力底线试跑。不合格＝准入错误回灌提案重试；不给「源码有调用
+        但试跑不触发」、超预算或全盘否决的 C 混进 199 题阶段的机会。"""
         graph=self.bootstrap_trial_graph
         if graph is None: return
         import tempfile
@@ -334,9 +335,14 @@ class ExperimentRunner:
             limits=Limits(self.config.function_steps,self.config.function_timeout_s,self.config.result_bytes)
             caps=DataCapabilities(graph)
             try:
-                from oak.kernel.checks import enforce_opinions
-                enforce_opinions(CheckRegistry(exported,limits).run('graph',
-                    {'nodes':list(caps.rows.values()),'stage':'graph'}),'候选预检')
+                from oak.kernel.checks import enforce_opinions, synthetic_answer_snapshot
+                checks=CheckRegistry(exported,limits)
+                all_rows=list(caps.rows.values())
+                enforce_opinions(checks.run('graph',{'nodes':all_rows,'stage':'graph'}),'候选预检')
+                if sample_question is not None:
+                    enforce_opinions(checks.run('answer',
+                        synthetic_answer_snapshot(all_rows,sample_question.text,
+                                                  dict(sample_question.parameters))),'候选预检答案阶段')
                 records=FunctionRegistry(exported,limits).trial(graph,
                     {a.id:list(a.trial_inputs) for a in exported.assets.assets if a.kind=='F'})
             except Exception as exc:   # 含 SandboxError（ValueError 子类）：统一带上下文回灌
@@ -496,7 +502,7 @@ class ExperimentRunner:
                 if (candidate_path/'manifest.json').exists():
                     candidate=KernelBundle(candidate_path)
                     # 恢复已有候选同样过预检（评审三）：不能仅凭 manifest 存在就跳过准入验证
-                    self._preflight(candidate,spec)
+                    self._preflight(candidate,spec,cases[0].questions[0])
                 else:
                     client=self._client(name)
                     feedback=training_feedback(cases,results,_per_case_feedback_facts(self.root,evidence,cases),baseline)
@@ -525,7 +531,7 @@ class ExperimentRunner:
                                                        allowed_kinds=tuple(scope or ()),
                                                        required_capabilities=required_caps)
                                 staged=KernelBundle(attempt_path/'bundle')
-                                self._preflight(staged,spec)
+                                self._preflight(staged,spec,cases[0].questions[0])
                                 candidate_path.parent.mkdir(parents=True,exist_ok=True)
                                 os.replace(attempt_path,candidate_path.parent)
                                 candidate=KernelBundle(candidate_path)

@@ -247,12 +247,18 @@ class AssetBootstrapper:
                         if problems: raise ValueError('检索底线试跑未触发: ' + str(problems))
                     # 图阶段 C 在完整真实图上执行（评审①）：预算随图规模伸缩由 CheckRegistry
                     # 负责；不合格 C 在这里反馈给模型修订，而不是等到正式运行整轮失败。
-                    from oak.kernel.checks import CheckRegistry, enforce_opinions
+                    from oak.kernel.checks import CheckRegistry, enforce_opinions, synthetic_answer_snapshot
                     graph_checks = CheckRegistry(trial_bundle, Limits(config.function_steps,
                                                        config.function_timeout_s, config.result_bytes))
                     graph_caps = __import__('oak.operators.data', fromlist=['DataCapabilities']).DataCapabilities(trial_graph)
-                    enforce_opinions(graph_checks.run('graph', {'nodes': list(graph_caps.rows.values()),
+                    all_rows = list(graph_caps.rows.values())
+                    enforce_opinions(graph_checks.run('graph', {'nodes': all_rows,
                                                'stage': 'graph'}), '冷启动')
+                    # 答案阶段 C 同样在准入环内真实执行（合成候选＝真实记忆行＋真实问题）：
+                    # 结构不兼容/全盘否决的 C 在这里被反馈修订，而不是 B0 阶段 199 题全灭。
+                    enforce_opinions(graph_checks.run('answer',
+                        synthetic_answer_snapshot(all_rows, questions[0].text,
+                                                  dict(questions[0].parameters))), '冷启动答案阶段')
             return assets
         floor_required = bool(capability_names(getattr(spec, 'retrieval_floor', {}) or {}))
         protocol = ASSET_PROTOCOL if anchored else (

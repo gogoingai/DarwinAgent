@@ -742,11 +742,11 @@ class PreflightStagingTests(unittest.TestCase):
                 super().__init__(root)
                 self.preflight_calls = 0
                 real = self._preflight
-                def patched(candidate, spec):
+                def patched(candidate, spec, *args, **kwargs):
                     self.preflight_calls += 1
                     if self.preflight_calls == 1:
                         raise ValueError('候选预检失败: SandboxError: boom')
-                    return real(candidate, spec)
+                    return real(candidate, spec, *args, **kwargs)
                 self._preflight = patched
 
             def _client(self, stage):
@@ -780,9 +780,9 @@ class PreflightStagingTests(unittest.TestCase):
                 super().__init__(root)
                 self.preflight_specs = []
                 real = self._preflight
-                def patched(candidate, spec):
+                def patched(candidate, spec, *args, **kwargs):
                     self.preflight_specs.append(candidate.version)
-                    return real(candidate, spec)
+                    return real(candidate, spec, *args, **kwargs)
                 self._preflight = patched
 
             def _client(self, stage):
@@ -878,6 +878,44 @@ class BaselineCompatibilityTests(unittest.TestCase):
             verdict = baseline_compatibility(mine, base)
             self.assertTrue(verdict.startswith('incompatible'), label)
             self.assertIn(marker, verdict, label)
+
+
+if __name__ == '__main__':
+    unittest.main()
+
+
+class AnswerCheckAdmissionTests(unittest.TestCase):
+    """agentic_v6 G1 B0 全灭事故回归：答案阶段 C 结构不兼容/全盘否决必须在准入被拒。"""
+
+    ROWS = [{'node_id': 'n000000', 'entity_type': '原子事实', '陈述': '甲计划下周修打印机',
+             'source_ids': ['s'], '编号': 'c-0001', '主体': '甲'}]
+
+    def _registry(self, src, check_stage='answer'):
+        from oak.kernel.checks import CheckRegistry
+        from oak.operators.sandbox import Limits
+        target_stage = check_stage
+        class A: kind='C'; id='c'; fingerprint='f'; stage=target_stage; content=src
+        class B:
+            assets=type('AS',(),{'assets':(A(),)})(); version='v'
+            def verify(self): pass
+        return CheckRegistry(B(), Limits(30000, 15.0, 180000))
+
+    def test_synthetic_snapshot_is_well_formed(self):
+        from oak.kernel.checks import synthetic_answer_snapshot
+        snap = synthetic_answer_snapshot(self.ROWS, '甲计划做什么？')
+        self.assertEqual(snap['status'], 'answered')
+        self.assertEqual(snap['answer'], '甲计划下周修打印机')
+        self.assertTrue(snap['evidence'] and snap['node_ids'])
+
+    def test_rejecting_c_fails_admission(self):
+        from oak.kernel.checks import enforce_opinions, synthetic_answer_snapshot
+        snap = synthetic_answer_snapshot(self.ROWS, '甲计划做什么？')
+        bad = self._registry("def check(candidate):\n return {'ok': False, 'issues': ['candidate 不是对象']}")
+        with self.assertRaises(ValueError) as caught:
+            enforce_opinions(bad.run('answer', snap), '冷启动答案阶段')
+        self.assertIn('candidate 不是对象', str(caught.exception))
+        sane = self._registry("def check(candidate):\n return {'ok': True, 'issues': []}")
+        enforce_opinions(sane.run('answer', snap), '冷启动答案阶段')   # 正常 C 通过
 
 
 if __name__ == '__main__':
