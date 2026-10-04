@@ -271,18 +271,7 @@ class Interpreter:
                     self.bound(r) if len(r) <= self.limits.container_items else self.fail('Range limit exceeded')
                     return list(r)
                 if name == 'str' and args and isinstance(args[0],(Mapping,list,tuple,set)):
-                    # 纯数据容器的确定性字符串化（用户拍板 2026-10-05 根治）：三轮事故
-                    # （R7/R10/R13 共 70 题故障）皆因模型对容器字段 str() 被拒。改为
-                    # 递归只含标量的安全拼接——无反射、无地址信息、结果确定。
-                    v = args[0]
-                    def _scalar(x, depth=0):
-                        if depth > 4: return '...'
-                        if isinstance(x, Mapping):
-                            return '{' + ';'.join(f'{k}={_scalar(x[k], depth+1)}' for k in list(x)[:8]) + '}'
-                        if isinstance(x, (list, tuple, set)):
-                            return '[' + ';'.join(_scalar(i, depth+1) for i in list(x)[:8]) + ']'
-                        return str(x)
-                    return _scalar(v)
+                    self.fail('Container-to-string conversion is unsupported')
                 result = BUILTINS[name](*args,**kwargs)
                 if name in {'enumerate','zip'}: result = list(result)
                 return self.bound(result)
