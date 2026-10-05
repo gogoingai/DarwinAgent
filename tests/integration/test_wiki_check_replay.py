@@ -287,6 +287,9 @@ class ArchivedAttributionTests(unittest.TestCase):
         from oak.experiments.wiki import WikiMaintainer
         from tests.integration.test_experiment import LedgerRecordedClient
         root = Path('datasets/travelplanner/runs/wiki_gap_repair_20261005_loop3/train')
+        if not root.exists():
+            self.skipTest('归档证据目录不在本检出（运行产物不进版本库）；'
+                          '在产生该证据的运行侧本测试为强制项')
         events = [json.loads(p.read_text())
                   for p in sorted((root / 'optimization/events').glob('*.json'))]
         targets = [e for e in events if e['kind'] in ('formal', 'decision')]
@@ -500,6 +503,9 @@ class ThirdReviewFixTests(unittest.TestCase):
         from oak.experiments.wiki import WikiMaintainer
         from tests.integration.test_experiment import LedgerRecordedClient
         root = Path('datasets/travelplanner/runs/wiki_gap_repair_20261005_loop6/train/optimization/events')
+        if not root.exists():
+            self.skipTest('归档证据目录不在本检出（运行产物不进版本库）；'
+                          '在产生该证据的运行侧本测试为强制项')
         source = next(p for p in sorted(root.glob('025aa34a*.json')))
         event = json.loads(source.read_text())
         reply = [{'cause': 'offline', 'action': 'ok', 'training_ids': event['training_ids']}]

@@ -577,6 +577,11 @@ class RealFaultAdmissionTests(unittest.TestCase):
     REAL_PARAMS = {'subject': '乔恩', 'fact_type': '', 'date_prefix': '', 'limit': 500}
     MC_B0 = Path('datasets/locomo/runs/wiki_gap_repair_20261005_mc/train/B0/assets')
 
+    def setUp(self):
+        if not self.MC_B0.exists():
+            self.skipTest('归档证据目录不在本检出（运行产物不进版本库）；'
+                          '在产生该证据的运行侧本测试为强制项')
+
     FIXED_FILTER_F = '''def run(params):
     filters = {}
     subject = params.get('subject', '')
