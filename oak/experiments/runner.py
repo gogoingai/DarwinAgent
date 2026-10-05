@@ -299,8 +299,6 @@ def _per_case_feedback_facts(root, name, cases):
         rows.append((case.id, diagnostics))
     return rows
 
-_DETERMINISTIC_ERRORS=frozenset({'SandboxError','ValueError','TypeError','KeyError'})
-
 
 def stress_trial_samples(base_inputs, graph):
     """F 单元测试——穷尽版（用户标准：单测应避免所有故障；历史回归驱动）。
@@ -495,14 +493,20 @@ def _per_case_feedback_facts(root, name, cases):
     return rows
 
 _DETERMINISTIC_ERRORS=frozenset({'SandboxError','ValueError','TypeError','KeyError'})
+# 服务瞬时族（529/连接/超时）在题级可重试；ProtocolError 仍不可——协议耗尽喂资产反馈，
+# 且 529 进传输层退避重试后，拥塞型协议饥饿自然消失（B0/R1 服务拥塞故障，2026-10-05）。
+_TRANSIENT_ERRORS=frozenset({'InternalServerError','APIStatusError','APIConnectionError',
+                             'APITimeoutError','RateLimitError'})
 
 
 def _retryable_answer(answer):
     if any(ev.get('stage')=='tool_error' for ev in plain(answer.trace or ())):
         return False
-    if str(answer.error).split(':',1)[0].strip() in _DETERMINISTIC_ERRORS:
+    kind=str(answer.error).split(':',1)[0].strip()
+    if kind in _DETERMINISTIC_ERRORS:
         return False
-    return str(answer.error).startswith(('TransportExhausted:', 'EmptyCompletion:'))
+    return (kind in _TRANSIENT_ERRORS
+            or str(answer.error).startswith(('TransportExhausted:', 'EmptyCompletion:')))
 
 
 def _retry_journal(path, identity):
