@@ -513,6 +513,8 @@ def _per_case_feedback_facts(root, name, cases):
     return rows
 
 _DETERMINISTIC_ERRORS=frozenset({'SandboxError','ValueError','TypeError','KeyError'})
+# 服务瞬时族（529/连接/超时）在题级可重试；ProtocolError 仍不可——协议耗尽喂资产反馈，
+# 且 529 进传输层退避重试后，拥塞型协议饥饿自然消失（B0/R1 服务拥塞故障，2026-10-05）。
 _TRANSIENT_ERRORS=frozenset({'InternalServerError','APIStatusError','APIConnectionError',
                              'APITimeoutError','RateLimitError'})
 

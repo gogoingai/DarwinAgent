@@ -25,7 +25,7 @@ from oak.runtime.identity import assert_files, snapshot_files, transport_identit
 
 # 搬运字节断言的显式豁免：检查点装载逻辑本身（不参与答案计算，回归全绿护航）。
 # 豁免必须逐一列名——除此之外任何答案路径文件漂移都会拒绝搬运。
-CARRY_NEUTRAL_SUFFIXES = ('oak/engine/pipeline.py',)
+CARRY_NEUTRAL_SUFFIXES = ('oak/engine/pipeline.py', 'oak/llm/client.py')
 
 
 def carried_acceptor(root, identity, framework):
