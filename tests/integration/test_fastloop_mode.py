@@ -62,13 +62,12 @@ class RoundBudgetTests(unittest.TestCase):
                 summary = _run(runner, rounds=1)
             decision = summary["rounds"][0]
             self.assertFalse(decision["accepted"])
-            self.assertEqual(decision["status"], "validation_failed")
+            self.assertEqual(decision["status"], "round_timeout")
             self.assertTrue(any("Round deadline" in r for r in decision["reasons"]),
                             decision["reasons"])
-            state = json.loads(
-                (root / "R1/optimization/attempt-1/status.json").read_text())
-            self.assertEqual(state["state"], "deadline")
-            self.assertIn("deadline exceeded", state["error"])
+            self.assertTrue((root / "R1/timeout.json").exists())
+            self.assertFalse((root / "R1/stage.json").exists())
+            self.assertEqual(summary["completed_rounds"], 0)
 
     def test_proposal_attempts_cap_exhausts_before_fifty(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -158,7 +157,7 @@ class ValidationSelectionTests(unittest.TestCase):
                                 {"original_precise": precise, "original_lenient": precise},
                                 2, 2, 0, 0)
                         return EvaluationResult(
-                            {"precise": 0 if name == "B0" else 1}, 1, 1, 0, 0)
+                            {"precise": 0 if name == "B0" else int(name[1:])}, 2, 2, 0, 0)
                 return _Eval()
 
             runner = FastLoopExperiment(root, evaluator=improving, validation_plan={
@@ -167,8 +166,23 @@ class ValidationSelectionTests(unittest.TestCase):
                                      fromlist=["SelectionPolicy"]).SelectionPolicy(
                                          "original_precise", "original_lenient")})
             runner.validation_plan["case"] = runner.case
-            summary = _run(runner, rounds=1)
+            summary = _run(runner, rounds=2)
             self.assertTrue(summary["rounds"][0]["accepted"], summary["rounds"][0])
+            self.assertFalse(summary["rounds"][1]["accepted"])
+            # Simulate interruption between the R2 score and terminal decision.
+            # R2 must still compare with adopted R1 validation, not B0.
+            (root / 'R2/decision.json').unlink()
+            restored = FastLoopExperiment(root, evaluator=improving,
+                                         validation_plan=runner.validation_plan)
+            with contextlib.redirect_stdout(io.StringIO()):
+                resumed = asyncio.run(restored.run(
+                    restored.case.id, TaskSpec.load(TASK / "task.yaml"),
+                    rounds=2, resume=True, scope=("S", "F", "C", "P")))
+            self.assertFalse(resumed['rounds'][1]['accepted'])
+            self.assertIn('validation_primary_not_strictly_improved',
+                          resumed['rounds'][1]['reasons'])
+            history = json.loads((root / "validation.json").read_text())
+            self.assertEqual(history['R1']['metrics']['original_precise'], 2)
 
 
 class PExtractMarkingTests(unittest.TestCase):

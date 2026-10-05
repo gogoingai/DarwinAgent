@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import httpx
+from oak.runtime.deadline import bounded_timeout, remaining_seconds
 
 
 @dataclass
@@ -42,28 +43,32 @@ class Embedder:
                     f"{self.base_url.rstrip('/')}/embeddings",
                     headers={"Authorization": f"Bearer {self.api_key}"},
                     json={"model": self.model, "input": texts},
-                    timeout=60,
+                    timeout=bounded_timeout(60),
                 )
                 if r.status_code == 429 or r.status_code >= 500:
                     raise RuntimeError(f"HTTP {r.status_code}: {r.text[:200]}")
                 r.raise_for_status()
                 data = r.json()["data"]
+                remaining_seconds()
                 vecs = [d["embedding"] for d in data]
                 if not self.dim and vecs:
                     self.dim = len(vecs[0])
                 return vecs
             except Exception as e:                 # noqa: BLE001
+                remaining_seconds()
                 last_err = e
-                time.sleep(1.5 * (attempt + 1))
+                time.sleep(bounded_timeout(1.5 * (attempt + 1)))
         raise RuntimeError(f"embeddings 调用失败（{self.base_url} {self.model}）: {last_err}")
 
     # ---------------------------------------------------------------- 对外
     def embed(self, text: str) -> list[float]:
+        remaining_seconds()
         text = str(text).strip()
         k = self._key(text)
         if k in self._cache:
             return self._cache[k]
         (vec,) = self._request([text])
+        remaining_seconds()
         self._cache[k] = vec
         self._flush()
         return vec

@@ -13,6 +13,7 @@ import json
 import os
 import shutil
 import time
+from contextlib import nullcontext
 from dataclasses import asdict
 from pathlib import Path
 
@@ -27,6 +28,7 @@ from oak.kernel.validation import capability_names
 from oak.llm.client import LLMClient
 from oak.runtime.artifacts import atomic_json, digest
 from oak.runtime.identity import assert_files, snapshot_files, transport_identity
+from oak.runtime.deadline import ROUND_DEADLINE, RoundDeadlineExceeded, bounded_timeout
 from .bootstrap import AssetBootstrapper
 from .proposal import ProposalGenerator
 from .spec import aggregate_scores
@@ -859,7 +861,7 @@ class ExperimentRunner:
         goal=json.loads(goal_path.read_text())
         for attempt in range(self.proposal_attempts):
             # 轮预算（新模式，recheck4）：deadline 自 round 起不随 attempt 重置；
-            # 到点终止在途工作并持久化状态，由上层记 validation_failed（超时轮
+            # 到点终止在途工作并持久化状态，由上层记 round_timeout（超时轮
             # 不计正式轮）。旧模式 round_deadline_s=None，检查为零成本短路。
             if self._round_deadline is not None and time.monotonic()>self._round_deadline:
                 record_dir=stage/'optimization'/f'attempt-{attempt}'
@@ -868,7 +870,7 @@ class ExperimentRunner:
                     'error':f'round deadline exceeded ({self.round_deadline_s}s)',
                     'deadline_elapsed_s':round(time.monotonic()-(self._round_deadline
                                             -self.round_deadline_s),1)})
-                raise WikiAdmissionExhausted(
+                raise RoundDeadlineExceeded(
                     f'Round deadline ({self.round_deadline_s}s) exceeded at attempt {attempt}')
             record_dir=stage/'optimization'/f'attempt-{attempt}'
             record_path=record_dir/'status.json'
@@ -954,7 +956,7 @@ class ExperimentRunner:
                         # 冒烟是单次尝试最长段：开跑前再查一次 deadline（不重置）。
                         if self._round_deadline is not None \
                                 and time.monotonic()>self._round_deadline:
-                            raise WikiAdmissionExhausted(
+                            raise RoundDeadlineExceeded(
                                 f'Round deadline ({self.round_deadline_s}s) exceeded '
                                 f'before smoke at attempt {attempt}')
                         smoke_started=time.monotonic()
@@ -997,7 +999,7 @@ class ExperimentRunner:
                     'base_version':adopted.version,'objective':goal}
                 await wiki.record(name,'attempt',facts,category='runtime',scope='trial',
                     training_ids=training_ids,source=str(record_path),infer=wiki.new_failure(facts))
-        raise WikiAdmissionExhausted(f'All {ADMISSION_ATTEMPTS} Wiki admission attempts failed')
+        raise WikiAdmissionExhausted(f'All {self.proposal_attempts} Wiki admission attempts failed')
 
     @staticmethod
     def _valid_proposal_raw(raw,base=None):
@@ -1156,7 +1158,7 @@ class ExperimentRunner:
                      'answer_examples':plain(getattr(spec,'answer_examples',()) or ())}
             request_path=report_path.with_name('admission-input.json')
             atomic_json(request_path,request)
-            if not run_isolated(request_path,report_path,180):
+            if not run_isolated(request_path,report_path,bounded_timeout(180)):
                 from .admission import AdmissionError
                 raise AdmissionError(report_path,json.loads(report_path.read_text()))
             return json.loads(report_path.read_text())
@@ -1526,6 +1528,14 @@ class ExperimentRunner:
                      'dynamic_trial':self.dynamic_trial}
         if self.optimization_mode=='wiki':
             declaration['optimization']={'mode':'wiki','maintenance_call_limit':self.wiki_call_limit}
+        if self.round_deadline_s is not None or self.proposal_attempts!=ADMISSION_ATTEMPTS:
+            declaration['round_controls']={'deadline_s':self.round_deadline_s,
+                                           'proposal_attempts':self.proposal_attempts}
+        if self.graph_builder is not None:
+            declaration['graph_mode']='frozen-memory-rebuilt-graph'
+        if self.validation_plan is not None:
+            declaration['validation']={'case_fingerprint':digest(self.validation_plan['case'].to_dict()),
+                                       'policy':asdict(self.validation_plan['policy'])}
         declaration=json.loads(json.dumps(declaration,ensure_ascii=False))
         experiment_path=self.root/'experiment.json'
         if experiment_path.exists():
@@ -1645,6 +1655,9 @@ class ExperimentRunner:
                     n+=1
                     self.verify();name=f'R{n}';stage=self.root/name
                     decision=json.loads(next_decision.read_text());decisions.append(decision)
+                    if self.validation_plan is not None and decision.get('validation'):
+                        val_history[name]=decision['validation']
+                        atomic_json(self.root/'validation.json',val_history)
                     if wiki is not None:
                         if decision.get('candidate') is not None:
                             await self._wiki_formal_from_disk(
@@ -1654,15 +1667,19 @@ class ExperimentRunner:
                         await wiki.record(name,'decision',{**self._wiki_decision_facts(decision),
                             **(formal_entry['facts'] if formal_entry else {})},
                                           training_ids=[tid for case in cases for tid in question_identity(case)],
-                                          category='runtime' if decision.get('status')=='validation_failed'
+                                          category='runtime' if decision.get('status') in ('validation_failed','round_timeout')
                                           else 'strategy',
-                                          scope='admission' if decision.get('status')=='validation_failed'
+                                          scope='admission' if decision.get('status') in ('validation_failed','round_timeout')
                                           else 'formal',
                                           source=str(next_decision),
-                                          infer=decision.get('status')!='validation_failed')
+                                          infer=decision.get('status') not in ('validation_failed','round_timeout'))
                     if decision['accepted']:
                         adopted=KernelBundle(stage/'candidate'/'bundle')
                         baseline=EvaluationResult(**decision['candidate'])
+                        if self.validation_plan is not None:
+                            if not decision.get('validation'):
+                                raise ValueError('Accepted round is missing validation scores')
+                            val_baseline=EvaluationResult(**decision['validation'])
                         evidence=name  # 恢复同样以最后采纳版本的评测为准
                         # The publish pointer must follow the restored adoption (B0 was
                         # re-published above during resume), atomically and idempotently.
@@ -1675,126 +1692,178 @@ class ExperimentRunner:
                 if rounds is not None and n>=rounds: break
                 n+=1
                 self.verify();name=f'R{n}';stage=self.root/name
-                # 轮预算（新模式）：deadline 自本轮起点固定，不随 attempt 重置；
-                # 首次初始化（B0/bootstrap）不在轮内计时。
-                self._round_deadline=(time.monotonic()+self.round_deadline_s
-                                      if self.round_deadline_s else None)
                 round_started=time.time()
-                decision_path=stage/'decision.json'
-                candidate_path=stage/'candidate'/'bundle'
-                if (candidate_path/'manifest.json').exists():
-                    candidate=KernelBundle(candidate_path)
-                    # 恢复已有候选同样过预检＋冒烟（评审三）：不能仅凭 manifest 存在就跳过验证
-                    recorded=self.root/name/'candidate'/'admission.json'
-                    saved=json.loads(recorded.read_text()) if recorded.exists() else {}
-                    if not (wiki is not None and self._wiki_report_valid(saved,candidate)):
-                        await self._preflight(candidate,spec,cases[0].questions[0],cases,
-                                        _failed_tool_params(results))
-                    if (self.snapshot_root is not None or self.dynamic_trial) and not (
-                            wiki is not None and self._wiki_report_valid(saved,candidate,smoke=True)):
-                        smoke_started=time.monotonic()
-                        resume_smoke=await self._smoke_gate(cases,spec.with_bundle(candidate),candidate=True)
-                        self._record_smoke(candidate,resume_smoke,
-                                           time.monotonic()-smoke_started)
-                        if resume_smoke: raise ValueError('恢复候选冒烟失败: '+resume_smoke)
-                else:
-                    if wiki is not None:
-                        try:
-                            candidate=await self._wiki_attempt(
-                                wiki,stage,name,cases,spec,adopted,results,scope)
-                        except WikiAdmissionExhausted as exc:
-                            decision={'accepted':False,'status':'validation_failed',
-                                      'reasons':[f'{type(exc).__name__}: {exc}'],
-                                      'base_version':adopted.version,'candidate':None}
+                budget_path=stage/'round-budget.json'
+                remaining=None
+                if self.round_deadline_s is not None:
+                    if budget_path.exists():
+                        budget=json.loads(budget_path.read_text())
+                        if budget['limit_s']!=self.round_deadline_s:
+                            raise ValueError('Resumed round budget changed')
+                    else:
+                        budget={'limit_s':self.round_deadline_s,'started_at':round_started,
+                                'deadline_at':round_started+self.round_deadline_s}
+                        atomic_json(budget_path,budget)
+                    round_started=budget['started_at']
+                    remaining=min(self.round_deadline_s,budget['deadline_at']-time.time())
+                self._round_deadline=(time.monotonic()+max(0,remaining)
+                                      if remaining is not None else None)
+                previous_validation=val_baseline
+                decision_count=len(decisions)
+                deadline_token=ROUND_DEADLINE.set(self._round_deadline)
+                try:
+                    if remaining is not None and remaining<=0:
+                        raise TimeoutError('Resumed round budget exhausted')
+                    async with asyncio.timeout(remaining) if remaining is not None else nullcontext():
+                        decision_path=stage/'decision.json'
+                        candidate_path=stage/'candidate'/'bundle'
+                        if (candidate_path/'manifest.json').exists():
+                            candidate=KernelBundle(candidate_path)
+                            # 恢复已有候选同样过预检＋冒烟（评审三）：不能仅凭 manifest 存在就跳过验证
+                            recorded=self.root/name/'candidate'/'admission.json'
+                            saved=json.loads(recorded.read_text()) if recorded.exists() else {}
+                            if not (wiki is not None and self._wiki_report_valid(saved,candidate)):
+                                await self._preflight(candidate,spec,cases[0].questions[0],cases,
+                                                _failed_tool_params(results))
+                            if (self.snapshot_root is not None or self.dynamic_trial) and not (
+                                    wiki is not None and self._wiki_report_valid(saved,candidate,smoke=True)):
+                                smoke_started=time.monotonic()
+                                resume_smoke=await self._smoke_gate(cases,spec.with_bundle(candidate),candidate=True)
+                                self._record_smoke(candidate,resume_smoke,
+                                                   time.monotonic()-smoke_started)
+                                if resume_smoke: raise ValueError('恢复候选冒烟失败: '+resume_smoke)
+                        else:
+                            if wiki is not None:
+                                try:
+                                    candidate=await self._wiki_attempt(
+                                        wiki,stage,name,cases,spec,adopted,results,scope)
+                                except WikiAdmissionExhausted as exc:
+                                    decision={'accepted':False,'status':'validation_failed',
+                                              'reasons':[f'{type(exc).__name__}: {exc}'],
+                                              'base_version':adopted.version,'candidate':None}
+                                    atomic_json(decision_path,decision);decisions.append(decision)
+                                    await wiki.record(name,'decision',self._wiki_decision_facts(decision),
+                                                      category='runtime',scope='admission',
+                                                      source=str(decision_path))
+                                    continue
+                            else:
+                                candidate=await self._legacy_candidate(
+                                    stage,name,cases,spec,adopted,results,baseline,evidence,scope,
+                                    decision_path,decisions,n)
+                                if candidate is None: continue
+                        if stage_gate is not None: stage_gate(name)
+                        candidate_results,candidate_scores=await self._stage(name,cases,spec.with_bundle(candidate))
+                        decision={**self.policy.decide(baseline,candidate_scores),'base_version':adopted.version,'candidate_version':candidate.version}
+                        # 新模式：P.extract 此模式不执行——其补丁不得报告为已生效优化。
+                        if self.graph_builder is not None:
+                            origin=getattr(candidate.assets,'origin',None)
+                            origin=origin if isinstance(origin,Mapping) else {}
+                            px=[p for p in origin.get('patches',())
+                                if (p.get('asset') or {}).get('kind')=='P'
+                                and (p.get('asset') or {}).get('role')=='extract']
+                            if px:
+                                decision['p_extract_not_effective']=len(px)
+                        # 新模式验证选版（防退化）：训练主判通过后，候选在固定验证题上聚合
+                        # 指标须无故障、primary 严格升＋floor 不降（与 SelectionPolicy 同谓词，
+                        # 逐候选判定）；验证退化即拒绝（训练小集收益只是继续迭代的信号）。
+                        if self.validation_plan is not None and decision['accepted']:
+                            _,val_scores=await self._stage(f'{name}-val',(val_case,),
+                                                           spec.with_bundle(candidate))
+                            policy=self.validation_plan['policy']
+                            v_failures=[]
+                            if val_scores.total!=val_baseline.total \
+                                    or val_scores.completed!=val_scores.total:
+                                v_failures.append('incomplete_evaluation')
+                            if val_scores.evaluation_faults or val_scores.generation_faults:
+                                v_failures.append('evaluation_fault')
+                            if set(val_scores.metrics)!=set(val_baseline.metrics):
+                                v_failures.append('metric_contract_changed')
+                            if not v_failures:
+                                if val_scores.metrics.get(policy.primary,-1) \
+                                        <= val_baseline.metrics.get(policy.primary,-1):
+                                    v_failures.append('primary_not_strictly_improved')
+                                if val_scores.metrics.get(policy.floor,-1) \
+                                        < val_baseline.metrics.get(policy.floor,-1):
+                                    v_failures.append('metric_decreased:'+policy.floor)
+                            decision['validation']={'metrics':plain(dict(val_scores.metrics)),
+                                'total':val_scores.total,'completed':val_scores.completed,
+                                'generation_faults':val_scores.generation_faults,
+                                'evaluation_faults':val_scores.evaluation_faults}
+                            val_history[name]=val_scores.to_dict()
+                            atomic_json(self.root/'validation.json',val_history)
+                            if v_failures:
+                                decision['accepted']=False
+                                decision['reasons']=[*decision['reasons'],
+                                                     *(f'validation_{r}' for r in v_failures)]
+                            else:
+                                val_baseline=val_scores
+                        decision['round_elapsed_s']=round(time.time()-round_started,1)
+                        # 保持旧循环的落盘顺序：Wiki 中断后可从正式决策补写经验。
+                        # 有整轮预算时推迟决策落盘，防 Wiki 超时留下可采纳记录。
+                        if self.round_deadline_s is None:
                             atomic_json(decision_path,decision);decisions.append(decision)
-                            await wiki.record(name,'decision',self._wiki_decision_facts(decision),
-                                              category='runtime',scope='admission',
-                                              source=str(decision_path))
-                            continue
-                    else:
-                        candidate=await self._legacy_candidate(
-                            stage,name,cases,spec,adopted,results,baseline,evidence,scope,
-                            decision_path,decisions,n)
-                        if candidate is None: continue
-                if stage_gate is not None: stage_gate(name)
-                candidate_results,candidate_scores=await self._stage(name,cases,spec.with_bundle(candidate))
-                decision={**self.policy.decide(baseline,candidate_scores),'base_version':adopted.version,'candidate_version':candidate.version}
-                # 新模式：P.extract 此模式不执行——其补丁不得报告为已生效优化。
-                if self.graph_builder is not None:
-                    origin=getattr(candidate.assets,'origin',None)
-                    origin=origin if isinstance(origin,Mapping) else {}
-                    px=[p for p in origin.get('patches',())
-                        if (p.get('asset') or {}).get('kind')=='P'
-                        and (p.get('asset') or {}).get('role')=='extract']
-                    if px:
-                        decision['p_extract_not_effective']=len(px)
-                # 新模式验证选版（防退化）：训练主判通过后，候选在固定验证题上聚合
-                # 指标须无故障、primary 严格升＋floor 不降（与 SelectionPolicy 同谓词，
-                # 逐候选判定）；验证退化即拒绝（训练小集收益只是继续迭代的信号）。
-                if self.validation_plan is not None and decision['accepted']:
-                    _,val_scores=await self._stage(f'{name}-val',(val_case,),
-                                                   spec.with_bundle(candidate))
-                    policy=self.validation_plan['policy']
-                    v_failures=[]
-                    if val_scores.total!=val_baseline.total \
-                            or val_scores.completed!=val_scores.total:
-                        v_failures.append('incomplete_evaluation')
-                    if val_scores.evaluation_faults or val_scores.generation_faults:
-                        v_failures.append('evaluation_fault')
-                    if set(val_scores.metrics)!=set(val_baseline.metrics):
-                        v_failures.append('metric_contract_changed')
-                    if not v_failures:
-                        if val_scores.metrics.get(policy.primary,-1) \
-                                <= val_baseline.metrics.get(policy.primary,-1):
-                            v_failures.append('primary_not_strictly_improved')
-                        if val_scores.metrics.get(policy.floor,-1) \
-                                < val_baseline.metrics.get(policy.floor,-1):
-                            v_failures.append('metric_decreased:'+policy.floor)
-                    decision['validation']={'metrics':plain(dict(val_scores.metrics)),
-                        'total':val_scores.total,'completed':val_scores.completed,
-                        'generation_faults':val_scores.generation_faults,
-                        'evaluation_faults':val_scores.evaluation_faults}
-                    val_history[name]=val_scores.to_dict()
-                    atomic_json(self.root/'validation.json',val_history)
-                    if v_failures:
-                        decision['accepted']=False
-                        decision['reasons']=[*decision['reasons'],
-                                             *(f'validation_{r}' for r in v_failures)]
-                    else:
-                        val_baseline=val_scores
-                decision['round_elapsed_s']=round(time.time()-round_started,1)
-                atomic_json(decision_path,decision);decisions.append(decision)
-                if wiki is not None:
-                    raw=training_feedback(cases,candidate_results,
-                        _per_case_feedback_facts(self.root,name,cases),candidate_scores,
-                        active_stages=pipeline_active_stages(self.snapshot_root))
-                    formal_facts={**safe_feedback(raw),**asset_evidence(adopted,candidate),
-                        **_wiki_training_evidence(cases,candidate_results,results,
-                            _per_case_feedback_facts(self.root,name,cases))}
-                    if decision.get('validation'):
-                        formal_facts['validation']=decision['validation']  # 聚合指标
-                    if decision.get('p_extract_not_effective'):
-                        formal_facts['p_extract_not_effective']=decision['p_extract_not_effective']
-                    await wiki.record(name,'formal',formal_facts,category='strategy',
-                        scope='formal',training_ids=[
-                            tid for case in cases for tid in question_identity(case)],
-                        source=str(stage/'stage.json'))
-                    await wiki.record(name,'decision',{**self._wiki_decision_facts(decision),
-                        **formal_facts},training_ids=[tid for case in cases for tid in question_identity(case)],
-                        category='strategy',scope='formal',source=str(decision_path),infer=True)
-                if decision['accepted']:
-                    adopted=self.revisions.publish(candidate,self.root/'published',decision)
-                    baseline=candidate_scores;results=candidate_results
-                    evidence=name  # 后续提案的诊断跟随新采纳版本
-                print(json.dumps({'stage':name,'accepted':decision['accepted'],'reasons':decision['reasons']},ensure_ascii=False),flush=True)
+                        if wiki is not None:
+                            raw=training_feedback(cases,candidate_results,
+                                _per_case_feedback_facts(self.root,name,cases),candidate_scores,
+                                active_stages=pipeline_active_stages(self.snapshot_root))
+                            formal_facts={**safe_feedback(raw),**asset_evidence(adopted,candidate),
+                                **_wiki_training_evidence(cases,candidate_results,results,
+                                    _per_case_feedback_facts(self.root,name,cases))}
+                            if decision.get('validation'):
+                                formal_facts['validation']=decision['validation']  # 聚合指标
+                            if decision.get('p_extract_not_effective'):
+                                formal_facts['p_extract_not_effective']=decision['p_extract_not_effective']
+                            await wiki.record(name,'formal',formal_facts,category='strategy',
+                                scope='formal',training_ids=[
+                                    tid for case in cases for tid in question_identity(case)],
+                                source=str(stage/'stage.json'))
+                            await wiki.record(name,'decision',{**self._wiki_decision_facts(decision),
+                                **formal_facts},training_ids=[tid for case in cases for tid in question_identity(case)],
+                                category='strategy',scope='formal',source=str(decision_path),infer=True)
+                        if self._round_deadline is not None and time.monotonic()>=self._round_deadline:
+                            raise TimeoutError('Round deadline exceeded before publication')
+                        decision['round_elapsed_s']=round(time.time()-round_started,1)
+                        if self.round_deadline_s is not None:
+                            atomic_json(decision_path,decision);decisions.append(decision)
+                        if decision['accepted']:
+                            adopted=self.revisions.publish(candidate,self.root/'published',decision)
+                            baseline=candidate_scores;results=candidate_results
+                            evidence=name  # 后续提案的诊断跟随新采纳版本
+                        print(json.dumps({'stage':name,'accepted':decision['accepted'],'reasons':decision['reasons']},ensure_ascii=False),flush=True)
+                except TimeoutError:
+                    if self._round_deadline is None or time.monotonic()<self._round_deadline:
+                        raise
+                    del decisions[decision_count:]
+                    val_baseline=previous_validation
+                    decision={'accepted':False,'status':'round_timeout',
+                              'reasons':[f'Round deadline ({self.round_deadline_s}s) exceeded'],
+                              'base_version':adopted.version,'candidate':None,
+                              'round_elapsed_s':round(time.time()-round_started,1)}
+                    atomic_json(stage/'timeout.json',decision)
+                    atomic_json(stage/'decision.json',decision);decisions.append(decision)
+                    if wiki is not None:
+                        await wiki.record(name,'decision',self._wiki_decision_facts(decision),
+                                          category='runtime',scope='admission',
+                                          source=str(stage/'decision.json'),infer=False)
+                    print(json.dumps({'stage':name,'status':'round_timeout'},ensure_ascii=False),flush=True)
+                finally:
+                    ROUND_DEADLINE.reset(deadline_token)
+                    self._round_deadline=None
             self.verify()
             # 汇总训练阶段执行/评测故障：正常评分后的拒绝可完成，评分未完成必须报失败
             unhealthy=self._stage_health()
-            summary={'status':'complete' if not unhealthy and all(d.get('status')!='validation_failed' for d in decisions) else 'failed',
+            summary={'status':'complete' if not unhealthy and all(d.get('status') not in ('validation_failed','round_timeout') for d in decisions) else 'failed',
                      'unhealthy_stages':unhealthy,
                      'stopped_by_operator':stopped,'rounds':decisions,'adopted_version':adopted.version,
                      'adopted_scores':baseline.to_dict(),
                      'stability':stability_metrics(self.root)}
+            if self.round_deadline_s is not None:
+                summary['completed_rounds']=sum(
+                    d.get('candidate') is not None
+                    and d.get('status') not in ('validation_failed','round_timeout')
+                    and d['candidate'].get('completed')==d['candidate'].get('total')
+                    and not d['candidate'].get('generation_faults')
+                    and not d['candidate'].get('evaluation_faults') for d in decisions)
             atomic_json(self.root/'summary.json',summary)
             return summary
         except Exception as exc:

@@ -1,0 +1,131 @@
+{
+  "main_sha": "df6e60f8dc0e8265759eacef1c0fbb4b2d49cd22",
+  "sources_start": {
+    "oak/experiments/runner.py": "28c5dd93707f5db6bc65e89443d9be4ae7024129a893dda181ccf5744314c524",
+    "oak/experiments/wiki.py": "a7f4ef26b84a39ac788c3071821fde5080cbf2d5b61c322ffefb56107bbd3dbc",
+    "datasets/locomo/graph_rules.py": "5271dec30b06e8ff1130d0deae52854905aaed4dc2e71d312f0320bf94343267",
+    "datasets/locomo/scripts/question_split.py": "a664f599d4e6844735bc38e2d0d2e16be4a3d1640796020025881f07a82f523e",
+    "oak/runtime/deadline.py": "5f0a472a5bd31479e0a0f9b7bef3a492040519f2d455d8b4b7b3cbfe42601034",
+    "oak/operators/sandbox.py": "96f2f45f6a9023ae68692c269512d9c860c76a40a65a3aec7d9f10c7c4edd122",
+    "oak/vector/embedder.py": "d8900c9ee7458af77c8d3a0f326c0a0ffad7faf2dd19d00bf2f6f0ba4b867c8e"
+  },
+  "deadline": {
+    "budget_s": 0.3,
+    "formal_delay_s": 0.6,
+    "status": "failed",
+    "accepted": false,
+    "decision_status": "round_timeout",
+    "round_elapsed_s": 0.3,
+    "formal_written": false
+  },
+  "split": {
+    "seed": 20261005,
+    "train": [
+      6,
+      45,
+      58,
+      65,
+      69,
+      70,
+      86,
+      87,
+      105,
+      116,
+      140,
+      154,
+      155,
+      172,
+      173
+    ],
+    "validation": [
+      30,
+      37,
+      44,
+      56,
+      68,
+      106,
+      111,
+      120,
+      168,
+      198
+    ],
+    "shared_evidence_across_splits": []
+  },
+  "session_dates": {
+    "sessions": 19,
+    "mismatched": 0,
+    "mismatches": []
+  },
+  "wiki_binding": [
+    {
+      "case_id": "train:0",
+      "variant": "different_scenario",
+      "incorrectly_marked_verified": false,
+      "lessons": [
+        {
+          "id": "3cf7c7342c368fe657fbdac054fc1ae2b450715cb2fd0816d30c68954ae1fd9d",
+          "pattern": "f_flight_pair:stress:ValueError:contract failure",
+          "stage": "R1",
+          "status": "unresolved",
+          "confidence": "hypothesis",
+          "evidence_ids": [
+            "old"
+          ],
+          "origin": {
+            "input_ref": "train:0:stress:0:3aacf250fdc04cab2da5744feee531f52ccf4ab7158ef2661f04d7935fe64b2e",
+            "error_type": "ValueError",
+            "error": "contract failure",
+            "issues": [],
+            "graph_digests": {
+              "train:0": "old-graph"
+            }
+          },
+          "cause": null,
+          "action": null,
+          "occurrences": 1,
+          "last_stage": "R1"
+        }
+      ]
+    },
+    {
+      "case_id": "train:0",
+      "variant": "different_graph",
+      "incorrectly_marked_verified": false,
+      "lessons": [
+        {
+          "id": "3cf7c7342c368fe657fbdac054fc1ae2b450715cb2fd0816d30c68954ae1fd9d",
+          "pattern": "f_flight_pair:stress:ValueError:contract failure",
+          "stage": "R1",
+          "status": "unresolved",
+          "confidence": "hypothesis",
+          "evidence_ids": [
+            "old"
+          ],
+          "origin": {
+            "input_ref": "train:0:stress:0:3aacf250fdc04cab2da5744feee531f52ccf4ab7158ef2661f04d7935fe64b2e",
+            "error_type": "ValueError",
+            "error": "contract failure",
+            "issues": [],
+            "graph_digests": {
+              "train:0": "old-graph"
+            }
+          },
+          "cause": null,
+          "action": null,
+          "occurrences": 1,
+          "last_stage": "R1"
+        }
+      ]
+    }
+  ],
+  "sources_end": {
+    "oak/experiments/runner.py": "28c5dd93707f5db6bc65e89443d9be4ae7024129a893dda181ccf5744314c524",
+    "oak/experiments/wiki.py": "a7f4ef26b84a39ac788c3071821fde5080cbf2d5b61c322ffefb56107bbd3dbc",
+    "datasets/locomo/graph_rules.py": "5271dec30b06e8ff1130d0deae52854905aaed4dc2e71d312f0320bf94343267",
+    "datasets/locomo/scripts/question_split.py": "a664f599d4e6844735bc38e2d0d2e16be4a3d1640796020025881f07a82f523e",
+    "oak/runtime/deadline.py": "5f0a472a5bd31479e0a0f9b7bef3a492040519f2d455d8b4b7b3cbfe42601034",
+    "oak/operators/sandbox.py": "96f2f45f6a9023ae68692c269512d9c860c76a40a65a3aec7d9f10c7c4edd122",
+    "oak/vector/embedder.py": "d8900c9ee7458af77c8d3a0f326c0a0ffad7faf2dd19d00bf2f6f0ba4b867c8e"
+  },
+  "source_unchanged": true
+}

@@ -156,11 +156,27 @@ def _lessons(entries):
                     # 负例（answer_invalid/answer_cx_*）无 digest 段。
                     tail=str(ref or '').rsplit(':',1)[-1]
                     return tail if len(tail)>=12 and all(c in '0123456789abcdef' for c in tail) else ''
-                def _ref_case(ref):
-                    return str(ref or '').split(':',1)[0]
-                def _ref_scenario(ref):
-                    parts=str(ref or '').split(':')
-                    return parts[1] if len(parts)>1 else ''
+                def _ref_identity(ref, scenario, graphs):
+                    """Use report case IDs, which may themselves contain colons.
+
+                    For old reports without graph identities, split at the known scenario;
+                    check replay references instead end in question_id:snapshot_digest.
+                    """
+                    ref=str(ref or '')
+                    for case_id in sorted(graphs, key=lambda c: (-len(c), c)):
+                        if ref.startswith(case_id+':'):
+                            return case_id,ref[len(case_id)+1:].split(':',1)[0]
+                    marker=':'+str(scenario)
+                    at=ref.find(marker)
+                    if at>=0 and (at+len(marker)==len(ref)
+                                  or ref[at+len(marker)]==':'):
+                        return ref[:at],str(scenario)
+                    if _ref_digest(ref):
+                        parts=ref.rsplit(':',2)
+                        if len(parts)==3:
+                            return parts[0],parts[1]
+                    parts=ref.split(':',1)
+                    return parts[0],parts[1].split(':',1)[0] if len(parts)>1 else ''
                 def _verifies(row,lesson,aid,report):
                     """四审五要素绑定：case＋场景族＋参数/快照 digest＋数据图身份＋期望档。
                     反例（recheck4 remaining-probes）：跨 case 同参数通过（base/stress 参数
@@ -175,12 +191,14 @@ def _lessons(entries):
                         return False  # 占位实例结构档不能证明语义故障已修复
                     origin=lesson.get('origin') or {}
                     origin_ref=str(origin.get('input_ref') or '')
-                    origin_case=_ref_case(origin_ref)
-                    if origin_case and origin_case!=_ref_case(row.get('input_ref')):
-                        return False  # 案例绑定：旧 case 的失败不能由新 case 的通过验证
                     origin_digest=_ref_digest(origin_ref)
-                    origin_scenario=_ref_scenario(origin_ref) or \
-                        (lesson['pattern'].split(':')[1] if ':' in lesson['pattern'] else '')
+                    origin_scenario=lesson['pattern'].split(':')[1] if ':' in lesson['pattern'] else ''
+                    origin_graphs=origin.get('graph_digests') or {}
+                    report_graphs=report.get('graph_digests') or {}
+                    origin_case,origin_slot=_ref_identity(origin_ref,origin_scenario,origin_graphs)
+                    row_case,row_slot=_ref_identity(row.get('input_ref'),row.get('scenario_id'),report_graphs)
+                    if origin_case and origin_case!=row_case:
+                        return False
                     if origin_digest:
                         # 数据相关场景：场景族一致＋原输入 digest 成功才算修复——
                         # 同 case 不同场景（stress 失败、base 通过）与同名不同参数
@@ -188,9 +206,9 @@ def _lessons(entries):
                         # 补全）。场景比对用 ref 段对 ref 段：check_replay 的 ref 是
                         # case:question_id:<digest>，第二段是题号而非场景名——与行
                         # scenario_id 标签不同源，比对标签会误拒真实回放验证。
-                        if _ref_scenario(origin_ref) != _ref_scenario(row.get('input_ref')):
+                        if origin_slot != row_slot:
                             return False
-                        if origin_digest not in str(row.get('input_ref','')):
+                        if origin_digest != _ref_digest(row.get('input_ref')):
                             return False
                     else:
                         if row.get('scenario_id')!=origin_scenario:
@@ -198,9 +216,7 @@ def _lessons(entries):
                     # 数据图身份：失败时的图与验证时的图不一致（可重建图模式）则
                     # 输入语义已变，不能证明原故障修复；任一侧缺失时退回前四要素
                     # （旧报告无图摘要，不追溯作废）。
-                    origin_graph=(origin.get('graph_digests') or {}).get(origin_case) \
-                        if origin_case else None
-                    report_graphs=report.get('graph_digests') or {}
+                    origin_graph=origin_graphs.get(origin_case) if origin_case else None
                     if origin_graph and origin_case in report_graphs \
                             and report_graphs[origin_case]!=origin_graph:
                         return False

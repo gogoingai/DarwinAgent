@@ -18,10 +18,11 @@ PROJECTION_VERSION（进图缓存键）。
 from __future__ import annotations
 
 import json
+import re
 from datetime import date
 from pathlib import Path
 
-PROJECTION_VERSION = 'fact-projection-v1'
+PROJECTION_VERSION = 'fact-projection-v2'
 
 # 投影发出的类型与关系（S 必须声明这些才可重建）
 FACT_TYPE = '原子事实'
@@ -44,14 +45,20 @@ def load_facts(snapshot_dir: Path):
     return rows, manifest
 
 
-def _session_dates(facts):
-    """会话 -> 日期：取该会话首个带 date_iso 的事实日期（确定性）。"""
+def _session_dates(facts, corpus=()):
+    """会话日期来自消息元数据；事实 date_iso 是事件日期，不能作为记录日。"""
     dates = {}
-    for row in sorted(facts, key=lambda r: str(r.get('fid', ''))):
-        n = row.get('session_no')
-        iso = str(row.get('date_iso') or '')
-        if n is not None and iso and n not in dates:
-            dates[n] = iso
+    for block in _corpus_blocks(corpus):
+        match = re.match(r'^D(\d+):', block.source.location)
+        raw = str(block.metadata.get('date') or '')
+        if not match or not raw:
+            continue
+        n = int(match.group(1))
+        iso = date.fromisoformat(raw[:10]).isoformat()
+        if n in dates and dates[n] != iso:
+            raise ValueError(f'会话 {n} 的消息日期冲突')
+        dates[n] = iso
+    # 无记录日期时不虚构，不回退到事件日期。
     return dates
 
 
@@ -128,7 +135,7 @@ def project_candidates(facts, schema=None, corpus=()):
 
     entities: list[EntityCandidate] = []
     relations: list[RelationCandidate] = []
-    sessions = _session_dates(facts)
+    sessions = _session_dates(facts, corpus)
 
     def fact_chunks(row):
         """事实的来源块 id 列表（证据解析用）；无 corpus 映射时退回追溯标记。"""

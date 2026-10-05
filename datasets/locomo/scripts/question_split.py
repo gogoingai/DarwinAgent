@@ -1,8 +1,9 @@
 """conv-26 题目分层划分（新模式：同对话 15 训练＋10 验证，四次复查/recheck4 协议）。
 
 规则：
-- 按 category 分层（1 单跳 / 2 多跳 / 3 时间 / 4 开放域 / 5 对抗），比例配额＋最大余数法；
-- 引用同一 evidence 事实的题进同侧（防训练/验证泄漏，题面与 gold 不进入本脚本）；
+- 按 category 比例及最大余数法计算平衡目标，实际类别数随完整证据组调整；
+- 跨类别、部分重叠及传递共享 evidence 的题作为完整连通组，只能进入一侧或不选；
+- 分组和选题只读取类别及 evidence，不使用题面或 gold；题数无法满足时明确报错；
 - 固定种子确定顺序（同机同库输出恒定）；保留原 case_id/question_id（idx 不变）。
 
 用法：python -m datasets.locomo.scripts.question_split [--out runs/<dir>/split.json]
@@ -22,6 +23,8 @@ SEED = 20261005
 
 
 def build_split(case_id='conv-26', train_n=TRAIN_N, val_n=VAL_N, seed=SEED):
+    if type(train_n) is not int or type(val_n) is not int or min(train_n, val_n)<1:
+        raise ValueError('Training and validation counts must be positive integers')
     data = json.loads(DATA.read_text())
     item = next(x for x in data if x['sample_id'] == case_id)
     qs = item['qa']
@@ -29,48 +32,56 @@ def build_split(case_id='conv-26', train_n=TRAIN_N, val_n=VAL_N, seed=SEED):
     if len(qs) < total:
         raise ValueError(f'{case_id} 题数不足: {len(qs)} < {total}')
     cats = sorted({q['category'] for q in qs})
-    # 比例配额（最大余数法），保证 train+val 恰为 total 且每类分到非负配额
-    quotas = largest_remainder({c: sum(1 for q in qs if q['category'] == c) for c in cats},
-                               len(qs), total)
+    counts = Counter(q['category'] for q in qs)
+    targets = (largest_remainder(counts, len(qs), train_n),
+               largest_remainder(counts, len(qs), val_n))
     rng = random.Random(seed)
-    train, val = [], []
-    for c in cats:
-        # 同类内按 evidence 首指针分组（同一事实的题同侧），组间随机排序
-        groups = defaultdict(list)
-        for i, q in enumerate(qs):
-            if q['category'] != c:
-                continue
-            ev = q.get('evidence')
-            key = json.dumps(ev, ensure_ascii=False, sort_keys=True) if ev else f'no-ev-{i}'
-            groups[key].append(i)
-        keys = sorted(groups)
-        rng.shuffle(keys)
-        pool = [i for k in keys for i in groups[k]]
-        # 组不可拆：整组交替分配直到该类配额用尽（超配额的组回落到同类已选侧）
-        take = quotas[c]
-        side, chosen, used = train, [], 0
-        for k in keys:
-            if used >= take:
-                break
-            grp = groups[k]
-            if used + len(grp) <= take:
-                chosen += grp
-                used += len(grp)
-            elif not chosen:
-                chosen = grp[:take]
-                used = take
-        # 组不可拆导致配额未满时，从剩余同类题补齐（同类即同层，不破坏分层）
-        rest = [i for k in keys for i in groups[k] if i not in set(chosen)]
-        rng.shuffle(rest)
-        chosen += rest[:take - len(chosen)]
-        # 该类配额内部再分 train/val：按组顺序前段给少的一侧，保证两侧行稳
-        n_train = round(take * train_n / total)
-        shuffled = chosen[:]
-        rng.shuffle(shuffled)
-        train += shuffled[:n_train]
-        val += shuffled[n_train:]
-    return {'case_id': case_id, 'seed': seed, 'method': 'category-stratified+evidence-grouped',
-            'categories': {str(c): n for c, n in quotas.items()},
+    # 全局证据连通组：跨题型、部分重叠和传递重叠都不能被拆到两侧。
+    parents=list(range(len(qs)))
+    def find(i):
+        while parents[i]!=i:
+            parents[i]=parents[parents[i]]
+            i=parents[i]
+        return i
+    seen={}
+    for i,q in enumerate(qs):
+        for evidence in q.get('evidence') or ():
+            key=json.dumps(evidence,ensure_ascii=False,sort_keys=True)
+            if key in seen:
+                parents[find(i)]=find(seen[key])
+            else:
+                seen[key]=i
+    grouped=defaultdict(list)
+    for i in range(len(qs)):
+        grouped[find(i)].append(i)
+    groups=sorted(grouped.values(),key=lambda g:g[0])
+    rng.shuffle(groups)
+    def distance(value):
+        return sum((value[side+2].get(c,0)-targets[side][c])**2
+                   for side in (0,1) for c in cats)
+    # 两侧题数作状态，整组选取；类别配额是平衡目标，绝不靠拆组凑数。
+    states={(0,0):([],[],Counter(),Counter())}
+    for group in groups:
+        next_states=dict(states)
+        group_counts=Counter(qs[i]['category'] for i in group)
+        for sizes,value in states.items():
+            for side,cap in ((0,train_n),(1,val_n)):
+                if sizes[side]+len(group)>cap:
+                    continue
+                key=list(sizes);key[side]+=len(group);key=tuple(key)
+                candidate=list(value)
+                candidate[side]=value[side]+group
+                candidate[side+2]=value[side+2]+group_counts
+                candidate=tuple(candidate)
+                if key not in next_states or distance(candidate)<distance(next_states[key]):
+                    next_states[key]=candidate
+        states=next_states
+    if (train_n,val_n) not in states:
+        raise ValueError('Cannot meet requested counts without splitting evidence groups; adjust counts')
+    train,val,train_counts,val_counts=states[(train_n,val_n)]
+    return {'case_id': case_id, 'seed': seed, 'method': 'category-balanced+evidence-components-v2',
+            'categories': {str(c):train_counts[c]+val_counts[c] for c in cats},
+            'split_categories':{'train':dict(train_counts),'validation':dict(val_counts)},
             'train': sorted(train), 'validation': sorted(val),
             'n_pool': len(qs)}
 

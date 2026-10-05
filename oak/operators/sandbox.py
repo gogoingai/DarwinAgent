@@ -15,6 +15,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 
 from oak.contracts import freeze, plain
+from oak.runtime.deadline import remaining_seconds
 
 
 class SandboxError(ValueError):
@@ -124,6 +125,7 @@ class Interpreter:
         self.steps, self.deadline = 0, 0.0
 
     def tick(self):
+        remaining_seconds()
         self.steps += 1
         if self.steps > self.limits.steps or time.monotonic() > self.deadline:
             raise SandboxError('Restricted execution budget exhausted')
