@@ -22,11 +22,14 @@ from datasets.locomo.run import ROOT, SNAPSHOTS, TASK_DIR, arm_config, connectio
 METRICS = ('original_precise', 'original_lenient', 'repaired_precise', 'repaired_lenient')
 
 
-async def evaluate_conversation(case_id, adapter, task, bundle, config, root):
+async def evaluate_conversation(case_id, adapter, task, bundle, config, root,
+                                graph_builder=None):
     case = adapter.generation_input(case_id)
     client = LLMClient(connection(root / case_id))
     try:
-        pipeline = Pipeline(client, root / case_id / 'generation', frozen_snapshot=SNAPSHOTS / case_id)
+        pipeline = Pipeline(client, root / case_id / 'generation',
+                            frozen_snapshot=SNAPSHOTS / case_id,
+                            graph_builder=graph_builder)
         result = await pipeline.run(case, task.with_bundle(bundle), config)
         scores = await LocomoEvaluator(client, root / case_id / 'evaluation').evaluate(result)
         cost = client.ledger_summary()
@@ -95,9 +98,12 @@ def aggregate_report(rows, baseline_rows=None):
     return report
 
 
-def preflight(bundle, config, task, cases, snap_root=None, embedder_factory=None):
+def preflight(bundle, config, task, cases, snap_root=None, embedder_factory=None,
+              graph_builder=None):
     """外测与冷启动/候选修订同一套能力准入（评审①③）：AST 底线＋逐对话快照真实试跑
-    （图挂冻结向量索引）＋完整图 C 检查否决即拒。锁定资产不因换了入口而豁免。"""
+    （图挂冻结向量索引）＋完整图 C 检查否决即拒。锁定资产不因换了入口而豁免。
+    graph_builder 给定时（新图重建模式）试跑图＝按锁定 S 从固定事实重建——与答题
+    Pipeline 同一派生规则，不得拿冻结旧图过检当新模式证据。"""
     import tempfile
     from oak.kernel.checks import CheckRegistry, enforce_opinions
     from oak.kernel.functions import FunctionRegistry
@@ -111,9 +117,16 @@ def preflight(bundle, config, task, cases, snap_root=None, embedder_factory=None
     if problems:
         raise SystemExit('外测预检失败（静态能力底线）: ' + str(problems))
     limits = Limits(config.function_steps, config.function_timeout_s, config.result_bytes)
+    schema = None
+    if graph_builder is not None:
+        from oak.kernel.validation import validate_bundle
+        schema = validate_bundle(bundle)
     for case_id, case in cases.items():
-        graph = load_frozen_graph(snap_root / case_id, case.corpus)
-        attach_vector(graph, snap_root / case_id, embedder_factory=embedder_factory)
+        if graph_builder is not None:
+            graph = graph_builder(snap_root / case_id, schema, case.corpus)
+        else:
+            graph = load_frozen_graph(snap_root / case_id, case.corpus)
+            attach_vector(graph, snap_root / case_id, embedder_factory=embedder_factory)
         with tempfile.TemporaryDirectory() as td:
             exported = bundle.assets.export(Path(td) / 'b')
             caps = DataCapabilities(graph)
@@ -154,20 +167,43 @@ def baseline_compatibility(mine, base):
     return 'compatible' if not diffs else 'incompatible: ' + '；'.join(diffs)
 
 
-def experiment_identity(bundle, config, conn, cases, snap_root=None):
+def experiment_identity(bundle, config, conn, cases, snap_root=None,
+                        graph_builder=None):
     """实验条件身份（评审④）：资产版本、模型路由、运行配置、各对话快照指纹、
-    冻结判题器文件锁——基线比对时核对共同条件，缺失/不兼容明确报出。"""
+    冻结判题器文件锁——基线比对时核对共同条件，缺失/不兼容明确报出。
+    新图重建模式（graph_builder 给定）加记：投影规则源码摘要、锁定 S 摘要、
+    各对话实际重建图摘要——旧图缓存/不同 S 不得冒充同身份（CONTINUE.md 阶段六）。"""
     from oak.experiments.spec import precheck_identity
     from datasets.locomo.evaluator import AUDITED, LOCK_PATH
     from oak.runtime.artifacts import digest
     from oak.runtime.identity import snapshot_files
     snap_root = Path(snap_root) if snap_root is not None else SNAPSHOTS
-    return {'asset_version': bundle.version,
-            'transport': precheck_identity(conn, config)['transport'],
-            'run_config': config.to_dict(),
-            'snapshots': {c: json.loads((snap_root / c / 'manifest.json').read_text())['snapshot_digest']
-                          for c in cases},
-            'judge_lock': digest(snapshot_files([AUDITED, LOCK_PATH]))}
+    identity = {'asset_version': bundle.version,
+                'transport': precheck_identity(conn, config)['transport'],
+                'run_config': config.to_dict(),
+                'snapshots': {c: json.loads((snap_root / c / 'manifest.json').read_text())['snapshot_digest']
+                              for c in cases},
+                'judge_lock': digest(snapshot_files([AUDITED, LOCK_PATH]))}
+    if graph_builder is not None:
+        import inspect
+        from oak.kernel.validation import validate_bundle
+        from oak.operators.data import DataCapabilities
+        try:
+            builder_src = inspect.getsource(graph_builder)
+        except (OSError, TypeError):
+            builder_src = repr(graph_builder)
+        identity['graph_mode'] = 'rebuild'
+        identity['graph_rules'] = digest(builder_src)
+        schema = validate_bundle(bundle)
+        identity['schema'] = digest(schema.to_yaml())
+        identity['rebuilt_graphs'] = {}
+        adapter = LocomoAdapter(ROOT / 'datasets/locomo/data/locomo10_zh.json')
+        for c in cases:
+            graph = graph_builder(snap_root / c, schema, adapter.generation_input(c).corpus)
+            # 与准入报告同口径的图身份：排序后数据行摘要（admission._graph_identity）
+            identity['rebuilt_graphs'][c] = digest(
+                sorted(DataCapabilities(graph).rows.values(), key=lambda r: r['node_id']))
+    return identity
 
 
 async def main(args):
@@ -177,17 +213,25 @@ async def main(args):
     task = TaskSpec.load(TASK_DIR / 'task.yaml')
     bundle = KernelBundle(Path(args.assets))
     config = arm_config(args.arm, args.vector_k)
+    # 新图重建模式（CONTINUE.md 阶段六）：默认关闭＝冻结图旧行为逐字节不变；
+    # 开启后预检与答题 Pipeline 同用 rebuild_snapshot_graph（同一派生规则）。
+    graph_builder = None
+    if getattr(args, 'graph_rebuild', False):
+        from datasets.locomo.graph_rules import rebuild_snapshot_graph
+        graph_builder = rebuild_snapshot_graph
     cases = [c.strip() for c in args.cases.split(',') if c.strip()]
     for c in cases:
         if not (SNAPSHOTS / c / 'manifest.json').exists():
             raise SystemExit(f'冻结快照缺失: {c}')
     case_inputs = {c: adapter.generation_input(c) for c in cases}
-    preflight(bundle, config, task, case_inputs)
+    preflight(bundle, config, task, case_inputs, graph_builder=graph_builder)
     rows = []
     for c in cases:
-        row = await evaluate_conversation(c, adapter, task, bundle, config, root)
+        row = await evaluate_conversation(c, adapter, task, bundle, config, root,
+                                          graph_builder=graph_builder)
         rows.append(row)
-        print(json.dumps(row, ensure_ascii=False), flush=True)
+        print(json.dumps(row, ensure_ascii=False), flush=True
+              )
     baseline_rows = None
     compatibility = {}
     delta_valid = None
@@ -199,11 +243,13 @@ async def main(args):
         else:
             base_report = json.loads(bp.read_text())
             baseline_rows = base_report['per_conversation']
-            mine = experiment_identity(bundle, config, connection(root), cases)
+            mine = experiment_identity(bundle, config, connection(root), cases,
+                                       graph_builder=graph_builder)
             compatibility['baseline'] = baseline_compatibility(mine, base_report.get('identity') or {})
             delta_valid = compatibility['baseline'] == 'compatible'
     report = aggregate_report(rows, baseline_rows)
-    report['identity'] = experiment_identity(bundle, config, connection(root), cases)
+    report['identity'] = experiment_identity(bundle, config, connection(root), cases,
+                                             graph_builder=graph_builder)
     report['baseline_compatibility'] = compatibility
     if delta_valid is not None:
         # 不兼容时差值保留作参考但标记无效，不得当作有效实验提升（评审五）
@@ -220,4 +266,7 @@ if __name__ == '__main__':
     p.add_argument('--output', required=True)
     p.add_argument('--vector-k', type=int, default=60)
     p.add_argument('--baseline', help='另一臂外测输出目录（含 report.json），报告逐对话差值')
+    p.add_argument('--graph-rebuild', action='store_true',
+                   help='新图重建模式：图按锁定 S 从固定事实重建（记忆/向量仍冻结）；'
+                        '默认关闭＝冻结图。身份加记投影规则/S/实际重建图摘要。')
     asyncio.run(main(p.parse_args()))
