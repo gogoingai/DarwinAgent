@@ -1,0 +1,61 @@
+{
+  "captured_at_unix": 1791198441.685389,
+  "runs": [
+    {
+      "run": "datasets/locomo/runs/wiki_gap_repair_20261005_mc/train",
+      "frozen_identity_error": "Frozen engineering/input files changed: ['/Users/xu/git/oak/.cache/worktrees/wiki-experience-phase-one/oak/experiments/admission.py', '/Users/xu/git/oak/.cache/worktrees/wiki-experience-phase-one/oak/experiments/admission_worker.py', '/Users/xu/git/oak/.cache/worktrees/wiki-experience-phase-one/oak/experiments/runner.py', '/Users/xu/git/oak/.cache/worktrees/wiki-experience-phase-one/oak/experiments/wiki.py', '/Users/xu/git/oak/.cache/worktrees/wiki-experience-phase-one/oak/kernel/checks.py', '/Users/xu/git/oak/.cache/worktrees/wiki-experience-phase-one/oak/kernel/spec.py']",
+      "stages": [
+        {
+          "stage": "B0",
+          "status": "failed",
+          "scores": {
+            "metrics": {
+              "original_lenient": 3,
+              "original_precise": 3
+            },
+            "total": 6,
+            "completed": 4,
+            "generation_faults": 2,
+            "evaluation_faults": 0
+          }
+        }
+      ],
+      "attributions": [
+        {
+          "stage": "B0",
+          "kind": "formal",
+          "present": true
+        }
+      ]
+    },
+    {
+      "run": "datasets/travelplanner/runs/wiki_gap_repair_20261005_loop4/train",
+      "frozen_identity_error": null,
+      "stages": [
+        {
+          "stage": "B0",
+          "status": "complete",
+          "scores": {
+            "metrics": {
+              "final": 0,
+              "macro_cs": 0,
+              "macro_hc": 0,
+              "delivered": 1
+            },
+            "total": 1,
+            "completed": 1,
+            "generation_faults": 0,
+            "evaluation_faults": 0
+          }
+        }
+      ],
+      "attributions": [
+        {
+          "stage": "B0",
+          "kind": "formal",
+          "present": true
+        }
+      ]
+    }
+  ]
+}

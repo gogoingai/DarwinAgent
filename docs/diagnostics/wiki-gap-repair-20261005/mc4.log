@@ -1,0 +1,6 @@
+{"stage": "B0", "status": "complete", "asset_version": "e6a1290b0003f41b63f9aa1e5b9d64cc2b0b4d947d677c9cd985dd5fc82e62c8", "elapsed_s": 83.34}
+{"stage": "R1", "status": "complete", "asset_version": "e03e4aee254c35e655011d1a657502cfd868b9f5ed216c11cb8ddd603e074d38", "elapsed_s": 93.05}
+{"stage": "R1", "accepted": false, "reasons": ["primary_not_strictly_improved", "metric_decreased:original_lenient"]}
+{"stage": "R2", "status": "complete", "asset_version": "54ae5d326244bad78392c13fd98904a79ec40fb1f907710ca4645d907a5b9df6", "elapsed_s": 127.4}
+{"stage": "R2", "accepted": false, "reasons": ["primary_not_strictly_improved"]}
+{"status": "complete", "rounds": [{"stage": null, "accepted": false, "reasons": ["primary_not_strictly_improved", "metric_decreased:original_lenient"]}, {"stage": null, "accepted": false, "reasons": ["primary_not_strictly_improved"]}], "adopted": "e6a1290b0003f41b63f9aa1e5b9d64cc2b0b4d947d677c9cd985dd5fc82e62c8"}

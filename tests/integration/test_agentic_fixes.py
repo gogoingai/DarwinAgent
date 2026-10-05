@@ -502,7 +502,7 @@ class FaultRetryInvalidatesEvaluationTests(unittest.TestCase):
         scripted = [faulted, recovered]
 
         class FakePipeline:
-            def __init__(self, client, work_dir, frozen_snapshot=None): pass
+            def __init__(self, client, work_dir, frozen_snapshot=None, graph_builder=None): pass
             async def run(self, case, spec, config):
                 return scripted.pop(0)
 
@@ -594,7 +594,7 @@ class GraphCheckBudgetTests(unittest.TestCase):
                                0,({'status':'execution_error','error':'SandboxError: budget'},))
         calls=[]
         class OncePipeline:
-            def __init__(self, client, work_dir, frozen_snapshot=None): pass
+            def __init__(self, client, work_dir, frozen_snapshot=None, graph_builder=None): pass
             async def run(self, case, spec, config):
                 calls.append(1); return graph_failed
         class C:
@@ -613,6 +613,9 @@ class GraphCheckBudgetTests(unittest.TestCase):
 
 
 class PreflightCapabilityTests(unittest.TestCase):
+    @staticmethod
+    def _preflight_sync(runner,*args,**kwargs):
+        return asyncio.run(runner._preflight(*args,**kwargs))
     def _runner_with_graph(self, root):
         import asyncio
         from oak.experiments.runner import ExperimentRunner
@@ -656,11 +659,11 @@ class PreflightCapabilityTests(unittest.TestCase):
             import tempfile as _tf
             fake_bundle=self._export(root, tuple(others+[fake]))
             with self.assertRaises(ValueError) as caught:
-                runner._preflight(fake_bundle, spec)
+                self._preflight_sync(runner,fake_bundle, spec)
             self.assertIn('候选能力试跑不合格', str(caught.exception))
             # 合格候选（真实触发 semantic_search）通过
             good=self._export(root, tuple(bundle.assets.assets)+(traverse,))
-            runner._preflight(good, spec)
+            self._preflight_sync(runner,good, spec)
 
     def _export(self, root, assets):
         import tempfile as _tf
@@ -968,7 +971,7 @@ class TrimmedEvaluateTests(unittest.TestCase):
             evaluator = ev.LocomoEvaluator(None, tdp / 'work', audited_path=aud or tdp / 'x.json')
             fake_aggregate = lambda rows, disputed: {
                 'overall': {'lenient': {'correct': len(rows)}, 'precise': {'correct': len(rows)}},
-                'grades': [{'idx': i, 'status': 'ok'} for i in range(n_qas)]}
+                'grades': [{'idx': row['idx'], 'status': 'ok'} for row in rows]}
             with mock.patch.object(ev, 'verify_files'), \
                  mock.patch.object(ev, 'load_conversation', return_value=conv), \
                  mock.patch.object(ev, 'transcript', return_value=''), \
@@ -1018,7 +1021,7 @@ class TrimmedEvaluateTests(unittest.TestCase):
 
 
 async def _fake_dual_grade_batch(items, client, context, cache_dir):
-    return [{'status': 'ok', 'precise': True} for _ in items]
+    return [{'idx': q.idx, 'status': 'ok', 'precise': True} for q, _, _ in items]
 
 
 class CarriedCheckpointTests(unittest.TestCase):
@@ -1089,6 +1092,7 @@ class SmokeThresholdTests(unittest.TestCase):
             runner._client = lambda stage: _StubClient()
             runner.snapshot_root = None
             runner.smoke_judge = None
+            runner.graph_builder = None
             runner.config = RunConfig(protocol_attempts=1)
             case = Case('c', tuple(Q(f'q{i}') for i in range(6)))
             with mock.patch.object(R.Pipeline, 'run', fake_pipeline_run), \
@@ -1173,7 +1177,7 @@ class DeterministicFaultTests(unittest.TestCase):
         ), (), ())]
         calls = []
         class FakePipeline:
-            def __init__(self, client, work_dir, frozen_snapshot=None): pass
+            def __init__(self, client, work_dir, frozen_snapshot=None, graph_builder=None): pass
             async def run(self, case, spec, config):
                 calls.append(1); return scripted[0]
         class FakeEvaluator:

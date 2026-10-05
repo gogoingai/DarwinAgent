@@ -1,0 +1,131 @@
+{
+  "captured_at_unix": 1791205114.513026,
+  "runs": [
+    {
+      "run": "datasets/travelplanner/runs/wiki_gap_repair_20261005_loop5/train",
+      "identity_error": "Frozen engineering/input files changed: ['/Users/xu/git/oak/.cache/worktrees/wiki-experience-phase-one/oak/engine/pipeline.py']",
+      "stages": [],
+      "summary": {
+        "status": "blocked_b0",
+        "rounds": 0
+      },
+      "wiki_version": 6,
+      "attribution": [],
+      "maintenance_errors": [],
+      "last_activity": {
+        "B0-smoke": 2545,
+        "trial-graph": 2822,
+        "B0": 2609
+      }
+    },
+    {
+      "run": "datasets/travelplanner/runs/wiki_gap_repair_20261005_loop6/train",
+      "identity_error": null,
+      "stages": [
+        {
+          "stage": "B0",
+          "status": "complete",
+          "scores": {
+            "metrics": {
+              "final": 0,
+              "macro_cs": 0,
+              "macro_hc": 0,
+              "delivered": 1
+            },
+            "total": 1,
+            "completed": 1,
+            "generation_faults": 0,
+            "evaluation_faults": 0
+          }
+        },
+        {
+          "stage": "R1",
+          "status": "complete",
+          "scores": {
+            "metrics": {
+              "final": 0,
+              "macro_cs": 0,
+              "macro_hc": 0,
+              "delivered": 1
+            },
+            "total": 1,
+            "completed": 1,
+            "generation_faults": 0,
+            "evaluation_faults": 0
+          }
+        },
+        {
+          "stage": "R2",
+          "status": "complete",
+          "scores": {
+            "metrics": {
+              "final": 0,
+              "macro_cs": 0,
+              "macro_hc": 0,
+              "delivered": 1
+            },
+            "total": 1,
+            "completed": 1,
+            "generation_faults": 0,
+            "evaluation_faults": 0
+          }
+        }
+      ],
+      "wiki_version": 31,
+      "attribution": [
+        {
+          "stage": "B0",
+          "kind": "formal",
+          "present": true
+        },
+        {
+          "stage": "R1",
+          "kind": "formal",
+          "present": false
+        },
+        {
+          "stage": "R1",
+          "kind": "decision",
+          "present": true
+        },
+        {
+          "stage": "R2",
+          "kind": "formal",
+          "present": false
+        },
+        {
+          "stage": "R2",
+          "kind": "decision",
+          "present": true
+        }
+      ],
+      "maintenance_errors": [],
+      "last_activity": {
+        "B0-smoke": 0,
+        "optimization": 51,
+        "trial-graph": 1667,
+        "R1": 97,
+        "B0": 1302,
+        "R2": 36
+      },
+      "summary": {
+        "status": "complete",
+        "rounds": 2,
+        "decisions": [
+          {
+            "accepted": false,
+            "reasons": [
+              "primary_not_strictly_improved"
+            ]
+          },
+          {
+            "accepted": false,
+            "reasons": [
+              "primary_not_strictly_improved"
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

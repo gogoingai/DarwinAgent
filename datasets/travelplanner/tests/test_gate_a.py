@@ -109,7 +109,9 @@ class TravelAssets(unittest.TestCase):
         params={'people':5,'choices':[{'node_id':r['node_id'],**({'nights':2} if r['entity_type']=='Accommodation' else {})} for r in selected]}
         result=self.runtime.call('travel_cost',params,self.graph)
         self.assertEqual(result['data'],{'total':1600.0,'valid':True}) # 2 flights*100*5 + 2 nights*100*ceil(5/2)
-        self.assertEqual(len(result['node_ids']),3)
+        self.assertEqual(result['node_ids'],[]) # scalar summary returns no evidence rows
+        self.assertEqual(set(result['read_node_ids']),{r['node_id'] for r in selected})
+        self.assertEqual(result['source_ids'],[])
 
     def test_ground_mode_formula(self):
         row=next(r for r in self.rows if r['entity_type']=='Distance')

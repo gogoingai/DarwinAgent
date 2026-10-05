@@ -1,0 +1,298 @@
+{
+  "format_version": 3,
+  "capability_version": "restricted-python-1",
+  "assets": [
+    {
+      "id": "c_answer_shape",
+      "kind": "C",
+      "content": null,
+      "input_contract": {
+        "type": "any"
+      },
+      "output_contract": {
+        "type": "any"
+      },
+      "schema_dependencies": [
+        "schema_travel"
+      ],
+      "role": "",
+      "stage": "answer",
+      "description": "Mechanical structural check: answer (when present) is an array of day objects with required keys and scalar types; accepts valid abstentions.",
+      "trial_inputs": [],
+      "path": "assets/C/c_answer_shape.py",
+      "sha256": "fe4e2d9e6cc9978b19f2fe343d3be2f1e1b1e5fc10d06f882e143e579c1d268f",
+      "fingerprint": "039af3c0053158dc06323928f0294ed23603e29f06de5fe1671c70dfd9810df0"
+    },
+    {
+      "id": "f_city_rows",
+      "kind": "F",
+      "content": null,
+      "input_contract": {
+        "type": "object",
+        "required": [
+          "table",
+          "city"
+        ],
+        "properties": {
+          "table": {
+            "type": "string",
+            "enum": [
+              "attractions",
+              "restaurants",
+              "accommodations",
+              "flights",
+              "cities"
+            ],
+            "description": "Which reference table to query."
+          },
+          "city": {
+            "type": "string",
+            "description": "Exact city name filter applied graph-wide."
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Maximum rows to return, 1..200."
+          }
+        },
+        "additionalProperties": false
+      },
+      "output_contract": {
+        "type": "object",
+        "required": [
+          "rows",
+          "scanned",
+          "note"
+        ],
+        "properties": {
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "scanned": {
+            "type": "integer"
+          },
+          "note": {
+            "type": "string"
+          }
+        }
+      },
+      "schema_dependencies": [
+        "schema_travel"
+      ],
+      "role": "",
+      "stage": "",
+      "description": "Fetches all rows of a reference table for one exact city via graph-wide filters, returning rows with node_id and source_ids for citation, plus a truncation note.",
+      "trial_inputs": [
+        {
+          "table": "restaurants",
+          "city": "Rockford",
+          "limit": 40
+        },
+        {
+          "table": "accommodations",
+          "city": "Rockford",
+          "limit": 20
+        },
+        {
+          "table": "flights",
+          "city": "Rockford",
+          "limit": 20
+        }
+      ],
+      "path": "assets/F/f_city_rows.py",
+      "sha256": "b550af9da1bcd88839b80b30437b691aa72fd992bcb9a1d652be6c299360a34c",
+      "fingerprint": "a357df9a6b61480f3aed2789769c41bd3ee999fca59b1b2e8acb60d33e20506f"
+    },
+    {
+      "id": "f_flight_pair",
+      "kind": "F",
+      "content": null,
+      "input_contract": {
+        "type": "object",
+        "required": [
+          "org",
+          "dest"
+        ],
+        "properties": {
+          "org": {
+            "type": "string",
+            "description": "Origin city name."
+          },
+          "dest": {
+            "type": "string",
+            "description": "Destination city name."
+          },
+          "date_from": {
+            "type": "string",
+            "description": "Optional exact ISO date filter for the outbound leg; empty string means unconstrained."
+          },
+          "date_to": {
+            "type": "string",
+            "description": "Optional exact ISO date filter for the return leg; empty string means unconstrained."
+          }
+        },
+        "additionalProperties": false
+      },
+      "output_contract": {
+        "type": "object",
+        "required": [
+          "outbound",
+          "inbound",
+          "outbound_candidates_scanned",
+          "inbound_candidates_scanned"
+        ],
+        "properties": {
+          "outbound": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "inbound": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "outbound_candidates_scanned": {
+            "type": "integer"
+          },
+          "inbound_candidates_scanned": {
+            "type": "integer"
+          }
+        }
+      },
+      "schema_dependencies": [
+        "schema_travel"
+      ],
+      "role": "",
+      "stage": "",
+      "description": "Finds the cheapest outbound and inbound flights between two cities using exact graph-wide origin/dest (and optional date) filters, returning full flight rows with source_ids; no nested functions.",
+      "trial_inputs": [
+        {
+          "org": "St. Petersburg",
+          "dest": "Rockford",
+          "date_from": "2022-03-16",
+          "date_to": "2022-03-18"
+        },
+        {
+          "org": "Rockford",
+          "dest": "St. Petersburg",
+          "date_from": "",
+          "date_to": ""
+        }
+      ],
+      "path": "assets/F/f_flight_pair.py",
+      "sha256": "c4482b34d576a77264359cc90d10bcd3dbec09a57336875ad7083501855debb8",
+      "fingerprint": "879d40679a6622335772842d96aba3acee82c2715c3d8d146c43b5d76a16ef6c"
+    },
+    {
+      "id": "p_answer",
+      "kind": "P",
+      "content": null,
+      "input_contract": {
+        "type": "any"
+      },
+      "output_contract": {
+        "type": "any"
+      },
+      "schema_dependencies": [
+        "schema_travel"
+      ],
+      "role": "answer",
+      "stage": "",
+      "description": "Composes the per-day JSON travel plan under the answer contract from grounded candidate rows.",
+      "trial_inputs": [],
+      "path": "assets/P/p_answer.txt",
+      "sha256": "9e3b011026f018847943ad8c1dfd4c2a6534b568731b3e9370dcefd88609bae2",
+      "fingerprint": "5cdd5d31e45f8e6c292cc71437993c40ae31c7ddff80cada3047aabaa94df6a8"
+    },
+    {
+      "id": "p_extract",
+      "kind": "P",
+      "content": null,
+      "input_contract": {
+        "type": "any"
+      },
+      "output_contract": {
+        "type": "any"
+      },
+      "schema_dependencies": [
+        "schema_travel"
+      ],
+      "role": "extract",
+      "stage": "",
+      "description": "Extracts the travel request parameters per the parameter contract.",
+      "trial_inputs": [],
+      "path": "assets/P/p_extract.txt",
+      "sha256": "a6854dde5c59808d195fa63fbaa98f09d75c46884527e0a149611782dd88f02c",
+      "fingerprint": "49a6157a9b1cb494a03e4835ec293c87aad68363d48ce9bc1386f93883e54aa2"
+    },
+    {
+      "id": "p_review",
+      "kind": "P",
+      "content": null,
+      "input_contract": {
+        "type": "any"
+      },
+      "output_contract": {
+        "type": "any"
+      },
+      "schema_dependencies": [
+        "schema_travel"
+      ],
+      "role": "review",
+      "stage": "",
+      "description": "Reviews the published plan for grounding, coverage and contract compliance without rewriting it.",
+      "trial_inputs": [],
+      "path": "assets/P/p_review.txt",
+      "sha256": "475a8b75eed79fc26cf8a312b146a0faafdd657eac14ea88f1f2fc72ad88b29c",
+      "fingerprint": "2762d4838f6fbdf37f3e11f6859b020f8724fbb2fad77766bc3da21314ef6c05"
+    },
+    {
+      "id": "p_tools",
+      "kind": "P",
+      "content": null,
+      "input_contract": {
+        "type": "any"
+      },
+      "output_contract": {
+        "type": "any"
+      },
+      "schema_dependencies": [
+        "schema_travel"
+      ],
+      "role": "tools",
+      "stage": "",
+      "description": "Adaptive retrieval loop over ${tools} to gather grounded candidate rows for the plan.",
+      "trial_inputs": [],
+      "path": "assets/P/p_tools.txt",
+      "sha256": "2d1d79c572a21aa498735d383366d3d0b658edadae0dafb298dcc39ad57419e0",
+      "fingerprint": "bf794ae26bf818c9eb8872d899517dd48af9cdc30b88d0d4eae5ab6a080bedb2"
+    },
+    {
+      "id": "schema_travel",
+      "kind": "S",
+      "content": null,
+      "input_contract": {
+        "type": "any"
+      },
+      "output_contract": {
+        "type": "any"
+      },
+      "schema_dependencies": [],
+      "role": "",
+      "stage": "",
+      "description": "Schema for the travel planning domain: attractions, restaurants, accommodations, flights and cities as grounded reference-table entities with location/flight relations.",
+      "trial_inputs": [],
+      "path": "assets/S/schema_travel.yaml",
+      "sha256": "7b93a94ad8473f5a8d11689d613f791035e584efd9b4f6ba7b1c94eba192d069",
+      "fingerprint": "3be41e9e0475679450aa521a02fc17426147849a84232d21a8097fe57cfaa93d"
+    }
+  ],
+  "origin": {
+    "kind": "cold_bootstrap",
+    "input_fingerprint": "ca33373f21a33fad11e0f8c18f011677f305055bced7d44985b2ef24655ab3a0",
+    "seed_assets": []
+  },
+  "version": "6a5f77cf641f6728dd2064dc93c74e3fbef1a00b2b1e77c8f2fb98a0ddff878a"
+}

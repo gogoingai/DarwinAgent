@@ -1,0 +1,292 @@
+{
+  "attribution": [
+    {
+      "source": "datasets/travelplanner/runs/wiki_gap_repair_20261005_loop3/train/optimization/events/3d461f31733801cedd029027699c0672c822756ada9db4e1642a597bfb5caabb.json",
+      "stage": "R2",
+      "kind": "formal",
+      "attribution_written": true,
+      "model_calls": 1,
+      "request_chars": 27110,
+      "after_compression": {
+        "facts_chars": 21851,
+        "examples": [
+          {
+            "training_id": 14,
+            "question": 187,
+            "question_parameters": 273,
+            "status": 10,
+            "generated_answer": 653,
+            "error": 4,
+            "baseline_answer": 223,
+            "score_flags": 2,
+            "trace": 13440,
+            "source_text": 1131,
+            "generated_answer_truncated": 4,
+            "baseline_answer_truncated": 4,
+            "source_text_total": 1
+          }
+        ]
+      },
+      "failure": null
+    },
+    {
+      "source": "datasets/travelplanner/runs/wiki_gap_repair_20261005_loop3/train/optimization/events/426f85fcf0fc676d70f4f2f2641bccb8c2f2611c73cc2f39becc6f48c5144e24.json",
+      "stage": "B0",
+      "kind": "formal",
+      "attribution_written": true,
+      "model_calls": 1,
+      "request_chars": 19196,
+      "after_compression": {
+        "facts_chars": 13937,
+        "examples": [
+          {
+            "training_id": 14,
+            "question": 187,
+            "question_parameters": 273,
+            "status": 10,
+            "generated_answer": 331,
+            "error": 4,
+            "baseline_answer": 4,
+            "score_flags": 2,
+            "trace": 452,
+            "source_text": 479,
+            "generated_answer_truncated": 4,
+            "source_text_total": 1,
+            "trace_events_dropped": 1
+          }
+        ]
+      },
+      "failure": null
+    },
+    {
+      "source": "datasets/travelplanner/runs/wiki_gap_repair_20261005_loop3/train/optimization/events/55b4aca796d311d38c54252a590576a06a6095943122c1302da7aa39d1941885.json",
+      "stage": "R1",
+      "kind": "formal",
+      "attribution_written": true,
+      "model_calls": 1,
+      "request_chars": 29656,
+      "after_compression": {
+        "facts_chars": 24397,
+        "examples": [
+          {
+            "training_id": 14,
+            "question": 187,
+            "question_parameters": 273,
+            "status": 10,
+            "generated_answer": 653,
+            "error": 4,
+            "baseline_answer": 223,
+            "score_flags": 2,
+            "trace": 15986,
+            "source_text": 1131,
+            "generated_answer_truncated": 4,
+            "baseline_answer_truncated": 4,
+            "source_text_total": 1
+          }
+        ]
+      },
+      "failure": null
+    },
+    {
+      "source": "datasets/travelplanner/runs/wiki_gap_repair_20261005_loop3/train/optimization/events/651ed82c555d504fbe6ab1f9f5871900da21fffb4009126ee5c585f1d84f3926.json",
+      "stage": "R2",
+      "kind": "decision",
+      "attribution_written": true,
+      "model_calls": 1,
+      "request_chars": 27516,
+      "after_compression": {
+        "facts_chars": 22255,
+        "examples": [
+          {
+            "training_id": 14,
+            "question": 187,
+            "question_parameters": 273,
+            "status": 10,
+            "generated_answer": 653,
+            "error": 4,
+            "baseline_answer": 223,
+            "score_flags": 2,
+            "trace": 13440,
+            "source_text": 1131,
+            "generated_answer_truncated": 4,
+            "baseline_answer_truncated": 4,
+            "source_text_total": 1
+          }
+        ]
+      },
+      "failure": null
+    },
+    {
+      "source": "datasets/travelplanner/runs/wiki_gap_repair_20261005_loop3/train/optimization/events/960b56022b53e694a61bf344c8da739b9b402ab1bedc18292cdd5b5dc87eb3ff.json",
+      "stage": "R1",
+      "kind": "decision",
+      "attribution_written": true,
+      "model_calls": 1,
+      "request_chars": 30062,
+      "after_compression": {
+        "facts_chars": 24801,
+        "examples": [
+          {
+            "training_id": 14,
+            "question": 187,
+            "question_parameters": 273,
+            "status": 10,
+            "generated_answer": 653,
+            "error": 4,
+            "baseline_answer": 223,
+            "score_flags": 2,
+            "trace": 15986,
+            "source_text": 1131,
+            "generated_answer_truncated": 4,
+            "baseline_answer_truncated": 4,
+            "source_text_total": 1
+          }
+        ]
+      },
+      "failure": null
+    }
+  ],
+  "check_admission": [
+    {
+      "candidate": "ideal",
+      "admission_verdict": "passed",
+      "real_candidate_opinions": [
+        {
+          "check_id": "c_answer_shape",
+          "fingerprint": "4f5772d308b882547c02eb4532a66aaf833e0ac69e25873a96345d2f3e08ac94",
+          "steps_used": 716,
+          "step_budget": 30000,
+          "elapsed_ms": 1.0,
+          "ok": true,
+          "issues": []
+        }
+      ]
+    },
+    {
+      "candidate": "container_bug",
+      "admission_verdict": "failed",
+      "real_candidate_opinions": [
+        {
+          "check_id": "c_answer_shape",
+          "fingerprint": "155c976a03660bba391b98dcc998112fdf57e00489597e68d78c9dcf4894c0f7",
+          "steps_used": 51,
+          "step_budget": 30000,
+          "elapsed_ms": 0.5,
+          "ok": false,
+          "issues": [
+            "answer is not an array"
+          ]
+        }
+      ]
+    },
+    {
+      "candidate": "always_reject_answered",
+      "admission_verdict": "failed",
+      "real_candidate_opinions": [
+        {
+          "check_id": "c_answer_shape",
+          "fingerprint": "69611dc91aaadc9867820974c31d1f397eaa2c7e77f614fa90965e46a2b4ca7e",
+          "steps_used": 13,
+          "step_budget": 30000,
+          "elapsed_ms": 0.8,
+          "ok": false,
+          "issues": [
+            "reject all answered"
+          ]
+        }
+      ]
+    }
+  ],
+  "lesson_verification": {
+    "different_input_ref_marked_verified": true,
+    "C_ok_false_marked_verified": false
+  },
+  "numeric_samples": 16,
+  "numeric_failed": [
+    {
+      "scenario": "archived_real_failure",
+      "parameters": {
+        "subject": "乔恩",
+        "fact_type": "",
+        "date_prefix": "",
+        "limit": 500
+      },
+      "error": "SandboxError: Restricted execution budget exhausted",
+      "observation": {
+        "steps_used": 30001,
+        "step_budget": 30000,
+        "elapsed_ms": 17.8,
+        "read_operations": 1,
+        "capability_calls": {
+          "nodes": 1
+        },
+        "traverse_observations": [],
+        "traverse_directions": []
+      }
+    },
+    {
+      "scenario": "stress",
+      "parameters": {
+        "subject": "",
+        "fact_type": "",
+        "date_prefix": "",
+        "limit": 500
+      },
+      "error": "SandboxError: Restricted execution budget exhausted",
+      "observation": {
+        "steps_used": 30001,
+        "step_budget": 30000,
+        "elapsed_ms": 16.8,
+        "read_operations": 1,
+        "capability_calls": {
+          "nodes": 1
+        },
+        "traverse_observations": [],
+        "traverse_directions": []
+      }
+    },
+    {
+      "scenario": "stress",
+      "parameters": {
+        "subject": "乔恩",
+        "fact_type": "",
+        "date_prefix": "",
+        "limit": 500
+      },
+      "error": "SandboxError: Restricted execution budget exhausted",
+      "observation": {
+        "steps_used": 30001,
+        "step_budget": 30000,
+        "elapsed_ms": 16.5,
+        "read_operations": 1,
+        "capability_calls": {
+          "nodes": 1
+        },
+        "traverse_observations": [],
+        "traverse_directions": []
+      }
+    },
+    {
+      "scenario": "stress",
+      "parameters": {
+        "subject": "吉娜",
+        "fact_type": "",
+        "date_prefix": "",
+        "limit": 500
+      },
+      "error": "SandboxError: Restricted execution budget exhausted",
+      "observation": {
+        "steps_used": 30001,
+        "step_budget": 30000,
+        "elapsed_ms": 16.2,
+        "read_operations": 1,
+        "capability_calls": {
+          "nodes": 1
+        },
+        "traverse_observations": [],
+        "traverse_directions": []
+      }
+    }
+  ],
+  "source_unchanged": true
+}

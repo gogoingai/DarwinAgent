@@ -33,7 +33,14 @@ from tests.integration.test_agentic_round import (FakeEmbedder, build_snapshot,
                                                    cold_bundle, corpus, gvtest_graph)
 
 
+
 class FrozenCandidateAdmissionTests(unittest.TestCase):
+    @staticmethod
+    def _preflight_sync(runner,*args,**kwargs):
+        # _preflight 自动态图准入改造起为协程（见 runner._dynamic_trial_graphs）；
+        # 快照/试验图路径内部全同步，asyncio.run 直排即可。
+        return asyncio.run(runner._preflight(*args,**kwargs))
+
     def test_missing_remote_vector_keeps_local_replay_evidence(self):
         with tempfile.TemporaryDirectory() as td:
             root=Path(td)
@@ -51,7 +58,7 @@ class FrozenCandidateAdmissionTests(unittest.TestCase):
             with mock.patch.dict('os.environ',{'EMBEDDING_BASE_URL':'',
                 'EMBEDDING_API_KEY':'','EMBEDDING_MODEL':''}):
                 with self.assertRaises(AdmissionError):
-                    runner._preflight(bundle,SimpleNamespace(retrieval_floor={}),
+                    self._preflight_sync(runner,bundle,SimpleNamespace(retrieval_floor={}),
                         cases=(case,),replay_inputs=(('conv-x','f_bad_local',{}),))
             report=json.loads((root/'admission.json').read_text())
             self.assertEqual(report['verdict'],'failed')
@@ -288,7 +295,7 @@ class FrozenCandidateAdmissionTests(unittest.TestCase):
             runner=ExperimentRunner(None,None,None,RunConfig(),None,root/'run',
                                     snapshot_root=root/'snapshots')
             with self.assertRaises(AdmissionError):
-                runner._preflight(candidate,SimpleNamespace(retrieval_floor={}),
+                self._preflight_sync(runner,candidate,SimpleNamespace(retrieval_floor={}),
                                   cases=(case,))
             report=json.loads((root/'candidate'/'admission.json').read_text())
             self.assertEqual(report['verdict'],'failed')
@@ -330,7 +337,7 @@ class FrozenCandidateAdmissionTests(unittest.TestCase):
             second=CaseInput('conv-y',corpus(),(QuestionInput('q2','事实'),))
             runner=ExperimentRunner(None,None,None,RunConfig(function_timeout_s=15),
                 None,root/'run',snapshot_root=snapshot.parent)
-            healthy=runner._preflight(working,SimpleNamespace(retrieval_floor={}),
+            healthy=self._preflight_sync(runner,working,SimpleNamespace(retrieval_floor={}),
                                       cases=(case,second))
             self.assertEqual(healthy['verdict'],'passed')
             self.assertGreater(healthy['counts']['conv-x']['f_nodes']['executed'],0)
@@ -338,7 +345,7 @@ class FrozenCandidateAdmissionTests(unittest.TestCase):
             self.assertTrue(any(row['scenario_id']=='invalid_params_rejected'
                 and row['status']=='passed' for row in healthy['scenarios']))
             with self.assertRaises(AdmissionError):
-                runner._preflight(failing,SimpleNamespace(retrieval_floor={}),
+                self._preflight_sync(runner,failing,SimpleNamespace(retrieval_floor={}),
                                   cases=(case,second))
             report=json.loads((root/'admission.json').read_text())
             self.assertEqual(report['candidate_version'],failing.version)
@@ -397,7 +404,7 @@ class FrozenCandidateAdmissionTests(unittest.TestCase):
             runner=ExperimentRunner(None,None,None,RunConfig(function_timeout_s=15),
                 None,root/'run',bootstrap_trial_graph=graph)
             with self.assertRaises(AdmissionError):
-                runner._preflight(candidate,SimpleNamespace(retrieval_floor={}),
+                self._preflight_sync(runner,candidate,SimpleNamespace(retrieval_floor={}),
                                   QuestionInput('q1','事实'))
             report=json.loads((root/'admission.json').read_text())
             self.assertTrue(any(row['scenario_id']=='function_check'
@@ -433,7 +440,7 @@ class FrozenCandidateAdmissionTests(unittest.TestCase):
             runner=ExperimentRunner(None,None,None,RunConfig(function_timeout_s=15),
                 None,root/'run',bootstrap_trial_graph=graph)
             with self.assertRaises(AdmissionError):
-                runner._preflight(candidate,SimpleNamespace(retrieval_floor={}),
+                self._preflight_sync(runner,candidate,SimpleNamespace(retrieval_floor={}),
                                   QuestionInput('q1','事实'))
             report=json.loads((root/'admission.json').read_text())
             self.assertTrue(any(row['scenario_id']=='function_chain'
@@ -461,7 +468,7 @@ class FrozenCandidateAdmissionTests(unittest.TestCase):
                              [('trial',aid,{'query':'打印机'})])
             runner=ExperimentRunner(None,None,None,RunConfig(function_timeout_s=15),
                 None,run,bootstrap_trial_graph=graph)
-            report=runner._preflight(candidate,SimpleNamespace(retrieval_floor={}),
+            report=self._preflight_sync(runner,candidate,SimpleNamespace(retrieval_floor={}),
                 QuestionInput('q1','事实'))
             self.assertTrue(any(row['scenario_id']=='replay'
                 and row['asset_id']==aid and row['status']=='passed'
@@ -527,7 +534,7 @@ class FrozenCandidateAdmissionTests(unittest.TestCase):
             self.assertEqual(outcome['capability_calls']['project'],1)
             runner=ExperimentRunner(None,None,None,RunConfig(function_timeout_s=15),
                 None,root/'new-run',bootstrap_trial_graph=graph)
-            report=runner._preflight(bundle,SimpleNamespace(retrieval_floor={}),
+            report=self._preflight_sync(runner,bundle,SimpleNamespace(retrieval_floor={}),
                 QuestionInput('q1','上周日的事实'))
             self.assertEqual(report['verdict'],'passed')
             self.assertTrue(any(row['scenario_id']=='relative_date_object'
@@ -587,7 +594,7 @@ class FrozenCandidateAdmissionTests(unittest.TestCase):
             runner=ExperimentRunner(None,None,None,RunConfig(function_timeout_s=15),
                 None,root/'run',bootstrap_trial_graph=graph)
             with self.assertRaises(AdmissionError):
-                runner._preflight(bundle,SimpleNamespace(retrieval_floor={}),
+                self._preflight_sync(runner,bundle,SimpleNamespace(retrieval_floor={}),
                                   QuestionInput('q1','事实'))
             report=json.loads((root/'admission.json').read_text())
             for direction in ('in','out'):
@@ -682,14 +689,14 @@ class FrozenCandidateAdmissionTests(unittest.TestCase):
             runner=ExperimentRunner(None,None,None,RunConfig(function_timeout_s=15),
                 None,root/'new-run',bootstrap_trial_graph=graph)
             aid=next(a.id for a in candidate.assets.assets if a.kind=='F')
-            healthy=runner._preflight(candidate,SimpleNamespace(retrieval_floor={}),
+            healthy=self._preflight_sync(runner,candidate,SimpleNamespace(retrieval_floor={}),
                                       QuestionInput('q1','事实'))
             self.assertEqual(healthy['verdict'],'passed')
             self.assertTrue(healthy['framework_digest'])
             self.assertTrue(healthy['snapshot_digests']['trial'])
             self.assertGreater(healthy['counts']['trial'][aid]['by_scenario']['stress']['executed'],0)
             with self.assertRaises(AdmissionError):
-                runner._preflight(candidate,SimpleNamespace(retrieval_floor={}),
+                self._preflight_sync(runner,candidate,SimpleNamespace(retrieval_floor={}),
                                   QuestionInput('q1','事实'),
                                   replay_inputs=((aid,{'unexpected_parameter':1}),))
             report=json.loads((root/'candidate'/'admission.json').read_text())
@@ -770,7 +777,7 @@ class FrozenCandidateAdmissionTests(unittest.TestCase):
                 None,root/'new-run',bootstrap_trial_graph=graph)
             question=QuestionInput('q1','哪些事实')
             with self.assertRaises(AdmissionError):
-                runner._preflight(candidate,SimpleNamespace(retrieval_floor={}),question,
+                self._preflight_sync(runner,candidate,SimpleNamespace(retrieval_floor={}),question,
                                   replay_inputs=(('f_bad',{'rows':list(
                                       DataCapabilities(graph).rows.values())[:1]}),))
             report=json.loads((root/'admission.json').read_text())

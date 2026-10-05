@@ -24,7 +24,7 @@ class LocomoEvaluator:
         self.audited_path,self.concurrency=Path(audited_path),concurrency
 
     async def evaluate(self,result,asked=None):
-        """asked＝本轮实际出题的 question idx 集合（训练集瘦身时是全集的前缀子集）。
+        """asked＝本轮实际出题的 question idx 集合（允许非连续题号子集）。
         None＝按全会话完整性要求（历史行为，验证/测试/外测全量路径不变）。
         判题上下文永远是全量转写，评分原语不变。"""
         verify_files(ROOT,json.loads(LOCK_PATH.read_text()))
@@ -58,18 +58,22 @@ class LocomoEvaluator:
             parts=await asyncio.gather(*(block(name,qas[i:i+4]) for i in range(0,len(qas),4)))
             reports[name]=aggregate([r for p in parts for r in p],disputed)
             atomic_json(self.work_dir/f'{name}.json',reports[name])
+        grades_by_idx={gold:{row['idx']:row for row in report['grades']}
+                       for gold,report in reports.items()}
+        if any(set(rows)!=set(predictions) for rows in grades_by_idx.values()):
+            raise ValueError('Incomplete or mismatched independent grade set')
         diagnostics=[]
         for idx in sorted(predictions):
             a=predictions[idx]
             row={'question_id':str(idx),'question':by_idx[idx].question,'status':a.status,'answer':a.answer,
-                'error':a.error,'original':reports['original']['grades'][idx]}
+                'error':a.error,'original':grades_by_idx['original'][idx]}
             if audited is not None:
-                row['repaired']=reports['repaired']['grades'][idx]
+                row['repaired']=grades_by_idx['repaired'][idx]
             diagnostics.append(row)
         metrics={f'{gold}_{metric}':reports[gold]['overall'][metric]['correct']
                  for gold in reports for metric in ('lenient','precise')}
         gen_faults=sum(a.status=='execution_error' for a in result.answers)
         eval_faults=sum(r['status']=='evaluation_error' for report in reports.values() for r in report['grades'])
-        completed=sum(all(reports[g]['grades'][idx]['status']=='ok' for g in reports) for idx in predictions)
+        completed=sum(all(grades_by_idx[g][idx]['status']=='ok' for g in reports) for idx in predictions)
         verify_files(ROOT,json.loads(LOCK_PATH.read_text()))
-        return EvaluationResult(metrics,len(qas),completed,gen_faults,eval_faults,tuple(diagnostics))
+        return EvaluationResult(metrics,len(predictions),completed,gen_faults,eval_faults,tuple(diagnostics))

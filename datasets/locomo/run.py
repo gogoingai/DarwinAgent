@@ -14,6 +14,7 @@ from pathlib import Path
 from oak.config import RunConfig
 from oak.engine import Pipeline
 from oak.experiments import (AdoptionPolicy, CampaignController, ExperimentRunner, ExperimentSpec, SelectionPolicy)
+from oak.experiments.spec import precheck_identity
 from oak.kernel import KernelBundle, TaskSpec
 from oak.llm.client import LLMClient
 from oak.llm.settings import load_connection
@@ -74,16 +75,27 @@ def memory_structure_sample(snapshot_dir,max_facts=30):
                              '要遍历关系先用 search/nodes 取行，再把行里的 node_id 传给 traverse。'}
 
 
-def _trimmed_train_adapter(inner, train_ids, limit):
+def _trimmed_train_adapter(inner, train_ids, limit, question_ids=None):
     """训练集瘦身（用户拍板：迭代提速）：仅训练对话截取前 N 题；验证/测试/外测全量。
     终局对比在持出对话上做，训练集大小是优化参数、不伤两臂公平。"""
     from types import SimpleNamespace
     ids=set(train_ids)
+    selected=tuple(question_ids or ())
+    if len(selected)!=len(set(selected)):
+        raise ValueError('Duplicate training question ids')
+    if selected and limit is not None and len(selected)!=limit:
+        raise ValueError('Selected question count must equal --train-questions')
     def generation_input(case_id):
         case = inner.generation_input(case_id)
-        if case_id in ids and len(case.questions) > limit:
+        if case_id in ids:
             import dataclasses
-            case = dataclasses.replace(case, questions=tuple(case.questions[:limit]))
+            if selected:
+                by_id={q.id:q for q in case.questions}
+                if set(selected)-set(by_id):
+                    raise ValueError('Unknown training question ids')
+                case=dataclasses.replace(case,questions=tuple(by_id[qid] for qid in selected))
+            elif limit is not None and len(case.questions)>limit:
+                case=dataclasses.replace(case,questions=tuple(case.questions[:limit]))
         return case
     return SimpleNamespace(generation_input=generation_input)
 
@@ -116,7 +128,7 @@ def connection(root):
     # 用户决策：全角色关闭深度思考（EmptyCompletion 突发的根因是推理链吃光补全预算）。
     # 「怎么关」按模型走注册表（glm/deepseek 发 thinking:disabled，MiniMax 发
     # reasoning_effort=low，关不掉的模型缓冲兜底）；这里只声明「哪些角色关思考」。
-    conn.thinking_disabled_roles.update({'answer','review','locomo_judge'})
+    conn.thinking_disabled_roles.update({'answer','review','locomo_judge','wiki_maintainer'})
     conn.reasoning_effort='low'
     conn.max_concurrency=6
     conn.fast_max_concurrency=8
@@ -135,27 +147,80 @@ def arm_spec(arm,rounds):
 
 async def run_arm(args):
     root=Path(args.output).resolve()
+    if args.optimization_mode=='wiki':
+        if args.arm!='g1' or args.scope!='sfcp':
+            raise ValueError('Wiki optimization requires --arm g1 --scope sfcp')
+        precheck=root/'precheck.json'
+        conn=connection(root)
+        expected=precheck_identity(conn,arm_config(args.arm,args.vector_k))
+        if not precheck.exists():
+            raise ValueError('Wiki optimization requires a passing precheck in the new run root')
+        record=json.loads(precheck.read_text())
+        if not record.get('passed') or record.get('identity')!=expected:
+            raise ValueError('Wiki precheck identity mismatch or failed precheck')
     adapter=LocomoAdapter(ROOT/'datasets/locomo/data/locomo10_zh.json')
     task=TaskSpec.load(TASK_DIR/'task.yaml')
     config=arm_config(args.arm,args.vector_k)
     spec=arm_spec(args.arm,args.rounds)
     if args.train_only:
         cases=tuple(c.strip() for c in args.cases.split(',')) if args.cases else spec.train
+        selected=getattr(args,'train_question_ids',None)
+        if args.optimization_mode=='wiki' and (args.train_questions or selected):
+            if not set(cases)<=set(spec.train):
+                raise ValueError('Wiki training cannot use validation/test cases')
+            adapter=_trimmed_train_adapter(adapter,cases,args.train_questions,
+                tuple(q.strip() for q in selected.split(',')) if selected else None)
+        # 新模式（recheck4「冻结记忆/向量、图可重建」）：graph_builder 注入后记忆/向量
+        # 仍取快照，图按当前 S 从固定事实重建（准入/冒烟/正式同派生规则）；轮预算
+        # 与同对话验证选版按参数接入。旧模式（默认）逐字节不变。
+        graph_builder=None;validation_plan=None;bootstrap_ctx=None
+        if getattr(args,'graph_rebuild',False):
+            from datasets.locomo.graph_rules import (projection_structure_sample,
+                                                      rebuild_snapshot_graph)
+            graph_builder=rebuild_snapshot_graph
+            # bootstrap 样本用投影词汇（可建图的真实关系集）——冻结图样本会引导
+            # 草案写 涉及* 等投影能力边界外的遍历，在重建图高压场景被拦。
+            bootstrap_ctx=projection_structure_sample(SNAPSHOTS/'conv-26')
+            if not selected or not getattr(args,'validation_question_ids',None):
+                raise ValueError('--graph-rebuild requires --train-question-ids and '
+                                 '--validation-question-ids (同对话按题划分)')
+            val_ids=tuple(q.strip() for q in args.validation_question_ids.split(','))
+            full=LocomoAdapter(ROOT/'datasets/locomo/data/locomo10_zh.json')
+            by_id={q.id:q for q in full.generation_input(cases[0]).questions}
+            missing=[i for i in val_ids if i not in by_id]
+            if missing:
+                raise ValueError(f'验证题号不在对话内: {missing}')
+            import dataclasses as _dc
+            val_case=_dc.replace(full.generation_input(cases[0]),
+                                 questions=tuple(by_id[i] for i in val_ids))
+            overlap=set(val_ids)&{q.strip() for q in selected.split(',')}
+            if overlap:
+                raise ValueError(f'训练/验证题重叠: {sorted(overlap)}')
+            validation_plan={'case':val_case,
+                'policy':SelectionPolicy('original_precise','original_lenient')}
         runner=ExperimentRunner(adapter,lambda client,path:LocomoEvaluator(client,path),
                                 connection(root),config,spec.adoption,root/'train',frozen_files(),
                                 snapshot_root=SNAPSHOTS,
-                                bootstrap_context=memory_structure_sample(SNAPSHOTS/'conv-26'),
+                                bootstrap_context=(bootstrap_ctx if graph_builder is not None
+                                                   else memory_structure_sample(SNAPSHOTS/'conv-26')),
                                 bootstrap_trial_graph=bootstrap_trial_graph(adapter),
-                                smoke_judge=smoke_judge)
-        summary=await runner.run(cases,task,rounds=0,resume=args.resume,scope=SCOPE[args.scope])
+                                smoke_judge=smoke_judge,optimization_mode=args.optimization_mode,
+                                graph_builder=graph_builder,
+                                proposal_attempts=getattr(args,'proposal_attempts',None),
+                                round_deadline_s=getattr(args,'round_deadline_s',None),
+                                validation_plan=validation_plan)
+        summary=await runner.run(cases,task,rounds=args.rounds if args.optimization_mode=='wiki'
+                                 else 0,resume=args.resume,scope=SCOPE[args.scope])
         print(summary['status'])
         return
+    if getattr(args,'train_question_ids',None):
+        raise ValueError('--train-question-ids requires --train-only --optimization-mode wiki')
     if args.train_questions:
         adapter=_trimmed_train_adapter(adapter,spec.train,args.train_questions)
     controller=CampaignController(adapter,lambda client,path:LocomoEvaluator(client,path),
                                   connection(root),config,spec,root,frozen_files(),snapshot_root=SNAPSHOTS,
                                   bootstrap_context=memory_structure_sample(SNAPSHOTS/'conv-26'),
-                                  smoke_judge=smoke_judge)
+                                  smoke_judge=smoke_judge,optimization_mode=args.optimization_mode)
     controller.bootstrap_trial_graph=bootstrap_trial_graph(adapter)
     # 冷启动轮 B0 门＝「可评分基线」：完成度≥90% 即锚定迭代起点（v10：93/100 被旧 95% 门
     # 拦出冷启动死锁——7 题确定性 F 契约故障只有 R1 修资产才能清，而 R1 要 B0 过门才开）。
@@ -175,6 +240,8 @@ async def main(args):
     if args.arm in ('v0','g1'):
         await run_arm(args)
         return
+    if args.optimization_mode=='wiki':
+        raise ValueError('Wiki mode requires --arm g1')
     adapter=LocomoAdapter(ROOT/'datasets/locomo/data/locomo10_zh.json')
     spec=TaskSpec.load(TASK_DIR/'task.yaml')
     config=RunConfig()
@@ -220,7 +287,19 @@ if __name__=='__main__':
                    help='迭代轮数上限；v0 固定 0，g1 缺省无限（操作者 --stop 叫停）')
     p.add_argument('--scope',choices=SCOPE.keys(),default='p',
                    help='迭代开放范围：p 只 P / pf 加 F / sfcp 全开（按失败归因推进）')
+    p.add_argument('--optimization-mode',choices=('legacy','wiki'),default='legacy',
+                   help='训练优化经验模式（默认 legacy，不影响已有运行）')
     p.add_argument('--train-questions',type=int,default=None,
                    help='训练对话截取前 N 题加速迭代（验证/测试/外测保持全量）')
+    p.add_argument('--train-question-ids',help='Wiki 小规模训练的固定题目 ID，逗号分隔；仅 train-only 生效')
+    p.add_argument('--graph-rebuild',action='store_true',
+                   help='新模式（recheck4 快速循环）：冻结记忆/向量、图按当前 S 从固定事实重建；'
+                        '需配合 --train-question-ids 与 --validation-question-ids')
+    p.add_argument('--validation-question-ids',
+                   help='同对话固定验证题清单（逗号分隔）；验证聚合指标进选版，逐题反馈不进提案器')
+    p.add_argument('--proposal-attempts',type=int,default=None,
+                   help='新模式每轮提案尝试上限（默认沿用 50；十轮协议用 3）')
+    p.add_argument('--round-deadline-s',type=float,default=None,
+                   help='新模式整轮墙钟上限秒数（提案起至决策落盘，不随重试重置；超时轮不计正式轮）')
     p.add_argument('--stop',action='store_true',help='写入 STOP 叫停信号：当前轮完成后锁定候选并进入验证/测试')
     asyncio.run(main(p.parse_args()))

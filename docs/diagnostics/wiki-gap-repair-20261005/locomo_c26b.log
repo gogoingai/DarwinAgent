@@ -1,0 +1,8 @@
+{"stage": "B0", "status": "complete", "asset_version": "e64d13b8a16a93e7603f8bc2a200ecb0083a5fe6346991084b40d01abfd27448", "elapsed_s": 80.43}
+{"stage": "R1", "status": "complete", "asset_version": "2a4f2b53ce62ff98a4b741fd04a64e03240647f1cb1e856f2438f622cc50ef5a", "elapsed_s": 77.23}
+{"stage": "R1", "accepted": false, "reasons": ["primary_not_strictly_improved"]}
+{"stage": "R2", "status": "complete", "asset_version": "429ada1e5b2b6d2d2a742bbf92f2768713c34dca91304fd3db453881b91d7e16", "elapsed_s": 141.74}
+{"stage": "R2", "accepted": true, "reasons": ["primary_strictly_improved"]}
+{"stage": "R3", "status": "complete", "asset_version": "fde75a77d10a8f210e5c92c4ce4dedb13d347f7a97b2a64efabaf238f367f719", "elapsed_s": 53.74}
+{"stage": "R3", "accepted": false, "reasons": ["primary_not_strictly_improved"]}
+complete

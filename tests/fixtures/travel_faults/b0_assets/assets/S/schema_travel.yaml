@@ -1,0 +1,131 @@
+entity_types:
+  attraction:
+    primary_key: [name, city]
+    attributes:
+      - {name: name, dtype: string}
+      - {name: city, dtype: string}
+      - {name: address, dtype: string}
+      - {name: phone, dtype: string}
+      - {name: website, dtype: string}
+      - {name: latitude, dtype: float}
+      - {name: longitude, dtype: float}
+    description: A tourist attraction listed in the per-request attractions reference table.
+  restaurant:
+    primary_key: [name, city, cuisines]
+    attributes:
+      - {name: name, dtype: string}
+      - {name: city, dtype: string}
+      - {name: cuisines, dtype: string}
+      - {name: average_cost, dtype: float}
+      - {name: aggregate_rating, dtype: float}
+    description: A dining option from the restaurants reference table.
+  accommodation:
+    primary_key: [name, city]
+    attributes:
+      - {name: name, dtype: string}
+      - {name: city, dtype: string}
+      - {name: room_type, dtype: string}
+      - {name: price, dtype: float}
+      - {name: house_rules, dtype: string}
+      - {name: minimum_nights, dtype: float}
+      - {name: maximum_occupancy, dtype: int}
+      - {name: review_rate_number, dtype: float}
+    description: A lodging option from the accommodations reference table.
+  flight:
+    primary_key: [flight_number, flight_date]
+    attributes:
+      - {name: flight_number, dtype: string}
+      - {name: price, dtype: float}
+      - {name: dep_time, dtype: string}
+      - {name: arr_time, dtype: string}
+      - {name: elapsed_time, dtype: string}
+      - {name: flight_date, dtype: string}
+      - {name: origin_city, dtype: string}
+      - {name: dest_city, dtype: string}
+      - {name: distance, dtype: float}
+    description: A scheduled flight row from the flights reference table.
+  city:
+    primary_key: [city]
+    attributes:
+      - {name: city, dtype: string}
+      - {name: state, dtype: string}
+    description: A city declared in the allowed environment city set.
+relation_types:
+  located_in:
+    domain: attraction
+    range: city
+    axioms:
+      - domain_attr city equals range key city
+  serves_city:
+    domain: restaurant
+    range: city
+    axioms:
+      - domain_attr city equals range key city
+  lodges_in:
+    domain: accommodation
+    range: city
+    axioms:
+      - domain_attr city equals range key city
+  flies_from:
+    domain: flight
+    range: city
+    axioms:
+      - domain_attr origin_city equals range key city
+  flies_to:
+    domain: flight
+    range: city
+    axioms:
+      - domain_attr dest_city equals range key city
+claims:
+  - source_id: 6cbf59905fca1ea9bc8cc26f2d62a1c45b3d1d36943dfb0fa282beea007f7268
+    quote: Burpee Museum of Natural History ... 737 N Main St, Rockford, IL 61103, USA ... Rockford
+    key: [Burpee Museum of Natural History, Rockford]
+    properties: {name: Burpee Museum of Natural History, city: Rockford, address: 737 N Main St, Rockford, IL 61103, USA, phone: (815) 965-3433, website: http://www.burpee.org/, latitude: 42.277324, longitude: -89.088142}
+  - source_id: 6cbf59905fca1ea9bc8cc26f2d62a1c45b3d1d36943dfb0fa282beea007f7268
+    quote: Anderson Japanese Gardens ... 318 Spring Creek Rd, Rockford, IL 61107, USA ... Rockford
+    key: [Anderson Japanese Gardens, Rockford]
+    properties: {name: Anderson Japanese Gardens, city: Rockford, address: 318 Spring Creek Rd, Rockford, IL 61107, USA, phone: (815) 229-9390, website: http://andersongardens.org/, latitude: 42.290054, longitude: -89.057795}
+  - source_id: 6f83425ed9dad9392a76a67bc748de95fd4f2803b3b0dc12dd4c75fe8c44e87d
+    quote: Ingersoll Centennial Park ... 315 S 1st St, Rockford, IL 61104, USA ... Rockford
+    key: [Ingersoll Centennial Park, Rockford]
+    properties: {name: Ingersoll Centennial Park, city: Rockford, address: 315 S 1st St, Rockford, IL 61104, USA, phone: (815) 987-8800, website: http://rockfordparkdistrict.org/, latitude: 42.266298, longitude: -89.091439}
+  - source_id: efd757a1c9deddfc34227cd5f3cee05e287b7c7cdfd91103936fdf74e299e5ce
+    quote: Coco Bambu ... Tea, French, Bakery, BBQ, Cafe ... 72 ... 4.9 ... Rockford
+    key: [Coco Bambu, Rockford, Tea, French, Bakery, BBQ, Cafe]
+    properties: {name: Coco Bambu, city: Rockford, cuisines: Tea, French, Bakery, BBQ, Cafe, average_cost: 72.0, aggregate_rating: 4.9}
+  - source_id: 4a304657ea81ee585ed4e2201e8c3855839ce2172b6bfad1fd1dd8af637ef1fb
+    quote: Flying Mango ... American, BBQ, Seafood ... 20 ... 4.5 ... Rockford
+    key: [Flying Mango, Rockford, American, BBQ, Seafood]
+    properties: {name: Flying Mango, city: Rockford, cuisines: American, BBQ, Seafood, average_cost: 20.0, aggregate_rating: 4.5}
+  - source_id: 489e46cae5b80588389d9bb1282c2019f25928f3af5342647a5fa8bf8aef7226
+    quote: Spacious 3BDR Prime Location! 1030.0 Entire home/apt No smoking 2.0 9 2.0 Rockford
+    key: [Spacious 3BDR Prime Location!, Rockford]
+    properties: {name: Spacious 3BDR Prime Location!, city: Rockford, room_type: Entire home/apt, price: 1030.0, house_rules: No smoking, minimum_nights: 2.0, maximum_occupancy: 9, review_rate_number: 2.0}
+  - source_id: cc5c6626aa3a36c07eb7b35812f3c68b5333cc5d265127fc2bb0b9671fbc3f92
+    quote: Private Room in a two bedroom apt. 210.0 Private room No visitors & No smoking 1.0 2 4.0 Rockford
+    key: [Private Room in a two bedroom apt., Rockford]
+    properties: {name: Private Room in a two bedroom apt., city: Rockford, room_type: Private room, price: 210.0, house_rules: No visitors & No smoking, minimum_nights: 1.0, maximum_occupancy: 2, review_rate_number: 4.0}
+  - source_id: 55981b7425ab426b2e462f8c9ebebb6f761968939e190b0edf83df2b98c0fa17
+    quote: F3573659 474 15:40 17:04 2 hours 24 minutes 2022-03-16 St. Petersburg Rockford 1049.0
+    key: [F3573659, 2022-03-16]
+    properties: {flight_number: F3573659, price: 474.0, dep_time: '15:40', arr_time: '17:04', elapsed_time: 2 hours 24 minutes, flight_date: '2022-03-16', origin_city: St. Petersburg, dest_city: Rockford, distance: 1049.0}
+  - source_id: a7ecd86878bf5c3fc73d271c58347b2f3b091c80b3b6a622614bba1ab5f723e1
+    quote: F3573120 346 19:00 22:43 2 hours 43 minutes 2022-03-18 Rockford St. Petersburg 1049.0
+    key: [F3573120, 2022-03-18]
+    properties: {flight_number: F3573120, price: 346.0, dep_time: '19:00', arr_time: '22:43', elapsed_time: 2 hours 43 minutes, flight_date: '2022-03-18', origin_city: Rockford, dest_city: St. Petersburg, distance: 1049.0}
+  - source_id: e60f6c46a25b8ef4db748eef303bed819deba22b021f3c1417e965e25ccb30a5
+    quote: Rockford Illinois city entry
+    key: [Rockford]
+    properties: {city: Rockford, state: Illinois}
+  - source_id: 6de1d4f3f8965ff5bf7ab26f794fd25108148f3988c5d4d422635984a31aa52f
+    quote: St. Petersburg Saint Petersburg city entry
+    key: [St. Petersburg]
+    properties: {city: St. Petersburg, state: Saint Petersburg}
+  - source_id: 9767b278682d2ed084216734171cb15d626a447e0040cb2bc40932b1fa1a7c42
+    quote: Magic Brooklyn townhouse room fit for a wizard ... St. Petersburg ... 624.0
+    key: [Magic Brooklyn townhouse room fit for a wizard, St. Petersburg]
+    properties: {name: Magic Brooklyn townhouse room fit for a wizard, city: St. Petersburg, room_type: Private room, price: 624.0, house_rules: No children under 10 & No parties, minimum_nights: 1.0, maximum_occupancy: 2, review_rate_number: 5.0}
+  - source_id: 416309870ecf784b2230fc55ac9f1c350828d9227489ac17617470e6e8ec2812
+    quote: Juniper Bar - Andaz Delhi ... St. Petersburg ... 81 ... 3.0
+    key: [Juniper Bar - Andaz Delhi, St. Petersburg, Tea, Pizza, Italian, Bakery, Cafe, Mediterranean]
+    properties: {name: Juniper Bar - Andaz Delhi, city: St. Petersburg, cuisines: Tea, Pizza, Italian, Bakery, Cafe, Mediterranean, average_cost: 81.0, aggregate_rating: 3.0}

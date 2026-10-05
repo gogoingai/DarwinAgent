@@ -6,7 +6,7 @@ import json
 from oak.contracts import AnswerResult, AtomicFact, CaseInput, GraphResult, plain
 from oak.kg.graph import EntityCandidate, RelationCandidate, build_graph, node_view, node_id
 from oak.schema.model import Schema
-from .spec import validate_value
+from .spec import validate_value, contract_errors
 
 FIXED_CHECK_IDS = ('fixed.input','fixed.schema','fixed.source','fixed.type','fixed.status','fixed.publish')
 
@@ -48,6 +48,12 @@ def validate_bundle(bundle, forbidden_questions=()):
     reserved={'node_id','entity_type','source_ids','claims','etype'}
     if any(a.name in reserved or a.name.startswith('__') for e in schema.entities for a in e.attributes):
         raise ValueError('Schema cannot redefine runtime metadata')
+    errors=[]
+    for asset in bundle.assets.assets:
+        errors.extend(contract_errors(asset.input_contract,f'{asset.id}.input_contract'))
+        errors.extend(contract_errors(asset.output_contract,f'{asset.id}.output_contract'))
+    if errors:
+        raise ValueError('Invalid asset contracts: '+' | '.join(errors[:24]))
     FunctionRegistry(bundle,forbidden_questions=forbidden_questions)
     CheckRegistry(bundle,forbidden_questions=forbidden_questions)
     return schema

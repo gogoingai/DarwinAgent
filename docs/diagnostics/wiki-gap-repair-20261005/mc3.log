@@ -1,0 +1,7 @@
+{"stage": "B0", "case": "conv-30", "fault_retry": {"questions": 1, "recovered": 0, "still_faulted": ["20"], "skipped_retry": "deterministic_tool_error", "sample_errors": ["ValueError: Answered results require evidence and no error"]}}
+{"stage": "B0", "status": "failed", "asset_version": "be6b6d924333577268db1a27a14591d8044bb61486d6c0effa66b8ac6eeac3e2", "elapsed_s": 88.95}
+{"stage": "R1", "status": "complete", "asset_version": "bd13c7bfc399ab129a551a3d220633ae8510a7190cb740413b375db444370eec", "elapsed_s": 91.51}
+{"stage": "R1", "accepted": false, "reasons": ["primary_not_strictly_improved"]}
+{"stage": "R2", "status": "complete", "asset_version": "5c1aa67fcabbb061b9d6e4d9f9b2794bf6159c08558c399784a6cc236475e575", "elapsed_s": 124.59}
+{"stage": "R2", "accepted": true, "reasons": ["primary_strictly_improved"]}
+{"status": "failed", "rounds": [{"stage": null, "accepted": false, "reasons": ["primary_not_strictly_improved"]}, {"stage": null, "accepted": true, "reasons": ["primary_strictly_improved"]}], "adopted": "5c1aa67fcabbb061b9d6e4d9f9b2794bf6159c08558c399784a6cc236475e575"}

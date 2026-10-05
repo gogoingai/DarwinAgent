@@ -1,0 +1,18 @@
+Traceback (most recent call last):
+  File "/Users/xu/git/oak/.cache/worktrees/wiki-experience-phase-one/docs/diagnostics/wiki-gap-repair-20261005/travel_loop1.py", line 53, in <module>
+    asyncio.run(main())
+  File "/Users/xu/.local/share/uv/python/cpython-3.11.15-macos-aarch64-none/lib/python3.11/asyncio/runners.py", line 190, in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "/Users/xu/.local/share/uv/python/cpython-3.11.15-macos-aarch64-none/lib/python3.11/asyncio/runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/xu/.local/share/uv/python/cpython-3.11.15-macos-aarch64-none/lib/python3.11/asyncio/base_events.py", line 654, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/Users/xu/git/oak/.cache/worktrees/wiki-experience-phase-one/docs/diagnostics/wiki-gap-repair-20261005/travel_loop1.py", line 43, in main
+    summary = await runner.run('train:0', spec, rounds=2, scope=('S', 'F', 'C', 'P'),
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/xu/git/oak/.cache/worktrees/wiki-experience-phase-one/oak/experiments/runner.py", line 1513, in run
+    raise ValueError('冒烟门拒绝（全量提交前 3 题全灭）: '+smoke_error)
+ValueError: 冒烟门拒绝（全量提交前 3 题全灭）: 冒烟执行错误达 1/1（≥2/3，系统性破绽）: ValueError: F counterexample failed for f_city_candidates: output did not follow renamed/date-shifted data

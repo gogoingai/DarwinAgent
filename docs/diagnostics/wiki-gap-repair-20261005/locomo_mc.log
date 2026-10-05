@@ -1,0 +1,31 @@
+{"stage": "B0", "case": "conv-30", "fault_retry": {"questions": 2, "retried": 1, "recovered": 1, "still_faulted": ["0"], "elapsed_s": 159.371, "skipped_deterministic": 1}}
+{"stage": "B0", "case": "conv-42", "fault_retry": {"questions": 1, "recovered": 0, "still_faulted": ["0"], "skipped_retry": "deterministic_tool_error", "sample_errors": ["SandboxError: Restricted execution budget exhausted"]}}
+{"stage": "B0", "status": "failed", "asset_version": "2f1e7cf48c8c2b06b6e4c74d7d1e827572ca9fa9f49ab9105ce6f5aef9cf93e9", "elapsed_s": 348.04}
+Traceback (most recent call last):
+  File "/Users/xu/git/oak/.cache/worktrees/wiki-experience-phase-one/docs/diagnostics/wiki-gap-repair-20261005/multi_loop.py", line 70, in <module>
+    asyncio.run(main())
+  File "/Users/xu/.local/share/uv/python/cpython-3.11.15-macos-aarch64-none/lib/python3.11/asyncio/runners.py", line 190, in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "/Users/xu/.local/share/uv/python/cpython-3.11.15-macos-aarch64-none/lib/python3.11/asyncio/runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/xu/.local/share/uv/python/cpython-3.11.15-macos-aarch64-none/lib/python3.11/asyncio/base_events.py", line 654, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/Users/xu/git/oak/.cache/worktrees/wiki-experience-phase-one/docs/diagnostics/wiki-gap-repair-20261005/multi_loop.py", line 61, in main
+    summary = await runner.run(IDS, TaskSpec.load(TASK_DIR / 'task.yaml'), rounds=2,
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/xu/git/oak/.cache/worktrees/wiki-experience-phase-one/oak/experiments/runner.py", line 1571, in run
+    'base_version':adopted.version,'candidate':None}
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/xu/git/oak/.cache/worktrees/wiki-experience-phase-one/oak/experiments/runner.py", line 1217, in _stage
+    report['smoke']={'status':'failed' if error else 'passed',
+    ^^^^^^^^^^^^^
+  File "/Users/xu/git/oak/.cache/worktrees/wiki-experience-phase-one/oak/experiments/runner.py", line 1197, in verify
+    atomic_json(cache/'graph.complete.json',{'digest':digest(payload),'case':case.id,
+    ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/xu/git/oak/.cache/worktrees/wiki-experience-phase-one/oak/runtime/identity.py", line 22, in assert_files
+    if changed: raise ValueError(f'Frozen engineering/input files changed: {changed}')
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ValueError: Frozen engineering/input files changed: ['/Users/xu/git/oak/.cache/worktrees/wiki-experience-phase-one/oak/experiments/admission.py', '/Users/xu/git/oak/.cache/worktrees/wiki-experience-phase-one/oak/experiments/admission_worker.py', '/Users/xu/git/oak/.cache/worktrees/wiki-experience-phase-one/oak/experiments/runner.py', '/Users/xu/git/oak/.cache/worktrees/wiki-experience-phase-one/oak/experiments/wiki.py', '/Users/xu/git/oak/.cache/worktrees/wiki-experience-phase-one/oak/kernel/checks.py', '/Users/xu/git/oak/.cache/worktrees/wiki-experience-phase-one/oak/kernel/spec.py']

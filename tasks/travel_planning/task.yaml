@@ -29,3 +29,57 @@ answer_contract:
       dinner: {type: string}
       attraction: {type: string}
       accommodation: {type: string}
+
+# 任务层答案反例（准入 must-reject 行）：这些形态结构上是 JSON 数组，但语义上必须被拒。
+# 声明在任务适配层，核心不硬编码任务规则（2026-10-05 审查 P1）。
+# 任务层正常 answered 正例（准入 must_pass 行，四次复查反例后重造）：自带问题/
+# 参数/候选/证据行的小型独立夹具。城市对、航班、餐厅、住宿、景点全部取自官方
+# 数据库真实实体（两日往返闭环：官方约束要求行程首末城市一致）；餐食/景点为官方
+# "Name (City)" 形态；两晚住宿均为官方库 minimum nights=1 的房源。夹具行程经官方
+# commonsense+hard 约束校验通过（tests/integration/test_wiki_faults_repro.py
+# FourthReviewFixtureTests 固定该事实，防漂移）。不是旧模型输出，不用评测金标。
+answer_examples:
+  - name: two_day_round_trip
+    question: Plan a 2-day round trip from St. Petersburg to Rockford.
+    parameters: {org: St. Petersburg, dest: Rockford, days: 2}
+    evidence_rows:
+      - {node_id: fx_flight_out, entity_type: flight, flight_number: F3573659, origin_city: St. Petersburg, dest_city: Rockford, flight_date: '2022-03-16', price: 474.0}
+      - {node_id: fx_flight_back, entity_type: flight, flight_number: F3573120, origin_city: Rockford, dest_city: St. Petersburg, flight_date: '2022-03-18', price: 346.0}
+      - {node_id: fx_rest_1, entity_type: restaurant, name: Aapki Apni Rasoi, city: St. Petersburg}
+      - {node_id: fx_rest_2, entity_type: restaurant, name: Applebee's, city: St. Petersburg}
+      - {node_id: fx_rest_3, entity_type: restaurant, name: Advance Bakery, city: Rockford}
+      - {node_id: fx_rest_4, entity_type: restaurant, name: Aggarwal Sweet Centre, city: Rockford}
+      - {node_id: fx_rest_5, entity_type: restaurant, name: Aroma Rest O Bar, city: Rockford}
+      - {node_id: fx_rest_6, entity_type: restaurant, name: Huber & Holly, city: St. Petersburg}
+      - {node_id: fx_attr_1, entity_type: attraction, name: Anderson Japanese Gardens, city: Rockford}
+      - {node_id: fx_attr_2, entity_type: attraction, name: Albert Whitted Park, city: St. Petersburg}
+      - {node_id: fx_acc_1, entity_type: accommodation, name: Private Room in a two bedroom apt., city: Rockford}
+      - {node_id: fx_acc_2, entity_type: accommodation, name: HugeTropical Bedrm near Ferry, city: St. Petersburg}
+    candidate:
+      status: answered
+      node_ids: [fx_flight_out, fx_flight_back, fx_rest_1, fx_rest_2, fx_rest_3, fx_rest_4, fx_rest_5, fx_rest_6, fx_attr_1, fx_attr_2, fx_acc_1, fx_acc_2]
+      answer: >-
+        [{"days": 1, "current_city": "from St. Petersburg to Rockford",
+        "transportation": "Flight Number: F3573659, From: St. Petersburg to Rockford",
+        "breakfast": "Aapki Apni Rasoi, St. Petersburg",
+        "lunch": "Applebee's, St. Petersburg",
+        "dinner": "Advance Bakery, Rockford",
+        "attraction": "Anderson Japanese Gardens, Rockford;",
+        "accommodation": "Private Room in a two bedroom apt., Rockford"},
+        {"days": 2, "current_city": "from Rockford to St. Petersburg",
+        "transportation": "Flight Number: F3573120, From: Rockford to St. Petersburg",
+        "breakfast": "Aggarwal Sweet Centre, Rockford",
+        "lunch": "Aroma Rest O Bar, Rockford",
+        "dinner": "Huber & Holly, St. Petersburg",
+        "attraction": "Albert Whitted Park, St. Petersburg;",
+        "accommodation": "HugeTropical Bedrm near Ferry, St. Petersburg"}]
+
+answer_counterexamples:
+  - name: duplicate_days
+    candidate:
+      status: answered
+      answer: '[{"days":1,"current_city":"Rockford","transportation":"","breakfast":"","lunch":"","dinner":"","attraction":"","accommodation":""},{"days":1,"current_city":"Rockford","transportation":"","breakfast":"","lunch":"","dinner":"","attraction":"","accommodation":""}]'
+  - name: empty_city
+    candidate:
+      status: answered
+      answer: '[{"days":1,"current_city":"","transportation":"","breakfast":"","lunch":"","dinner":"","attraction":"","accommodation":""}]'

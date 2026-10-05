@@ -10,7 +10,7 @@ from .bootstrap import revision_protocol
 
 class ProposalGenerator:
     async def propose(self, base, cases, feedback, client, config, target, questions=None,
-                      allowed_kinds=(), admission_error=None):
+                      allowed_kinds=(), admission_error=None, wiki_context=None):
         """allowed_kinds 与上一轮的准入错误都明示给提案模型：范围外补丁与指纹回显错
         应在模型侧重试消化，而不是整轮作废后重复同类错误。"""
         if isinstance(cases, tuple) and len(cases) == 1:
@@ -23,28 +23,52 @@ class ProposalGenerator:
         session = ModelSession(client, config, 'proposal', limit=6)
         payload = {'base_version': base.version,
                    'assets': [dict(a.to_dict(), fingerprint=a.fingerprint) for a in base.assets.assets],
-                   'task_training_feedback': feedback, 'questions': questions,
+                   'questions': questions,
                    'allowed_asset_kinds': sorted(set(allowed_kinds)) if allowed_kinds else []}
-        if admission_error:
+        if wiki_context is None:
+            payload['task_training_feedback'] = feedback
+        else:
+            payload['wiki'] = wiki_context
+        if admission_error and wiki_context is None:
             payload['previous_admission_error'] = admission_error
         # output format; it is recorded for audit alongside the payload.
         protocol = revision_protocol(base, allowed_kinds)
-        def valid(obj):
-            if set(obj)!={'patches'} or not isinstance(obj['patches'],list) or not obj['patches']:
-                raise ValueError('Expected a nonempty structured asset proposal')
-            import dataclasses
-            fields={f.name for f in dataclasses.fields(Asset)}
-            def _asset(item):
-                # 提案常把展示用的 fingerprint 键回显进资产对象（v13 R4 十连败死因）；
-                # 指纹属于补丁层 base_fingerprint，资产对象里多余键机械剥离——格式类
-                # 错误不再依赖模型自觉，重试预算（50 次）留给内容类问题。
-                extra=sorted(set(item)-fields-{'schema_dependencies'})
-                if extra:
-                    item={k:v for k,v in item.items() if k in fields or k=='schema_dependencies'}
-                    item['description']=str(item.get('description',''))+f' [normalize: dropped {extra}]'
-                return Asset(**item)
-            return tuple(AssetPatch(_asset(p['asset']),p['base_fingerprint'],p['reason'],tuple(p['training_evidence'])) for p in obj['patches'])
+        if wiki_context is not None:
+            for asset in payload['assets']:
+                asset['current_ref']='current:'+asset['id']
+            protocol += ('\nWiki current-asset reference protocol overrides the hash-copy requirement: '
+                         'for an existing asset, set base_fingerprint to its current_ref (e.g. current:p_review). '
+                         'The framework resolves this reference against the frozen base_version and verifies the full fingerprint. '
+                         'Do not copy or edit the 64-character fingerprint. New assets still use null.')
         try:
-            return await session.request(config.proposal_role,protocol,payload,valid,max_tokens=14000)
+            return await session.request(config.proposal_role,protocol,payload,lambda obj:self.decode(obj,base if wiki_context is not None else None),max_tokens=14000)
         finally:
             atomic_json(target,{'input':payload,'protocol':protocol,'raw_outputs':session.raw,'events':session.events})
+
+    @staticmethod
+    def decode(obj, base=None):
+        if set(obj)!={'patches'} or not isinstance(obj['patches'],list) or not obj['patches']:
+            raise ValueError('Expected a nonempty structured asset proposal')
+        import dataclasses
+        fields={f.name for f in dataclasses.fields(Asset)}
+        def _asset(item):
+            extra=sorted(set(item)-fields-{'schema_dependencies'})
+            if extra:
+                item={k:v for k,v in item.items() if k in fields or k=='schema_dependencies'}
+                item['description']=str(item.get('description',''))+f' [normalize: dropped {extra}]'
+            return Asset(**item)
+        current={a.id:a for a in base.assets.assets} if base is not None else {}
+        if base is not None: base.verify()
+        patches=[]
+        for item in obj['patches']:
+            asset=_asset(item['asset']);fingerprint=item['base_fingerprint']
+            if isinstance(fingerprint,str) and fingerprint.startswith('current:'):
+                if base is None or asset.id not in current or fingerprint!='current:'+asset.id:
+                    raise ValueError('Invalid current-asset reference for '+asset.id)
+                if asset.kind!=current[asset.id].kind:
+                    raise ValueError('Asset type change for '+asset.id)
+                fingerprint=current[asset.id].fingerprint
+            elif base is not None and asset.id in current and fingerprint!=current[asset.id].fingerprint:
+                raise ValueError('Wrong fingerprint for '+asset.id+'; use current:'+asset.id)
+            patches.append(AssetPatch(asset,fingerprint,item['reason'],tuple(item['training_evidence'])))
+        return tuple(patches)

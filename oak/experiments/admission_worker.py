@@ -120,7 +120,10 @@ def main(payload_path):
     admit_candidate(bundle,cases,graphs,RunConfig(**request['config']),
                     tuple(request['required_caps']),request['report_path'],
                     replay_inputs=tuple(request.get('replay_inputs',())),
-                    remote_vector_error=remote_vector_error)
+                    remote_vector_error=remote_vector_error,
+                    replay_checks=tuple(request.get('replay_checks',())),
+                    answer_counterexamples=tuple(request.get('answer_counterexamples',())),
+                    answer_examples=tuple(request.get('answer_examples',())))
 
 
 if __name__=='__main__':

@@ -8,8 +8,8 @@ from datetime import date
 from pathlib import Path
 
 from oak.contracts import plain
-from oak.kernel.checks import (CheckRegistry, synthetic_answer_variants,
-                               synthetic_answer_snapshot,
+from oak.kernel.checks import (CheckRegistry, counterexample_snapshot,
+                               synthetic_answer_battery, synthetic_answer_snapshot,
                                synthetic_invalid_answer_snapshot)
 from oak.kernel.functions import FunctionRegistry
 from oak.kernel.spec import validate_value
@@ -94,54 +94,169 @@ def _traversal_relations(asset, params):
     return relations
 
 
+def _traversal_shape(asset):
+    """Resolve parameter dependencies, not spelling conventions, for traverse inputs."""
+    tree=ast.parse(asset.content)
+    assignments={}
+    for node in ast.walk(tree):
+        if isinstance(node,ast.Assign):
+            for target in node.targets:
+                if isinstance(target,ast.Name):
+                    assignments.setdefault(target.id,[]).append(node.value)
+
+    for node in ast.walk(tree):
+        if isinstance(node,(ast.For,ast.comprehension)) and isinstance(node.target,ast.Name):
+            assignments.setdefault(node.target.id,[]).append(node.iter)
+        if (isinstance(node,ast.Call) and isinstance(node.func,ast.Attribute)
+                and isinstance(node.func.value,ast.Name) and node.func.attr in ('append','extend')):
+            assignments.setdefault(node.func.value.id,[]).extend(node.args)
+
+    def keys(expr,seen=()):
+        if expr is None:
+            return set()
+        if isinstance(expr,ast.Name):
+            if expr.id in seen:
+                return set()
+            return set().union(*(keys(v,(*seen,expr.id))
+                                for v in assignments.get(expr.id,())))
+        if isinstance(expr,ast.Call) and isinstance(expr.func,ast.Name) and expr.func.id in (
+                'nodes','search','semantic_search','traverse'):
+            return set()  # Operator filters are not externally supplied traversal seeds.
+        if (isinstance(expr,ast.Subscript) and isinstance(expr.value,ast.Name)
+                and expr.value.id=='params' and isinstance(expr.slice,ast.Constant)):
+            return {expr.slice.value} if isinstance(expr.slice.value,str) else set()
+        if (isinstance(expr,ast.Call) and isinstance(expr.func,ast.Attribute)
+                and isinstance(expr.func.value,ast.Name) and expr.func.value.id=='params'
+                and expr.func.attr=='get' and expr.args
+                and isinstance(expr.args[0],ast.Constant)):
+            return {expr.args[0].value} if isinstance(expr.args[0].value,str) else set()
+        if isinstance(expr,ast.Subscript):
+            return keys(expr.value,seen) # slice limits/indexes do not supply node identities
+        return set().union(*(keys(child,seen) for child in ast.iter_child_nodes(expr)))
+
+    seeds=set();directions=set();fixed=set();filters={}
+    for node in ast.walk(tree):
+        if not isinstance(node,ast.Call) or not isinstance(node.func,ast.Name):
+            continue
+        if node.func.id=='nodes':
+            selector=next((kw.value for kw in node.keywords if kw.arg=='filters'),None)
+            if isinstance(selector,ast.Dict):
+                for field,value in zip(selector.keys,selector.values):
+                    if isinstance(field,ast.Constant) and isinstance(field.value,str):
+                        for key in keys(value):
+                            filters[key]=field.value
+        if node.func.id!='traverse':
+            continue
+        seed=node.args[0] if node.args else next(
+            (kw.value for kw in node.keywords if kw.arg=='node_ids'),None)
+        direction=node.args[2] if len(node.args)>2 else next(
+            (kw.value for kw in node.keywords if kw.arg=='direction'),ast.Constant('out'))
+        seeds.update(keys(seed));directions.update(keys(direction))
+        if isinstance(direction,ast.Constant) and direction.value in ('in','out'):
+            fixed.add(direction.value)
+    return seeds,directions,fixed,filters
+
+
+def _traversal_directions(asset):
+    _,keys,fixed,_=_traversal_shape(asset)
+    enabled=set(fixed)
+    for key in keys:
+        spec=asset.input_contract.get('properties',{}).get(key,{})
+        enabled.update(set(spec.get('enum',('in','out'))) & {'in','out'})
+    return enabled or {'out'}
+
+
+def _pressure_graph(asset,params,graph,tag):
+    """Exercise internally selected seeds under adversarial row order, on a graph copy.
+
+    Node/edge attributes, sources and vector memory IDs are unchanged. Public row IDs
+    are rebuilt together with the copy; external-addressed functions use the original.
+    """
+    if not tag.startswith('high_degree_') or _traversal_shape(asset)[0]:
+        return graph
+    import networkx as nx
+    from oak.contracts import GraphResult
+    direction=tag.removeprefix('high_degree_')
+    edges=graph.graph.in_edges if direction=='in' else graph.graph.out_edges
+    relations=_traversal_relations(asset,params)
+    degree=lambda n:sum(not relations or attrs.get('relation') in relations
+                       for _,_,attrs in edges(n,data=True))
+    ordered=sorted(graph.graph.nodes,key=degree,reverse=True)
+    copy=nx.MultiDiGraph()
+    copy.graph.update(graph.graph.graph)
+    copy.add_nodes_from((n,dict(graph.graph.nodes[n])) for n in ordered)
+    copy.add_edges_from((u,v,k,dict(a)) for u,v,k,a in graph.graph.edges(keys=True,data=True))
+    return GraphResult(nx.freeze(copy),getattr(graph,'sources',{}),
+                       getattr(graph,'raw_outputs',()),getattr(graph,'diagnostics',()),
+                       getattr(graph,'vector',None))
+
+
 def _samples(asset, graph):
     """Prefer actual registered parameters and bounded, contract-valid risk variants."""
     from .runner import stress_trial_samples
     bases=[plain(v) for v in asset.trial_inputs]
     caps=DataCapabilities(graph)
     rows=list(caps.rows.values())
+    seed_keys,direction_keys,fixed_directions,filter_keys=_traversal_shape(asset)
     options=[('stress',v) for v in stress_trial_samples(asset.trial_inputs,graph)]
     if rows:
         # A seed with a broad scalar filter can scan the entire graph.
         for base in bases[:3]:
             wide={k:('' if isinstance(v,str) and k not in
-                     ('node_id','relation','direction','query','anchor_iso','expression')
+                     ({'node_id','relation','direction','query','anchor_iso','expression'} | seed_keys | direction_keys)
                      else v) for k,v in base.items()}
             options.append(('wide_filter',wide))
             if 'rows' in base and isinstance(base['rows'],list):
                 options.append(('large_rows',{**base,'rows':rows}))
-            if 'traverse' in asset.content and ('rows' in base or 'node_id' in base):
+            if 'traverse' in asset.content:
                 graph_edges=graph.graph
                 row_for_node={actual:rid for rid,actual in caps.actual_ids.items()}
                 relations=_traversal_relations(asset,base) or [None]
-                for direction in ('in','out'):
-                    if direction=='in' and 'direction' not in base:
-                        continue
-                    edges=(graph_edges.in_edges if direction=='in'
-                           else graph_edges.out_edges)
+                allowed_directions=_traversal_directions(asset)
+                for direction in sorted(allowed_directions):
+                    edges=graph_edges.in_edges if direction=='in' else graph_edges.out_edges
                     for relation in relations:
                         degree={n:sum(relation is None or attrs.get('relation')==relation
                                       for _,_,attrs in edges(n,data=True))
                                 for n in graph_edges.nodes}
                         ranked=sorted(degree,key=degree.get,reverse=True)
                         if not ranked or degree[ranked[0]]==0:
+                            # Unknown/absent relation must still face a nonempty-edge test.
+                            ranked=sorted(graph_edges.nodes,key=graph_edges.degree,reverse=True)
+                        if not ranked:
                             continue
                         target=caps.rows.get(row_for_node.get(ranked[0]))
                         if target:
                             params={**base}
-                            if 'rows' in base:
-                                params['rows']=[target]
-                            if 'node_id' in base:
-                                params['node_id']=target['node_id']
-                            if 'direction' in base:
-                                params['direction']=direction
+                            for key in seed_keys:
+                                value=base.get(key)
+                                spec=asset.input_contract.get('properties',{}).get(key,{})
+                                if isinstance(value,(list,tuple)) or spec.get('type')=='array':
+                                    items=spec.get('items',{})
+                                    row_input=items.get('type')!='string' and (not value or isinstance(value[0],Mapping))
+                                    params[key]=[target] if row_input else [target['node_id']]
+                                else:
+                                    params[key]=target['node_id']
+                            for key in direction_keys:
+                                params[key]=direction
+                            if not seed_keys:
+                                # Internal nodes(filters=...) selectors get real graph values.
+                                for key,field in filter_keys.items():
+                                    if field in target:
+                                        params[key]=target[field]
                             options.append((f'high_degree_{direction}',params))
+                            if not seed_keys:
+                                options.append((f'high_degree_{direction}',{
+                                    **base,**{key:direction for key in direction_keys}}))
             if 'relative_date' in asset.content:
                 options.append(('relative_date_object',{**base,
                     **({'anchor_iso':'2024-05-08'} if 'anchor_iso' in base else {}),
                     **({'expression':'上周日'} if 'expression' in base else {}),
                     **({'rows':rows[:100]} if isinstance(base.get('rows'),list) else {})}))
     seen=set()
+    # 遍历种子参数（AST 解析，别名/中文键同样命中）必须是图内节点——空串/未知值
+    # 的压力变体在生成端即非法（2026-10-05：逐字段清空变体曾把空种子送进试跑）。
+    seed_keys,_dk,_fd,_flt=_traversal_shape(asset)
     for tag,params in options:
         params=plain(params)
         try:
@@ -149,6 +264,9 @@ def _samples(asset, graph):
         except ValueError:
             continue
         if isinstance(params.get('node_id'),str) and params['node_id'] not in caps.rows:
+            continue
+        if any(isinstance(params.get(k),str) and params.get(k) not in caps.rows
+               for k in seed_keys):
             continue
         if 'semantic_search' in asset.content and 'query' in params \
                 and not str(params['query']).strip():
@@ -171,7 +289,8 @@ def _samples(asset, graph):
 
 
 def admit_candidate(bundle, training_cases, graph_refs, config, required_caps, report_path,
-                    replay_inputs=(), remote_vector_error=None):
+                    replay_inputs=(), remote_vector_error=None, answer_contract=None,
+                    replay_checks=(), answer_counterexamples=(), answer_examples=()):
     """Run independent required checks, persist the complete report, then reject on gaps."""
     report_path=Path(report_path)
     limits=Limits(config.function_steps,config.function_timeout_s,config.result_bytes)
@@ -215,23 +334,42 @@ def admit_candidate(bundle, training_cases, graph_refs, config, required_caps, r
         if manifest:
             report['snapshot_digests'][case.id]=manifest['snapshot_digest']
         graph_rows=list(DataCapabilities(graph).rows.values())
-        snapshots=[('graph',{'stage':'graph','nodes':graph_rows})]
+        snapshots=[('graph','must_pass',{'stage':'graph','nodes':graph_rows})]
         if case.questions:
             q=case.questions[0]
-            snapshots += [('answer_'+str(i),v) for i,v in enumerate(
-                synthetic_answer_variants(graph_rows,q.text,plain(q.parameters)))]
-            snapshots.append(('answer_invalid',synthetic_invalid_answer_snapshot(q.text)))
-        for tag,snapshot in snapshots:
+            snapshots += [(f'answer_{i}',expectation,v) for i,(expectation,v) in enumerate(
+                synthetic_answer_battery(graph_rows,q.text,plain(q.parameters),
+                                         answer_contract=answer_contract))]
+            snapshots.append(('answer_invalid','must_reject',
+                              synthetic_invalid_answer_snapshot(q.text,plain(q.parameters))))
+            # 任务层正常 answered 正例（三次复查 P1）：自洽可验证夹具（自带问题/
+            # 参数），真实合法候选必须被接受——「只接受弃答、拒绝所有 answered」
+            # 或冻结容器误判的 C 在此被拦；换 case/图不会把旧行程错装进来。
+            for ex in answer_examples:
+                snapshots.append((f"answer_ex_{ex.get('name','x')}",'must_pass',
+                                  counterexample_snapshot(ex,graph_rows,q.text,
+                                                          plain(q.parameters))))
+            for cx in answer_counterexamples:
+                snapshots.append((f"answer_cx_{cx.get('name','x')}",'must_reject',
+                                  counterexample_snapshot(cx,graph_rows,q.text,plain(q.parameters))))
+        for tag,expectation,snapshot in snapshots:
             checked=checks.trial_report(snapshot['stage'],snapshot)
             invalid_rejected=any(item['status']=='failed' and item.get('ok') is False
                                  for item in checked)
             for item in checked:
                 asset=checks.checks[item['check_id']][0]
-                passed=item['status']=='passed'
-                if tag=='answer_invalid':
-                    passed=invalid_rejected and (passed or item.get('ok') is False)
+                if expectation=='must_reject':
+                    passed=invalid_rejected and (item['status']=='passed'
+                                                 or item.get('ok') is False)
+                elif expectation=='structure':
+                    # 结构行（契约占位实例）：冻结容器下可执行＋意见良构即可；
+                    # 语义拒绝合法——占位实例不要求 C 认可（2026-10-05 审查 P1）。
+                    passed=not item.get('error_type')
+                else:
+                    passed=item['status']=='passed'
                 scenarios.append(_row(asset,tag,'passed' if passed else 'failed',
-                    ref=f'{case.id}:{tag}',**{k:v for k,v in item.items()
+                    ref=f'{case.id}:{tag}',expectation=expectation,
+                    **{k:v for k,v in item.items()
                     if k not in ('check_id','fingerprint','stage','status')}))
         atomic_json(report_path,report)
         for entry in replay_inputs:
@@ -270,6 +408,58 @@ def admit_candidate(bundle, training_cases, graph_refs, config, required_caps, r
                                       error_type=type(exc).__name__,error=str(exc),
                                       **observation))
             atomic_json(report_path,report)
+        for row in replay_checks:
+            if row.get('case_id')!=case.id:
+                continue
+            snapshot=row.get('snapshot')
+            if not isinstance(snapshot,dict):
+                continue
+            snapshot_digest=row.get('snapshot_digest') or digest(snapshot)
+            ref=f'{case.id}:{row.get("question_id")}:{str(snapshot_digest)[:12]}'
+            expectation=row.get('expectation','informational')
+            registered={aid for aid,(a,_) in checks.checks.items() if a.stage=='answer'}
+            bound=[aid for aid in row.get('check_ids',()) if aid in registered]
+            opinions=checks.trial_report('answer',snapshot)
+            rejected=any(item.get('ok') is False for item in opinions)
+            if expectation=='must_reject':
+                # 畸形历史输入：任何候选的答案阶段 C 至少一个必须拒（装饰性 C 守门）。
+                scenarios.append(_row(None,'check_replay_reject',
+                    'skipped' if not registered else ('passed' if rejected else 'failed'),
+                    required=bool(registered),ref=ref,expectation=expectation,
+                    reason=row.get('reason',''),check_ids=sorted(bound) or sorted(registered),
+                    source=str(row.get('source',''))))
+            elif expectation=='verified_must_pass':
+                # 具体复现验证过的合法快照：绑定的历史检查资产在候选中必须通过——
+                # 同一资产过准入不等于历史问题修复，修复必须重放不再复现失败签名。
+                if not bound:
+                    scenarios.append(_row(None,'check_replay_verified','incomplete',ref=ref,
+                        expectation=expectation,required=True,
+                        error='Historical check assets not registered: '
+                              +str(sorted(row.get('check_ids',()))),
+                        source=str(row.get('source',''))))
+                else:
+                    for item in opinions:
+                        if item['check_id'] not in bound:
+                            continue
+                        asset=checks.checks[item['check_id']][0]
+                        scenarios.append(_row(asset,'check_replay_verified',
+                            'passed' if item['status']=='passed' else 'failed',ref=ref,
+                            expectation=expectation,verified_by=row.get('reason',''),
+                            **{k:v for k,v in item.items()
+                               if k not in ('check_id','fingerprint','stage','status')}))
+            else:
+                # 类型合法但被拒：只记录回放结果，不做 pass/fail（合法语义拒绝不自动判
+                # bug；归因假设不得覆盖这里的检查事实）。
+                for item in opinions:
+                    if bound and item['check_id'] not in bound:
+                        continue
+                    scenarios.append(_row(checks.checks[item['check_id']][0],
+                        'check_replay_info','passed' if item['status']=='passed' else 'failed',
+                        required=False,ref=ref,expectation=expectation,
+                        historical_issues=row.get('issues',()),
+                        **{k:v for k,v in item.items()
+                           if k not in ('check_id','fingerprint','stage','status')}))
+            atomic_json(report_path,report)
         composable={}
         for aid,(asset,_) in sorted(registry.functions.items()):
             if remote_vector_error and 'semantic_search' in asset.content:
@@ -301,6 +491,10 @@ def admit_candidate(bundle, training_cases, graph_refs, config, required_caps, r
             if static_errors:
                 scenarios.append(_row(asset,'loop_carried','failed',ref=case.id,
                                       error='; '.join(static_errors)))
+            else:
+                # 通过也落行：场景行集完整，verified_fix 的「最初失败场景复现通过」
+                # 绑定才能机器判定（2026-10-05 审查 P2）。
+                scenarios.append(_row(asset,'loop_carried','passed',ref=case.id))
             required=[('base',plain(v)) for v in asset.trial_inputs]
             generated=list(_samples(asset,graph))
             counts['base']=len(required)
@@ -322,12 +516,13 @@ def admit_candidate(bundle, training_cases, graph_refs, config, required_caps, r
             if 'relative_date' in asset.content:
                 expected_tags.add('relative_date_object')
             if 'traverse' in asset.content:
+                _,direction_keys,fixed_directions,_=_traversal_shape(asset)
+                enabled=_traversal_directions(asset)
                 for direction in ('in','out'):
                     tag=f'high_degree_{direction}'
-                    if direction=='in' and not any(
-                            'direction' in base for base in asset.trial_inputs):
+                    if direction not in enabled:
                         scenarios.append(_row(asset,tag,'skipped',required=False,
-                            ref=case.id,reason='Input contract has no direction parameter'))
+                            ref=case.id,reason='Traversal code does not expose this direction'))
                         continue
                     degree=(graph.graph.in_degree if direction=='in'
                             else graph.graph.out_degree)
@@ -345,7 +540,11 @@ def admit_candidate(bundle, training_cases, graph_refs, config, required_caps, r
                 ref=f'{case.id}:{tag}:{index}:{digest(params)}'
                 observation={}
                 try:
-                    outcome=registry.call(aid,params,graph,_observation=observation)
+                    trial_graph=_pressure_graph(asset,params,graph,tag)
+                    if trial_graph is not graph:
+                        observation['pressure_kind']='graph_row_order'
+                        observation['pressure_graph_digest']=_graph_identity(trial_graph)
+                    outcome=registry.call(aid,params,trial_graph,_observation=observation)
                     status,error_type,error='passed',None,None
                 except Exception as exc:
                     outcome=None
@@ -371,7 +570,7 @@ def admit_candidate(bundle, training_cases, graph_refs, config, required_caps, r
                 covered['executed']+=1
                 covered['passed']+=status=='passed'
                 scenarios.append(_row(asset,tag,status,ref=ref,error_type=error_type,
-                    error=error,**observation))
+                    error=error,parameters=plain(params),**observation))
                 if outcome is not None:
                     scenarios[-1]['capability_calls']=outcome['capability_calls']
                     scenarios[-1]['read_node_ids']=outcome['read_node_ids']
@@ -379,8 +578,20 @@ def admit_candidate(bundle, training_cases, graph_refs, config, required_caps, r
                     scenarios[-1]['source_ids']=outcome['source_ids']
                     if tag=='base':
                         base_records.append(outcome)
-                    if status=='passed' and _returned_rows(outcome['data']):
+                    if status=='passed' and trial_graph is graph and _returned_rows(outcome['data']):
                         composable.setdefault(aid,(outcome,_returned_rows(outcome['data'])))
+            # Some legal selectors return no relation hits. They are discovery trials,
+            # not execution failures. Require an actually covered pressure path per
+            # direction across the legal selectors; never waive runtime failures.
+            for tag in sorted(expected_tags):
+                attempts=[r for r in scenarios if r.get('asset_id')==aid
+                          and r.get('scenario_id')==tag
+                          and str(r.get('input_ref','')).startswith(case.id+':')]
+                gaps=[r for r in attempts if r.get('error_type')=='CoverageGap']
+                if any(r['status']=='passed' for r in attempts):
+                    for row in gaps:
+                        row['required']=False
+                        row['reason']='Other legal selector actually exercised this pressure path'
             if counts['executed']<counts['base']+counts['stress_legal']:
                 scenarios.append(_row(asset,'stress_coverage','incomplete',ref=case.id,
                                       error='Not all generated legal samples executed'))
@@ -411,12 +622,21 @@ def admit_candidate(bundle, training_cases, graph_refs, config, required_caps, r
                 q=case.questions[0]
                 evidence=[r for r in rows if r.get('node_id') in source['node_ids']]
                 if evidence:
-                    snapshot=synthetic_answer_snapshot(evidence,q.text,plain(q.parameters))
+                    snapshot=synthetic_answer_snapshot(evidence,q.text,plain(q.parameters),
+                                                       answer_contract=answer_contract)
+                    # 契约占位实例（非 string 根类型）在 function_check 同样只做
+                    # 结构判定：可执行＋意见良构；语义拒绝合法（2026-10-05 审查 P1）。
+                    from collections.abc import Mapping as _Map
+                    _root=((answer_contract or {}).get('type')
+                           if isinstance(answer_contract,_Map) else None)
+                    _structure=_root not in (None,'string','any')
                     for item in checks.trial_report('answer',snapshot):
                         asset=checks.checks[item['check_id']][0]
                         combinations+=1
+                        passed=not item.get('error_type') if _structure \
+                            else item['status']=='passed'
                         scenarios.append(_row(asset,'function_check','passed'
-                            if item['status']=='passed' else 'failed',
+                            if passed else 'failed',
                             ref=f'{case.id}:{source_id}->{asset.id}:{digest(snapshot)}',
                             source_asset_id=source_id,
                             **{k:v for k,v in item.items()

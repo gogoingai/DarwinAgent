@@ -1,0 +1,9 @@
+{"stage": "B0", "status": "complete", "asset_version": "e22a335fba6e7304f5433251a86b9a1054f56750a1bd0a3fa301824fc4ecc465", "elapsed_s": 60.07}
+{"stage": "R1", "status": "complete", "asset_version": "7988d76ef19036a362a9e15abf652dd898c71aef2c17a0b3b9f60ecbf43b6add", "elapsed_s": 85.21}
+{"stage": "R1", "accepted": true, "reasons": ["primary_strictly_improved"]}
+{"stage": "R2", "case": "conv-26", "fault_retry": {"questions": 1, "recovered": 0, "still_faulted": ["39"], "skipped_retry": "deterministic_tool_error", "sample_errors": ["ProtocolError: Feedback retries exhausted without a publishable candidate"]}}
+{"stage": "R2", "status": "failed", "asset_version": "ce06770e1df6387db4c766c5f56049ec5d470637f2babdeaf3c511a91873ec4a", "elapsed_s": 62.99}
+{"stage": "R2", "accepted": false, "reasons": ["incomplete_evaluation", "more_generation_faults", "primary_not_strictly_improved", "metric_decreased:original_lenient", "metric_decreased:original_precise", "metric_decreased:repaired_lenient"]}
+{"stage": "R3", "status": "complete", "asset_version": "77e5c1be4974ac34d83ac6f09eef79a35bafd10e61114208c61d35652381bdea", "elapsed_s": 91.92}
+{"stage": "R3", "accepted": false, "reasons": ["primary_not_strictly_improved"]}
+failed
