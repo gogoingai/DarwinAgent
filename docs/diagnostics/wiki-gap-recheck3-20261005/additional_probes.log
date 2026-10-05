@@ -1,0 +1,235 @@
+{
+  "positive": {
+    "example": "legal_plan",
+    "official_evaluation": {
+      "n": 1,
+      "final_cnt": 0,
+      "macro_cs_cnt": 0,
+      "per_query": [
+        {
+          "idx": 0,
+          "delivered": true,
+          "cs": {
+            "is_valid_information_in_current_city": false,
+            "is_valid_information_in_sandbox": false,
+            "is_reasonable_visiting_city": true,
+            "is_valid_restaurants": true,
+            "is_valid_transportation": true,
+            "is_valid_attractions": true,
+            "is_valid_accommodation": true,
+            "is_not_absent": false
+          },
+          "hc": {},
+          "cs_msg": {
+            "is_valid_information_in_current_city": "The accommodation in day 1 is invalid city choice.",
+            "is_valid_information_in_sandbox": "The accommodation in day 1 is invalid in the sandbox.",
+            "is_not_absent": "No attaction in day 1 is not allowed."
+          },
+          "hc_msg": {},
+          "error": null,
+          "hard_not_run_reason": "gated",
+          "hc_denominator": 1,
+          "macro_cs": false,
+          "macro_hc": false,
+          "final": false
+        }
+      ]
+    },
+    "strengthened_C_admission": "failed",
+    "rejected_positive_rows": [
+      {
+        "asset_id": "c_answer_shape",
+        "asset_fingerprint": "1377d4e31450f8813220fe6c45225ca0602786a81d92528fe437a504bab8539c",
+        "scenario_id": "answer_ex_legal_plan",
+        "input_ref": "train:0:answer_ex_legal_plan",
+        "required": true,
+        "status": "failed",
+        "expectation": "must_pass",
+        "ok": false,
+        "issues": [
+          "Meals must be present on non-transit days",
+          "Meals must be present on non-transit days",
+          "Meals must be present on non-transit days"
+        ],
+        "steps_used": 874,
+        "step_budget": 30000,
+        "elapsed_ms": 0.5
+      }
+    ],
+    "cross_case_binding": {
+      "next_case": "train:1",
+      "parameters": {
+        "org": "Kansas City",
+        "dest": "Pensacola",
+        "days": 3,
+        "people_number": 1,
+        "local_constraint": {
+          "house rule": null,
+          "cuisine": null,
+          "room type": null,
+          "transportation": null
+        },
+        "budget": 900,
+        "visiting_city_number": 1,
+        "date": [
+          "2022-03-27",
+          "2022-03-28",
+          "2022-03-29"
+        ]
+      },
+      "example_cities": [
+        "Rockford",
+        "Rockford",
+        "Rockford"
+      ]
+    }
+  },
+  "binding": {
+    "old_ref": "train:0:stress:0:3320bdd2d325b999efdc40189b4d0306caa9e69f59deedfdf14f8cad34c6fb1d",
+    "new_ref": "train:0:stress:1:61923601f4a178aaa7163909c9aa7ab9858c3ca545b1ad6cd2d2e11ffff22b2a",
+    "different_stress_input_marked_verified": true,
+    "lessons": [
+      {
+        "id": "e60931518fe4fa173bc7986bc436778ed3490cfc5dd19b1fbd4310152226b5f9",
+        "pattern": "f_flight_pair:stress:ValueError:tool.result.outbound: expected object",
+        "stage": "R1",
+        "status": "admission_verified",
+        "confidence": "hypothesis",
+        "evidence_ids": [
+          "old"
+        ],
+        "origin": {
+          "input_ref": "train:0:stress:0:3320bdd2d325b999efdc40189b4d0306caa9e69f59deedfdf14f8cad34c6fb1d",
+          "error_type": "ValueError",
+          "error": "tool.result.outbound: expected object",
+          "issues": []
+        },
+        "cause": null,
+        "action": null,
+        "occurrences": 1,
+        "last_stage": "R1",
+        "verification_event": "new",
+        "validation_scope": "admission",
+        "verified_asset_fingerprint": "new-fingerprint",
+        "verified_fix": {
+          "id": "f_flight_pair",
+          "kind": "F",
+          "input_contract": {
+            "type": "object",
+            "required": [
+              "org",
+              "dest"
+            ],
+            "properties": {
+              "org": {
+                "type": "string",
+                "description": "Origin city name."
+              },
+              "dest": {
+                "type": "string",
+                "description": "Destination city name."
+              },
+              "date_from": {
+                "type": "string",
+                "description": "Optional exact ISO date filter for the outbound leg; empty string means unconstrained."
+              },
+              "date_to": {
+                "type": "string",
+                "description": "Optional exact ISO date filter for the return leg; empty string means unconstrained."
+              }
+            },
+            "additionalProperties": false
+          },
+          "output_contract": {
+            "type": "object",
+            "required": [
+              "outbound",
+              "inbound",
+              "outbound_candidates_scanned",
+              "inbound_candidates_scanned"
+            ],
+            "properties": {
+              "outbound": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "inbound": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "outbound_candidates_scanned": {
+                "type": "integer"
+              },
+              "inbound_candidates_scanned": {
+                "type": "integer"
+              }
+            }
+          },
+          "trial_inputs": [
+            {
+              "org": "St. Petersburg",
+              "dest": "Rockford",
+              "date_from": "2022-03-16",
+              "date_to": "2022-03-18"
+            },
+            {
+              "org": "Rockford",
+              "dest": "St. Petersburg",
+              "date_from": "",
+              "date_to": ""
+            }
+          ],
+          "content": "def run(params):\n    org = params.get('org')\n    dest = params.get('dest')\n    date_from = params.get('date_from')\n    date_to = params.get('date_to')\n    outbound = nodes(entity_type='flight', filters={'origin_city': org, 'dest_city': dest}, limit=5000)\n    inbound = nodes(entity_type='flight', filters={'origin_city': dest, 'dest_city': org}, limit=5000)\n    ob = None\n    for r in outbound:\n        if date_from is not None and date_from != '' and r.get('flight_date') != date_from:\n            continue\n        if ob is None or (r.get('price') or 0.0) < (ob.get('price') or 0.0):\n            ob = r\n    ib = None\n    for r in inbound:\n        if date_to is not None and date_to != '' and r.get('flight_date') != date_to:\n            continue\n        if ib is None or (r.get('price') or 0.0) < (ib.get('price') or 0.0):\n            ib = r\n    out = {'outbound': None, 'inbound': None, 'outbound_candidates_scanned': len(outbound), 'inbound_candidates_scanned': len(inbound)}\n    if ob is not None:\n        out['outbound'] = {'node_id': ob.get('node_id'), 'entity_type': 'flight', 'source_ids': list(ob.get('source_ids', ())), 'flight_number': ob.get('flight_number'), 'price': ob.get('price'), 'dep_time': ob.get('dep_time'), 'arr_time': ob.get('arr_time'), 'flight_date': ob.get('flight_date'), 'origin_city': ob.get('origin_city'), 'dest_city': ob.get('dest_city')}\n    if ib is not None:\n        out['inbound'] = {'node_id': ib.get('node_id'), 'entity_type': 'flight', 'source_ids': list(ib.get('source_ids', ())), 'flight_number': ib.get('flight_number'), 'price': ib.get('price'), 'dep_time': ib.get('dep_time'), 'arr_time': ib.get('arr_time'), 'flight_date': ib.get('flight_date'), 'origin_city': ib.get('origin_city'), 'dest_city': ib.get('dest_city')}\n    return out",
+          "content_truncated": false
+        }
+      }
+    ]
+  },
+  "compression": {
+    "budget": 5000,
+    "result_chars": 4314,
+    "original_candidate_event": {
+      "stage": "candidate",
+      "checks": [
+        {
+          "check_id": "c_answer_shape",
+          "fingerprint": "155c976a03660bba391b98dcc998112fdf57e00489597e68d78c9dcf4894c0f7",
+          "steps_used": 51,
+          "step_budget": 30000,
+          "elapsed_ms": 0.5,
+          "ok": false,
+          "issues": [
+            "answer is not an array"
+          ]
+        }
+      ],
+      "candidate_summary": {
+        "status": "answered",
+        "answer": "[{\"days\":1,\"current_city\":\"Rockford\",\"transportation\":\"Flight F3573659 from St. Petersburg to Rockford, Dep 15:40 Arr 17:04, Price: $474\",\"breakfast\":\"\",\"lunch\":\"\",\"dinner\":\"Flying Mango, Cuisine: American, BBQ, Seafood, Cost: 20, Rating: 4.5\",\"attraction\":\"\",\"accommodation\":\"Private Room in a two bedroom apt., Room Type: Private room, Price: $210 per night, Rating: 4.0\"},{\"days\":2,\"current_city\":\"Rockford\",\"transportation\":\"\",\"breakfast\":\"Subway, Cuisine: Bakery, Pizza, BBQ, Desserts, Cost: 26, Rating: 3.8\",\"lunch\":\"Grappa - Shangri-La's - Eros Hotel, Cuisine: Bakery, Desserts, Italian, Cost: 21, Rating: 3.4\",\"dinner\":\"Coco Bambu, Cuisine: Tea, French, Bakery, BBQ, Cafe, Cost: 72, Rating: 4.9\",\"attraction\":\"Anderson Japanese Gardens, 318 Spring Creek Rd; Burpee Museum of Natural History, 737 N Main St; Discovery Center Museum, 711 N Main St\",\"accommodation\":\"Private Room in a two bedroom apt., Room Type: Private room, Price: $210 per night, Rating: 4.0\"},{\"days\":3,\"current_city\":\"Rockford\",\"transportation\":\"\",\"breakfast\":\"Dunkin' Donuts, Cuisine: Cafe, Bakery, BBQ, Seafood, Cost: 24, Rating: 0.0\",\"lunch\":\"Nutri Punch, Cuisine: Tea, Chinese, Cafe, Desserts, Cost: 34, Rating: 4.0\",\"dinner\":\"Cafe Southall, Cuisine: Seafood, Pizza, Cafe, Fast Food, Cost: 56, Rating: 4.2\",\"attraction\":\"Nicholas Conservatory & Gardens, 1354 N 2nd St; Sinnissippi Park, 1401 N 2nd St; Tinker Swiss Cottage Museum and Gardens, 411 Kent St\",\"accommodation\":\"\"}]",
+        "answer_truncated": false,
+        "json_type": "list",
+        "node_ids": [
+          "n000062",
+          "n000049",
+          "n000022",
+          "n000044",
+          "n000041",
+          "n000021",
+          "n000043",
+          "n000027",
+          "n000028",
+          "n000004",
+          "n000000",
+          "n000002"
+        ]
+      }
+    },
+    "compressed_trace": [
+      {
+        "stage": "candidate"
+      }
+    ],
+    "nested_checks_preserved": false,
+    "nested_json_type_preserved": false
+  }
+}

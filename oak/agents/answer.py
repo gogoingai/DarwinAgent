@@ -86,6 +86,18 @@ class AnswerAgent:
                 trace.append({'stage':'candidate','attempt':attempt,'candidate':candidate,'checks':opinions})
                 failures=[x for x in opinions if not x['ok']]
                 if failures:
+                    # C 失败候选的检查快照原地留存（可验证经验回放原料，2026-10-05 Travel
+                    # 冻结容器误判事故）：输入与判定事实原样进检查点，供后续候选准入回放；
+                    # visible_evidence 行数封顶防爆轨迹，整体超限则只留截断标记。
+                    saved=plain(snapshot)
+                    if len(saved.get('visible_evidence') or ())>60:
+                        saved['visible_evidence']=list(saved['visible_evidence'][:60])
+                        saved['visible_evidence_truncated']=True
+                    import json as _json
+                    if len(_json.dumps(saved,ensure_ascii=False,default=str))<=200000:
+                        trace[-1]['check_snapshot']=saved
+                    else:
+                        trace[-1]['check_snapshot_truncated']=True
                     feedback.append({'candidate':candidate,'task_checks':failures})
                     continue
                 relevant=set(candidate['node_ids']) if candidate['status']=='answered' else visible

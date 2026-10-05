@@ -1,0 +1,64 @@
+{
+  "checked_at": "2026-10-05T18:32:54+08:00",
+  "purpose": "read-only review; no active code or experiment mutations",
+  "invalid_days_plan": {
+    "plan": [
+      {
+        "days": 1,
+        "current_city": "Rockford",
+        "transportation": "",
+        "breakfast": "",
+        "lunch": "",
+        "dinner": "",
+        "attraction": "",
+        "accommodation": ""
+      },
+      {
+        "days": 1,
+        "current_city": "Rockford",
+        "transportation": "",
+        "breakfast": "",
+        "lunch": "",
+        "dinner": "",
+        "attraction": "",
+        "accommodation": ""
+      }
+    ],
+    "old_C": {
+      "ok": false,
+      "issues": [
+        "days sequence 1,1 is not 1..N"
+      ]
+    },
+    "passed_candidate_C": {
+      "ok": true,
+      "issues": []
+    }
+  },
+  "verified_fix_without_replay": {
+    "id": "5cb0004437fcd3776a9fc70512bb8b68bcd324a5bf22fba91ac683f31984665f",
+    "pattern": "c:answer_0:CandidateCheckRejected:valid array rejected",
+    "stage": "R1",
+    "status": "admission_verified",
+    "confidence": "hypothesis",
+    "evidence_ids": [
+      "old-failure"
+    ],
+    "cause": null,
+    "action": null,
+    "occurrences": 1,
+    "last_stage": "R1",
+    "verification_event": "unrelated-pass",
+    "validation_scope": "admission",
+    "verified_asset_fingerprint": "new",
+    "verified_fix": {
+      "id": "c",
+      "kind": "C",
+      "input_contract": null,
+      "output_contract": null,
+      "trial_inputs": null,
+      "content": "diagnostic placeholder",
+      "content_truncated": false
+    }
+  }
+}

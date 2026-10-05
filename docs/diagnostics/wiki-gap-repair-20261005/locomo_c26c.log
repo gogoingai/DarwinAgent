@@ -1,0 +1,8 @@
+{"stage": "B0", "status": "complete", "asset_version": "8f040766d7e36a0903ed8e622006cb738a3d3768b00d027cd017bd07ae3a4270", "elapsed_s": 88.1}
+{"stage": "R1", "status": "complete", "asset_version": "4c04476bf9c02616b8ff65d69cbead7d9e4bb6de1bec518770c28fb1c06480bf", "elapsed_s": 74.9}
+{"stage": "R1", "accepted": false, "reasons": ["primary_not_strictly_improved"]}
+{"stage": "R2", "status": "complete", "asset_version": "36737e260839262f0896c8127c971bc54c4b3b2b787a614cf222d2819861ab58", "elapsed_s": 88.77}
+{"stage": "R2", "accepted": false, "reasons": ["primary_not_strictly_improved"]}
+{"stage": "R3", "status": "complete", "asset_version": "1b7e7965163d64af9a535e9b4d92708201e1508732fd6b24043c2a5ec4cb79dd", "elapsed_s": 108.28}
+{"stage": "R3", "accepted": false, "reasons": ["primary_not_strictly_improved", "metric_decreased:original_lenient", "metric_decreased:original_precise", "metric_decreased:repaired_lenient"]}
+complete

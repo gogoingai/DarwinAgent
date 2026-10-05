@@ -15,6 +15,7 @@ MODEL_ROLES: dict[str, str] = {
     # tools＝中间档 MiniMax（用户拍板：留现位最优）；fast＝DeepSeek 备援，暂无固定角色
     "extraction": "middle", "tools": "middle", "answer": "strong", "review": "strong",
     "bootstrap": "strong", "proposal": "strong",
+    "wiki_maintainer": "strong",
     "schema": "strong",      # P1 需求分析 / P2 模式草拟
     "func_gen": "strong",    # P4 函数生成（含能力规划）
     "judicator": "strong",   # P6 评判器

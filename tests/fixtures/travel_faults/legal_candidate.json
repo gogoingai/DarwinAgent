@@ -1,0 +1,16 @@
+{
+ "status": "answered",
+ "answer": "[{\"days\":1,\"current_city\":\"Rockford\",\"transportation\":\"Flight F3573659 from St. Petersburg to Rockford\",\"breakfast\":\"\",\"lunch\":\"\",\"dinner\":\"\",\"attraction\":\"\",\"accommodation\":\"Private Room in a two bedroom apt.\"},{\"days\":2,\"current_city\":\"Rockford\",\"transportation\":\"\",\"breakfast\":\"\",\"lunch\":\"\",\"dinner\":\"\",\"attraction\":\"Burpee Museum of Natural History, Discovery Center Museum, Anderson Japanese Gardens\",\"accommodation\":\"Private Room in a two bedroom apt.\"},{\"days\":3,\"current_city\":\"Rockford\",\"transportation\":\"Flight F3573120 from Rockford to St. Petersburg\",\"breakfast\":\"\",\"lunch\":\"\",\"dinner\":\"\",\"attraction\":\"Nicholas Conservatory & Gardens, Tinker Swiss Cottage Museum and Gardens\",\"accommodation\":\"\"}]",
+ "node_ids": [
+  "n000048",
+  "n000060",
+  "n000061",
+  "n000000",
+  "n000002",
+  "n000004",
+  "n000005",
+  "n000003",
+  "n000062",
+  "n000063"
+ ]
+}

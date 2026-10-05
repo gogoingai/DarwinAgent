@@ -13,12 +13,30 @@ import os
 import sys
 
 
+def _ensure_gradio_stub() -> None:
+    """官方 utils/func.py 顶层 import gradio（仅 UI 校验用 gr.Error；评测路径只用
+    三个纯字符串 helper）。无 gradio 环境注入最小 stub，不触碰 third_party、不改判分。
+    （2026-10-05 loop3 B0 评测故障：ModuleNotFoundError gradio。）"""
+    import importlib.util
+    import types
+    if importlib.util.find_spec("gradio") is not None:
+        return
+    stub = types.ModuleType("gradio")
+
+    class Error(Exception):
+        pass
+
+    stub.Error = Error
+    sys.modules["gradio"] = stub
+
+
 def main() -> None:
     in_path, out_path = sys.argv[1], sys.argv[2]
     # cwd=evaluation（adapter 保证）；把 cwd 与上级加入 sys.path：
     # 前者为了 commonsense_constraint/hard_constraint，后者为了 tools/utils
     sys.path.insert(0, os.getcwd())
     sys.path.insert(1, os.path.abspath(".."))
+    _ensure_gradio_stub()
     from commonsense_constraint import evaluation as commonsense_eval
     from hard_constraint import evaluation as hard_eval
 

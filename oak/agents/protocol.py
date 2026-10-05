@@ -1,6 +1,7 @@
 """Fixed model protocol, budget accounting, parsing and bounded format feedback."""
 from __future__ import annotations
 
+import inspect
 import json
 
 
@@ -48,6 +49,8 @@ class ModelSession:
                 raw=response.content
                 self.raw.append(raw)
                 value=validator(parse_json(raw))
+                if inspect.isawaitable(value):  # 异步校验器（如动态图真图试跑）与同步等价
+                    value=await value
                 self.events.append({'role':role,'attempt':attempt,'status':'ok'})
                 return value
             except (ValueError, json.JSONDecodeError) as exc:

@@ -1,0 +1,120 @@
+{
+  "positive": {
+    "verdict": "failed",
+    "positive_rows": [
+      {
+        "asset_id": "c_answer_shape",
+        "asset_fingerprint": "1377d4e31450f8813220fe6c45225ca0602786a81d92528fe437a504bab8539c",
+        "scenario_id": "answer_ex_two_day_consistent",
+        "input_ref": "train:0:answer_ex_two_day_consistent",
+        "required": true,
+        "status": "failed",
+        "expectation": "must_pass",
+        "ok": false,
+        "issues": [
+          "Meals must be present on non-transit days"
+        ],
+        "steps_used": 608,
+        "step_budget": 30000,
+        "elapsed_ms": 0.4
+      }
+    ]
+  },
+  "cross_case_same_parameters_verified": true,
+  "lessons": [
+    {
+      "id": "e60931518fe4fa173bc7986bc436778ed3490cfc5dd19b1fbd4310152226b5f9",
+      "pattern": "f_flight_pair:stress:ValueError:tool.result.outbound: expected object",
+      "stage": "R1",
+      "status": "admission_verified",
+      "confidence": "hypothesis",
+      "evidence_ids": [
+        "old"
+      ],
+      "origin": {
+        "input_ref": "case-old:stress:0:3320bdd2d325b999efdc40189b4d0306caa9e69f59deedfdf14f8cad34c6fb1d",
+        "error_type": "ValueError",
+        "error": "tool.result.outbound: expected object",
+        "issues": []
+      },
+      "cause": null,
+      "action": null,
+      "occurrences": 1,
+      "last_stage": "R1",
+      "verification_event": "new",
+      "validation_scope": "admission",
+      "verified_asset_fingerprint": "new-fingerprint",
+      "verified_fix": {
+        "id": "f_flight_pair",
+        "kind": "F",
+        "input_contract": {
+          "type": "object",
+          "required": [
+            "org",
+            "dest"
+          ],
+          "properties": {
+            "org": {
+              "type": "string",
+              "description": "Origin city name."
+            },
+            "dest": {
+              "type": "string",
+              "description": "Destination city name."
+            },
+            "date_from": {
+              "type": "string",
+              "description": "Optional exact ISO date filter for the outbound leg; empty string means unconstrained."
+            },
+            "date_to": {
+              "type": "string",
+              "description": "Optional exact ISO date filter for the return leg; empty string means unconstrained."
+            }
+          },
+          "additionalProperties": false
+        },
+        "output_contract": {
+          "type": "object",
+          "required": [
+            "outbound",
+            "inbound",
+            "outbound_candidates_scanned",
+            "inbound_candidates_scanned"
+          ],
+          "properties": {
+            "outbound": {
+              "type": "object",
+              "additionalProperties": true
+            },
+            "inbound": {
+              "type": "object",
+              "additionalProperties": true
+            },
+            "outbound_candidates_scanned": {
+              "type": "integer"
+            },
+            "inbound_candidates_scanned": {
+              "type": "integer"
+            }
+          }
+        },
+        "trial_inputs": [
+          {
+            "org": "St. Petersburg",
+            "dest": "Rockford",
+            "date_from": "2022-03-16",
+            "date_to": "2022-03-18"
+          },
+          {
+            "org": "Rockford",
+            "dest": "St. Petersburg",
+            "date_from": "",
+            "date_to": ""
+          }
+        ],
+        "content": "def run(params):\n    org = params.get('org')\n    dest = params.get('dest')\n    date_from = params.get('date_from')\n    date_to = params.get('date_to')\n    outbound = nodes(entity_type='flight', filters={'origin_city': org, 'dest_city': dest}, limit=5000)\n    inbound = nodes(entity_type='flight', filters={'origin_city': dest, 'dest_city': org}, limit=5000)\n    ob = None\n    for r in outbound:\n        if date_from is not None and date_from != '' and r.get('flight_date') != date_from:\n            continue\n        if ob is None or (r.get('price') or 0.0) < (ob.get('price') or 0.0):\n            ob = r\n    ib = None\n    for r in inbound:\n        if date_to is not None and date_to != '' and r.get('flight_date') != date_to:\n            continue\n        if ib is None or (r.get('price') or 0.0) < (ib.get('price') or 0.0):\n            ib = r\n    out = {'outbound': None, 'inbound': None, 'outbound_candidates_scanned': len(outbound), 'inbound_candidates_scanned': len(inbound)}\n    if ob is not None:\n        out['outbound'] = {'node_id': ob.get('node_id'), 'entity_type': 'flight', 'source_ids': list(ob.get('source_ids', ())), 'flight_number': ob.get('flight_number'), 'price': ob.get('price'), 'dep_time': ob.get('dep_time'), 'arr_time': ob.get('arr_time'), 'flight_date': ob.get('flight_date'), 'origin_city': ob.get('origin_city'), 'dest_city': ob.get('dest_city')}\n    if ib is not None:\n        out['inbound'] = {'node_id': ib.get('node_id'), 'entity_type': 'flight', 'source_ids': list(ib.get('source_ids', ())), 'flight_number': ib.get('flight_number'), 'price': ib.get('price'), 'dep_time': ib.get('dep_time'), 'arr_time': ib.get('arr_time'), 'flight_date': ib.get('flight_date'), 'origin_city': ib.get('origin_city'), 'dest_city': ib.get('dest_city')}\n    return out",
+        "content_truncated": false
+      }
+    }
+  ]
+}

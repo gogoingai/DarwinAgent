@@ -1,0 +1,31 @@
+{
+  "source": "datasets/travelplanner/runs/wiki_gap_repair_20261005_loop6/train/R1/optimization/attempt-0/admission.json",
+  "original_row": {
+    "asset_id": "c_answer_structure",
+    "asset_fingerprint": "956a15d0fb7e862b1c336192cfafc3b34fd8e823d0085549effe77d7bd832ab2",
+    "scenario_id": "answer_2",
+    "input_ref": "train:0:answer_2",
+    "required": true,
+    "status": "failed",
+    "expectation": "must_pass",
+    "ok": false,
+    "issues": [
+      "structured_answer is missing or not parseable JSON"
+    ],
+    "steps_used": 23,
+    "step_budget": 30000,
+    "elapsed_ms": 0.1
+  },
+  "brief_row": {
+    "asset_id": "c_answer_structure",
+    "asset_fingerprint": "956a15d0fb7e862b1c336192cfafc3b34fd8e823d0085549effe77d7bd832ab2",
+    "scenario_id": "answer_2",
+    "status": "failed",
+    "error": null,
+    "input_ref": "train:0:answer_2",
+    "parameters": null,
+    "steps_used": 23,
+    "capability_calls": null,
+    "traverse_observations": null
+  }
+}

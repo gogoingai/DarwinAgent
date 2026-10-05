@@ -1,0 +1,15 @@
+......................s..........s.{"stage": "B0", "case": "c", "fault_retry": {"questions": 2, "retried": 2, "recovered": 2, "still_faulted": [], "elapsed_s": 0.0, "skipped_deterministic": 0}}
+{"stage": "B0", "status": "complete", "asset_version": "v", "elapsed_s": 0.0}
+..{"stage": "B0", "case": "c", "fault_retry": {"questions": 1, "recovered": 0, "still_faulted": ["q1"], "skipped_retry": "graph_stage_failure", "graph_error": "SandboxError: budget"}}
+............................................./Users/xu/.local/share/uv/python/cpython-3.11.15-macos-aarch64-none/lib/python3.11/tempfile.py:934: ResourceWarning: Implicitly cleaning up <TemporaryDirectory '/var/folders/00/bl7b9mxn6gj30hr_flxt6hq40000gn/T/tmpkb16p9up'>
+  _warnings.warn(warn_message, ResourceWarning)
+.....................{"stage": "B0", "status": "complete", "asset_version": "593cddfb893d7c9f45127f4da6fa4058c411556c74cc5786a8c1cb2be3609dbc", "elapsed_s": 0.03}
+............................................................{"stage": "R1", "case": "trial", "fault_retry": {"questions": 2, "retried": 1, "recovered": 1, "still_faulted": ["q2"], "elapsed_s": 0.0, "skipped_deterministic": 1}}
+{"stage": "R1", "status": "failed", "asset_version": "version", "elapsed_s": 0.0}
+.{"stage": "R1", "case": "trial", "fault_retry": {"questions": 1, "recovered": 0, "still_faulted": ["q1"], "skipped_retry": "already_reserved_or_deterministic"}}
+{"stage": "R1", "status": "complete", "asset_version": "version", "elapsed_s": 0.0}
+.......................................................................................................................
+----------------------------------------------------------------------
+Ran 283 tests in 17.415s
+
+OK (skipped=2)

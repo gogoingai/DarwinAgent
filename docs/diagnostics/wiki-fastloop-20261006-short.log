@@ -1,0 +1,5 @@
+{"stage": "B0", "status": "complete", "asset_version": "2993fcc6f4321a6183e4b96f78781a16f371fe7ac21466fef04296c636235596", "elapsed_s": 85.66}
+{"stage": "B0-val", "status": "complete", "asset_version": "2993fcc6f4321a6183e4b96f78781a16f371fe7ac21466fef04296c636235596", "elapsed_s": 80.16}
+{"stage": "R1", "status": "complete", "asset_version": "3d24370e43e2daab885d2203f21bc14328950296882fd5a18ffe8a6b73a7ec75", "elapsed_s": 118.35}
+{"stage": "R1", "accepted": false, "reasons": ["primary_not_strictly_improved", "metric_decreased:original_lenient", "metric_decreased:original_precise", "metric_decreased:repaired_lenient"]}
+complete

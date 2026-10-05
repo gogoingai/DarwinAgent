@@ -47,13 +47,31 @@ def carried_acceptor(root, identity, framework):
 
 
 class Pipeline:
-    def __init__(self,client,work_dir,frozen_snapshot=None,embedder_factory=None):
+    def __init__(self,client,work_dir,frozen_snapshot=None,embedder_factory=None,graph_builder=None):
         # frozen_snapshot: 共享冻结记忆快照目录（graph/facts/vector＋manifest）。注入时
         # 抽取与构图全部跳过——图是指纹校验的冻结输入数据，臂间唯一差异是资产。
         # embedder_factory: 查询嵌入端点注入（默认读 EMBEDDING_* 环境变量）。
+        # graph_builder（新模式，recheck4）：frozen_snapshot 仍冻结记忆/向量，但图由
+        # builder(snapshot_dir, schema, embedder_factory) 按当前 S 从固定事实确定性
+        # 重建（零模型调用）——「冻结记忆/向量、图可重建」。builder 由任务/适配层
+        # 注入（core 不感知事实行格式）；旧模式（None）行为逐字节不变。
         self.client,self.work_dir=client,Path(work_dir)
         self.frozen_snapshot=Path(frozen_snapshot) if frozen_snapshot is not None else None
         self.embedder_factory=embedder_factory
+        self.graph_builder=graph_builder
+
+    def _graph_mode_identity(self):
+        """运行身份中的图模式标记：rebuild 模式与同输入的 frozen 运行不得共享身份
+        （图派生规则不同＝不同实验）；builder 源码摘要进身份（投影规则实现变化
+        ⇒ 身份变化 ⇒ 旧检查点不可搬运）。旧模式返回空（身份逐字节不变）。"""
+        if self.graph_builder is None:
+            return {}
+        import inspect
+        try:
+            source=inspect.getsource(self.graph_builder)
+        except (OSError,TypeError):
+            source=repr(self.graph_builder)
+        return {'graph_mode':'rebuild','graph_builder':digest(source)}
 
     async def run(self,case,spec,config: RunConfig):
         if not isinstance(config,RunConfig) or spec.bundle is None:
@@ -66,7 +84,8 @@ class Pipeline:
         snapshot_identity=snapshot_manifest(self.frozen_snapshot) if self.frozen_snapshot is not None else None
         identity=digest({'case':case.to_dict(),'task':spec.declaration(),'config':config.to_dict(),
                          'assets':runtime.bundle.version,'framework':framework,'transport':transport,
-                         'snapshot':None if snapshot_identity is None else snapshot_identity['snapshot_digest']})
+                         'snapshot':None if snapshot_identity is None else snapshot_identity['snapshot_digest'],
+                         **self._graph_mode_identity()})
         root=self.work_dir/case.id
         root.mkdir(parents=True,exist_ok=True)
         carried_ok=carried_acceptor(root,identity,framework)
@@ -139,7 +158,16 @@ class Pipeline:
                 attach_vector(graph,self.frozen_snapshot,embedder_factory=self.embedder_factory)
         else:
             try:
-                if self.frozen_snapshot is not None:
+                if self.graph_builder is not None and self.frozen_snapshot is not None:
+                    # 新模式：图＝按当前 S 从固定事实重建（builder 负责 rebuild＋出处落
+                    # 真实证据块＋挂冻结向量＋命中映射校验，返回已包 GraphResult）；
+                    # 记忆/向量仍取快照。sources 在此接 case 语料（builder 无 case 上下文
+                    # 时兜底）。质量门与冻结路径同构：F 试跑＋反例探针＋任务图 C。
+                    graph=self.graph_builder(self.frozen_snapshot,runtime.schema,
+                                             corpus,self.embedder_factory)
+                    if not dict(getattr(graph,'sources',{}) or {}):
+                        object.__setattr__(graph,'sources',MappingProxyType(corpus))
+                elif self.frozen_snapshot is not None:
                     # 冻结快照图：指纹校验的输入数据。质量门＝F 试跑（真图实参）＋反例探针＋
                     # 任务图 C；类型重查/claims/锚定不变量不适用（词汇由 bootstrap 依结构样本生成）。
                     from oak.experiments.snapshots import attach_vector, load_frozen_graph
@@ -157,10 +185,11 @@ class Pipeline:
                 trials=runtime.functions.trial(graph,{a.id:list(a.trial_inputs) for a in runtime.bundle.assets.assets if a.kind=='F'})
                 atomic_json(root/'function-trials.json',trials)
                 from oak.kernel.counterexamples import run_probes
-                if self.frozen_snapshot is not None and runtime.bundle.assets.origin.get('kind')=='cold_bootstrap':
+                if runtime.bundle.assets.origin.get('kind')=='cold_bootstrap':
                     # 冷启动 bundle 由无标签结构样本生成，无训练名接触面：字面量准入＋真图试跑已覆盖；
                     # 改名探针对生成式检索 F 的截断/惯用法敏感，误伤多于收益——提案轮（proposal
-                    # origin）恢复全量探针。
+                    # origin）恢复全量探针。动态图任务（无冻结快照，2026-10-05 loop5 B0 冒烟
+                    # 被 cold_bootstrap 探针全灭拦下）与冻结快照路径同规则。
                     atomic_json(root/'counterexamples.json',{'probe':'renamed_keys_shifted_dates',
                         'status':'skipped','reason':'cold_bootstrap: literal admission + real-graph trials cover name independence; probes resume on proposals'})
                 else:

@@ -1,0 +1,559 @@
+{
+  "main": {
+    "root": "/Users/xu/git/oak/.cache/worktrees/wiki-experience-phase-one/datasets/locomo/runs/wiki_fixed_10q_10r_20261005_05/train",
+    "status": "failed",
+    "stability": {
+      "admission_submitted": 15,
+      "admission_passed": 11,
+      "admission_pass_rate": 0.7333333333333333,
+      "smoke_passed": 11,
+      "admission_elapsed_s": 7.203,
+      "smoke_elapsed_s": 762.142,
+      "formal_execution_faults": 1,
+      "formal_elapsed_s": 861.76,
+      "retry_elapsed_s": 0,
+      "retry_reserved": 0,
+      "retry_same_class_failures": 0
+    },
+    "stages": [
+      {
+        "stage": "B0",
+        "scores": {
+          "metrics": {
+            "original_lenient": 9,
+            "original_precise": 8,
+            "repaired_lenient": 9,
+            "repaired_precise": 8
+          },
+          "total": 10,
+          "completed": 10,
+          "generation_faults": 0,
+          "evaluation_faults": 0
+        },
+        "accepted": null,
+        "reasons": null,
+        "attempts": 0,
+        "elapsed_s": 70.73
+      },
+      {
+        "stage": "R1",
+        "scores": {
+          "metrics": {
+            "original_lenient": 9,
+            "original_precise": 8,
+            "repaired_lenient": 9,
+            "repaired_precise": 8
+          },
+          "total": 10,
+          "completed": 10,
+          "generation_faults": 0,
+          "evaluation_faults": 0
+        },
+        "accepted": false,
+        "reasons": [
+          "primary_not_strictly_improved"
+        ],
+        "attempts": 1,
+        "elapsed_s": 55.01
+      },
+      {
+        "stage": "R2",
+        "scores": {
+          "metrics": {
+            "original_lenient": 8,
+            "original_precise": 7,
+            "repaired_lenient": 8,
+            "repaired_precise": 7
+          },
+          "total": 10,
+          "completed": 10,
+          "generation_faults": 0,
+          "evaluation_faults": 0
+        },
+        "accepted": false,
+        "reasons": [
+          "primary_not_strictly_improved",
+          "metric_decreased:original_lenient",
+          "metric_decreased:original_precise",
+          "metric_decreased:repaired_lenient"
+        ],
+        "attempts": 6,
+        "elapsed_s": 49.43
+      },
+      {
+        "stage": "R3",
+        "scores": {
+          "metrics": {
+            "original_lenient": 7,
+            "original_precise": 7,
+            "repaired_lenient": 7,
+            "repaired_precise": 7
+          },
+          "total": 10,
+          "completed": 10,
+          "generation_faults": 0,
+          "evaluation_faults": 0
+        },
+        "accepted": false,
+        "reasons": [
+          "primary_not_strictly_improved",
+          "metric_decreased:original_lenient",
+          "metric_decreased:original_precise",
+          "metric_decreased:repaired_lenient"
+        ],
+        "attempts": 1,
+        "elapsed_s": 62.77
+      },
+      {
+        "stage": "R4",
+        "scores": {
+          "metrics": {
+            "original_lenient": 8,
+            "original_precise": 7,
+            "repaired_lenient": 8,
+            "repaired_precise": 7
+          },
+          "total": 10,
+          "completed": 9,
+          "generation_faults": 1,
+          "evaluation_faults": 0
+        },
+        "accepted": false,
+        "reasons": [
+          "incomplete_evaluation",
+          "more_generation_faults",
+          "primary_not_strictly_improved",
+          "metric_decreased:original_lenient",
+          "metric_decreased:original_precise",
+          "metric_decreased:repaired_lenient"
+        ],
+        "attempts": 1,
+        "elapsed_s": 78.8
+      },
+      {
+        "stage": "R5",
+        "scores": {
+          "metrics": {
+            "original_lenient": 9,
+            "original_precise": 9,
+            "repaired_lenient": 9,
+            "repaired_precise": 9
+          },
+          "total": 10,
+          "completed": 10,
+          "generation_faults": 0,
+          "evaluation_faults": 0
+        },
+        "accepted": true,
+        "reasons": [
+          "primary_strictly_improved"
+        ],
+        "attempts": 2,
+        "elapsed_s": 67.6
+      },
+      {
+        "stage": "R6",
+        "scores": {
+          "metrics": {
+            "original_lenient": 8,
+            "original_precise": 8,
+            "repaired_lenient": 8,
+            "repaired_precise": 8
+          },
+          "total": 10,
+          "completed": 10,
+          "generation_faults": 0,
+          "evaluation_faults": 0
+        },
+        "accepted": false,
+        "reasons": [
+          "primary_not_strictly_improved",
+          "metric_decreased:original_lenient",
+          "metric_decreased:original_precise",
+          "metric_decreased:repaired_lenient"
+        ],
+        "attempts": 1,
+        "elapsed_s": 78.32
+      },
+      {
+        "stage": "R7",
+        "scores": {
+          "metrics": {
+            "original_lenient": 8,
+            "original_precise": 7,
+            "repaired_lenient": 8,
+            "repaired_precise": 7
+          },
+          "total": 10,
+          "completed": 10,
+          "generation_faults": 0,
+          "evaluation_faults": 0
+        },
+        "accepted": false,
+        "reasons": [
+          "primary_not_strictly_improved",
+          "metric_decreased:original_lenient",
+          "metric_decreased:original_precise",
+          "metric_decreased:repaired_lenient"
+        ],
+        "attempts": 1,
+        "elapsed_s": 134.67
+      },
+      {
+        "stage": "R8",
+        "scores": {
+          "metrics": {
+            "original_lenient": 8,
+            "original_precise": 8,
+            "repaired_lenient": 8,
+            "repaired_precise": 8
+          },
+          "total": 10,
+          "completed": 10,
+          "generation_faults": 0,
+          "evaluation_faults": 0
+        },
+        "accepted": false,
+        "reasons": [
+          "primary_not_strictly_improved",
+          "metric_decreased:original_lenient",
+          "metric_decreased:original_precise",
+          "metric_decreased:repaired_lenient"
+        ],
+        "attempts": 1,
+        "elapsed_s": 87.77
+      },
+      {
+        "stage": "R9",
+        "scores": {
+          "metrics": {
+            "original_lenient": 9,
+            "original_precise": 8,
+            "repaired_lenient": 9,
+            "repaired_precise": 8
+          },
+          "total": 10,
+          "completed": 10,
+          "generation_faults": 0,
+          "evaluation_faults": 0
+        },
+        "accepted": false,
+        "reasons": [
+          "primary_not_strictly_improved",
+          "metric_decreased:original_precise"
+        ],
+        "attempts": 1,
+        "elapsed_s": 70.3
+      },
+      {
+        "stage": "R10",
+        "scores": {
+          "metrics": {
+            "original_lenient": 8,
+            "original_precise": 8,
+            "repaired_lenient": 8,
+            "repaired_precise": 8
+          },
+          "total": 10,
+          "completed": 10,
+          "generation_faults": 0,
+          "evaluation_faults": 0
+        },
+        "accepted": false,
+        "reasons": [
+          "primary_not_strictly_improved",
+          "metric_decreased:original_lenient",
+          "metric_decreased:original_precise",
+          "metric_decreased:repaired_lenient"
+        ],
+        "attempts": 1,
+        "elapsed_s": 106.36
+      }
+    ],
+    "adopted_version": "2c3832cae9a03e1353c325c68dfc6b349b41087604fdb4097b1b1e67c939aec6",
+    "adopted_scores": {
+      "metrics": {
+        "original_lenient": 9,
+        "original_precise": 9,
+        "repaired_lenient": 9,
+        "repaired_precise": 9
+      },
+      "total": 10,
+      "completed": 10,
+      "generation_faults": 0,
+      "evaluation_faults": 0
+    },
+    "wiki_version": 58,
+    "entries": 42,
+    "lessons": 22,
+    "calls_by_role": {
+      "tools": 823,
+      "answer": 214,
+      "review": 211,
+      "locomo_judge": 59,
+      "wiki_maintainer": 16,
+      "proposal": 16
+    },
+    "total_calls": 1339,
+    "prompt_tokens": 15434866,
+    "completion_tokens": 249231,
+    "repeated_runtime_patterns": [
+      {
+        "pattern": "f_relation_expand_facts:high_degree_in:CoverageGap:high_degree_in did not traverse any matching relation edge",
+        "occurrences": 2,
+        "status": "admission_verified",
+        "validation_scope": "smoke"
+      },
+      {
+        "pattern": "f_relation_expand_facts:loop_carried:None:能力调用 traverse 在循环体内（逐行调用）——批量化：一次调用传全量 id/条件",
+        "occurrences": 3,
+        "status": "admission_verified",
+        "validation_scope": "smoke"
+      }
+    ]
+  },
+  "multi": {
+    "root": "/Users/xu/git/oak/.cache/worktrees/wiki-experience-phase-one/datasets/locomo/runs/wiki_multiconv_2q_2r_20261005_smoke6/train",
+    "status": "complete",
+    "stability": {
+      "admission_submitted": 3,
+      "admission_passed": 3,
+      "admission_pass_rate": 1.0,
+      "smoke_passed": 3,
+      "admission_elapsed_s": 4.984,
+      "smoke_elapsed_s": 778.027,
+      "formal_execution_faults": 0,
+      "formal_elapsed_s": 214.19,
+      "retry_elapsed_s": 0,
+      "retry_reserved": 0,
+      "retry_same_class_failures": 0
+    },
+    "stages": [
+      {
+        "stage": "B0",
+        "scores": {
+          "metrics": {
+            "original_lenient": 4,
+            "original_precise": 3
+          },
+          "total": 6,
+          "completed": 6,
+          "generation_faults": 0,
+          "evaluation_faults": 0
+        },
+        "accepted": null,
+        "reasons": null,
+        "attempts": 0,
+        "elapsed_s": 2.26
+      },
+      {
+        "stage": "R1",
+        "scores": {
+          "metrics": {
+            "original_lenient": 6,
+            "original_precise": 5
+          },
+          "total": 6,
+          "completed": 6,
+          "generation_faults": 0,
+          "evaluation_faults": 0
+        },
+        "accepted": true,
+        "reasons": [
+          "primary_strictly_improved"
+        ],
+        "attempts": 1,
+        "elapsed_s": 95.83
+      },
+      {
+        "stage": "R2",
+        "scores": {
+          "metrics": {
+            "original_lenient": 5,
+            "original_precise": 5
+          },
+          "total": 6,
+          "completed": 6,
+          "generation_faults": 0,
+          "evaluation_faults": 0
+        },
+        "accepted": false,
+        "reasons": [
+          "primary_not_strictly_improved",
+          "metric_decreased:original_lenient"
+        ],
+        "attempts": 1,
+        "elapsed_s": 116.1
+      }
+    ],
+    "adopted_version": "854a9795847fde47cde641fb1cc7c3e80c1dbf2f60d1de6293121e73b84aa507",
+    "adopted_scores": {
+      "metrics": {
+        "original_lenient": 6,
+        "original_precise": 5
+      },
+      "total": 6,
+      "completed": 6,
+      "generation_faults": 0,
+      "evaluation_faults": 0
+    },
+    "wiki_version": 16,
+    "entries": 13,
+    "lessons": 13,
+    "calls_by_role": {
+      "tools": 265,
+      "answer": 77,
+      "review": 76,
+      "locomo_judge": 24,
+      "wiki_maintainer": 3,
+      "proposal": 2
+    },
+    "total_calls": 447,
+    "prompt_tokens": 7283252,
+    "completion_tokens": 72435,
+    "repeated_runtime_patterns": [
+      {
+        "pattern": "f_relation_expand:high_degree_in:CoverageGap:high_degree_in did not traverse any matching relation edge",
+        "occurrences": 2,
+        "status": "unresolved",
+        "validation_scope": null
+      },
+      {
+        "pattern": "f_relation_expand:high_degree_out:CoverageGap:high_degree_out did not traverse any matching relation edge",
+        "occurrences": 2,
+        "status": "unresolved",
+        "validation_scope": null
+      }
+    ]
+  },
+  "travel_evalfix": {
+    "root": "/Users/xu/git/oak/.cache/worktrees/wiki-experience-phase-one/datasets/travelplanner/runs/wiki_loop_compat_20261005_case0_evalfix/train",
+    "status": "failed",
+    "stages": [
+      {
+        "stage": "B0",
+        "scores": {
+          "metrics": {
+            "final": 0,
+            "macro_cs": 0,
+            "macro_hc": 0,
+            "delivered": 0
+          },
+          "total": 1,
+          "completed": 1,
+          "generation_faults": 1,
+          "evaluation_faults": 0
+        },
+        "answer_error": "ProtocolError: Feedback retries exhausted without a publishable candidate",
+        "check_issues": [
+          [
+            "answer is not an array"
+          ],
+          [
+            "answer is not an array"
+          ],
+          [
+            "answer is not an array"
+          ]
+        ]
+      },
+      {
+        "stage": "R1",
+        "scores": {
+          "metrics": {
+            "final": 0,
+            "macro_cs": 0,
+            "macro_hc": 0,
+            "delivered": 0
+          },
+          "total": 1,
+          "completed": 1,
+          "generation_faults": 1,
+          "evaluation_faults": 0
+        },
+        "answer_error": "ValueError: tool.result.inbound: expected object",
+        "check_issues": []
+      }
+    ],
+    "stability": {
+      "admission_submitted": 0,
+      "admission_passed": 0,
+      "admission_pass_rate": null,
+      "smoke_passed": 0,
+      "admission_elapsed_s": 0,
+      "smoke_elapsed_s": 0,
+      "formal_execution_faults": 2,
+      "formal_elapsed_s": 164.37,
+      "retry_elapsed_s": 0,
+      "retry_reserved": 0,
+      "retry_same_class_failures": 0
+    },
+    "wiki_entries": 6,
+    "wiki_version": 8
+  },
+  "travel_runtimecontract": {
+    "root": "/Users/xu/git/oak/.cache/worktrees/wiki-experience-phase-one/datasets/travelplanner/runs/wiki_loop_compat_20261005_case0_runtimecontract/train",
+    "status": "failed",
+    "stages": [
+      {
+        "stage": "B0",
+        "scores": {
+          "metrics": {
+            "final": 0,
+            "macro_cs": 0,
+            "macro_hc": 0,
+            "delivered": 0
+          },
+          "total": 1,
+          "completed": 1,
+          "generation_faults": 1,
+          "evaluation_faults": 0
+        },
+        "answer_error": "ValueError: tool.result.outbound: expected object",
+        "check_issues": []
+      },
+      {
+        "stage": "R1",
+        "scores": {
+          "metrics": {
+            "final": 0,
+            "macro_cs": 0,
+            "macro_hc": 0,
+            "delivered": 0
+          },
+          "total": 1,
+          "completed": 1,
+          "generation_faults": 1,
+          "evaluation_faults": 0
+        },
+        "answer_error": "ProtocolError: Feedback retries exhausted without a publishable candidate",
+        "check_issues": [
+          [
+            "answer is not an array"
+          ],
+          [
+            "answer is not an array"
+          ],
+          [
+            "answer is not an array"
+          ]
+        ]
+      }
+    ],
+    "stability": {
+      "admission_submitted": 0,
+      "admission_passed": 0,
+      "admission_pass_rate": null,
+      "smoke_passed": 0,
+      "admission_elapsed_s": 0,
+      "smoke_elapsed_s": 0,
+      "formal_execution_faults": 2,
+      "formal_elapsed_s": 177.17,
+      "retry_elapsed_s": 0,
+      "retry_reserved": 0,
+      "retry_same_class_failures": 0
+    },
+    "wiki_entries": 6,
+    "wiki_version": 8
+  }
+}

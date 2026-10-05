@@ -1,0 +1,37 @@
+Traceback (most recent call last):
+  File "/Users/xu/git/oak/.cache/worktrees/wiki-experience-phase-one/docs/diagnostics/wiki-gap-repair-20261005/travel_loop1.py", line 44, in <module>
+    asyncio.run(main())
+  File "/Users/xu/.local/share/uv/python/cpython-3.11.15-macos-aarch64-none/lib/python3.11/asyncio/runners.py", line 190, in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "/Users/xu/.local/share/uv/python/cpython-3.11.15-macos-aarch64-none/lib/python3.11/asyncio/runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/xu/.local/share/uv/python/cpython-3.11.15-macos-aarch64-none/lib/python3.11/asyncio/base_events.py", line 654, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/Users/xu/git/oak/.cache/worktrees/wiki-experience-phase-one/docs/diagnostics/wiki-gap-repair-20261005/travel_loop1.py", line 35, in main
+    summary = await runner.run('train:0', spec, rounds=2, scope=('S', 'F', 'C', 'P'))
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/xu/git/oak/.cache/worktrees/wiki-experience-phase-one/oak/experiments/runner.py", line 1415, in run
+    bundle=await AssetBootstrapper().initialize(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/xu/git/oak/.cache/worktrees/wiki-experience-phase-one/oak/experiments/bootstrap.py", line 377, in initialize
+    assets = await session.request(config.bootstrap_role, protocol, payload, valid, max_tokens=14000)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/xu/git/oak/.cache/worktrees/wiki-experience-phase-one/oak/agents/protocol.py", line 53, in request
+    value=await value
+          ^^^^^^^^^^^
+  File "/Users/xu/git/oak/.cache/worktrees/wiki-experience-phase-one/oak/experiments/bootstrap.py", line 353, in valid
+    graphs=await trial_supply(trial_bundle,cases[:1])
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/xu/git/oak/.cache/worktrees/wiki-experience-phase-one/oak/experiments/runner.py", line 1111, in _dynamic_trial_graphs
+    graph=await self._extract_trial_graph(bundle,case)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/xu/git/oak/.cache/worktrees/wiki-experience-phase-one/oak/experiments/runner.py", line 1179, in _extract_trial_graph
+    graph=await ExtractionAgent(runtime,client,self.config,key[:16]).extract_entities(case.corpus)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/xu/git/oak/.cache/worktrees/wiki-experience-phase-one/oak/agents/extraction.py", line 333, in extract_entities
+    if faults: raise ProtocolError('Extraction failed: ' + '; '.join(faults), raw)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+oak.agents.protocol.ProtocolError: Extraction failed: batch 2: ValueError: entities[7].quote: 未注册来源或引文不是 96b276d23b82eeceb513019016fd743d13c0bdf4e8598b2bc97d17390b8aea66 原文逐字子串; batch 4: JSONDecodeError: Expecting property name enclosed in double quotes: line 1 column 5911 (char 5910)

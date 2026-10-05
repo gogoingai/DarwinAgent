@@ -1,0 +1,718 @@
+{
+  "source_hashes_start": {
+    "oak/experiments/wiki.py": "4c72051b88461e3e0b2646cd33001c239fd06e69dafa19dd517b0afe87077f7e",
+    "oak/experiments/admission.py": "73ea97a5e8aa9dc19c0ad824adcffc0ab5cabdc0c2ca4f9f2692610b9beaba19",
+    "oak/experiments/runner.py": "aaedc0a811de6e53924e0d3bd606543ac5f2a779e988c6184d62b20098336a00",
+    "oak/kernel/checks.py": "46a907aaf8fe7efec7c2f633900e4f3d03b36af3a531e962e1466ee1b9eb5371",
+    "tasks/travel_planning/task.yaml": "7645e90179c048c5acc408dd3d992a87be1925e73b5bf27c42e6499fdbe2354a"
+  },
+  "archived_attribution": [
+    {
+      "source": "datasets/travelplanner/runs/wiki_gap_repair_20261005_loop3/train/optimization/events/3d461f31733801cedd029027699c0672c822756ada9db4e1642a597bfb5caabb.json",
+      "stage": "R2",
+      "kind": "formal",
+      "attribution_written": true,
+      "model_calls": 1,
+      "request_chars": 32929,
+      "after_compression": {
+        "facts_chars": 27670,
+        "examples": [
+          {
+            "training_id": 14,
+            "question": 187,
+            "question_parameters": 273,
+            "status": 10,
+            "generated_answer": 1287,
+            "error": 4,
+            "baseline_answer": 223,
+            "score_flags": 2,
+            "trace": 18530,
+            "source_text": 1131,
+            "baseline_answer_truncated": 4,
+            "source_text_total": 1
+          }
+        ]
+      },
+      "failure": null
+    },
+    {
+      "source": "datasets/travelplanner/runs/wiki_gap_repair_20261005_loop3/train/optimization/events/426f85fcf0fc676d70f4f2f2641bccb8c2f2611c73cc2f39becc6f48c5144e24.json",
+      "stage": "B0",
+      "kind": "formal",
+      "attribution_written": false,
+      "model_calls": 0,
+      "request_chars": null,
+      "after_compression": {
+        "facts_chars": 36247,
+        "examples": [
+          {
+            "training_id": 14,
+            "question": 187,
+            "question_parameters": 273,
+            "status": 10,
+            "generated_answer": 1281,
+            "error": 4,
+            "baseline_answer": 4,
+            "score_flags": 2,
+            "trace": 18993,
+            "source_text": 1131,
+            "source_text_total": 1
+          }
+        ]
+      },
+      "failure": {
+        "error": "Maintenance evidence exceeds 35000 characters"
+      }
+    },
+    {
+      "source": "datasets/travelplanner/runs/wiki_gap_repair_20261005_loop3/train/optimization/events/55b4aca796d311d38c54252a590576a06a6095943122c1302da7aa39d1941885.json",
+      "stage": "R1",
+      "kind": "formal",
+      "attribution_written": true,
+      "model_calls": 1,
+      "request_chars": 33343,
+      "after_compression": {
+        "facts_chars": 28084,
+        "examples": [
+          {
+            "training_id": 14,
+            "question": 187,
+            "question_parameters": 273,
+            "status": 10,
+            "generated_answer": 1289,
+            "error": 4,
+            "baseline_answer": 223,
+            "score_flags": 2,
+            "trace": 18942,
+            "source_text": 1131,
+            "baseline_answer_truncated": 4,
+            "source_text_total": 1
+          }
+        ]
+      },
+      "failure": null
+    },
+    {
+      "source": "datasets/travelplanner/runs/wiki_gap_repair_20261005_loop3/train/optimization/events/651ed82c555d504fbe6ab1f9f5871900da21fffb4009126ee5c585f1d84f3926.json",
+      "stage": "R2",
+      "kind": "decision",
+      "attribution_written": true,
+      "model_calls": 1,
+      "request_chars": 33335,
+      "after_compression": {
+        "facts_chars": 28074,
+        "examples": [
+          {
+            "training_id": 14,
+            "question": 187,
+            "question_parameters": 273,
+            "status": 10,
+            "generated_answer": 1287,
+            "error": 4,
+            "baseline_answer": 223,
+            "score_flags": 2,
+            "trace": 18530,
+            "source_text": 1131,
+            "baseline_answer_truncated": 4,
+            "source_text_total": 1
+          }
+        ]
+      },
+      "failure": null
+    },
+    {
+      "source": "datasets/travelplanner/runs/wiki_gap_repair_20261005_loop3/train/optimization/events/960b56022b53e694a61bf344c8da739b9b402ab1bedc18292cdd5b5dc87eb3ff.json",
+      "stage": "R1",
+      "kind": "decision",
+      "attribution_written": true,
+      "model_calls": 1,
+      "request_chars": 33749,
+      "after_compression": {
+        "facts_chars": 28488,
+        "examples": [
+          {
+            "training_id": 14,
+            "question": 187,
+            "question_parameters": 273,
+            "status": 10,
+            "generated_answer": 1289,
+            "error": 4,
+            "baseline_answer": 223,
+            "score_flags": 2,
+            "trace": 18942,
+            "source_text": 1131,
+            "baseline_answer_truncated": 4,
+            "source_text_total": 1
+          }
+        ]
+      },
+      "failure": null
+    }
+  ],
+  "check_admission": [
+    {
+      "candidate": "ideal",
+      "admission_verdict": "passed",
+      "real_candidate_opinions": [
+        {
+          "check_id": "c_answer_shape",
+          "fingerprint": "4f5772d308b882547c02eb4532a66aaf833e0ac69e25873a96345d2f3e08ac94",
+          "steps_used": 716,
+          "step_budget": 30000,
+          "elapsed_ms": 0.8,
+          "ok": true,
+          "issues": []
+        }
+      ],
+      "answer_scenarios": [
+        {
+          "asset_id": "c_answer_shape",
+          "asset_fingerprint": "4f5772d308b882547c02eb4532a66aaf833e0ac69e25873a96345d2f3e08ac94",
+          "scenario_id": "answer_0",
+          "input_ref": "train:0:answer_0",
+          "required": true,
+          "status": "passed",
+          "ok": false,
+          "issues": [
+            "current_city must be non-empty"
+          ],
+          "steps_used": 301,
+          "step_budget": 30000,
+          "elapsed_ms": 0.3
+        },
+        {
+          "asset_id": "c_answer_shape",
+          "asset_fingerprint": "4f5772d308b882547c02eb4532a66aaf833e0ac69e25873a96345d2f3e08ac94",
+          "scenario_id": "answer_1",
+          "input_ref": "train:0:answer_1",
+          "required": true,
+          "status": "passed",
+          "ok": false,
+          "issues": [
+            "current_city must be non-empty"
+          ],
+          "steps_used": 512,
+          "step_budget": 30000,
+          "elapsed_ms": 0.4
+        },
+        {
+          "asset_id": "c_answer_shape",
+          "asset_fingerprint": "4f5772d308b882547c02eb4532a66aaf833e0ac69e25873a96345d2f3e08ac94",
+          "scenario_id": "answer_2",
+          "input_ref": "train:0:answer_2",
+          "required": true,
+          "status": "passed",
+          "ok": true,
+          "issues": [],
+          "steps_used": 18,
+          "step_budget": 30000,
+          "elapsed_ms": 0.1
+        },
+        {
+          "asset_id": "c_answer_shape",
+          "asset_fingerprint": "4f5772d308b882547c02eb4532a66aaf833e0ac69e25873a96345d2f3e08ac94",
+          "scenario_id": "answer_invalid",
+          "input_ref": "train:0:answer_invalid",
+          "required": true,
+          "status": "passed",
+          "ok": false,
+          "issues": [
+            "answer is not an array"
+          ],
+          "steps_used": 59,
+          "step_budget": 30000,
+          "elapsed_ms": 0.1
+        },
+        {
+          "asset_id": "c_answer_shape",
+          "asset_fingerprint": "4f5772d308b882547c02eb4532a66aaf833e0ac69e25873a96345d2f3e08ac94",
+          "scenario_id": "answer_cx_duplicate_days",
+          "input_ref": "train:0:answer_cx_duplicate_days",
+          "required": true,
+          "status": "passed",
+          "ok": false,
+          "issues": [
+            "days sequence must be 1..N"
+          ],
+          "steps_used": 510,
+          "step_budget": 30000,
+          "elapsed_ms": 0.3
+        },
+        {
+          "asset_id": "c_answer_shape",
+          "asset_fingerprint": "4f5772d308b882547c02eb4532a66aaf833e0ac69e25873a96345d2f3e08ac94",
+          "scenario_id": "answer_cx_empty_city",
+          "input_ref": "train:0:answer_cx_empty_city",
+          "required": true,
+          "status": "passed",
+          "ok": false,
+          "issues": [
+            "current_city must be non-empty"
+          ],
+          "steps_used": 301,
+          "step_budget": 30000,
+          "elapsed_ms": 0.2
+        }
+      ]
+    },
+    {
+      "candidate": "container_bug",
+      "admission_verdict": "passed",
+      "real_candidate_opinions": [
+        {
+          "check_id": "c_answer_shape",
+          "fingerprint": "155c976a03660bba391b98dcc998112fdf57e00489597e68d78c9dcf4894c0f7",
+          "steps_used": 51,
+          "step_budget": 30000,
+          "elapsed_ms": 0.5,
+          "ok": false,
+          "issues": [
+            "answer is not an array"
+          ]
+        }
+      ],
+      "answer_scenarios": [
+        {
+          "asset_id": "c_answer_shape",
+          "asset_fingerprint": "155c976a03660bba391b98dcc998112fdf57e00489597e68d78c9dcf4894c0f7",
+          "scenario_id": "answer_0",
+          "input_ref": "train:0:answer_0",
+          "required": true,
+          "status": "passed",
+          "ok": false,
+          "issues": [
+            "answer is not an array"
+          ],
+          "steps_used": 51,
+          "step_budget": 30000,
+          "elapsed_ms": 0.1
+        },
+        {
+          "asset_id": "c_answer_shape",
+          "asset_fingerprint": "155c976a03660bba391b98dcc998112fdf57e00489597e68d78c9dcf4894c0f7",
+          "scenario_id": "answer_1",
+          "input_ref": "train:0:answer_1",
+          "required": true,
+          "status": "passed",
+          "ok": false,
+          "issues": [
+            "answer is not an array"
+          ],
+          "steps_used": 51,
+          "step_budget": 30000,
+          "elapsed_ms": 0.1
+        },
+        {
+          "asset_id": "c_answer_shape",
+          "asset_fingerprint": "155c976a03660bba391b98dcc998112fdf57e00489597e68d78c9dcf4894c0f7",
+          "scenario_id": "answer_2",
+          "input_ref": "train:0:answer_2",
+          "required": true,
+          "status": "passed",
+          "ok": true,
+          "issues": [],
+          "steps_used": 18,
+          "step_budget": 30000,
+          "elapsed_ms": 0.1
+        },
+        {
+          "asset_id": "c_answer_shape",
+          "asset_fingerprint": "155c976a03660bba391b98dcc998112fdf57e00489597e68d78c9dcf4894c0f7",
+          "scenario_id": "answer_invalid",
+          "input_ref": "train:0:answer_invalid",
+          "required": true,
+          "status": "passed",
+          "ok": false,
+          "issues": [
+            "answer is not an array"
+          ],
+          "steps_used": 57,
+          "step_budget": 30000,
+          "elapsed_ms": 0.1
+        },
+        {
+          "asset_id": "c_answer_shape",
+          "asset_fingerprint": "155c976a03660bba391b98dcc998112fdf57e00489597e68d78c9dcf4894c0f7",
+          "scenario_id": "answer_cx_duplicate_days",
+          "input_ref": "train:0:answer_cx_duplicate_days",
+          "required": true,
+          "status": "passed",
+          "ok": false,
+          "issues": [
+            "answer is not an array"
+          ],
+          "steps_used": 51,
+          "step_budget": 30000,
+          "elapsed_ms": 0.1
+        },
+        {
+          "asset_id": "c_answer_shape",
+          "asset_fingerprint": "155c976a03660bba391b98dcc998112fdf57e00489597e68d78c9dcf4894c0f7",
+          "scenario_id": "answer_cx_empty_city",
+          "input_ref": "train:0:answer_cx_empty_city",
+          "required": true,
+          "status": "passed",
+          "ok": false,
+          "issues": [
+            "answer is not an array"
+          ],
+          "steps_used": 51,
+          "step_budget": 30000,
+          "elapsed_ms": 0.1
+        }
+      ]
+    },
+    {
+      "candidate": "always_reject_answered",
+      "admission_verdict": "passed",
+      "real_candidate_opinions": [
+        {
+          "check_id": "c_answer_shape",
+          "fingerprint": "69611dc91aaadc9867820974c31d1f397eaa2c7e77f614fa90965e46a2b4ca7e",
+          "steps_used": 13,
+          "step_budget": 30000,
+          "elapsed_ms": 0.5,
+          "ok": false,
+          "issues": [
+            "reject all answered"
+          ]
+        }
+      ],
+      "answer_scenarios": [
+        {
+          "asset_id": "c_answer_shape",
+          "asset_fingerprint": "69611dc91aaadc9867820974c31d1f397eaa2c7e77f614fa90965e46a2b4ca7e",
+          "scenario_id": "answer_0",
+          "input_ref": "train:0:answer_0",
+          "required": true,
+          "status": "passed",
+          "ok": false,
+          "issues": [
+            "reject all answered"
+          ],
+          "steps_used": 13,
+          "step_budget": 30000,
+          "elapsed_ms": 0.1
+        },
+        {
+          "asset_id": "c_answer_shape",
+          "asset_fingerprint": "69611dc91aaadc9867820974c31d1f397eaa2c7e77f614fa90965e46a2b4ca7e",
+          "scenario_id": "answer_1",
+          "input_ref": "train:0:answer_1",
+          "required": true,
+          "status": "passed",
+          "ok": false,
+          "issues": [
+            "reject all answered"
+          ],
+          "steps_used": 13,
+          "step_budget": 30000,
+          "elapsed_ms": 0.1
+        },
+        {
+          "asset_id": "c_answer_shape",
+          "asset_fingerprint": "69611dc91aaadc9867820974c31d1f397eaa2c7e77f614fa90965e46a2b4ca7e",
+          "scenario_id": "answer_2",
+          "input_ref": "train:0:answer_2",
+          "required": true,
+          "status": "passed",
+          "ok": true,
+          "issues": [],
+          "steps_used": 12,
+          "step_budget": 30000,
+          "elapsed_ms": 0.1
+        },
+        {
+          "asset_id": "c_answer_shape",
+          "asset_fingerprint": "69611dc91aaadc9867820974c31d1f397eaa2c7e77f614fa90965e46a2b4ca7e",
+          "scenario_id": "answer_invalid",
+          "input_ref": "train:0:answer_invalid",
+          "required": true,
+          "status": "passed",
+          "ok": false,
+          "issues": [
+            "reject all answered"
+          ],
+          "steps_used": 13,
+          "step_budget": 30000,
+          "elapsed_ms": 0.0
+        },
+        {
+          "asset_id": "c_answer_shape",
+          "asset_fingerprint": "69611dc91aaadc9867820974c31d1f397eaa2c7e77f614fa90965e46a2b4ca7e",
+          "scenario_id": "answer_cx_duplicate_days",
+          "input_ref": "train:0:answer_cx_duplicate_days",
+          "required": true,
+          "status": "passed",
+          "ok": false,
+          "issues": [
+            "reject all answered"
+          ],
+          "steps_used": 13,
+          "step_budget": 30000,
+          "elapsed_ms": 0.1
+        },
+        {
+          "asset_id": "c_answer_shape",
+          "asset_fingerprint": "69611dc91aaadc9867820974c31d1f397eaa2c7e77f614fa90965e46a2b4ca7e",
+          "scenario_id": "answer_cx_empty_city",
+          "input_ref": "train:0:answer_cx_empty_city",
+          "required": true,
+          "status": "passed",
+          "ok": false,
+          "issues": [
+            "reject all answered"
+          ],
+          "steps_used": 13,
+          "step_budget": 30000,
+          "elapsed_ms": 0.1
+        }
+      ]
+    }
+  ],
+  "lesson_verification": {
+    "different_input_ref_marked_verified": true,
+    "C_ok_false_marked_verified": true,
+    "actual_admission_row": {
+      "asset_id": "c_answer_shape",
+      "asset_fingerprint": "155c976a03660bba391b98dcc998112fdf57e00489597e68d78c9dcf4894c0f7",
+      "scenario_id": "answer_0",
+      "input_ref": "case-old:answer_0",
+      "required": true,
+      "status": "passed",
+      "ok": false,
+      "issues": [
+        "answer is not an array"
+      ],
+      "steps_used": 51,
+      "step_budget": 30000,
+      "elapsed_ms": 0.1
+    },
+    "different_input_lessons": [
+      {
+        "id": "62b752cc5c086dea6ebd963ec30d517a990419061130485557659f7d528f0cc3",
+        "pattern": "c_answer_shape:answer_0:CandidateCheckRejected:answer is not an array",
+        "stage": "R1",
+        "status": "admission_verified",
+        "confidence": "hypothesis",
+        "evidence_ids": [
+          "old"
+        ],
+        "cause": null,
+        "action": null,
+        "occurrences": 1,
+        "last_stage": "R1",
+        "verification_event": "new",
+        "validation_scope": "admission",
+        "verified_asset_fingerprint": "155c976a03660bba391b98dcc998112fdf57e00489597e68d78c9dcf4894c0f7",
+        "verified_fix": {
+          "id": "c_answer_shape",
+          "kind": "C",
+          "input_contract": {
+            "type": "any"
+          },
+          "output_contract": {
+            "type": "any"
+          },
+          "trial_inputs": [],
+          "content": "def check(candidate):\n    issues = []\n    ans = None\n    if candidate.get('status') == 'abstained':\n        return {'ok': True, 'issues': []}\n    if candidate.get('structured_answer') is not None:\n        ans = candidate.get('structured_answer')\n    elif candidate.get('answer') is not None:\n        ans = candidate.get('answer')\n    status = candidate.get('status')\n    if status is None:\n        issues.append('missing status')\n    if ans is None:\n        if status == 'answered':\n            issues.append('answered status without an answer payload')\n        if not issues:\n            return {'ok': True, 'issues': []}\n        return {'ok': False, 'issues': issues}\n    if not isinstance(ans, list):\n        issues.append('answer is not an array')\n        return {'ok': False, 'issues': issues}\n    required = ['days', 'current_city', 'transportation', 'breakfast', 'lunch', 'dinner', 'attraction', 'accommodation']\n    for i, day in enumerate(ans):\n        if not isinstance(day, dict):\n            day = dict(day)\n        for k in required:\n            if k not in day:\n                issues.append('day ' + str(i) + ' missing field ' + k)\n        d = day.get('days')\n        if isinstance(d, bool) or not isinstance(d, int):\n            issues.append('day ' + str(i) + ' field days is not an integer')\n        for k in ['current_city', 'transportation', 'breakfast', 'lunch', 'dinner', 'attraction', 'accommodation']:\n            v = day.get(k)\n            if v is not None and not isinstance(v, str):\n                issues.append('day ' + str(i) + ' field ' + k + ' is not a string')\n    return {'ok': len(issues) == 0, 'issues': issues}",
+          "content_truncated": false
+        }
+      }
+    ],
+    "still_rejected_lessons": [
+      {
+        "id": "62b752cc5c086dea6ebd963ec30d517a990419061130485557659f7d528f0cc3",
+        "pattern": "c_answer_shape:answer_0:CandidateCheckRejected:answer is not an array",
+        "stage": "R1",
+        "status": "admission_verified",
+        "confidence": "hypothesis",
+        "evidence_ids": [
+          "old"
+        ],
+        "cause": null,
+        "action": null,
+        "occurrences": 1,
+        "last_stage": "R1",
+        "verification_event": "new",
+        "validation_scope": "admission",
+        "verified_asset_fingerprint": "155c976a03660bba391b98dcc998112fdf57e00489597e68d78c9dcf4894c0f7",
+        "verified_fix": {
+          "id": "c_answer_shape",
+          "kind": "C",
+          "input_contract": {
+            "type": "any"
+          },
+          "output_contract": {
+            "type": "any"
+          },
+          "trial_inputs": [],
+          "content": "def check(candidate):\n    issues = []\n    ans = None\n    if candidate.get('status') == 'abstained':\n        return {'ok': True, 'issues': []}\n    if candidate.get('structured_answer') is not None:\n        ans = candidate.get('structured_answer')\n    elif candidate.get('answer') is not None:\n        ans = candidate.get('answer')\n    status = candidate.get('status')\n    if status is None:\n        issues.append('missing status')\n    if ans is None:\n        if status == 'answered':\n            issues.append('answered status without an answer payload')\n        if not issues:\n            return {'ok': True, 'issues': []}\n        return {'ok': False, 'issues': issues}\n    if not isinstance(ans, list):\n        issues.append('answer is not an array')\n        return {'ok': False, 'issues': issues}\n    required = ['days', 'current_city', 'transportation', 'breakfast', 'lunch', 'dinner', 'attraction', 'accommodation']\n    for i, day in enumerate(ans):\n        if not isinstance(day, dict):\n            day = dict(day)\n        for k in required:\n            if k not in day:\n                issues.append('day ' + str(i) + ' missing field ' + k)\n        d = day.get('days')\n        if isinstance(d, bool) or not isinstance(d, int):\n            issues.append('day ' + str(i) + ' field days is not an integer')\n        for k in ['current_city', 'transportation', 'breakfast', 'lunch', 'dinner', 'attraction', 'accommodation']:\n            v = day.get(k)\n            if v is not None and not isinstance(v, str):\n                issues.append('day ' + str(i) + ' field ' + k + ' is not a string')\n    return {'ok': len(issues) == 0, 'issues': issues}",
+          "content_truncated": false
+        }
+      }
+    ]
+  },
+  "numeric_pressure": [
+    {
+      "scenario": "archived_real_failure",
+      "parameters": {
+        "subject": "乔恩",
+        "fact_type": "",
+        "date_prefix": "",
+        "limit": 500
+      },
+      "error": "SandboxError: Restricted execution budget exhausted",
+      "observation": {
+        "steps_used": 30001,
+        "step_budget": 30000,
+        "elapsed_ms": 16.4,
+        "read_operations": 1,
+        "capability_calls": {
+          "nodes": 1
+        },
+        "traverse_observations": [],
+        "traverse_directions": []
+      }
+    },
+    {
+      "scenario": "stress",
+      "parameters": {
+        "subject": "",
+        "fact_type": "",
+        "date_prefix": "",
+        "limit": 20
+      },
+      "error": null,
+      "observation": {
+        "steps_used": 2238,
+        "step_budget": 30000,
+        "elapsed_ms": 1.5,
+        "read_operations": 1,
+        "capability_calls": {
+          "nodes": 1
+        },
+        "traverse_observations": [],
+        "traverse_directions": [],
+        "result_bytes": 8052
+      }
+    },
+    {
+      "scenario": "stress",
+      "parameters": {
+        "subject": "乔恩",
+        "fact_type": "事件",
+        "date_prefix": "",
+        "limit": 500
+      },
+      "error": null,
+      "observation": {
+        "steps_used": 7540,
+        "step_budget": 30000,
+        "elapsed_ms": 4.7,
+        "read_operations": 1,
+        "capability_calls": {
+          "nodes": 1
+        },
+        "traverse_observations": [],
+        "traverse_directions": [],
+        "result_bytes": 26733
+      }
+    },
+    {
+      "scenario": "stress",
+      "parameters": {
+        "subject": "吉娜",
+        "fact_type": "",
+        "date_prefix": "2023-05",
+        "limit": 20
+      },
+      "error": null,
+      "observation": {
+        "steps_used": 284,
+        "step_budget": 30000,
+        "elapsed_ms": 0.6,
+        "read_operations": 1,
+        "capability_calls": {
+          "nodes": 1
+        },
+        "traverse_observations": [],
+        "traverse_directions": [],
+        "result_bytes": 117
+      }
+    },
+    {
+      "scenario": "stress",
+      "parameters": {
+        "subject": "乔恩",
+        "fact_type": "事件",
+        "date_prefix": "",
+        "limit": 20
+      },
+      "error": null,
+      "observation": {
+        "steps_used": 2248,
+        "step_budget": 30000,
+        "elapsed_ms": 1.6,
+        "read_operations": 1,
+        "capability_calls": {
+          "nodes": 1
+        },
+        "traverse_observations": [],
+        "traverse_directions": [],
+        "result_bytes": 8098
+      }
+    },
+    {
+      "scenario": "stress",
+      "parameters": {
+        "subject": "吉娜",
+        "fact_type": "",
+        "date_prefix": "2023-05",
+        "limit": 500
+      },
+      "error": null,
+      "observation": {
+        "steps_used": 6150,
+        "step_budget": 30000,
+        "elapsed_ms": 7.3,
+        "read_operations": 1,
+        "capability_calls": {
+          "nodes": 1
+        },
+        "traverse_observations": [],
+        "traverse_directions": [],
+        "result_bytes": 7800
+      }
+    },
+    {
+      "scenario": "wide_filter",
+      "parameters": {
+        "subject": "",
+        "fact_type": "",
+        "date_prefix": "",
+        "limit": 20
+      },
+      "error": null,
+      "observation": {
+        "steps_used": 2238,
+        "step_budget": 30000,
+        "elapsed_ms": 1.5,
+        "read_operations": 1,
+        "capability_calls": {
+          "nodes": 1
+        },
+        "traverse_observations": [],
+        "traverse_directions": [],
+        "result_bytes": 8052
+      }
+    }
+  ],
+  "source_hashes_end": {
+    "oak/experiments/wiki.py": "4c72051b88461e3e0b2646cd33001c239fd06e69dafa19dd517b0afe87077f7e",
+    "oak/experiments/admission.py": "73ea97a5e8aa9dc19c0ad824adcffc0ab5cabdc0c2ca4f9f2692610b9beaba19",
+    "oak/experiments/runner.py": "aaedc0a811de6e53924e0d3bd606543ac5f2a779e988c6184d62b20098336a00",
+    "oak/kernel/checks.py": "46a907aaf8fe7efec7c2f633900e4f3d03b36af3a531e962e1466ee1b9eb5371",
+    "tasks/travel_planning/task.yaml": "7645e90179c048c5acc408dd3d992a87be1925e73b5bf27c42e6499fdbe2354a"
+  }
+}
