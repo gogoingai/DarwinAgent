@@ -580,7 +580,7 @@ class ExperimentRunner:
                     enforce_rejection(checks.run('answer',
                                     synthetic_invalid_answer_snapshot(sample_question.text)),
                                     '候选预检答案阶段[invalid]')
-                from oak.kernel.validation import loop_carried_capability_errors
+                from oak.experiments.admission_rules import loop_carried_capability_errors
                 for a in exported.assets.assets:
                     if a.kind=='F':
                         errs = loop_carried_capability_errors(a.content)
