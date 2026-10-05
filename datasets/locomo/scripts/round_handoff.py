@@ -115,7 +115,7 @@ def main():
                 subprocess.run(['bash', '-c',
                                 f'nohup {REPO}/datasets/locomo/scripts/supervise_agentic.sh g1 '
                                 f'{st["source_root"]} 6 --scope sfcp --resume >> '
-                                f'{st["source_root"].parent}/supervise_g1.log 2>&1 &'],
+                                f'{Path(st["source_root"]).parent}/supervise_g1.log 2>&1 &'],
                                start_new_session=True)
                 save(state_file, state='failed',
                      fail_reason=f'merge 失败（已复活旧循环继续迭代）: {merge.stderr[-300:]}')
