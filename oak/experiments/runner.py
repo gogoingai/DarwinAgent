@@ -156,8 +156,15 @@ def _retrieval_trace(answer):
         tool_keys.add(call_key)
         tools.append(entry)
     rejections = []
+    tool_errors=[]
     for ev in events:
         stage = ev.get('stage')
+        if stage=='tool_error':
+            tool_errors.append({'tool':ev.get('asset_id'),
+                                'input_ref':ev.get('input_ref'),
+                                'error_type':ev.get('error_type'),
+                                'error':_clip(ev.get('error'),150),
+                                'observation':ev.get('observation')})
         if stage == 'review' and not ev.get('accepted'):
             rejections.append({'by': 'review', 'reason': _clip(ev.get('feedback') or ev.get('reason'), 150)})
         elif stage == 'candidate':
@@ -172,7 +179,8 @@ def _retrieval_trace(answer):
     trace = {'question_id': answer.question_id, 'status': answer.status,
              'tool_calls': len(tools), 'model_calls': len(raw_outputs),
              'returned_rows': returned_rows, 'empty_results': empty_results,
-             'stopped': stopped, 'tools': tools, 'rejections': rejections}
+             'stopped': stopped, 'tools': tools, 'tool_errors':tool_errors[:2],
+             'rejections': rejections}
     if getattr(answer, 'error', None):
         trace['error'] = _clip(answer.error, 150)
     truncated = 0
@@ -277,29 +285,6 @@ def question_identity(case):
     """Composite training identity: same-named questions in different cases stay distinct,
     and '::' inside either id cannot create collisions (length-prefixed encoding)."""
     return [training_id(case.id, q.id) for q in case.questions]
-
-
-async def batched_fault_retry(pipeline, case, spec, config, answers_dir, faulted,
-                              sleep=asyncio.sleep, batch_size=25, lead_s=150.0, gap_s=60.0):
-    """One bounded retry pass for faulted questions: wait out the transient-burst window,
-    then delete their answer checkpoints in small batches and rerun the case (healthy
-    questions checkpoint-reuse at zero cost). The final fault set is recomputed from the
-    LAST complete answer set — never a union of per-batch snapshots: batches not yet retried
-    still carry their stale fault checkpoints, and a union would preserve those pre-retry
-    states as phantom faults (review #4, offline-reproduced)."""
-    await sleep(lead_s)
-    from oak.runtime.artifacts import digest as _digest
-    result = None
-    for start in range(0, len(faulted), batch_size):
-        for a in faulted[start:start + batch_size]:
-            (Path(answers_dir) / f'{_digest(a.question_id)}.json').unlink(missing_ok=True)
-        result = await pipeline.run(case, spec, config)
-        if start + batch_size < len(faulted):
-            await sleep(gap_s)
-    still_faulted = sorted(a.question_id for a in result.answers if a.status == 'execution_error')
-    return result, still_faulted
-
-
 
 
 def _per_case_feedback_facts(root, name, cases):
@@ -512,6 +497,129 @@ def _per_case_feedback_facts(root, name, cases):
 _DETERMINISTIC_ERRORS=frozenset({'SandboxError','ValueError','TypeError','KeyError'})
 
 
+def _retryable_answer(answer):
+    if any(ev.get('stage')=='tool_error' for ev in plain(answer.trace or ())):
+        return False
+    if str(answer.error).split(':',1)[0].strip() in _DETERMINISTIC_ERRORS:
+        return False
+    return str(answer.error).startswith(('TransportExhausted:', 'EmptyCompletion:'))
+
+
+def _retry_journal(path, identity):
+    if path.exists():
+        journal=json.loads(path.read_text())
+        if journal['identity']!=identity:
+            raise ValueError('Retry budget belongs to a different run identity')
+        return journal
+    return {'identity':identity,'questions':{}}
+
+
+def _settle_reservations(path, result, consumed):
+    if not path.exists():
+        return
+    journal=_retry_journal(path,result.identity)
+    for answer in result.answers:
+        previous=journal['questions'].get(answer.question_id)
+        if previous is not None and previous['state']=='reserved':
+            previous.update(state='done',consumed_after=consumed,
+                            recovered_from_reservation=True,
+                            final_error_type=str(answer.error).split(':',1)[0]
+                            if answer.status=='execution_error' else None)
+    atomic_json(path,journal)
+
+
+def _failed_tool_params(results):
+    """Only training failures, with the original executed action when recorded."""
+    entries=[]
+    for result in results or ():
+        for answer in result.answers:
+            if answer.status!='execution_error':
+                continue
+            for event in plain(answer.trace or ()):
+                if event.get('stage')=='tool_error':
+                    entries.append((result.case_id,event['asset_id'],event['parameters']))
+            # Older checkpoints lack tool_error; the final action is usable only
+            # when its asset matches a deterministic tool failure.
+            if not any(e.get('stage')=='tool_error' for e in plain(answer.trace or ())) \
+                    and str(answer.error).startswith(('SandboxError:', 'ValueError:')):
+                for raw in reversed(answer.raw_outputs or ()):
+                    try:
+                        action=json.loads(raw)
+                    except (ValueError,TypeError):
+                        continue
+                    if isinstance(action,dict) and action.get('action')=='call':
+                        entries.append((result.case_id,action.get('asset_id'),
+                                        action.get('parameters')))
+                        break
+    return entries
+
+
+def _prior_failed_tool_params(root):
+    """Replay saved failures from earlier stages, including rejected candidates."""
+    entries=[]
+    seen=set()
+    for path in sorted(Path(root).glob('*/generation/*/answers/*.json')):
+        answer=json.loads(path.read_text()).get('result',{})
+        if answer.get('status')!='execution_error':
+            continue
+        case_id=path.parent.parent.name
+        actions=[(event.get('asset_id'),event.get('parameters'))
+                 for event in answer.get('trace',())
+                 if event.get('stage')=='tool_error']
+        if not actions and str(answer.get('error','')).startswith(
+                ('SandboxError:', 'ValueError:')):
+            for raw in reversed(answer.get('raw_outputs',())):
+                try:
+                    action=json.loads(raw)
+                except (TypeError,ValueError):
+                    continue
+                if isinstance(action,dict) and action.get('action')=='call':
+                    actions=[(action.get('asset_id'),action.get('parameters'))]
+                    break
+        for aid,params in actions:
+            if aid is None or params is None:
+                continue
+            key=(case_id,aid,digest(plain(params)))
+            if key not in seen:
+                seen.add(key)
+                entries.append((case_id,aid,params))
+    return entries
+
+
+def stability_metrics(root):
+    """Summarize only persisted attempts and evaluated stages from this run."""
+    root=Path(root)
+    paths=([root/'B0'/'admission.json']
+           +list(root.glob('R*/.candidate-attempt-*/admission.json'))
+           +list(root.glob('R*/candidate/admission.json')))
+    reports=[json.loads(p.read_text()) for p in paths if p.exists()]
+    stages=[json.loads(p.read_text()) for p in root.glob('*/stage.json')]
+    retry_rows=[]
+    for path in root.glob('*/fault-retry/*.json'):
+        retry_rows.extend(json.loads(path.read_text()).get('questions',{}).values())
+    count=len(reports)
+    passed=sum(r.get('verdict')=='passed' for r in reports)
+    smoke_passed=sum(r.get('verdict')=='passed' and
+                     r.get('smoke',{}).get('status')=='passed' for r in reports)
+    return {'admission_submitted':count,'admission_passed':passed,
+            'admission_pass_rate':passed/count if count else None,
+            'smoke_passed':smoke_passed,
+            'admission_elapsed_s':round(sum(r.get('elapsed_s',0) for r in reports),3),
+            'smoke_elapsed_s':round(sum(r.get('smoke',{}).get('elapsed_s',0)
+                                         for r in reports),3),
+            'formal_execution_faults':sum(
+                s.get('scores',{}).get('generation_faults',0) or 0 for s in stages),
+            'formal_elapsed_s':round(sum(s.get('elapsed_s',0) for s in stages),3),
+            'retry_elapsed_s':round(sum(
+                sum(r.get('elapsed_s',0) for r in s.get('fault_retries',{}).values())
+                for s in stages),3),
+            'retry_reserved':len(retry_rows),
+            'retry_same_class_failures':sum(
+                x.get('final_error_type')==x.get('initial_error_type')
+                for x in retry_rows if x.get('initial_error_type')
+                and 'final_error_type' in x)}
+
+
 ADMISSION_ATTEMPTS=50
 
 
@@ -550,65 +658,56 @@ class ExperimentRunner:
                 health[path.parent.name]=faults
         return health
 
-    def _preflight(self,candidate,spec,sample_question=None):
-        """候选在正式逐题运行前的预检（评审①③）：完整真图上的图阶段 C＋答案阶段 C
-        （合成候选快照）＋能力底线试跑。不合格＝准入错误回灌提案重试；不给「源码有调用
-        但试跑不触发」、超预算或全盘否决的 C 混进 199 题阶段的机会。"""
-        graph=self.bootstrap_trial_graph
-        if graph is None: return
-        import tempfile
-        from oak.kernel.checks import CheckRegistry
-        from oak.kernel.functions import FunctionRegistry
-        from oak.kernel.validation import trial_capability_floor_errors
-        from oak.operators.sandbox import Limits
-        from oak.operators.data import DataCapabilities
-        with tempfile.TemporaryDirectory() as td:
-            exported=candidate.assets.export(Path(td)/'b')
-            limits=Limits(self.config.function_steps,self.config.function_timeout_s,self.config.result_bytes)
-            caps=DataCapabilities(graph)
+    def _preflight(self,candidate,spec,sample_question=None,cases=None,replay_inputs=()):
+        """An identity-bound candidate report, including actual frozen trial inputs."""
+        from types import SimpleNamespace
+        from .admission import admit_candidate
+        if self.snapshot_root is None and self.bootstrap_trial_graph is None:
+            # Legacy dynamic-graph runs execute their actual-data trials in Pipeline.run.
+            return None
+        if cases is None:
+            cases=(SimpleNamespace(id='trial',questions=() if sample_question is None
+                                    else (sample_question,)),)
+        replay_inputs=tuple(replay_inputs)+tuple(_prior_failed_tool_params(self.root))
+        report_path=Path(candidate.root).parent/'admission.json'
+        required=capability_names(getattr(spec,'retrieval_floor',{}) or {})
+        if self.snapshot_root is not None:
+            from .admission_worker import run_isolated
+            from .snapshots import snapshot_digest
             try:
-                from oak.kernel.checks import (enforce_opinions, enforce_rejection,
-                                               synthetic_answer_variants, synthetic_invalid_answer_snapshot)
-                checks=CheckRegistry(exported,limits)
-                all_rows=list(caps.rows.values())
-                enforce_opinions(checks.run('graph',{'nodes':all_rows,'stage':'graph'}),'候选预检')
-                if sample_question is not None:
-                    for variant in synthetic_answer_variants(all_rows,sample_question.text,
-                                                             dict(sample_question.parameters)):
-                        enforce_opinions(checks.run('answer',variant),
-                                         f'候选预检答案阶段[{variant["status"]}]')
-                    enforce_rejection(checks.run('answer',
-                                    synthetic_invalid_answer_snapshot(sample_question.text)),
-                                    '候选预检答案阶段[invalid]')
-                from oak.experiments.admission_rules import loop_carried_capability_errors
-                for a in exported.assets.assets:
-                    if a.kind=='F':
-                        errs = loop_carried_capability_errors(a.content)
-                        if errs:
-                            raise ValueError(f'{a.id}: ' + '; '.join(errs))
-                orig_inputs={a.id:list(a.trial_inputs) for a in exported.assets.assets if a.kind=='F'}
-                f_inputs={k:list(v) for k,v in orig_inputs.items()}
-                for a in exported.assets.assets:
-                    if a.kind=='F':
-                        f_inputs[a.id]+=stress_trial_samples(list(a.trial_inputs),graph)
-                # 电池噪声过滤：合成参数的语义错位（如主体名被替换进 node_id 字段）不作拦截；
-                # F 内部执行缺陷（预算/容器/类型崩）照拦——历史回归两类真实故障的拦截不变。
-                _NOISE=('Unknown graph node', 'not in enum', 'tool.params',
-                        'Invalid traversal', 'Search requires', 'requires')
-                _probe=FunctionRegistry(exported,limits)
-                for aid,plist in f_inputs.items():
-                    for pp in plist:
-                        try:
-                            _probe.call(aid,pp,graph)
-                        except ValueError as exc:
-                            if not any(n in str(exc) for n in _NOISE):
-                                raise
-                records=_probe.trial(graph,orig_inputs)
-            except Exception as exc:   # 含 SandboxError（ValueError 子类）：统一带上下文回灌
-                raise ValueError(f'候选预检失败: {type(exc).__name__}: {exc}') from exc
-            problems=trial_capability_floor_errors(records,
-                capability_names(getattr(spec,'retrieval_floor',{}) or {}))
-            if problems: raise ValueError('候选能力试跑不合格: '+str(problems))
+                snapshot_digests={
+                    c.id:snapshot_digest(self.snapshot_root/c.id) for c in cases}
+            except (OSError,ValueError) as exc:
+                from .admission import AdmissionError
+                report={'schema_version':1,'candidate_version':candidate.version,
+                        'asset_fingerprints':{
+                            a.id:a.fingerprint for a in candidate.assets.assets},
+                        'config_digest':digest(self.config.to_dict()),
+                        'scenarios':[{'asset_id':'bundle','scenario_id':'training_graph',
+                            'status':'incomplete','required':True,'error':str(exc)}],
+                        'verdict':'failed'}
+                atomic_json(report_path,report)
+                raise AdmissionError(report_path,report) from exc
+            request={'bundle_path':str(candidate.root),'bundle_version':candidate.version,
+                     'snapshot_root':str(self.snapshot_root),
+                     'snapshot_digests':snapshot_digests,
+                     'asset_fingerprints':{
+                         a.id:a.fingerprint for a in candidate.assets.assets},
+                     'cases':[c.to_dict() for c in cases],
+                     'config':self.config.to_dict(),'required_caps':sorted(required),
+                     'report_path':str(report_path),
+                     'replay_inputs':plain(replay_inputs)}
+            request_path=report_path.with_name('admission-input.json')
+            atomic_json(request_path,request)
+            if not run_isolated(request_path,report_path,180):
+                from .admission import AdmissionError
+                raise AdmissionError(report_path,json.loads(report_path.read_text()))
+            return json.loads(report_path.read_text())
+        graphs={}
+        for case in cases:
+            graphs[case.id]=self.bootstrap_trial_graph
+        return admit_candidate(candidate,cases,graphs,self.config,
+            required,report_path,replay_inputs=replay_inputs)
 
     def _client(self,stage):
         if self._injected_client is not None:
@@ -619,6 +718,18 @@ class ExperimentRunner:
 
     def verify(self):
         assert_files(self.frozen)
+
+    @staticmethod
+    def _record_smoke(bundle,error,elapsed_s=0):
+        path=Path(bundle.root).parent/'admission.json'
+        if not path.exists():
+            return
+        report=json.loads(path.read_text())
+        report['smoke']={'status':'failed' if error else 'passed',
+                         'error':error,'elapsed_s':round(elapsed_s,3)}
+        if error:
+            report['verdict']='failed'
+        atomic_json(path,report)
 
     async def _stage(self,name,cases,spec):
         """Run every case of the split on the same bundle; aggregate by the frozen sum rule.
@@ -634,6 +745,8 @@ class ExperimentRunner:
                 pipeline=Pipeline(client,stage/'generation',
                                   frozen_snapshot=None if self.snapshot_root is None else self.snapshot_root/case.id)
                 result=await pipeline.run(case,spec,self.config)
+                journal_path=stage/'fault-retry'/f'{case.id}.json'
+                _settle_reservations(journal_path,result,client.ledger_summary())
                 faulted=[a for a in result.answers if a.status=='execution_error']
                 graph_failure=[d for d in (result.graph_diagnostics or ())
                                if isinstance(d,Mapping) and d.get('status')=='execution_error']
@@ -645,8 +758,7 @@ class ExperimentRunner:
                                       'skipped_retry':'graph_stage_failure',
                                       'graph_error':str(graph_failure[0].get('error'))[:200]}
                     print(json.dumps({'stage':name,'case':case.id,'fault_retry':retries[case.id]},ensure_ascii=False),flush=True)
-                elif faulted and all(a.error.split(':',1)[0].strip() in _DETERMINISTIC_ERRORS
-                                     for a in faulted):
+                elif faulted and not any(_retryable_answer(a) for a in faulted):
                     # 确定性工具错误（评审：接口/参数错误重试不会变好）：不整题重检索，
                     # 如实入统计与反馈，由资产修订解决（scope F）。
                     retries[case.id]={'questions':len(faulted),'recovered':0,
@@ -654,16 +766,46 @@ class ExperimentRunner:
                                       'skipped_retry':'deterministic_tool_error',
                                       'sample_errors':[str(a.error)[:150] for a in faulted[:3]]}
                     print(json.dumps({'stage':name,'case':case.id,'fault_retry':retries[case.id]},ensure_ascii=False),flush=True)
-                elif faulted and (name,case.id) not in self._fault_retried:
-                    self._fault_retried.add((name,case.id))
+                elif faulted:
+                    journal=_retry_journal(journal_path,result.identity)
+                    eligible=[]
+                    for answer in faulted:
+                        if not _retryable_answer(answer):
+                            continue
+                        previous=journal['questions'].get(answer.question_id)
+                        if previous is not None:
+                            continue
+                        journal['questions'][answer.question_id]={
+                            'state':'reserved','attempts':1,
+                            'initial_digest':digest(answer.to_dict()),
+                            'initial_error_type':str(answer.error).split(':',1)[0],
+                            'consumed_before':client.ledger_summary()}
+                        eligible.append(answer)
+                        atomic_json(journal_path,journal)
+                    if not eligible:
+                        retries[case.id]={'questions':len(faulted),'recovered':0,
+                                          'still_faulted':sorted(a.question_id for a in faulted),
+                                          'skipped_retry':'already_reserved_or_deterministic'}
+                    else:
                     # 先歇再重试：EmptyCompletion 类故障多为瞬时突发，隔窗后分批小跑；
                     # 统计口径见 batched_fault_retry（末份答案集重算，不做批次并集）。
-                    result,still_faulted=await batched_fault_retry(
-                        pipeline,case,spec,self.config,
-                        stage/'generation'/case.id/'answers',faulted)
-                    retries[case.id]={'questions':len(faulted),
-                                      'recovered':len(faulted)-len(still_faulted),
-                                      'still_faulted':still_faulted}
+                        retry_started=time.monotonic()
+                        result,still_faulted=await batched_fault_retry(
+                            pipeline,case,spec,self.config,
+                            stage/'generation'/case.id/'answers',eligible)
+                        latest={a.question_id:a for a in result.answers}
+                        for answer in eligible:
+                            journal['questions'][answer.question_id].update(
+                                state='done',consumed_after=client.ledger_summary(),
+                                final_error_type=str(latest[answer.question_id].error).split(':',1)[0]
+                                if latest[answer.question_id].status=='execution_error' else None)
+                        atomic_json(journal_path,journal)
+                        retries[case.id]={'questions':len(faulted),
+                                          'retried':len(eligible),
+                                          'recovered':sum(a.question_id not in still_faulted for a in eligible),
+                                          'still_faulted':still_faulted,
+                                          'elapsed_s':round(time.monotonic()-retry_started,3),
+                                          'skipped_deterministic':len(faulted)-len(eligible)}
                     print(json.dumps({'stage':name,'case':case.id,'fault_retry':retries[case.id]},ensure_ascii=False),flush=True)
                 scores_path=stage/'evaluation'/f'{case.id}.json'
                 if case.id in retries:
@@ -693,7 +835,7 @@ class ExperimentRunner:
             return results,aggregated
         finally: await client.aclose()
 
-    async def _smoke_gate(self,cases,spec,questions_per_case=6):
+    async def _smoke_gate(self,cases,spec,questions_per_case=6,candidate=False):
         """B0 全量提交前的冒烟门（用户拍板：先保证能答对，再启动跑；v10 追加：6 题对 2）：
         每训练对话抽前 6 题走完整真实管线＋冻结判题（临时目录、真模型、~5 分钟）。
         过门条件＝执行错误 <2/3、判题完整、至少 2/6 precise 答对；不满足分钟级中止换根
@@ -705,12 +847,35 @@ class ExperimentRunner:
         client=self._client('B0-smoke')
         try:
             for case in cases:
-                sampled=_dc.replace(case,questions=tuple(case.questions[:questions_per_case]))
+                questions=case.questions
+                if candidate:
+                    risk=('时间|日期|哪天|何时|上周|昨天',
+                          '过滤|全部|哪些|多少|类型|主题',
+                          '关系|相关|属于|关联|遍历')
+                    import re
+                    selected=[]
+                    for pattern in risk:
+                        first=next((q for q in questions if q not in selected
+                                    and re.search(pattern,q.text)),None)
+                        if first is not None:
+                            selected.append(first)
+                    selected.extend(q for q in questions if q not in selected)
+                    questions=tuple(selected)
+                sampled=_dc.replace(case,questions=tuple(questions[:questions_per_case]))
                 with tempfile.TemporaryDirectory() as td:
                     pipeline=Pipeline(client,Path(td),
                                       frozen_snapshot=None if self.snapshot_root is None else self.snapshot_root/case.id)
                     result=await pipeline.run(sampled,spec,self.config)
+                    faults=[a for a in result.answers if a.status=='execution_error']
+                    recoverable=[a for a in faults if _retryable_answer(a)]
+                    if candidate and recoverable and len(recoverable)==len(faults):
+                        result,_=await batched_fault_retry(
+                            pipeline,sampled,spec,self.config,
+                            Path(td)/case.id/'answers',recoverable)
                 faults=[a for a in result.answers if a.status=='execution_error']
+                if candidate and faults:
+                    return (f'候选冒烟执行故障 {len(faults)}/{len(result.answers)}: '
+                            + str(faults[0].error)[:200])
                 if len(faults)*3>=len(result.answers)*2:
                     return f'冒烟执行错误达 {len(faults)}/{len(result.answers)}（≥2/3，系统性破绽）: '+str(faults[0].error)[:200]
                 if not any(a.status in ('answered','abstained') for a in result.answers):
@@ -762,11 +927,16 @@ class ExperimentRunner:
                 client=self._client('B0')
                 try: bundle=await AssetBootstrapper().initialize(cases,spec,client,self.config,bundle_path,
                                                                  structure_sample=self.bootstrap_context,
-                                                                 trial_graph=self.bootstrap_trial_graph)
+                                                                 trial_graph=self.bootstrap_trial_graph,
+                                                                 snapshot_root=self.snapshot_root)
                 finally: await client.aclose()
+            if self.snapshot_root is not None or self.bootstrap_trial_graph is not None:
+                self._preflight(bundle,spec,cases[0].questions[0],cases)
             if stage_gate is not None: stage_gate('B0')
             if self.snapshot_root is not None:
+                smoke_started=time.monotonic()
                 smoke_error=await self._smoke_gate(cases,spec.with_bundle(bundle))
+                self._record_smoke(bundle,smoke_error,time.monotonic()-smoke_started)
                 if smoke_error:
                     summary={'status':'blocked_b0','reason':'smoke gate: 3 题全灭（确定性缺陷）',
                              'smoke_error':smoke_error,'rounds':[],'adopted_version':None}
@@ -814,9 +984,13 @@ class ExperimentRunner:
                 if (candidate_path/'manifest.json').exists():
                     candidate=KernelBundle(candidate_path)
                     # 恢复已有候选同样过预检＋冒烟（评审三）：不能仅凭 manifest 存在就跳过验证
-                    self._preflight(candidate,spec,cases[0].questions[0])
+                    self._preflight(candidate,spec,cases[0].questions[0],cases,
+                                    _failed_tool_params(results))
                     if self.snapshot_root is not None:
-                        resume_smoke=await self._smoke_gate(cases,spec.with_bundle(candidate))
+                        smoke_started=time.monotonic()
+                        resume_smoke=await self._smoke_gate(cases,spec.with_bundle(candidate),candidate=True)
+                        self._record_smoke(candidate,resume_smoke,
+                                           time.monotonic()-smoke_started)
                         if resume_smoke: raise ValueError('恢复候选冒烟失败: '+resume_smoke)
                 else:
                     client=self._client(name)
@@ -856,11 +1030,15 @@ class ExperimentRunner:
                                                        allowed_kinds=tuple(scope or ()),
                                                        required_capabilities=required_caps)
                                 staged=KernelBundle(attempt_path/'bundle')
-                                self._preflight(staged,spec,cases[0].questions[0])
+                                self._preflight(staged,spec,cases[0].questions[0],cases,
+                                                _failed_tool_params(results))
                                 if self.snapshot_root is not None:
                                     # 每轮候选同样先冒烟（用户拍板）：坏补丁在 3 题内暴露并
                                     # 回灌重试，不烧 70 分钟全量
-                                    round_smoke=await self._smoke_gate(cases,spec.with_bundle(staged))
+                                    smoke_started=time.monotonic()
+                                    round_smoke=await self._smoke_gate(cases,spec.with_bundle(staged),candidate=True)
+                                    self._record_smoke(staged,round_smoke,
+                                                       time.monotonic()-smoke_started)
                                     if round_smoke: raise ValueError(round_smoke)
                                 candidate_path.parent.mkdir(parents=True,exist_ok=True)
                                 os.replace(attempt_path,candidate_path.parent)
@@ -895,7 +1073,8 @@ class ExperimentRunner:
             summary={'status':'complete' if not unhealthy and all(d.get('status')!='validation_failed' for d in decisions) else 'failed',
                      'unhealthy_stages':unhealthy,
                      'stopped_by_operator':stopped,'rounds':decisions,'adopted_version':adopted.version,
-                     'adopted_scores':baseline.to_dict()}
+                     'adopted_scores':baseline.to_dict(),
+                     'stability':stability_metrics(self.root)}
             atomic_json(self.root/'summary.json',summary)
             return summary
         except Exception as exc:

@@ -40,15 +40,20 @@ class ModelSession:
                 response=await self.client.chat(role=role,messages=messages,
                     temperature=self.config.temperature,max_tokens=max_tokens or self.config.max_tokens,
                     json_mode=True,namespace=self.namespace,use_cache=(attempt==0))
+            except Exception as exc:
+                self.events.append({'role':role,'attempt':attempt,'status':'transport_or_budget_error',
+                                    'error':f'{type(exc).__name__}: {exc}'})
+                raise
+            try:
                 raw=response.content
                 self.raw.append(raw)
                 value=validator(parse_json(raw))
                 self.events.append({'role':role,'attempt':attempt,'status':'ok'})
                 return value
-            except Exception as exc:
+            except (ValueError, json.JSONDecodeError) as exc:
                 if not raw: self.raw.append(raw)
                 last=f'{type(exc).__name__}: {exc}'
-                self.events.append({'role':role,'attempt':attempt,'status':'error','error':last})
+                self.events.append({'role':role,'attempt':attempt,'status':'protocol_error','error':last})
                 messages=messages+[{'role':'assistant','content':raw},
                     {'role':'user','content':'协议或执行校验失败：'+last+'。请按固定协议重新输出完整 JSON。'}]
         raise ProtocolError(last,self.raw)

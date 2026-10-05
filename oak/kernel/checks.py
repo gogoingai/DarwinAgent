@@ -36,6 +36,31 @@ class CheckRegistry:
                              'elapsed_ms':round(1000*(_t.monotonic()-started),1),**result})
         return opinions
 
+    def trial_report(self, stage, snapshot):
+        """Keep independently executable C opinions and failures in one admission report."""
+        rows=[]
+        for aid, (asset, fn) in sorted(self.checks.items()):
+            if asset.stage != stage:
+                continue
+            import time
+            started=time.monotonic()
+            limits=self.budget(snapshot)
+            interp=Interpreter(fn,{},limits)
+            row={'check_id':aid,'fingerprint':asset.fingerprint,'stage':stage}
+            try:
+                result=interp.execute(snapshot)
+                if not isinstance(result,dict) or set(result)!={'ok','issues'} or type(result['ok']) is not bool \
+                        or not isinstance(result['issues'],list) or not all(isinstance(x,str) and x.strip() for x in result['issues']) \
+                        or result['ok'] != (not result['issues']):
+                    raise ValueError('C must return consistent {ok: bool, issues: [nonempty string]}')
+                row.update(result,status='passed' if result['ok'] else 'failed')
+            except Exception as exc:
+                row.update(status='failed',error_type=type(exc).__name__,error=str(exc))
+            row.update(steps_used=interp.steps,step_budget=limits.steps,
+                       elapsed_ms=round(1000*(time.monotonic()-started),1))
+            rows.append(row)
+        return rows
+
 
 def enforce_opinions(opinions, context=''):
     """图阶段 C 的否决必须被采纳（评审二）：任一 ok=False 即拒绝准入，check_id、

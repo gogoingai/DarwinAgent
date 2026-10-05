@@ -187,7 +187,7 @@ def revision_protocol(base, allowed_kinds=()):
 
 class AssetBootstrapper:
     async def initialize(self, cases, spec, client, config, target, seed_schema=None,
-                         structure_sample=None, trial_graph=None):
+                         structure_sample=None, trial_graph=None, snapshot_root=None):
         if isinstance(cases, tuple) and len(cases) == 1:
             cases = cases[0]
         if not isinstance(cases, (list, tuple)):
@@ -265,50 +265,35 @@ class AssetBootstrapper:
                         raise ValueError('meta.atomic_memory_type 必须是快照 node_types 中的既有类型名')
             for a in assets.assets:
                 if a.kind in {'F', 'C'}: admit(a.content, a.kind, [q.text for q in questions])
-            if trial_graph is not None:
-                # 真图实参试跑在 bootstrap 反馈环内完成：契约与实测不符在这里就被定位并
-                # 反馈给模型重生成，而不是等到 B0 阶段炸掉整个 campaign。
+            if trial_graph is not None or snapshot_root is not None:
                 import tempfile
-                from oak.kernel.functions import FunctionRegistry
-                from oak.operators.sandbox import Limits
+                from oak.experiments.admission import AdmissionError, admit_candidate
                 with tempfile.TemporaryDirectory() as trial_dir:
                     trial_bundle = assets.export(Path(trial_dir) / 'trial')
-                    registry = FunctionRegistry(
-                        trial_bundle,
-                        Limits(config.function_steps, config.function_timeout_s, config.result_bytes),
-                        [q.text for q in questions])
-                    f_inputs = {a.id: list(a.trial_inputs) for a in assets.assets if a.kind == 'F'}
-                    from oak.experiments.runner import stress_trial_samples
-                    for a in assets.assets:
-                        if a.kind == 'F':
-                            f_inputs[a.id] += stress_trial_samples(list(a.trial_inputs), trial_graph)
-                    records = registry.trial(trial_graph, f_inputs)
-                    if floor_caps:
-                        # 动态底线：试跑必须真实触发每个必备能力（capability_calls 计数），
-                        # 仅静态出现/未触发都不合规（评审#4）。
-                        from oak.kernel.validation import trial_capability_floor_errors
-                        problems = trial_capability_floor_errors(records, floor_caps)
-                        if problems: raise ValueError('检索底线试跑未触发: ' + str(problems))
-                    # 图阶段 C 在完整真实图上执行（评审①）：预算随图规模伸缩由 CheckRegistry
-                    # 负责；不合格 C 在这里反馈给模型修订，而不是等到正式运行整轮失败。
-                    from oak.kernel.checks import (CheckRegistry, enforce_opinions, enforce_rejection,
-                                   synthetic_answer_variants, synthetic_invalid_answer_snapshot)
-                    graph_checks = CheckRegistry(trial_bundle, Limits(config.function_steps,
-                                                       config.function_timeout_s, config.result_bytes))
-                    graph_caps = __import__('oak.operators.data', fromlist=['DataCapabilities']).DataCapabilities(trial_graph)
-                    all_rows = list(graph_caps.rows.values())
-                    enforce_opinions(graph_checks.run('graph', {'nodes': all_rows,
-                                               'stage': 'graph'}), '冷启动')
-                    # 答案阶段 C 在准入环内对形态电池真实执行（单事实/列举/合规拒答）：
-                    # 结构不兼容或对良好成形答案过严的 C 在这里被反馈修订，
-                    # 而不是 B0 阶段重试耗尽（agentic_v9 31 题事故）。
-                    for variant in synthetic_answer_variants(all_rows, questions[0].text,
-                                                             dict(questions[0].parameters)):
-                        enforce_opinions(graph_checks.run('answer', variant),
-                                         f'冷启动答案阶段[{variant["status"]}]')
-                    enforce_rejection(graph_checks.run('answer',
-                                    synthetic_invalid_answer_snapshot(questions[0].text)),
-                                    '冷启动答案阶段[invalid]')
+                    report_path=Path(trial_dir)/'admission.json'
+                    if snapshot_root is not None:
+                        from oak.experiments.admission_worker import run_isolated
+                        from oak.experiments.snapshots import snapshot_digest
+                        request={'bundle_path':str(trial_bundle.root),
+                                 'bundle_version':trial_bundle.version,
+                                 'asset_fingerprints':{
+                                     a.id:a.fingerprint for a in trial_bundle.assets.assets},
+                                 'snapshot_root':str(snapshot_root),
+                                 'snapshot_digests':{
+                                     c.id:snapshot_digest(Path(snapshot_root)/c.id)
+                                     for c in cases},
+                                 'cases':[c.to_dict() for c in cases],
+                                 'config':config.to_dict(),
+                                 'required_caps':sorted(floor_caps),
+                                 'report_path':str(report_path)}
+                        request_path=Path(trial_dir)/'admission-input.json'
+                        atomic_json(request_path,request)
+                        if not run_isolated(request_path,report_path,180):
+                            import json
+                            raise AdmissionError(report_path,json.loads(report_path.read_text()))
+                    else:
+                        admit_candidate(trial_bundle,cases[:1],{cases[0].id:trial_graph},
+                                        config,floor_caps,report_path)
             return assets
         floor_required = bool(capability_names(getattr(spec, 'retrieval_floor', {}) or {}))
         protocol = ASSET_PROTOCOL if anchored else (

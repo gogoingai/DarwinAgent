@@ -32,6 +32,14 @@ class EmptyCompletion(RuntimeError):
     pass
 
 
+class TransportExhausted(RuntimeError):
+    """A transport failure after the client's existing bounded recovery."""
+
+    def __init__(self, role, cause):
+        super().__init__(f"LLM 调用在传输层恢复耗尽: {role}: {cause!r}")
+        self.role, self.cause_type = role, type(cause).__name__
+
+
 # 关闭深度思考的角色（机械执行类任务无需长思考）；核心推理步骤保留思考。
 # 「哪些角色关思考」是提示工程策略（Config 层）；「怎么关、关不掉怎么办」按模型
 # 走注册表——两个维度正交。
@@ -193,9 +201,7 @@ class LLMClient:
             self._log_retry(namespace, role, attempt, repr(last_err), backoff)
             await asyncio.sleep(backoff)
 
-        raise RuntimeError(
-            f"LLM 调用在 {self.cfg.max_retries} 次重试后仍失败: {role=} {last_err!r}"
-        )
+        raise TransportExhausted(role,last_err) from last_err
 
     def chat_sync(self, **kwargs) -> LLMResult:
         return asyncio.run(self.chat(**kwargs))

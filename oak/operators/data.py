@@ -16,6 +16,8 @@ class DataCapabilities:
         self.read_ids = set()
         self.read_operations = 0
         self.capability_calls = {}  # 能力名 -> 实际调用次数（准入试跑与轨迹用，注释/字符串不算）
+        self.traverse_directions = set()
+        self.traverse_observations = []
         self._memory_rows = None  # lazy: 原子记忆 id -> row_id（首次 semantic_search 时构建）
         # 行序＝图插入序（冻结快照的 JSON 装载序，确定且在改名探针副本中保持同序；
         # 按节点 id 排序会在改名后重排，使带 limit 截断的 F 输出无法做改名跟随比对）。
@@ -63,16 +65,22 @@ class DataCapabilities:
         if isinstance(node_ids,str): node_ids=[node_ids]
         if direction not in {'out','in'} or len(node_ids)>100:
             raise ValueError('Invalid traversal')
+        self.traverse_directions.add(direction)
         g=self.graph_result.graph
         rev={v:k for k,v in self.actual_ids.items()}
         found=set()
+        matched_edges=0
         for rid in node_ids:
             if rid not in self.actual_ids: raise ValueError('Unknown graph node')
             self.read_ids.add(rid)
             nid=self.actual_ids[rid]
             edges=g.out_edges(nid,data=True) if direction=='out' else g.in_edges(nid,data=True)
             for head,tail,attrs in edges:
-                if attrs.get('relation')==relation: found.add(rev[tail if direction=='out' else head])
+                if attrs.get('relation')==relation:
+                    matched_edges+=1
+                    found.add(rev[tail if direction=='out' else head])
+        self.traverse_observations.append({'direction':direction,'relation':relation,
+                                          'matched_edges':matched_edges})
         return self._read([self.rows[r] for r in sorted(found)])
 
     @staticmethod

@@ -25,8 +25,8 @@ class KernelRuntime:
         slots={'schema':self.schema.to_yaml(),'tools':json.dumps(self.functions.descriptions(),ensure_ascii=False)}
         return Template(self.prompts[role].content).substitute(slots)
 
-    def call(self,asset_id,params,graph):
-        return self.functions.call(asset_id,params,graph)
+    def call(self,asset_id,params,graph,observation=None):
+        return self.functions.call(asset_id,params,graph,_observation=observation)
 
     def graph_snapshot(self,graph):
         return {'nodes':list(DataCapabilities(graph).rows.values()),'stage':'graph'}

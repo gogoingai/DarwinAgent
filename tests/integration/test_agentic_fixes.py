@@ -494,8 +494,9 @@ class FaultRetryInvalidatesEvaluationTests(unittest.TestCase):
             def ledger_summary(self): return {'total_calls': 0}
 
         ev = (SourceRef('message_text', 'c', '1'),)
-        faulted = RunResult('c', 'i', 'v', (AnswerResult('q1', 'execution_error', '', error='x'),
-                                            AnswerResult('q2', 'execution_error', '', error='y')), 0)
+        faulted = RunResult('c', 'i', 'v', (
+            AnswerResult('q1', 'execution_error', '', error='TransportExhausted: connection'),
+            AnswerResult('q2', 'execution_error', '', error='TransportExhausted: rate limit')), 0)
         recovered = RunResult('c', 'i', 'v', (AnswerResult('q1', 'answered', 'ok', evidence=ev),
                                               AnswerResult('q2', 'answered', 'ok', evidence=ev)), 0)
         scripted = [faulted, recovered]

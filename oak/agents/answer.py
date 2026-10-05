@@ -47,12 +47,28 @@ class AnswerAgent:
                              'tools':self.runtime.functions.descriptions(),'previous_results':tool_results,
                              'feedback':feedback},valid_tool)
                         if action['action']=='ready': break
-                        result=self.runtime.call(action['asset_id'],action['parameters'],graph)
+                        aid=action['asset_id']
+                        asset=self.runtime.functions.functions[aid][0]
+                        from oak.runtime.artifacts import digest
+                        call={'stage':'call_start','attempt':attempt,'step':step,
+                              'asset_id':aid,'asset_fingerprint':asset.fingerprint,
+                              'input_ref':digest(plain(action['parameters'])),
+                              'parameters':plain(action['parameters'])}
+                        trace.append(call)
+                        observation={}
+                        try:
+                            result=self.runtime.call(aid,action['parameters'],graph,observation)
+                        except Exception as exc:
+                            trace.append({'stage':'tool_error',**{k:v for k,v in call.items()
+                                          if k!='stage'},'error_type':type(exc).__name__,
+                                          'error':str(exc),'observation':observation})
+                            raise
                         visible.update(result['node_ids']);tool_results.append(result)
                         # 参数在真实执行点入轨迹（评审②）：协议重试中被拒的旧动作不会错配到
                         # 成功调用上；反馈摘要据此读取，不再依赖 raw_outputs 顺序配对。
                         trace.append({'stage':'tool','attempt':attempt,'step':step,
-                                      'parameters':plain(action['parameters']),**result})
+                                      'parameters':plain(action['parameters']),
+                                      'observation':observation,**result})
                 candidate=await session.request(self.config.answer_role,
                     ANSWER_PROTOCOL+'\n任务作答指引：\n'+self.runtime.prompt('answer'),
                     {'question':question.text,'parameters':plain(question.parameters),'answer_format':self.spec.answer_format,
