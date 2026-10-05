@@ -60,3 +60,6 @@ datasets/locomo/runs/**/*.console.log
 dist/
 papers/
 datasets/locomo/runs/agentic_v1/
+
+# 实验根大产物不入库（磁盘保留＋HF 归档）：大文件走 HF，不进 git
+datasets/locomo/runs/agentic_v*/
