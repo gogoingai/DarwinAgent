@@ -1,0 +1,3 @@
+
+# 快照向量缓存＝运行时产物（每次实验增长，不版本化；HF/磁盘归档承载）
+datasets/locomo/snapshots/**/vector/embed_cache*
