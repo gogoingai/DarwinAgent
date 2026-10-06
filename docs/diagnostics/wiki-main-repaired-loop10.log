@@ -1,0 +1,103 @@
+{"stage": "B0", "case": "conv-26", "fault_retry": {"questions": 2, "recovered": 0, "still_faulted": ["69", "70"], "skipped_retry": "deterministic_tool_error", "sample_errors": ["ValueError: tool.params: undeclared fields {'主体'}", "ValueError: tool.params: undeclared fields {'主体'}"]}}
+{"stage": "B0", "status": "failed", "asset_version": "440d1f8e7de1aa98297b34c092ce30039a8089bf6b369142293b59d7e8e2d62e", "elapsed_s": 259.11}
+{"stage": "B0-val", "case": "conv-26", "fault_retry": {"questions": 4, "recovered": 0, "still_faulted": ["198", "30", "37", "56"], "skipped_retry": "deterministic_tool_error", "sample_errors": ["SandboxError: Restricted execution budget exhausted", "SandboxError: Restricted execution budget exhausted", "SandboxError: Restricted execution budget exhausted"]}}
+{"stage": "B0-val", "status": "failed", "asset_version": "440d1f8e7de1aa98297b34c092ce30039a8089bf6b369142293b59d7e8e2d62e", "elapsed_s": 214.15}
+{"stage": "R1", "status": "complete", "asset_version": "2069f3cb23bd05d440d8553fa6621af42ce9b1cc26474c5ced9a93608f4fa50a", "elapsed_s": 229.73}
+{"stage": "R1", "accepted": false, "reasons": ["primary_not_strictly_improved", "metric_decreased:original_lenient", "metric_decreased:repaired_lenient"]}
+Traceback (most recent call last):
+  File "/Users/xu/git/oak/oak/llm/client.py", line 161, in chat
+    async for chunk in await use_client.chat.completions.create(**kwargs):
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/xu/git/oak/.venv/lib/python3.11/site-packages/openai/resources/chat/completions/completions.py", line 2952, in create
+    return await self._post(
+           ^^^^^^^^^^^^^^^^^
+  File "/Users/xu/git/oak/.venv/lib/python3.11/site-packages/openai/_base_client.py", line 2052, in post
+    return await self.request(cast_to, opts, stream=stream, stream_cls=stream_cls)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/xu/git/oak/.venv/lib/python3.11/site-packages/openai/_base_client.py", line 1837, in request
+    raise self._make_status_error_from_response(err.response) from None
+openai.RateLimitError: Error code: 429 - {'error': {'code': '1302', 'message': '您的账户已达到速率限制，请您控制请求频率'}}
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/Users/xu/git/oak/datasets/locomo/run.py", line 305, in <module>
+    asyncio.run(main(p.parse_args()))
+  File "/Users/xu/.local/share/uv/python/cpython-3.11.15-macos-aarch64-none/lib/python3.11/asyncio/runners.py", line 190, in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "/Users/xu/.local/share/uv/python/cpython-3.11.15-macos-aarch64-none/lib/python3.11/asyncio/runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/xu/.local/share/uv/python/cpython-3.11.15-macos-aarch64-none/lib/python3.11/asyncio/base_events.py", line 654, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/Users/xu/git/oak/datasets/locomo/run.py", line 241, in main
+    await run_arm(args)
+  File "/Users/xu/git/oak/datasets/locomo/run.py", line 212, in run_arm
+    summary=await runner.run(cases,task,rounds=args.rounds if args.optimization_mode=='wiki'
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/xu/git/oak/oak/experiments/runner.py", line 1738, in run
+    candidate=await self._wiki_attempt(
+              ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/xu/git/oak/oak/experiments/runner.py", line 924, in _wiki_attempt
+    patches=await ProposalGenerator().propose(
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/xu/git/oak/oak/experiments/proposal.py", line 44, in propose
+    return await session.request(config.proposal_role,protocol,payload,lambda obj:self.decode(obj,base if wiki_context is not None else None),max_tokens=14000)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/xu/git/oak/oak/agents/protocol.py", line 41, in request
+    response=await self.client.chat(role=role,messages=messages,
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/xu/git/oak/oak/llm/client.py", line 204, in chat
+    raise TransportExhausted(role,last_err) from last_err
+oak.llm.client.TransportExhausted: LLM 调用在传输层恢复耗尽: proposal: RateLimitError("Error code: 429 - {'error': {'code': '1302', 'message': '您的账户已达到速率限制，请您控制请求频率'}}")
+{"stage": "B0", "case": "conv-26", "fault_retry": {"questions": 2, "recovered": 0, "still_faulted": ["69", "70"], "skipped_retry": "deterministic_tool_error", "sample_errors": ["ValueError: tool.params: undeclared fields {'主体'}", "ValueError: tool.params: undeclared fields {'主体'}"]}}
+{"stage": "B0", "status": "failed", "asset_version": "440d1f8e7de1aa98297b34c092ce30039a8089bf6b369142293b59d7e8e2d62e", "elapsed_s": 3.73}
+{"stage": "B0-val", "case": "conv-26", "fault_retry": {"questions": 4, "recovered": 0, "still_faulted": ["198", "30", "37", "56"], "skipped_retry": "deterministic_tool_error", "sample_errors": ["SandboxError: Restricted execution budget exhausted", "SandboxError: Restricted execution budget exhausted", "SandboxError: Restricted execution budget exhausted"]}}
+{"stage": "B0-val", "status": "failed", "asset_version": "440d1f8e7de1aa98297b34c092ce30039a8089bf6b369142293b59d7e8e2d62e", "elapsed_s": 3.51}
+{"stage": "R3", "status": "round_timeout"}
+{"stage": "R4", "case": "conv-26", "fault_retry": {"questions": 1, "recovered": 0, "still_faulted": ["70"], "skipped_retry": "deterministic_tool_error", "sample_errors": ["ProtocolError: Feedback retries exhausted without a publishable candidate"]}}
+{"stage": "R4", "status": "failed", "asset_version": "54c91bb908642ca0a597e17de9777585bb3f49826a85c357630a80ed7817b752", "elapsed_s": 281.19}
+{"stage": "R4", "accepted": false, "reasons": ["incomplete_evaluation", "primary_not_strictly_improved", "metric_decreased:original_lenient", "metric_decreased:repaired_lenient"]}
+{"stage": "R5", "status": "complete", "asset_version": "657dc12a596efd284223689906a3a89bc169c1cb944faae37aa323f42cb97868", "elapsed_s": 313.96}
+{"stage": "R5-val", "case": "conv-26", "fault_retry": {"questions": 1, "recovered": 0, "still_faulted": ["56"], "skipped_retry": "deterministic_tool_error", "sample_errors": ["SandboxError: Restricted execution budget exhausted"]}}
+{"stage": "R5-val", "status": "failed", "asset_version": "657dc12a596efd284223689906a3a89bc169c1cb944faae37aa323f42cb97868", "elapsed_s": 259.72}
+{"stage": "R5", "accepted": false, "reasons": ["primary_strictly_improved", "validation_incomplete_evaluation", "validation_evaluation_fault"]}
+{"stage": "R6", "status": "complete", "asset_version": "84957c8f4e854c2da7c2dcb00143b47eb44eb1dccaa89d3d83bc4a35ee3be062", "elapsed_s": 318.15}
+{"stage": "R6-val", "status": "complete", "asset_version": "84957c8f4e854c2da7c2dcb00143b47eb44eb1dccaa89d3d83bc4a35ee3be062", "elapsed_s": 223.37}
+{"stage": "R6", "accepted": true, "reasons": ["primary_strictly_improved"]}
+{"stage": "R7", "status": "complete", "asset_version": "a25634457e698886283467c3a649bb0f5dd64a935184bce5e4b078af7643e087", "elapsed_s": 144.09}
+{"stage": "R7", "accepted": false, "reasons": ["primary_not_strictly_improved", "metric_decreased:original_lenient", "metric_decreased:original_precise", "metric_decreased:repaired_lenient"]}
+{"stage": "R8", "case": "conv-26", "fault_retry": {"questions": 1, "recovered": 0, "still_faulted": ["70"], "skipped_retry": "deterministic_tool_error", "sample_errors": ["ProtocolError: Feedback retries exhausted without a publishable candidate"]}}
+{"stage": "R8", "status": "failed", "asset_version": "49245001c35065cc7e78d7c4b407157c3f36439c9827316c5cb31775686970b6", "elapsed_s": 233.96}
+{"stage": "R8", "accepted": false, "reasons": ["incomplete_evaluation", "more_generation_faults", "primary_not_strictly_improved"]}
+{"stage": "R9", "status": "complete", "asset_version": "93dae8cda3c470d0f20edab603ce8805ad45b5a9adb31cca1f0907a8b28c6ad8", "elapsed_s": 150.59}
+{"stage": "R9", "accepted": false, "reasons": ["primary_not_strictly_improved"]}
+{"stage": "R10", "status": "complete", "asset_version": "a40b1388bf7eb405fa9a75dfd9c3d51d7a05e7a3045497bcfddfa8adc4ea615b", "elapsed_s": 159.8}
+{"stage": "R10", "accepted": false, "reasons": ["primary_not_strictly_improved", "metric_decreased:original_lenient", "metric_decreased:original_precise", "metric_decreased:repaired_lenient"]}
+failed
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/Users/xu/git/oak/datasets/locomo/run.py", line 305, in <module>
+    asyncio.run(main(p.parse_args()))
+  File "/Users/xu/.local/share/uv/python/cpython-3.11.15-macos-aarch64-none/lib/python3.11/asyncio/runners.py", line 190, in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "/Users/xu/.local/share/uv/python/cpython-3.11.15-macos-aarch64-none/lib/python3.11/asyncio/runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/xu/.local/share/uv/python/cpython-3.11.15-macos-aarch64-none/lib/python3.11/asyncio/base_events.py", line 654, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/Users/xu/git/oak/datasets/locomo/run.py", line 241, in main
+    await run_arm(args)
+  File "/Users/xu/git/oak/datasets/locomo/run.py", line 212, in run_arm
+    summary=await runner.run(cases,task,rounds=args.rounds if args.optimization_mode=='wiki'
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/xu/git/oak/oak/experiments/runner.py", line 1543, in run
+    raise ValueError('Existing experiment requires explicit resume with exactly the same identity')
+ValueError: Existing experiment requires explicit resume with exactly the same identity

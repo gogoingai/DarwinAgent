@@ -1,0 +1,3 @@
+{"stage": "B0", "case": "conv-26", "fault_retry": {"questions": 1, "recovered": 0, "still_faulted": ["173"], "skipped_retry": "deterministic_tool_error", "sample_errors": ["SandboxError: Restricted execution budget exhausted"]}}
+{"stage": "B0", "status": "failed", "asset_version": "a2de39c14d8378dd256e41257953598e98c35c46df74454a2e6dd59e3dbbdc1d", "elapsed_s": 210.16}
+{"stage": "B0-val", "case": "conv-26", "fault_retry": {"questions": 1, "recovered": 0, "still_faulted": ["30"], "skipped_retry": "deterministic_tool_error", "sample_errors": ["SandboxError: Restricted execution budget exhausted"]}}

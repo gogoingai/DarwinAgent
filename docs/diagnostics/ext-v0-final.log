@@ -1,0 +1,32 @@
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/Users/xu/git/oak/datasets/locomo/scripts/external_test.py", line 301, in <module>
+    asyncio.run(main(p.parse_args()))
+  File "/Users/xu/.local/share/uv/python/cpython-3.11.15-macos-aarch64-none/lib/python3.11/asyncio/runners.py", line 190, in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "/Users/xu/.local/share/uv/python/cpython-3.11.15-macos-aarch64-none/lib/python3.11/asyncio/runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/xu/.local/share/uv/python/cpython-3.11.15-macos-aarch64-none/lib/python3.11/asyncio/base_events.py", line 654, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/Users/xu/git/oak/datasets/locomo/scripts/external_test.py", line 259, in main
+    row = await evaluate_conversation(c, adapter, task, bundle, config, root,
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/xu/git/oak/datasets/locomo/scripts/external_test.py", line 34, in evaluate_conversation
+    result = await pipeline.run(case, task.with_bundle(bundle), config)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/xu/git/oak/oak/engine/pipeline.py", line 236, in run
+    answers=tuple(await asyncio.gather(*(one(q) for q in case.questions)))
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/xu/git/oak/oak/engine/pipeline.py", line 232, in one
+    verify()
+  File "/Users/xu/git/oak/oak/engine/pipeline.py", line 100, in verify
+    runtime.bundle.verify();assert_files(framework)
+                            ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/xu/git/oak/oak/runtime/identity.py", line 22, in assert_files
+    if changed: raise ValueError(f'Frozen engineering/input files changed: {changed}')
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ValueError: Frozen engineering/input files changed: ['/Users/xu/git/oak/oak/experiments/runner.py']

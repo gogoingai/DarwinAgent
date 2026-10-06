@@ -1,0 +1,470 @@
+{
+  "assets": "/Users/xu/git/oak/datasets/locomo/runs/wiki_main_repaired_loop10_20261006_081956/train/published/versions/84957c8f4e854c2da7c2dcb00143b47eb44eb1dccaa89d3d83bc4a35ee3be062",
+  "version": "84957c8f4e854c2da7c2dcb00143b47eb44eb1dccaa89d3d83bc4a35ee3be062",
+  "framework": {
+    "/Users/xu/git/oak/oak/__init__.py": "b5e2ae32a65eeaba4c67183b8ac72ceb32ba4236538d69215be2b0d86a4040df",
+    "/Users/xu/git/oak/oak/agents/__init__.py": "e606982679311878f9359c83fcab9faaba3d7ce5a7029cffa4f94cbe20269e37",
+    "/Users/xu/git/oak/oak/agents/answer.py": "3336b0e34b9ed89f2c05c2bdf5a01b0f5b28194ed3a425922156a5741bb5531d",
+    "/Users/xu/git/oak/oak/agents/extraction.py": "c270e9304cf54d14d80fd0450d1117a68b2c394c94bc3fd1927dc7f498079936",
+    "/Users/xu/git/oak/oak/agents/protocol.py": "74d533a29069ca9a1c9b7d36909d0988d564681406f130944c4cdc2fb79480fb",
+    "/Users/xu/git/oak/oak/config.py": "23bd09440f73b2cbd8a58c17bbc8b14c46540f0543eece0f5c8fa8c00c6f076a",
+    "/Users/xu/git/oak/oak/contracts.py": "64e92f4e63872b9ec957a71f62f8a45ef8f4ecda749ef1c1dc228f57009df248",
+    "/Users/xu/git/oak/oak/engine/__init__.py": "e10032171ff66ae4f9ded3181ec75de73dd6358fe1537f813c3215de6257ab78",
+    "/Users/xu/git/oak/oak/engine/pipeline.py": "29ca4d3d22631779d6d1e735a46d8955fa2c54efcad2eb85e633106a6a1abd2d",
+    "/Users/xu/git/oak/oak/experiments/__init__.py": "6d58fe474f03176f8b355bf24469ac0e1700243e11285e88172fcfc2e57ea71e",
+    "/Users/xu/git/oak/oak/experiments/admission.py": "8c2ffe07ef9519c3da548a0a672e826b95fbb24c9099787a4edf866edfb32ce5",
+    "/Users/xu/git/oak/oak/experiments/admission_rules.py": "482c1668419cec63d00ed379300baa5e1adc2b39aba3229f86f9062ae81cb901",
+    "/Users/xu/git/oak/oak/experiments/admission_worker.py": "0c5f8a67f7358e9d9507d77ed6bad66d456514206a2dd37d5a6261072d440d55",
+    "/Users/xu/git/oak/oak/experiments/bootstrap.py": "9a14ff7e437cddbc5f594bfc078cd66d7508f992e04b3be81e4b578db539c8aa",
+    "/Users/xu/git/oak/oak/experiments/campaign.py": "26c4af8eb731f4e7573338e9f02b7d60f0929366e243aa0e54912c34d1590071",
+    "/Users/xu/git/oak/oak/experiments/policy.py": "497b94e144c26c31fb0ff2d4125c1d6b6c544ef5334cb15833448a398e21cf60",
+    "/Users/xu/git/oak/oak/experiments/proposal.py": "1d84ec3b66a973d552adf1f96866f50a2f6c013920e99a86b6c963c458f94c59",
+    "/Users/xu/git/oak/oak/experiments/runner.py": "28c5dd93707f5db6bc65e89443d9be4ae7024129a893dda181ccf5744314c524",
+    "/Users/xu/git/oak/oak/experiments/snapshots.py": "3ea50e723dbf3310579077347c2607843ae6215934fc211e9a8c2c3766b56511",
+    "/Users/xu/git/oak/oak/experiments/spec.py": "37ea11ce6b0dd8e9df60c7f82a72f2d5f30b930aadc44f121d7d9071542c8518",
+    "/Users/xu/git/oak/oak/experiments/wiki.py": "a7f4ef26b84a39ac788c3071821fde5080cbf2d5b61c322ffefb56107bbd3dbc",
+    "/Users/xu/git/oak/oak/kernel/__init__.py": "b4d272daa80ae7cb0714a3c43dab89f05e94b3109fec6fa6f95d6b5760a1890a",
+    "/Users/xu/git/oak/oak/kernel/assets.py": "226c3e334bb30f1fddd553e7b0d679f1b5f9bd17753a9b977cbfa920aa8220b3",
+    "/Users/xu/git/oak/oak/kernel/checks.py": "75c374c43902c60053956e9beaf96bff50f3d2084e7e0b4f28a7a053307e6021",
+    "/Users/xu/git/oak/oak/kernel/counterexamples.py": "964bccf86540497faff50d5e275835134ac617627f8984ef1a20395effdf43a2",
+    "/Users/xu/git/oak/oak/kernel/execution.py": "f122f6cddfc415f731996fbbc768c1741b08edccfb78d4427819a17b9799e335",
+    "/Users/xu/git/oak/oak/kernel/functions.py": "cfd3b1600b42b9bf64e201fe88b1c60c82c04ba1becd5c4b3920f5282a3646b4",
+    "/Users/xu/git/oak/oak/kernel/registration.py": "e187131165a8aa4176a57485cc23ee2a9ee510b8ee59ac51808c656ed9ba426a",
+    "/Users/xu/git/oak/oak/kernel/revision.py": "daa4312fd9697986b5f73f8ad105c5cbb6545dbb9a1b032a66e3ba8619a601b6",
+    "/Users/xu/git/oak/oak/kernel/spec.py": "c1d6be3659feb62af0345f31cd03f0dde4e02ad6b0f84ecda84340777b897dea",
+    "/Users/xu/git/oak/oak/kernel/validation.py": "5ea8eca22f71b651b8aa8a001f389f9074bb13ea77a4a28f1786fdb522404b6c",
+    "/Users/xu/git/oak/oak/kg/__init__.py": "c9636a4acd246babcfff8a5fd14a9a970afabbc7667aff016075cb390f6985fb",
+    "/Users/xu/git/oak/oak/kg/assembler.py": "7057bd247ec39c75ad4c9443a5b3f82f4d686dd2de5c71efafc07adc30e8bc38",
+    "/Users/xu/git/oak/oak/kg/graph.py": "053466574e7e467655afc0ac7481b01682a2a1b40d5b050a3e30ab30d461dbb0",
+    "/Users/xu/git/oak/oak/llm/__init__.py": "bbb79ea92680e127db40715cde77914471387da4fd3ba1629aaabe1647210473",
+    "/Users/xu/git/oak/oak/llm/client.py": "bfd67eecac3d2ac87c3c5396717df3aa1aeba332d7e06a0c4a0f7f6dfb567761",
+    "/Users/xu/git/oak/oak/llm/recorded.py": "2109b4fa6fb08a97091fbf38d805a2bf6d07f7521babab0d91f75abe22a8412c",
+    "/Users/xu/git/oak/oak/llm/registry.py": "5bfcdd0310d0c717553fe0522b95094e0387ee5a2f22f85b0f0340e7c3e5e972",
+    "/Users/xu/git/oak/oak/llm/settings.py": "febea622b059be43c5d681da3b3f5f0c6d807afbf8244694ae2ec0280f9d0d4f",
+    "/Users/xu/git/oak/oak/operators/__init__.py": "f583ca6a8a760548e5d48eaf1e17832a62ec29ad78c6ef2100a3417f7cd10de6",
+    "/Users/xu/git/oak/oak/operators/data.py": "47ecd2d698994b99ea4c338d5346d91d935af2c5860754330fc3db9e4260d5f2",
+    "/Users/xu/git/oak/oak/operators/dates.py": "397f3d901e2c62d6a8fc48c166dd3997ffe2fd56f9f603e968b2cec28412b2a2",
+    "/Users/xu/git/oak/oak/operators/sandbox.py": "96f2f45f6a9023ae68692c269512d9c860c76a40a65a3aec7d9f10c7c4edd122",
+    "/Users/xu/git/oak/oak/runtime/__init__.py": "f9c8b11e495974b8752b3b4e023612622860188cc02ce81a73784a6c7e6925bb",
+    "/Users/xu/git/oak/oak/runtime/artifacts.py": "f2948311090febfc07bbe86581c6204fa57c3fa723f762f2d59f8db545b7b681",
+    "/Users/xu/git/oak/oak/runtime/budgets.py": "aa9acb407e2c2e0cfee664b1f7ad270071d90cf2e9587a321d11b41702968dc2",
+    "/Users/xu/git/oak/oak/runtime/deadline.py": "5f0a472a5bd31479e0a0f9b7bef3a492040519f2d455d8b4b7b3cbfe42601034",
+    "/Users/xu/git/oak/oak/runtime/identity.py": "4bc027c75da463757da891be2f17beac629504272767f4aa27df98d258aee825",
+    "/Users/xu/git/oak/oak/schema/__init__.py": "cc6609481372e561610422725b751a0b081ff3f7d8721886099d084ed862f45d",
+    "/Users/xu/git/oak/oak/schema/graphcheck.py": "8fe55eaa2a5ad849612919ec30a05513277d23f03d27ae99d51a67e7ea3d55f3",
+    "/Users/xu/git/oak/oak/schema/model.py": "6d0e77252904d51dc93fa7bae7b56994cddcabe12598a4a0a6ede02b1e936628",
+    "/Users/xu/git/oak/oak/schema/owlcheck.py": "e74f9d8aab06204a7502e2740b4fba935d4a64a71c04363a4f4cc80929c1796c",
+    "/Users/xu/git/oak/oak/vector/__init__.py": "88f923faa9f164293829f1ef315bf7392a476fad7910409e848dc5d6a041f570",
+    "/Users/xu/git/oak/oak/vector/embedder.py": "d8900c9ee7458af77c8d3a0f326c0a0ffad7faf2dd19d00bf2f6f0ba4b867c8e",
+    "/Users/xu/git/oak/oak/vector/index.py": "8c7e76d8e002c034325258da293d0c323cdb1de353a7780595db17bfa337d6e6",
+    "/Users/xu/git/oak/oak/vector/store.py": "a5fef2314c289272894a992603e9e6fe4b9b73ffcdaa8b749fa21cdfdab9ac55"
+  },
+  "domain_sources": {
+    "/Users/xu/git/oak/datasets/locomo/graph_rules.py": "6cfb495b7361afb4a978b7182f441ceb5f5279eaa659b1fe062824dc91cfafeb",
+    "/Users/xu/git/oak/datasets/locomo/scripts/external_test.py": "643037cc9764d9b6e417624b375cc13914c6fbdcdb6ee3a4d572c3c7d11bc782"
+  },
+  "cells": [
+    {
+      "arm": "v0",
+      "case_id": "conv-42",
+      "total": 260,
+      "saved": 260,
+      "missing": 0,
+      "rate_failures": [
+        "90",
+        "106",
+        "117"
+      ],
+      "other_failures": [
+        {
+          "question_id": "18",
+          "error_type": "ValueError"
+        },
+        {
+          "question_id": "207",
+          "error_type": "ProtocolError"
+        },
+        {
+          "question_id": "94",
+          "error_type": "ValueError"
+        },
+        {
+          "question_id": "129",
+          "error_type": "ProtocolError"
+        },
+        {
+          "question_id": "22",
+          "error_type": "ValueError"
+        }
+      ]
+    },
+    {
+      "arm": "v0",
+      "case_id": "conv-43",
+      "total": 242,
+      "saved": 242,
+      "missing": 0,
+      "rate_failures": [
+        "17",
+        "29"
+      ],
+      "other_failures": [
+        {
+          "question_id": "20",
+          "error_type": "ValueError"
+        },
+        {
+          "question_id": "7",
+          "error_type": "ProtocolError"
+        },
+        {
+          "question_id": "50",
+          "error_type": "ValueError"
+        },
+        {
+          "question_id": "59",
+          "error_type": "ValueError"
+        },
+        {
+          "question_id": "229",
+          "error_type": "ValueError"
+        },
+        {
+          "question_id": "148",
+          "error_type": "ProtocolError"
+        },
+        {
+          "question_id": "65",
+          "error_type": "ProtocolError"
+        }
+      ]
+    },
+    {
+      "arm": "v0",
+      "case_id": "conv-50",
+      "total": 204,
+      "saved": 10,
+      "missing": 194,
+      "rate_failures": [
+        "5"
+      ],
+      "other_failures": []
+    },
+    {
+      "arm": "g1",
+      "case_id": "conv-42",
+      "total": 260,
+      "saved": 236,
+      "missing": 24,
+      "rate_failures": [
+        "89",
+        "90",
+        "94",
+        "106",
+        "160",
+        "226",
+        "229",
+        "230",
+        "231",
+        "232",
+        "233",
+        "234",
+        "235"
+      ],
+      "other_failures": [
+        {
+          "question_id": "25",
+          "error_type": "ValueError"
+        },
+        {
+          "question_id": "77",
+          "error_type": "ValueError"
+        },
+        {
+          "question_id": "22",
+          "error_type": "ValueError"
+        }
+      ]
+    },
+    {
+      "arm": "g1",
+      "case_id": "conv-43",
+      "total": 242,
+      "saved": 152,
+      "missing": 90,
+      "rate_failures": [
+        "1",
+        "16",
+        "18",
+        "142",
+        "145",
+        "146",
+        "147",
+        "148",
+        "149",
+        "150",
+        "151"
+      ],
+      "other_failures": [
+        {
+          "question_id": "20",
+          "error_type": "ValueError"
+        },
+        {
+          "question_id": "36",
+          "error_type": "ProtocolError"
+        },
+        {
+          "question_id": "50",
+          "error_type": "ValueError"
+        },
+        {
+          "question_id": "96",
+          "error_type": "ProtocolError"
+        }
+      ]
+    },
+    {
+      "arm": "g1",
+      "case_id": "conv-50",
+      "total": 204,
+      "saved": 15,
+      "missing": 189,
+      "rate_failures": [
+        "2",
+        "4"
+      ],
+      "other_failures": []
+    }
+  ],
+  "moves": [
+    {
+      "source": "/Users/xu/git/oak/datasets/locomo/runs/ext_v0_final_20261006/conv-42/generation/conv-42/answers/168578b517bbc0eff98cee9a91d5837e3da156479220ed042926495897248387.json",
+      "sha256": "64b14d3dda82fd705bd1f8dbce462209f3c09c94a1d5118b5ef65151e66ebfa9",
+      "arm": "v0",
+      "case_id": "conv-42",
+      "question_id": "117"
+    },
+    {
+      "source": "/Users/xu/git/oak/datasets/locomo/runs/ext_v0_final_20261006/conv-42/generation/conv-42/answers/78cee6c1e2eb2e74f8a3eb06342910344c22b2c264a3e21cbe03a6cc70868e7e.json",
+      "sha256": "aa02628574ef000abe00b9643bfab321407c9209c7d9f2aa13faeee057c98b52",
+      "arm": "v0",
+      "case_id": "conv-42",
+      "question_id": "106"
+    },
+    {
+      "source": "/Users/xu/git/oak/datasets/locomo/runs/ext_v0_final_20261006/conv-42/generation/conv-42/answers/c05204d076c56077c0cd2d1debe7ed7147d7f36e28e64ff2f22e21db5cf7aab6.json",
+      "sha256": "a2583ab9dc6233ee34c30fe6cf2e9bf1f94054ddbe19b49ac4c2d1e8a8af7ccb",
+      "arm": "v0",
+      "case_id": "conv-42",
+      "question_id": "90"
+    },
+    {
+      "source": "/Users/xu/git/oak/datasets/locomo/runs/ext_v0_final_20261006/conv-43/generation/conv-43/answers/06998a9f7c3bd27271effa6f37d89ba0f60a00fb32f5f48b1d1309c30fade120.json",
+      "sha256": "325908f5c9d966fe596c50289bed04b636666399ddad68e22ff619d585d48714",
+      "arm": "v0",
+      "case_id": "conv-43",
+      "question_id": "29"
+    },
+    {
+      "source": "/Users/xu/git/oak/datasets/locomo/runs/ext_v0_final_20261006/conv-43/generation/conv-43/answers/e4bb04eec661be0b6c4cde1d3e6dca3fff3c9bdbb8c1244061f85bab274505e9.json",
+      "sha256": "2525ecdae1c40083e1ed0374e13294c1906edcd93bb10ad801dd409697851780",
+      "arm": "v0",
+      "case_id": "conv-43",
+      "question_id": "17"
+    },
+    {
+      "source": "/Users/xu/git/oak/datasets/locomo/runs/ext_v0_final_20261006/conv-50/generation/conv-50/answers/d10a4bc9e0c1fa4e8f3d7ce2512b8756e47ca5fa451f373c39a1431bb88db49f.json",
+      "sha256": "f4da294752d32048f45a44739db90b327faebc68cc0b408999f7d93edeb9c763",
+      "arm": "v0",
+      "case_id": "conv-50",
+      "question_id": "5"
+    },
+    {
+      "source": "/Users/xu/git/oak/datasets/locomo/runs/ext_g1_final_20261006/conv-42/generation/conv-42/answers/224cf03028e604446ceda4896704f4325780b3a7ca00e530ac966927d1a19161.json",
+      "sha256": "0c38289858ad1bd5f3182ea87893d771cafd49480b64128742a339cdcde9234c",
+      "arm": "g1",
+      "case_id": "conv-42",
+      "question_id": "230"
+    },
+    {
+      "source": "/Users/xu/git/oak/datasets/locomo/runs/ext_g1_final_20261006/conv-42/generation/conv-42/answers/4c499ccd2dc21ac5299b0b1d323e5812beda1e508f9acf0e4a5aeefae61d9fbe.json",
+      "sha256": "35520b3f9a3a005241dc96ffbb2de5510b434d767af4b6ee2e21f50ae63639a9",
+      "arm": "g1",
+      "case_id": "conv-42",
+      "question_id": "94"
+    },
+    {
+      "source": "/Users/xu/git/oak/datasets/locomo/runs/ext_g1_final_20261006/conv-42/generation/conv-42/answers/78cee6c1e2eb2e74f8a3eb06342910344c22b2c264a3e21cbe03a6cc70868e7e.json",
+      "sha256": "23b0ffdbb819e5388e3bc127590c28083a60313c11ff801edd2c2f86bbda2710",
+      "arm": "g1",
+      "case_id": "conv-42",
+      "question_id": "106"
+    },
+    {
+      "source": "/Users/xu/git/oak/datasets/locomo/runs/ext_g1_final_20261006/conv-42/generation/conv-42/answers/7a7cf17d69de528cbf351d0f63b7d281b45ae7e13df5eefb47c02d64cd076c79.json",
+      "sha256": "2dcc53f7e89912717f9e7e1d52a7c479cd41cfe919eb79c9d087cccdb060bd97",
+      "arm": "g1",
+      "case_id": "conv-42",
+      "question_id": "89"
+    },
+    {
+      "source": "/Users/xu/git/oak/datasets/locomo/runs/ext_g1_final_20261006/conv-42/generation/conv-42/answers/7c9b07c2fa5b1d4e7235278176a80b7886acc8fe4cfc3fe29252dad1bbce1888.json",
+      "sha256": "cedb3e784e310188fb9ea7d264b73742c2b9066b9f0957ceabacaf80075ecc07",
+      "arm": "g1",
+      "case_id": "conv-42",
+      "question_id": "234"
+    },
+    {
+      "source": "/Users/xu/git/oak/datasets/locomo/runs/ext_g1_final_20261006/conv-42/generation/conv-42/answers/80283ec1985dee973d7f590face6aefe38b13154545514594a3f44c5b3118358.json",
+      "sha256": "4e785614a8b1d0edce00f367ca631e7cd7f65d4466a6c8d38e57cc5b87b2b5fb",
+      "arm": "g1",
+      "case_id": "conv-42",
+      "question_id": "229"
+    },
+    {
+      "source": "/Users/xu/git/oak/datasets/locomo/runs/ext_g1_final_20261006/conv-42/generation/conv-42/answers/8978ea649cc7e226c214f573a3a8be8d8aafa94b10bc106c7e7421df8e2cb1c6.json",
+      "sha256": "e3e2beeb4da762b09921aac9df6bdfa1896836f3799b21621eade3c60f5506cf",
+      "arm": "g1",
+      "case_id": "conv-42",
+      "question_id": "160"
+    },
+    {
+      "source": "/Users/xu/git/oak/datasets/locomo/runs/ext_g1_final_20261006/conv-42/generation/conv-42/answers/b43a050dfe480dcca5b00811ef4e18df4b9b50671363c8aab11eb6ca683b51eb.json",
+      "sha256": "6219ac13617100893ef5c308d5f5a53f8f46dbc7c9dc77d4c850b2d02ae8c163",
+      "arm": "g1",
+      "case_id": "conv-42",
+      "question_id": "231"
+    },
+    {
+      "source": "/Users/xu/git/oak/datasets/locomo/runs/ext_g1_final_20261006/conv-42/generation/conv-42/answers/bc8754734f14c2c579461e6497c395a0990bc01ca76021010cd73d0c0394503f.json",
+      "sha256": "fcfdc1c5fd66d80311a5464ace009fae5421de033c7f523adc1442831d52b1a1",
+      "arm": "g1",
+      "case_id": "conv-42",
+      "question_id": "233"
+    },
+    {
+      "source": "/Users/xu/git/oak/datasets/locomo/runs/ext_g1_final_20261006/conv-42/generation/conv-42/answers/bc9912c53b60197c32ab0684ca254c79af08dc0ca14b8fe283bbf1a3eff35df7.json",
+      "sha256": "0875a374fc4025ca52dcf9ea7ab3ff858e4c6735af178e2f7a5e30e147c45943",
+      "arm": "g1",
+      "case_id": "conv-42",
+      "question_id": "235"
+    },
+    {
+      "source": "/Users/xu/git/oak/datasets/locomo/runs/ext_g1_final_20261006/conv-42/generation/conv-42/answers/c05204d076c56077c0cd2d1debe7ed7147d7f36e28e64ff2f22e21db5cf7aab6.json",
+      "sha256": "7d8d227680418a4e57ba4355a49e43ef2561a81dab6ea0ec7e2796b6353897e7",
+      "arm": "g1",
+      "case_id": "conv-42",
+      "question_id": "90"
+    },
+    {
+      "source": "/Users/xu/git/oak/datasets/locomo/runs/ext_g1_final_20261006/conv-42/generation/conv-42/answers/decb3f4a381ccd2c910bbe09a6ddb1bbc9cd56066d7d6fec5c49efca18a15b80.json",
+      "sha256": "147f10f1ef2d6a238121672f8843f4743d545088aeac1fbad3ff3b29510d89bd",
+      "arm": "g1",
+      "case_id": "conv-42",
+      "question_id": "232"
+    },
+    {
+      "source": "/Users/xu/git/oak/datasets/locomo/runs/ext_g1_final_20261006/conv-42/generation/conv-42/answers/f5452e5c2800681919c8d3e7ebae3f6a891c99700e863f7a0e0ec560d40c646f.json",
+      "sha256": "c79d4099a91d3b02880db478d8cd2518d22fb04c015ee2cc5b78581276597090",
+      "arm": "g1",
+      "case_id": "conv-42",
+      "question_id": "226"
+    },
+    {
+      "source": "/Users/xu/git/oak/datasets/locomo/runs/ext_g1_final_20261006/conv-43/generation/conv-43/answers/0234a350f4d56ae45c5ece57b08c54496f372bc570bd83a465fb6d2d85531479.json",
+      "sha256": "d03a9a4829b3cdc7fbd24dea34700b443372aab083b74f4ed9bb87818078face",
+      "arm": "g1",
+      "case_id": "conv-43",
+      "question_id": "18"
+    },
+    {
+      "source": "/Users/xu/git/oak/datasets/locomo/runs/ext_g1_final_20261006/conv-43/generation/conv-43/answers/17eed2c0e7c9788d0b46fafdf328b3e955aa0a22132c16cde72aa4f32dcd5282.json",
+      "sha256": "504643a533e4d5c850b2b132088b5649efcecfb3f9f76506253b2240f912bd9d",
+      "arm": "g1",
+      "case_id": "conv-43",
+      "question_id": "16"
+    },
+    {
+      "source": "/Users/xu/git/oak/datasets/locomo/runs/ext_g1_final_20261006/conv-43/generation/conv-43/answers/1b580220fe1521846722925fb939df82f103bf369dabe8709414e53888ea1a17.json",
+      "sha256": "e74dbac00c3fe5924c9491c40144f4cce67d244f6c90ac6481662c5497dd517d",
+      "arm": "g1",
+      "case_id": "conv-43",
+      "question_id": "147"
+    },
+    {
+      "source": "/Users/xu/git/oak/datasets/locomo/runs/ext_g1_final_20261006/conv-43/generation/conv-43/answers/1c79305e86be176b17d7be4c54295c5adc89427416c8c246f2ed4144fea952cf.json",
+      "sha256": "b861dc89338b9f5e7496ce176f2d9e524eb9cb9add88f324e09b37713b6c337b",
+      "arm": "g1",
+      "case_id": "conv-43",
+      "question_id": "151"
+    },
+    {
+      "source": "/Users/xu/git/oak/datasets/locomo/runs/ext_g1_final_20261006/conv-43/generation/conv-43/answers/28573e8070e2ed29bf1ae70c68a7334a3a903a8d33b51111776bf54c582adcda.json",
+      "sha256": "37e07f9d890ca64c0a47fc84daf8d736b2da611231c81936eb1ff88aab792f04",
+      "arm": "g1",
+      "case_id": "conv-43",
+      "question_id": "150"
+    },
+    {
+      "source": "/Users/xu/git/oak/datasets/locomo/runs/ext_g1_final_20261006/conv-43/generation/conv-43/answers/3392a29a04bbb2690c27f1fc479556e7521b701d6c8921bbe4d4e8d684058779.json",
+      "sha256": "a1b986853b050a02d0637ffb831cb1888171a577b306e5d9ff341dd04e453acf",
+      "arm": "g1",
+      "case_id": "conv-43",
+      "question_id": "149"
+    },
+    {
+      "source": "/Users/xu/git/oak/datasets/locomo/runs/ext_g1_final_20261006/conv-43/generation/conv-43/answers/391552c099c101b131feaf24c5795a6a15bc8ec82015424e0d2b4274a369a0bf.json",
+      "sha256": "3a7eb6319e5656c5b6333abc96d91d04507eb0cf5b966222031ef97367773ef9",
+      "arm": "g1",
+      "case_id": "conv-43",
+      "question_id": "1"
+    },
+    {
+      "source": "/Users/xu/git/oak/datasets/locomo/runs/ext_g1_final_20261006/conv-43/generation/conv-43/answers/8950e13ae318d1388e11f0486ab310123e6cae153e38f13471d72a779552fbb2.json",
+      "sha256": "62e82f85da7bc2b5bc3e1b577effec13854d32829b4710f984961aea7f7e1fb6",
+      "arm": "g1",
+      "case_id": "conv-43",
+      "question_id": "148"
+    },
+    {
+      "source": "/Users/xu/git/oak/datasets/locomo/runs/ext_g1_final_20261006/conv-43/generation/conv-43/answers/8a1ca3d14181e58affa3443b2c9646995c6e5568351fe71747156ad2a6cb0cae.json",
+      "sha256": "4c446016a965e3e91d649ff2f0459c46d93e6c953bcb241ac97247c4ac80e255",
+      "arm": "g1",
+      "case_id": "conv-43",
+      "question_id": "145"
+    },
+    {
+      "source": "/Users/xu/git/oak/datasets/locomo/runs/ext_g1_final_20261006/conv-43/generation/conv-43/answers/9a2fdb11a8475e8a7845410eb514c7a0499116b377b1a28a11c07b176834c8ee.json",
+      "sha256": "6ef8f6e54fc3e7d43801701f6336a0f36a0d2cf6a32ebd9d82c574199b1c57a1",
+      "arm": "g1",
+      "case_id": "conv-43",
+      "question_id": "142"
+    },
+    {
+      "source": "/Users/xu/git/oak/datasets/locomo/runs/ext_g1_final_20261006/conv-43/generation/conv-43/answers/be42ae699d507351e0c50c09f81e7b2b8393820ead040aff232b7d140d4e1fa8.json",
+      "sha256": "c09600e283313b6e2c2df92f817f7f6ef0eefde4e9043d33ee03734ddb429123",
+      "arm": "g1",
+      "case_id": "conv-43",
+      "question_id": "146"
+    },
+    {
+      "source": "/Users/xu/git/oak/datasets/locomo/runs/ext_g1_final_20261006/conv-50/generation/conv-50/answers/2bf175f9655e7bb7357b9f0a7c6051465a5ae701104ffe741b98e852c0e4d460.json",
+      "sha256": "4070b206c1b11b80a633420cd8260ede39245270bf48d79ef801c66dcb2c2553",
+      "arm": "g1",
+      "case_id": "conv-50",
+      "question_id": "4"
+    },
+    {
+      "source": "/Users/xu/git/oak/datasets/locomo/runs/ext_g1_final_20261006/conv-50/generation/conv-50/answers/cc11310c456c3690d5a74c23aa31cc25b4e74cdae146c71e54ad9dbc1d109fde.json",
+      "sha256": "f661da2afc53f7fd0e4251e008214fbf1c06f030e4e44a625dc3ae02d144f98f",
+      "arm": "g1",
+      "case_id": "conv-50",
+      "question_id": "2"
+    }
+  ],
+  "graph_rebuild": {
+    "v0": true,
+    "g1": true
+  }
+}

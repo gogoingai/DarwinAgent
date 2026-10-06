@@ -1,0 +1,22 @@
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/Users/xu/git/oak/datasets/locomo/run.py", line 305, in <module>
+    asyncio.run(main(p.parse_args()))
+  File "/Users/xu/.local/share/uv/python/cpython-3.11.15-macos-aarch64-none/lib/python3.11/asyncio/runners.py", line 190, in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "/Users/xu/.local/share/uv/python/cpython-3.11.15-macos-aarch64-none/lib/python3.11/asyncio/runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/xu/.local/share/uv/python/cpython-3.11.15-macos-aarch64-none/lib/python3.11/asyncio/base_events.py", line 654, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/Users/xu/git/oak/datasets/locomo/run.py", line 241, in main
+    await run_arm(args)
+  File "/Users/xu/git/oak/datasets/locomo/run.py", line 212, in run_arm
+    summary=await runner.run(cases,task,rounds=args.rounds if args.optimization_mode=='wiki'
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/xu/git/oak/oak/experiments/runner.py", line 1618, in run
+    raise ValueError('冒烟门拒绝（全量提交前 3 题全灭）: '+smoke_error)
+ValueError: 冒烟门拒绝（全量提交前 3 题全灭）: 冒烟 1 题对 0（需≥2）——质量门拒绝

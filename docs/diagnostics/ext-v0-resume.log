@@ -1,0 +1,4 @@
+{"case_id": "conv-42", "completed": 255, "total": 260, "generation_faults": 5, "evaluation_faults": 0, "original_precise": 176, "original_lenient": 189, "llm_calls": 678, "prompt_tokens": 9884552, "completion_tokens": 163540, "original_precise_rate": 67.69, "original_lenient_rate": 72.69}
+{"case_id": "conv-43", "completed": 235, "total": 242, "generation_faults": 7, "evaluation_faults": 0, "original_precise": 167, "original_lenient": 169, "llm_calls": 629, "prompt_tokens": 9850401, "completion_tokens": 149371, "original_precise_rate": 69.01, "original_lenient_rate": 69.83}
+{"case_id": "conv-50", "completed": 203, "total": 204, "generation_faults": 1, "evaluation_faults": 0, "original_precise": 148, "original_lenient": 154, "llm_calls": 508, "prompt_tokens": 7591258, "completion_tokens": 125719, "original_precise_rate": 72.55, "original_lenient_rate": 75.49}
+{"original_precise_rate": 69.75, "original_lenient_rate": 72.67}

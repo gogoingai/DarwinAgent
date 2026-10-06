@@ -1,0 +1,2 @@
+{"case_id": "conv-42", "completed": 252, "total": 260, "generation_faults": 8, "evaluation_faults": 0, "original_precise": 174, "original_lenient": 186, "llm_calls": 669, "prompt_tokens": 9627030, "completion_tokens": 162022, "original_precise_rate": 66.92, "original_lenient_rate": 71.54}
+{"original_precise_rate": 66.92, "original_lenient_rate": 71.54}
