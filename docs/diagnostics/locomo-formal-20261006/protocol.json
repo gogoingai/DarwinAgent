@@ -67,7 +67,12 @@
     {
       "case_id": "conv-44",
       "questions": 158,
-      "frozen_inputs_present": false
+      "frozen_inputs_present": true,
+      "prepared_input_sha256": {
+        "datasets/locomo/snapshots/gvtest_v1/conv-44/facts.jsonl": "27809651124a333907084048187cf09466b4a05fbea7088658aed5ded828a798",
+        "datasets/locomo/snapshots/gvtest_v1/conv-44/vector/index.jsonl": "fbdd05bd40445912c694aded072168aadc05ec6d7c8979b59675440ba66a64a0",
+        "datasets/locomo/snapshots/gvtest_v1/conv-44/manifest.json": "5c0cdba8650a70ed637b313d5949650a8c22d2c2857d7060e4419c160ccc6a84"
+      }
     },
     {
       "case_id": "conv-47",
@@ -132,7 +137,7 @@
     "policy": "reuse_existing_else_extract_from_conversation_and_build_vectors_then_freeze",
     "qa_gold_or_reference_answers_allowed": false,
     "shared_frozen_snapshot_for_both_arms": true,
-    "stage": "before_formal_experiment"
+    "stage": "prepared_conv44_imported_frozen"
   },
   "target_comparison_cases": [
     "conv-26",
