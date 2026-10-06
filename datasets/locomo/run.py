@@ -124,6 +124,11 @@ def bootstrap_trial_graph(adapter):
 def connection(root):
     conn=load_connection(ROOT,root/'runtime','LOCOMO')
     conn.role_tiers['locomo_judge']='strong'
+    # 用户指令（2026-10-07「我要用 deepseek」）：tools/抽取改走 fast 档 DeepSeek
+    # （commandcode 网关）——原 middle 档 MiniMax Token Plan 额度耗尽卡死正式运行。
+    # 作答/审查/判题/引导/提案仍为 strong=glm 不变；MiniMax 档保留但本路径不再承载角色。
+    conn.role_tiers['tools']='fast'
+    conn.role_tiers['extraction']='fast'
     conn.empty_response_passthrough_roles.add('locomo_judge')
     # 用户决策：全角色关闭深度思考（EmptyCompletion 突发的根因是推理链吃光补全预算）。
     # 「怎么关」按模型走注册表（glm/deepseek 发 thinking:disabled，MiniMax 发
