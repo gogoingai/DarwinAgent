@@ -1,0 +1,151 @@
+{
+  "status": "prepared_not_started",
+  "fast_model_requirement": "use_existing_DeepSeek_configuration_before_precheck_then_freeze_for_iteration_and_both_final_arms",
+  "training_case": "conv-26",
+  "train_questions": 120,
+  "validation_questions": 79,
+  "split_sha256": "ed75066ddf84271e0c4bf87323b1e962db4f52b9d45e2448099b1d7b0b38cc0d",
+  "rounds": 10,
+  "proposal_attempts": 3,
+  "round_deadline_s": 7200,
+  "memory_mode": "fully_frozen_facts_and_vector",
+  "graph_mode": "B0_cold_start_then_rebuild_from_frozen_facts_and_current_S",
+  "optimization_mode": "wiki",
+  "scope": "sfcp",
+  "vector_k": 30,
+  "conversations": [
+    {
+      "case_id": "conv-26",
+      "questions": 199,
+      "frozen_inputs_present": true,
+      "prepared_input_sha256": {
+        "datasets/locomo/snapshots/gvtest_v1/conv-26/facts.jsonl": "8b87ac30710c1986882c7cb1593d4744625f3753a69b05dda5f52dc4fab606e8",
+        "datasets/locomo/snapshots/gvtest_v1/conv-26/vector/index.jsonl": "d6d84d6af5e7a0c61ce3fc9a3173f832b60819762a35febdceae39ee38023d9b",
+        "datasets/locomo/snapshots/gvtest_v1/conv-26/manifest.json": "1ae8032fb4d21328441dcc4472cef1e7754be956153436e9dd2f7c6e899853da"
+      }
+    },
+    {
+      "case_id": "conv-30",
+      "questions": 105,
+      "frozen_inputs_present": true,
+      "prepared_input_sha256": {
+        "datasets/locomo/snapshots/gvtest_v1/conv-30/facts.jsonl": "06337325a5229dbdd595243a75fe88a2bc061c79bf910b87d5703bb66db012d9",
+        "datasets/locomo/snapshots/gvtest_v1/conv-30/vector/index.jsonl": "c1fbd3f795ee220e9fada523561e413f582831eca646caaaf6d96c0e293e70b5",
+        "datasets/locomo/snapshots/gvtest_v1/conv-30/manifest.json": "02f7d695d7931241099f27738fbf5af1335ddae6ab54952fcf77e69d53fdb50e"
+      }
+    },
+    {
+      "case_id": "conv-41",
+      "questions": 193,
+      "frozen_inputs_present": true,
+      "prepared_input_sha256": {
+        "datasets/locomo/snapshots/gvtest_v1/conv-41/facts.jsonl": "e3c654cd6d06c5be3bd07c1cb503f2ad611814a3292fcba4172944e1d623e838",
+        "datasets/locomo/snapshots/gvtest_v1/conv-41/vector/index.jsonl": "1e9c3133acce4d46145480135c7524353d50afb2ef05e633dd2d199bbcbd5367",
+        "datasets/locomo/snapshots/gvtest_v1/conv-41/manifest.json": "81dfec7ce81b2fa2c61af5f22d82560e0cc5530918e968462ec2bc4c4546293e"
+      }
+    },
+    {
+      "case_id": "conv-42",
+      "questions": 260,
+      "frozen_inputs_present": true,
+      "prepared_input_sha256": {
+        "datasets/locomo/snapshots/gvtest_v1/conv-42/facts.jsonl": "d5787986ac703adcc7410b08f8622fbea90303bb45129299efd862ab982f474f",
+        "datasets/locomo/snapshots/gvtest_v1/conv-42/vector/index.jsonl": "0bc4f29a3e72b1011f7c6fcd08959ab0911298af10e8eebad942ae8239aa34a6",
+        "datasets/locomo/snapshots/gvtest_v1/conv-42/manifest.json": "7227423d850d8c9486cc58f1751fe576561c3ed3e6388633939d89744ebffffc"
+      }
+    },
+    {
+      "case_id": "conv-43",
+      "questions": 242,
+      "frozen_inputs_present": true,
+      "prepared_input_sha256": {
+        "datasets/locomo/snapshots/gvtest_v1/conv-43/facts.jsonl": "69941582eadf0389b5dcd8fd6605b1b1af7094f18c377bc190fc2221ee47b18b",
+        "datasets/locomo/snapshots/gvtest_v1/conv-43/vector/index.jsonl": "a08cccc5d3aad942f1d4255fa6978d48ab429f4f38fb4d898145762661cc8266",
+        "datasets/locomo/snapshots/gvtest_v1/conv-43/manifest.json": "5037060abadeb64fa035df4f8c1e9d0acca5139de854c7fcc4d407ff5ccc694c"
+      }
+    },
+    {
+      "case_id": "conv-44",
+      "questions": 158,
+      "frozen_inputs_present": false
+    },
+    {
+      "case_id": "conv-47",
+      "questions": 190,
+      "frozen_inputs_present": true,
+      "prepared_input_sha256": {
+        "datasets/locomo/snapshots/gvtest_v1/conv-47/facts.jsonl": "1b6c646aad46356a8b598faf6085d2032e9f287021200be7adc9d3bdfd537113",
+        "datasets/locomo/snapshots/gvtest_v1/conv-47/vector/index.jsonl": "eccf1445c3606bf63b174fd431d07be59a5f99f4e1fce50b15610a936f819177",
+        "datasets/locomo/snapshots/gvtest_v1/conv-47/manifest.json": "f1eddc1a1b99755000652c297406b505cf3cdcac5417d110500ee32a31c99683"
+      }
+    },
+    {
+      "case_id": "conv-48",
+      "questions": 239,
+      "frozen_inputs_present": true,
+      "prepared_input_sha256": {
+        "datasets/locomo/snapshots/gvtest_v1/conv-48/facts.jsonl": "ebde297a3b6f3795076a40a93a3adc4cb36fb051358be3aa72fb7ac8519e60eb",
+        "datasets/locomo/snapshots/gvtest_v1/conv-48/vector/index.jsonl": "84883ab2441085c17e733f168d03ece5a119fc37083025bc95a05d7e109b25bd",
+        "datasets/locomo/snapshots/gvtest_v1/conv-48/manifest.json": "a89d6d08ab4c9f4dc59ac72cf888dec68e8d2849acc41f29308268ca36d3a4c5"
+      }
+    },
+    {
+      "case_id": "conv-49",
+      "questions": 196,
+      "frozen_inputs_present": true,
+      "prepared_input_sha256": {
+        "datasets/locomo/snapshots/gvtest_v1/conv-49/facts.jsonl": "4870ba562883c6f7227307c31a11eb14fd5aaa260d3b18e7b4c2d43f64be777d",
+        "datasets/locomo/snapshots/gvtest_v1/conv-49/vector/index.jsonl": "bb0521b27dda611c9bfcf37ec5f694178421f1a8cd0a5c7c10f80aadfc025b62",
+        "datasets/locomo/snapshots/gvtest_v1/conv-49/manifest.json": "7cc20dd8c2fa3da0c37b1195aa564b11367a802b8bdd472ce119826a6ea8cc58"
+      }
+    },
+    {
+      "case_id": "conv-50",
+      "questions": 204,
+      "frozen_inputs_present": true,
+      "prepared_input_sha256": {
+        "datasets/locomo/snapshots/gvtest_v1/conv-50/facts.jsonl": "2beccbe3935b660d04fddacf8847a604aa7125a05ce40db46a8b9fef27977bdd",
+        "datasets/locomo/snapshots/gvtest_v1/conv-50/vector/index.jsonl": "5110fd87a8dc44937497a2b2b1d438657740769cc0c06359cd5761200d73528a",
+        "datasets/locomo/snapshots/gvtest_v1/conv-50/manifest.json": "5a1f82c82b39ffbf17b83da579013cb002886bd2c2d1e920fece2bf645c78d49"
+      }
+    }
+  ],
+  "full_questions": 1986,
+  "available_questions": 1828,
+  "shell_syntax_checks": [
+    {
+      "block": 1,
+      "exit_code": 0,
+      "error": ""
+    },
+    {
+      "block": 2,
+      "exit_code": 0,
+      "error": ""
+    }
+  ],
+  "question_overlap": 0,
+  "evidence_overlap": 0,
+  "memory_preparation": {
+    "existing_snapshots": "preserve_existing_9_facts_and_vectors",
+    "missing_case": "conv-44",
+    "policy": "reuse_existing_else_extract_from_conversation_and_build_vectors_then_freeze",
+    "qa_gold_or_reference_answers_allowed": false,
+    "shared_frozen_snapshot_for_both_arms": true,
+    "stage": "before_formal_experiment"
+  },
+  "target_comparison_cases": [
+    "conv-26",
+    "conv-30",
+    "conv-41",
+    "conv-42",
+    "conv-43",
+    "conv-44",
+    "conv-47",
+    "conv-48",
+    "conv-49",
+    "conv-50"
+  ],
+  "target_comparison_questions": 1986,
+  "requires_all_10_before_final_completion": true
+}

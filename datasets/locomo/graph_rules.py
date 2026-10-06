@@ -138,8 +138,15 @@ def project_candidates(facts, schema=None, corpus=()):
     sessions = _session_dates(facts, corpus)
 
     def fact_chunks(row):
-        """事实的来源块 id 列表（证据解析用）；无 corpus 映射时退回追溯标记。"""
-        dias = [str(d) for d in (row.get('sources') or ())]
+        """事实的来源块 id 列表（证据解析用）；无 corpus 映射时退回追溯标记。
+        sources 兼容列表与整串（conv-50 存在 "D12:12, D12:14" 单串形态，按
+        importer 同款分隔规则拆分）；未登记出处＝ValueError。"""
+        raw = row.get('sources') or ()
+        if isinstance(raw, str):
+            raw = (raw,)
+        dias = [p.strip() for item in raw
+                for chunk in re.split(r'[;；]', str(item))
+                for p in chunk.split(',') if p.strip()]
         if chunk_for is None:
             return [f"fact:{row.get('fid', '')}"] if dias else []
         unmapped = [d for d in dias if d not in dia_to_source]
