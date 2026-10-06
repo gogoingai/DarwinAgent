@@ -10,6 +10,7 @@ import json
 from pathlib import Path
 
 from oak.config import RunConfig
+from oak.contracts import plain
 from oak.engine import Pipeline
 from oak.kernel import KernelBundle, TaskSpec
 from oak.llm.client import LLMClient
@@ -31,6 +32,19 @@ async def evaluate_conversation(case_id, adapter, task, bundle, config, root,
                             frozen_snapshot=SNAPSHOTS / case_id,
                             graph_builder=graph_builder)
         result = await pipeline.run(case, task.with_bundle(bundle), config)
+        # 每轮结束后一次有界故障重试（缺口④修复，2026-10-06）：与训练路径同款
+        # batched_fault_retry——失败题删检查点小批重跑，健康题检查点零成本复用；
+        # 最终故障集以最后一次完整答案集为准（不做批次并集）。
+        faulted = [a for a in result.answers if a.status == 'execution_error']
+        if faulted:
+            from oak.experiments.runner import batched_fault_retry
+            result, still = await batched_fault_retry(
+                pipeline, case, task.with_bundle(bundle), config,
+                root / case_id / 'generation' / case_id / 'answers', faulted)
+            print(json.dumps({'case_id': case_id, 'fault_retry':
+                              {'questions': len(faulted), 'recovered':
+                               len(faulted) - len(still),
+                               'still_faulted': still}}, ensure_ascii=False), flush=True)
         scores = await LocomoEvaluator(client, root / case_id / 'evaluation').evaluate(result)
         cost = client.ledger_summary()
     finally:
@@ -142,6 +156,34 @@ def preflight(bundle, config, task, cases, snap_root=None, embedder_factory=None
             except Exception as exc:
                 raise SystemExit(f'外测预检失败（{case_id}）: {type(exc).__name__}: {exc}') from exc
             missing = trial_capability_floor_errors(records, required)
+            if missing:
+                # 训练对话实体绑定的 trial_inputs（如 subject=卡罗琳）在外测对话上
+                # 可能空集而不触发能力。用目标图内真实主体重试一次——能力必须
+                # 真实触发（capability_calls>0），不放宽任何底线要求；仅输入来源
+                # 换成本对话图的事实主体，且只动 F 输入契约里声明过的主体字段。
+                subjects = []
+                for r in caps.rows.values():
+                    if r.get('entity_type') == '原子事实' and r.get('主体') \
+                            and r['主体'] not in subjects:
+                        subjects.append(r['主体'])
+                    if len(subjects) >= 3:
+                        break
+                substitute = {}
+                if subjects:
+                    for a in exported.assets.assets:
+                        if a.kind != 'F':
+                            continue
+                        props = set((a.input_contract or {}).get('properties') or {})
+                        key = next((k for k in ('subject', '主体') if k in props), None)
+                        base = [plain(v) for v in a.trial_inputs][:1] or [{}]
+                        if key and not any(k in props for k in ('node_id',)):
+                            substitute[a.id] = [{**base[0], key: s} for s in subjects]
+                if substitute:
+                    registry = FunctionRegistry(exported, limits)
+                    records = list(records) + [
+                        registry.call(aid, params, graph)
+                        for aid, probes in substitute.items() for params in probes]
+                    missing = trial_capability_floor_errors(records, required)
             if missing:
                 raise SystemExit(f'外测预检失败（{case_id} 试跑未触发能力）: ' + str(missing))
 

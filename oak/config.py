@@ -91,7 +91,7 @@ class Config:
     max_concurrency: int = 4
     # fast 档独立池大小（仅当 fast 异站分池时生效；commandcode 独立限流池，可略高）
     fast_max_concurrency: int = 6
-    max_retries: int = 5
+    max_retries: int = 10
 
     # 框架级路径（任务通常覆盖 work_dir 以隔离产物）
     work_dir: Path = field(default_factory=lambda: Path.cwd() / "runs")
