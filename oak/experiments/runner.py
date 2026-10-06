@@ -763,7 +763,8 @@ class ExperimentRunner:
                  frozen_files=(),client_factory=None,bootstrap_context=None,snapshot_root=None,
                  bootstrap_trial_graph=None,smoke_judge=None,optimization_mode='legacy',
                  wiki_call_limit=30,dynamic_trial=False,graph_builder=None,
-                 proposal_attempts=None,round_deadline_s=None,validation_plan=None):
+                 proposal_attempts=None,round_deadline_s=None,validation_plan=None,
+                 seed_assets=None):
         if optimization_mode not in ('legacy','wiki'):
             raise ValueError('Unknown optimization mode')
         if type(wiki_call_limit) is not int or wiki_call_limit < 1:
@@ -805,6 +806,9 @@ class ExperimentRunner:
         # 行为不变）；validation_plan 把同对话验证题接入选版（聚合指标进决策与
         # Wiki，逐题 gold/答案/诊断不进提案器）。
         self.graph_builder=graph_builder
+        # seed-assets（缺口③）：给定锁定 bundle 目录时跳过冷启动、直接以其为 B0
+        # （准入/冒烟/评分不豁免）；进声明 identity。
+        self.seed_assets=Path(seed_assets) if seed_assets is not None else None
         self.proposal_attempts=proposal_attempts or ADMISSION_ATTEMPTS
         self.round_deadline_s=round_deadline_s
         self.validation_plan=validation_plan
@@ -1520,7 +1524,8 @@ class ExperimentRunner:
                      'aggregation':'sum',
                      'task':spec.declaration(),'config':self.config.to_dict(),
                      'connection':transport_identity(type('Connection',(),{'cfg':self.connection_config})()),
-                     'policy':asdict(self.policy),'frozen_files':self.frozen,'rounds':rounds,'seed_assets':[],
+                     'policy':asdict(self.policy),'frozen_files':self.frozen,
+                     'seed_assets':[str(self.seed_assets)] if getattr(self,'seed_assets',None) else [],
                      'scope':list(scope or ()),
                      'source_layers':sorted({b.source.kind for case in cases for b in case.corpus}),
                      'snapshots':({c.id:(self.snapshot_root/c.id/'manifest.json').read_text()
@@ -1539,8 +1544,15 @@ class ExperimentRunner:
         declaration=json.loads(json.dumps(declaration,ensure_ascii=False))
         experiment_path=self.root/'experiment.json'
         if experiment_path.exists():
-            if not resume or json.loads(experiment_path.read_text())!=declaration:
+            recorded=json.loads(experiment_path.read_text())
+            # 兼容旧声明：rounds 已移出身份（2026-10-06 缺口①修复——轮数是预算
+            # 上限不是数据身份）；旧运行的 wiki/检查点身份仍按冻结纪律校验。
+            recorded.pop('rounds',None)
+            if not resume or recorded!=declaration:
                 raise ValueError('Existing experiment requires explicit resume with exactly the same identity')
+            if 'rounds' in json.loads(experiment_path.read_text()):
+                # 旧格式迁移：校验通过后落盘新形态，旧键不再残留
+                atomic_json(experiment_path,declaration)
         else: atomic_json(experiment_path,declaration)
         wiki=(WikiMaintainer(self.root,digest(declaration),self._client,self.config,self.wiki_call_limit)
               if self.optimization_mode=='wiki' else None)
@@ -1549,6 +1561,18 @@ class ExperimentRunner:
         try:
             bundle_path=self.root/'B0'/'assets'
             if (bundle_path/'manifest.json').exists(): bundle=KernelBundle(bundle_path)
+            elif getattr(self,'seed_assets',None) is not None:
+                # seed-assets 入口（缺口③修复，2026-10-06）：从锁定 bundle 直接锚定
+                # B0（跳过冷启动引导），准入/冒烟/评分门槛原样作用——种子资产不豁免
+                # 任何检查；Wiki 仍从零开始（跨运行经验不导入）。
+                import shutil
+                seed=Path(self.seed_assets)
+                seeded=KernelBundle(seed)  # 构造即校验 manifest/资产
+                bundle_path.parent.mkdir(parents=True,exist_ok=True)
+                shutil.copytree(seed,bundle_path)
+                bundle=KernelBundle(bundle_path)
+                atomic_json(self.root/'B0'/'seed.json',{'source':str(seed),
+                    'version':seeded.version})
             else:
                 client=self._client('B0')
                 def trial_record(report):
@@ -1689,7 +1713,15 @@ class ExperimentRunner:
                         results,_=await self._stage(name,cases,spec.with_bundle(adopted))
                     continue
                 if stop_file is not None and Path(stop_file).exists(): stopped=True; break
-                if rounds is not None and n>=rounds: break
+                # 轮数口径（缺口①修复，2026-10-06）：rounds＝**完整计分轮**上限——
+                # 超时/准入耗尽/服务中断的迭代如实记录但不占轮数，循环继续到凑满；
+                # 2×迭代上限兜底防死循环。旧模式（无验证计划）维持迭代数口径不变。
+                if rounds is not None:
+                    if self.validation_plan is None and n>=rounds: break
+                    if self.validation_plan is not None:
+                        scored=sum(1 for d in decisions
+                                   if (d.get('candidate') or {}).get('metrics'))
+                        if scored>=rounds or n>=rounds*2: break
                 n+=1
                 self.verify();name=f'R{n}';stage=self.root/name
                 round_started=time.time()

@@ -208,7 +208,8 @@ async def run_arm(args):
                                 graph_builder=graph_builder,
                                 proposal_attempts=getattr(args,'proposal_attempts',None),
                                 round_deadline_s=getattr(args,'round_deadline_s',None),
-                                validation_plan=validation_plan)
+                                validation_plan=validation_plan,
+                                seed_assets=getattr(args,'seed_assets',None))
         summary=await runner.run(cases,task,rounds=args.rounds if args.optimization_mode=='wiki'
                                  else 0,resume=args.resume,scope=SCOPE[args.scope])
         print(summary['status'])
@@ -295,6 +296,9 @@ if __name__=='__main__':
     p.add_argument('--graph-rebuild',action='store_true',
                    help='新模式（recheck4 快速循环）：冻结记忆/向量、图按当前 S 从固定事实重建；'
                         '需配合 --train-question-ids 与 --validation-question-ids')
+    p.add_argument('--seed-assets',default=None,
+                   help='锁定 bundle 目录（含 manifest.json）：跳过冷启动直接以其为 B0 续作资产链；'
+                        '准入/冒烟/评分不豁免，Wiki 仍从零开始')
     p.add_argument('--validation-question-ids',
                    help='同对话固定验证题清单（逗号分隔）；验证聚合指标进选版，逐题反馈不进提案器')
     p.add_argument('--proposal-attempts',type=int,default=None,

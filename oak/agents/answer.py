@@ -129,9 +129,24 @@ class AnswerAgent:
                     feedback.append({'candidate':candidate,'review':rejected})
                     continue
                 evidence=tuple(graph.sources[s].source for s in sorted(source_ids)) if candidate['status']=='answered' else ()
-                result=AnswerResult(question.id,candidate['status'],candidate['answer'],evidence,
-                    node_ids=tuple(candidate['node_ids']),raw_outputs=tuple(session.raw),trace=tuple(trace))
-                validate_published(result,question,graph)
+                # 发布点契约错误进反馈环（缺口⑤⑥修复，2026-10-06）：此前 AnswerResult
+                # 构造/validate_published 抛 ValueError 会直接落到兜底 except 记执行
+                # 故障、不给模型重答机会。现改为与检查/审查拒绝同路：反馈里给出
+                # 逐引用节点的来源数（含无出处行——缺口⑥的显式处理），重试耗尽才
+                # 由既有 ProtocolError 兜底。
+                try:
+                    result=AnswerResult(question.id,candidate['status'],candidate['answer'],evidence,
+                        node_ids=tuple(candidate['node_ids']),raw_outputs=tuple(session.raw),trace=tuple(trace))
+                    validate_published(result,question,graph)
+                except ValueError as exc:
+                    cited_sources={nid:(len(caps.rows[nid]['source_ids']) if nid in caps.rows else -1)
+                                   for nid in candidate['node_ids'] or ()}
+                    feedback.append({'candidate':candidate,'publish_reject':{
+                        'error':str(exc),
+                        'cited_node_source_counts':cited_sources,
+                        'hint':'answered 候选必须引用带出处（source_ids 非空）的事实行；'
+                              '来源数为 0 的行不可作为证据，请改引有出处的行或如实拒答'}})
+                    continue
                 return result
             raise ProtocolError('Feedback retries exhausted without a publishable candidate',session.raw)
         except Exception as exc:
