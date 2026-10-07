@@ -39,7 +39,7 @@ class Attribute:
     dtype: str = "string"
 
     @staticmethod
-    def from_dict(d: dict) -> "Attribute":
+    def from_dict(d: dict) -> Attribute:
         if not isinstance(d, dict) or "name" not in d:
             raise SchemaParseError(f"attribute 需要 {{name, dtype}}，得到: {d!r}")
         name = str(d["name"]).strip()
@@ -84,7 +84,7 @@ class Axiom:
     params: dict
 
     @staticmethod
-    def from_dict(d: dict) -> "Axiom":
+    def from_dict(d: dict) -> Axiom:
         if not isinstance(d, dict) or "kind" not in d:
             raise SchemaParseError(f"axiom 需要 kind，得到: {d!r}")
         kind = str(d["kind"]).strip()
@@ -133,7 +133,7 @@ class Schema:
         return yaml.safe_dump(data, allow_unicode=True, sort_keys=False, width=100)
 
     @classmethod
-    def from_yaml(cls, text: str) -> "Schema":
+    def from_yaml(cls, text: str) -> Schema:
         # 剥可能的代码栅栏
         t = text.strip()
         if t.startswith("```"):
@@ -143,7 +143,7 @@ class Schema:
         try:
             data = yaml.safe_load(t)
         except yaml.YAMLError as e:
-            raise SchemaParseError(f"YAML 解析失败: {e}")
+            raise SchemaParseError(f"YAML 解析失败: {e}") from e
         if not isinstance(data, dict):
             raise SchemaParseError(f"YAML 顶层应是映射，得到 {type(data).__name__}")
 
@@ -257,7 +257,7 @@ class Schema:
                     errs.append(f"axiom {ax.kind}: 引用不存在的类 {p.get('class')!r}")
             elif ax.kind == "cardinality":
                 if p.get("relation") not in rnames or p.get("class") not in names:
-                    errs.append(f"axiom cardinality: 引用不存在的关系/类")
+                    errs.append("axiom cardinality: 引用不存在的关系/类")
                 bounds = [p.get(k) for k in ("min", "max") if p.get(k) is not None]
                 if any(type(v) is not int or v < 0 for v in bounds):
                     errs.append("axiom cardinality: min/max 必须为非负整数")
@@ -276,13 +276,10 @@ class Schema:
             pk = ", ".join(e.primary_key)
             lines.append(f"- {e.name} (primary key: {pk})")
             if with_attrs and e.attributes:
-                lines.append(
-                    f"    attrs: " + "; ".join(f"{a.name}:{a.dtype}" for a in e.attributes)
-                )
+                lines.append("    attrs: " + "; ".join(f"{a.name}:{a.dtype}" for a in e.attributes))
             if e.attribute_aliases:
                 lines.append(
-                    f"    aliases: "
-                    + "; ".join(f"{k}->{v}" for k, v in e.attribute_aliases.items())
+                    "    aliases: " + "; ".join(f"{k}->{v}" for k, v in e.attribute_aliases.items())
                 )
         lines.append("RELATION TYPES:")
         for r in self.relations:

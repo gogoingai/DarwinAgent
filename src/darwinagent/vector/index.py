@@ -6,8 +6,8 @@ asset: every arm of an experiment consumes the identical frozen store."""
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable
 
 
 @dataclass

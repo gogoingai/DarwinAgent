@@ -3,16 +3,15 @@
 import json
 import unittest
 from pathlib import Path
-from types import SimpleNamespace
 
 import networkx as nx
 
 from darwinagent.agents.extraction import (
+    ExtractionAgent,
     Segment,
     bisect,
     looks_truncated,
     plan_batches,
-    ExtractionAgent,
 )
 from darwinagent.config import RunConfig
 from darwinagent.contracts import (
@@ -25,13 +24,13 @@ from darwinagent.contracts import (
     MemoryResult,
     SourceRef,
 )
+from darwinagent.kernel.validation import validate_graph
 from darwinagent.kg.assembler import (
     GraphAssembler,
     anchoring_errors,
     anchoring_invariants,
     recover_facts,
 )
-from darwinagent.kernel.validation import validate_graph
 from darwinagent.llm.recorded import RecordedClient
 from darwinagent.runtime.artifacts import digest
 from darwinagent.schema.model import Schema

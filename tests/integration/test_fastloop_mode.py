@@ -15,14 +15,11 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from darwinagent.config import RunConfig
-from darwinagent.experiments.proposal import ProposalGenerator
-from darwinagent.experiments.runner import ExperimentRunner
-from darwinagent.kernel import TaskSpec
-from darwinagent.kernel.registration import load_assets
 from darwinagent.contracts import EvaluationResult
+from darwinagent.experiments.proposal import ProposalGenerator
+from darwinagent.kernel import TaskSpec
 from tests.fixtures import TASK
-from tests.integration.test_experiment import LedgerRecordedClient, RecordedExperiment, client
+from tests.integration.test_experiment import RecordedExperiment
 from tests.integration.test_wiki_optimization import WikiRecordedExperiment
 
 
@@ -243,6 +240,7 @@ class PExtractMarkingTests(unittest.TestCase):
                         updated = asset.to_dict()
                         updated["content"] += "\nReweight extraction emphasis."
                         from collections import deque
+
                         from darwinagent.kernel.revision import training_id
 
                         replies["proposal"] = deque(

@@ -1,7 +1,9 @@
-import tempfile, unittest
+import tempfile
+import unittest
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
+
 from datasets.locomo.evaluator import LocomoEvaluator
 
 
@@ -9,6 +11,7 @@ class SubsetEvaluation(unittest.IsolatedAsyncioTestCase):
     def evaluator(self, root):
         # Synthetic reference fixture for mocked grading; never an audited benchmark gold.
         import json
+
         from datasets.locomo.pipeline.data import load_conversation
 
         conv = load_conversation(Path("datasets/locomo/data/locomo10_zh.json"), "conv-26")

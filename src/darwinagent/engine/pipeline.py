@@ -16,13 +16,12 @@ import networkx as nx
 from darwinagent.agents import AnswerAgent, ExtractionAgent
 from darwinagent.config import RunConfig
 from darwinagent.contracts import AnswerResult, GraphResult, MemoryResult, RunResult, plain
-from darwinagent.kg.assembler import GraphAssembler
-from darwinagent.kg.graph import load_graph, save_graph
 from darwinagent.kernel.execution import KernelRuntime
 from darwinagent.kernel.validation import validate_case, validate_published
+from darwinagent.kg.assembler import GraphAssembler
+from darwinagent.kg.graph import load_graph, save_graph
 from darwinagent.runtime.artifacts import atomic_json, digest
 from darwinagent.runtime.identity import assert_files, snapshot_files, transport_identity
-
 
 # 搬运字节断言的显式豁免：检查点装载逻辑本身（不参与答案计算，回归全绿护航）。
 # 豁免必须逐一列名——除此之外任何答案路径文件漂移都会拒绝搬运。

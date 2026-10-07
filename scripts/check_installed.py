@@ -1,10 +1,10 @@
 """Installed-wheel acceptance; invoke with the installed environment's Python, outside checkout."""
 
 import json
-from pathlib import Path
 import subprocess
 import sys
 import tempfile
+from pathlib import Path
 
 
 def check():

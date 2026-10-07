@@ -1,7 +1,7 @@
 """A round's absolute deadline, shared by async tasks and synchronous primitives."""
 
-from contextvars import ContextVar
 import time
+from contextvars import ContextVar
 
 ROUND_DEADLINE = ContextVar("oak_round_deadline", default=None)
 

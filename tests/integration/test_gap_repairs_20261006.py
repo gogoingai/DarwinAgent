@@ -16,25 +16,26 @@ from pathlib import Path
 from unittest import mock
 
 from networkx import freeze
+
+from darwinagent.agents.answer import AnswerAgent
 from darwinagent.config import RunConfig
 from darwinagent.contracts import GraphResult
 from darwinagent.kernel import KernelBundle, TaskSpec
 from darwinagent.kernel.execution import KernelRuntime
 from darwinagent.kernel.registration import load_assets
+from darwinagent.kg.graph import load_graph
 from tests.fixtures import TASK
 from tests.integration.test_experiment import RecordedExperiment
 from tests.integration.test_wiki_faults_repro import (
-    FIXTURES,
-    TASK_YAML,
     FIXED_C,
     FIXED_F,
+    FIXTURES,
+    TASK_YAML,
     base_bundle,
     candidate_bundle,
     legal_candidate,
     travel_case,
 )
-from darwinagent.kg.graph import load_graph
-from darwinagent.agents.answer import AnswerAgent
 
 
 class MaxRetriesDefault(unittest.TestCase):
@@ -179,6 +180,7 @@ class ScoredRoundsAndIdentity(unittest.TestCase):
 
     def test_timeout_iteration_does_not_consume_round(self):
         import asyncio as _aio
+
         from tests.integration.test_fastloop_mode import FastLoopExperiment, _run
 
         with tempfile.TemporaryDirectory() as tmp:

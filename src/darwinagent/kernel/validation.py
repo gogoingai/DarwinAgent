@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import json
 
-from darwinagent.contracts import AnswerResult, AtomicFact, CaseInput, GraphResult, plain
-from darwinagent.kg.graph import EntityCandidate, RelationCandidate, build_graph, node_view, node_id
+from darwinagent.contracts import AnswerResult, AtomicFact, CaseInput, GraphResult
+from darwinagent.kg.graph import EntityCandidate, RelationCandidate, build_graph, node_id, node_view
 from darwinagent.schema.model import Schema
-from .spec import validate_value, contract_errors
+
+from ..operators.sandbox import DATA_CAPABILITIES as _CAPS
+from .spec import contract_errors, validate_value
 
 FIXED_CHECK_IDS = (
     "fixed.input",
@@ -37,9 +39,10 @@ def atomic_memory_errors(schema):
 
 
 def validate_bundle(bundle, forbidden_questions=()):
-    from .functions import FunctionRegistry
-    from .checks import CheckRegistry
     from darwinagent.kg.assembler import anchoring_errors
+
+    from .checks import CheckRegistry
+    from .functions import FunctionRegistry
 
     bundle.verify()
     schema = Schema.from_yaml(next(a.content for a in bundle.assets.assets if a.kind == "S"))
@@ -93,7 +96,9 @@ def validate_graph(result: GraphResult, schema, expected_memory_fingerprint=None
                 try:
                     fact = AtomicFact.from_dict(json.loads(nd.get("__fact__", "null")))
                 except Exception as exc:
-                    raise ValueError(f"Fact node {nid} does not carry a complete definition: {exc}")
+                    raise ValueError(
+                        f"Fact node {nid} does not carry a complete definition: {exc}"
+                    ) from exc
                 for ev in fact.evidence:
                     block = result.sources.get(ev.source_id)
                     if block is None or block.text[ev.start : ev.end] != ev.quote:
@@ -209,7 +214,6 @@ def validate_case(case, spec):
 
 # 任务检索底线 → 必须出现在 F 源码中的沙箱能力名（能力词汇属框架层，映射集中在此；
 # 任务只声明意图键——语义参数化在 task.yaml，不进内核硬编码）。
-from ..operators.sandbox import DATA_CAPABILITIES as _CAPS
 
 DATA_CAPABILITY_NAMES = frozenset(_CAPS)
 RETRIEVAL_FLOOR_CAPABILITIES = {"semantic_search": ("semantic_search",), "traversal": ("traverse",)}

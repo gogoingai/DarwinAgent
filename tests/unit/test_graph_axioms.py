@@ -5,11 +5,11 @@ from dataclasses import replace
 from pathlib import Path
 
 from darwinagent.agents import ExtractionAgent
+from darwinagent.agents.protocol import ProtocolError
 from darwinagent.config import RunConfig
 from darwinagent.kernel.assets import KernelAssets
 from darwinagent.kernel.execution import KernelRuntime
-from darwinagent.agents.protocol import ProtocolError
-from tests.fixtures import spec, case, client
+from tests.fixtures import case, client, spec
 
 
 class GraphAxiomAcceptance(unittest.TestCase):

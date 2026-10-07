@@ -1,19 +1,19 @@
 """End-to-end negative admission checks using frozen Asset trial inputs."""
 
-import json
 import asyncio
+import json
+import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
-import shutil
-import subprocess
 from dataclasses import dataclass, replace
 from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
 
-from darwinagent.config import RunConfig
 from darwinagent.agents.protocol import ModelSession, ProtocolError
+from darwinagent.config import RunConfig
 from darwinagent.contracts import (
     AnswerResult,
     CaseInput,
@@ -27,10 +27,10 @@ from darwinagent.experiments.admission_worker import run_isolated
 from darwinagent.experiments.bootstrap import AssetBootstrapper
 from darwinagent.experiments.runner import (
     ExperimentRunner,
+    _prior_failed_tool_params,
     _retry_journal,
     _retryable_answer,
     _settle_reservations,
-    _prior_failed_tool_params,
     stability_metrics,
 )
 from darwinagent.experiments.snapshots import attach_vector, load_frozen_graph
@@ -39,8 +39,7 @@ from darwinagent.kernel.functions import FunctionRegistry
 from darwinagent.llm.recorded import RecordedClient
 from darwinagent.operators.data import DataCapabilities
 from darwinagent.operators.sandbox import Limits
-from darwinagent.runtime.artifacts import atomic_json
-from darwinagent.runtime.artifacts import digest
+from darwinagent.runtime.artifacts import atomic_json, digest
 from tests.integration.test_agentic_round import (
     FakeEmbedder,
     build_snapshot,
@@ -135,7 +134,7 @@ class FrozenCandidateAdmissionTests(unittest.TestCase):
 
             async def chat(self, **_kwargs):
                 self.calls += 1
-                return SimpleNamespace(content='{"count":%d}' % self.calls)
+                return SimpleNamespace(content=f'{{"count":{self.calls}}}')
 
         def validator(value):
             if value["count"] != 2:

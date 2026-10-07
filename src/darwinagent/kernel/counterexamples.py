@@ -126,7 +126,7 @@ def run_probes(runtime, graph, memory=None):
             # Query traversal order may change under renamed primary keys; compare list data as a multiset.
             def canonical(v):
                 if isinstance(v, list):
-                    return sorted((json.dumps(x, sort_keys=True, ensure_ascii=False) for x in v))
+                    return sorted(json.dumps(x, sort_keys=True, ensure_ascii=False) for x in v)
                 return v
 
             if canonical(expected) != canonical(after["data"]):
@@ -157,6 +157,7 @@ def run_fact_probes(runtime, memory):
     """Fixed synthetic fact mutations: negation, plan, duplicates, add/delete, renames and
     date shifts must land as separate preserved facts whose identity follows their content."""
     from dataclasses import replace as _replace
+
     from darwinagent.contracts import AtomicFact, EntityRef, MemoryResult
     from darwinagent.kg.assembler import GraphAssembler
 

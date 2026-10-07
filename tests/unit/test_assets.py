@@ -6,13 +6,11 @@ from dataclasses import replace
 from pathlib import Path
 
 from darwinagent.config import RunConfig
-from darwinagent.contracts import freeze
-from darwinagent.kernel import Asset, KernelAssets, KernelBundle, TaskSpec
-from darwinagent.kernel.revision import AssetPatch, AssetRevisionService, training_id
-from darwinagent.kernel.validation import validate_bundle
-from darwinagent.operators.sandbox import Interpreter, Limits, SandboxError, admit
+from darwinagent.kernel import Asset, KernelBundle, TaskSpec
 from darwinagent.kernel.registration import load_assets
-from tests.fixtures import ROOT, TASK
+from darwinagent.kernel.revision import AssetPatch, AssetRevisionService, training_id
+from darwinagent.operators.sandbox import Interpreter, Limits, SandboxError, admit
+from tests.fixtures import TASK
 
 
 class AssetBoundary(unittest.TestCase):

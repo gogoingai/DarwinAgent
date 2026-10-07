@@ -7,6 +7,7 @@ from string import Template
 
 from darwinagent.contracts import plain
 from darwinagent.operators.sandbox import Limits
+
 from .checks import CheckRegistry
 from .functions import DataCapabilities, FunctionRegistry
 from .validation import validate_bundle, validate_graph

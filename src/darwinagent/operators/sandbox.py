@@ -312,7 +312,7 @@ class Interpreter:
             except (TypeError, ValueError) as exc:
                 raise SandboxError("Result must be JSON data") from exc
             if len(blob.encode()) > self.limits.result_bytes:
-                raise SandboxError("Result byte limit exceeded")
+                raise SandboxError("Result byte limit exceeded") from None
             return json.loads(blob)
         except (SandboxError,):
             raise

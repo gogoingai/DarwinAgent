@@ -5,10 +5,10 @@ traces back to fact nodes, and the same memory plus declared mapping yields the 
 from __future__ import annotations
 
 import json
-from typing import Mapping
+from collections.abc import Mapping
+from types import MappingProxyType
 
 import networkx as nx
-from types import MappingProxyType
 
 from darwinagent.contracts import AtomicFact, GraphResult, MemoryResult
 from darwinagent.kg.graph import node_id
@@ -257,7 +257,7 @@ def anchoring_invariants(
                 if ed.get("relation") == "time_anchor"
             }
             if got != want:
-                errors.append(f"时间节点锚点连边与事实定义不一致")
+                errors.append("时间节点锚点连边与事实定义不一致")
         for ev in fact.evidence:
             span_nid = node_id(
                 "EvidenceSpan",
@@ -280,7 +280,7 @@ def anchoring_invariants(
                     snd.get("start_offset"),
                     snd.get("end_offset"),
                 ) != (ev.source_id, ev.quote, ev.start, ev.end):
-                    errors.append(f"证据节点内容与事实定义不一致")
+                    errors.append("证据节点内容与事实定义不一致")
                 block = sources.get(ev.source_id)
                 want = node_id(
                     "Source",
@@ -296,7 +296,7 @@ def anchoring_invariants(
                     if ed.get("relation") == "locates"
                 }
                 if got != {want}:
-                    errors.append(f"证据定位连边与事实定义不一致")
+                    errors.append("证据定位连边与事实定义不一致")
         facts.append(fact.to_dict())
         fact_objs.append(fact)
         # Provenance follows structure: each node's __sources__ must be exactly the evidence

@@ -1,14 +1,9 @@
 """Experiment statistics helpers; independent of the controller."""
 
 from __future__ import annotations
-import asyncio
+
 import json
-import time
 from pathlib import Path
-from collections.abc import Mapping
-from darwinagent.contracts import plain
-from darwinagent.kernel.revision import training_id
-from darwinagent.runtime.artifacts import atomic_json, digest
 
 
 def stability_metrics(root):

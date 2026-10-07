@@ -12,13 +12,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from openai import AsyncOpenAI, APIError, APIConnectionError, APIStatusError, APITimeoutError
 import httpx
+from openai import APIConnectionError, APIError, APIStatusError, APITimeoutError, AsyncOpenAI
 
 from ..config import Config
-from .registry import REGISTRY_VERSION, request_policy, resolve
 from ..runtime.artifacts import atomic_json
 from ..runtime.budgets import counter_transaction
+from .registry import REGISTRY_VERSION, request_policy, resolve
 
 
 class BudgetExceeded(RuntimeError):

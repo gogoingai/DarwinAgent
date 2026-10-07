@@ -14,51 +14,68 @@ import json
 import os
 import shutil
 import time
+from collections.abc import Mapping
 from contextlib import nullcontext
 from dataclasses import asdict
 from pathlib import Path
 
-from collections.abc import Mapping
-
-from darwinagent.contracts import AnswerResult, EvaluationResult, GraphResult, RunResult, plain
 from darwinagent.agents.protocol import ProtocolError
+from darwinagent.contracts import AnswerResult, EvaluationResult, GraphResult, RunResult, plain
 from darwinagent.engine.pipeline import Pipeline
 from darwinagent.kernel import KernelBundle
-from darwinagent.kernel.revision import AssetRevisionService, training_id
+from darwinagent.kernel.revision import AssetRevisionService
+from darwinagent.kernel.revision import training_id as training_id
 from darwinagent.kernel.validation import capability_names
 from darwinagent.llm.client import LLMClient
 from darwinagent.runtime.artifacts import atomic_json, digest
-from darwinagent.runtime.identity import assert_files, snapshot_files, transport_identity
 from darwinagent.runtime.deadline import ROUND_DEADLINE, RoundDeadlineExceeded, bounded_timeout
-from .bootstrap import AssetBootstrapper
-from .proposal import ProposalGenerator
-from .spec import aggregate_scores
-from .wiki import WikiMaintainer, safe_feedback, safe_scores, asset_evidence, bounded_trace
+from darwinagent.runtime.identity import assert_files, snapshot_files, transport_identity
 
+from .bootstrap import AssetBootstrapper
 from .feedback import (
-    _clip,
-    _diagnostic_failure,
-    _compact_diagnostic,
-    _retrieval_trace,
-    pipeline_active_stages,
-    training_feedback as _training_feedback,
-    question_identity,
-    _wiki_training_evidence,
+    _clip as _clip,
+)
+from .feedback import (
+    _compact_diagnostic as _compact_diagnostic,
+)
+from .feedback import (
+    _diagnostic_failure as _diagnostic_failure,
+)
+from .feedback import (
     _per_case_feedback_facts,
+    _wiki_training_evidence,
+    pipeline_active_stages,
+    question_identity,
 )
-from .trials import stress_trial_samples
+from .feedback import (
+    _retrieval_trace as _retrieval_trace,
+)
+from .feedback import (
+    training_feedback as _training_feedback,
+)
+from .proposal import ProposalGenerator
 from .recovery import (
-    batched_fault_retry,
-    _retryable_answer,
-    _retry_journal,
-    _settle_reservations,
-    _failed_tool_params,
-    _prior_failed_tool_params,
-    _check_snapshot_expectation,
-    _prior_failed_check_snapshots,
-    promote_verified_check_replay,
+    _check_snapshot_expectation as _check_snapshot_expectation,
 )
+from .recovery import (
+    _failed_tool_params,
+    _prior_failed_check_snapshots,
+    _prior_failed_tool_params,
+    _retry_journal,
+    _retryable_answer,
+    _settle_reservations,
+)
+from .recovery import (
+    batched_fault_retry as batched_fault_retry,
+)
+from .recovery import (
+    promote_verified_check_replay as promote_verified_check_replay,
+)
+from .spec import aggregate_scores
 from .statistics import stability_metrics
+from .trials import stress_trial_samples as stress_trial_samples
+from .wiki import WikiMaintainer, asset_evidence, safe_feedback, safe_scores
+from .wiki import bounded_trace as bounded_trace
 
 FEEDBACK_BUDGET_CHARS = 35000
 _DIAG_ROW_CHARS = 2200  # 未识别结构的诊断行截断上限（locomo 判分行会被结构化压缩）
@@ -342,7 +359,7 @@ class ExperimentRunner:
                         record_dir / "patches.json", {"patches": [p.to_dict() for p in patches]}
                     )
                 patch_file = record_dir / "patches.json"
-                patch_evidence = json.loads(patch_file.read_text()) if patch_file.exists() else {}
+                _patch_evidence = json.loads(patch_file.read_text()) if patch_file.exists() else {}
                 if not (staged_path / "bundle" / "manifest.json").exists():
                     self.revisions.propose(
                         adopted,
@@ -657,6 +674,7 @@ class ExperimentRunner:
     async def _preflight(self, candidate, spec, sample_question=None, cases=None, replay_inputs=()):
         """An identity-bound candidate report, including actual frozen trial inputs."""
         from types import SimpleNamespace
+
         from .admission import admit_candidate
 
         if (
@@ -782,9 +800,11 @@ class ExperimentRunner:
         摘要（投影实现版本）——F/C/P 改动复用同图，S 变才重建。core 不 import
         任务侧模块：builder 身份用源码摘要（与 Pipeline 身份同口径）。"""
         import inspect
-        from .snapshots import snapshot_manifest
-        from ..kernel.validation import validate_bundle
+
         from darwinagent.runtime.artifacts import digest as _digest
+
+        from ..kernel.validation import validate_bundle
+        from .snapshots import snapshot_manifest
 
         manifest = snapshot_manifest(self.snapshot_root / case.id)
         schema = validate_bundle(bundle)
@@ -840,7 +860,9 @@ class ExperimentRunner:
         """最近已采纳 stage 的同题真图；无基线版本/stage 缺图/digest 不符 → None（走重抽）。"""
         import re as _re
         from types import MappingProxyType as _MP
+
         import networkx as nx
+
         from darwinagent.kg.graph import load_graph
 
         if not base_version:
@@ -881,8 +903,10 @@ class ExperimentRunner:
     async def _extract_trial_graph(self, bundle, case):
         """用候选资产真抽一次试验图；键=(case, S 指纹, P.extract 指纹, config, 传输身份)
         ——不含候选整体版本，未触碰抽取面的后续候选共享缓存。"""
-        import networkx as nx
         from types import MappingProxyType as _MP
+
+        import networkx as nx
+
         from darwinagent.agents import ExtractionAgent
         from darwinagent.kernel.execution import KernelRuntime
         from darwinagent.kg.graph import load_graph, save_graph

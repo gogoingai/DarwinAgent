@@ -17,6 +17,7 @@ from darwinagent.kernel import KernelBundle
 from darwinagent.llm.client import LLMClient
 from darwinagent.runtime.artifacts import atomic_json
 from darwinagent.runtime.identity import assert_files, snapshot_files, transport_identity
+
 from .runner import ExperimentRunner
 from .spec import ExperimentSpec, aggregate_scores, precheck_identity
 
@@ -259,19 +260,6 @@ class CampaignController:
                     f"Adopted bundle missing from publication tree: {candidate['version']}"
                 )
         return chain
-
-    def _register_train_runs(self):
-        train = self.root / "train"
-        stages = ["B0"]
-        n = 1
-        while (train / f"R{n}" / "generation" / case_id / "result.json").exists():
-            stages.append(f"R{n}")
-            n += 1
-        for name in stages:
-            result_path = train / name / "generation" / case_id / "result.json"
-            if result_path.exists():
-                row = json.loads(result_path.read_text())
-                self._register("train", case_id, row["asset_version"], len(row["answers"]))
 
     # ---- orchestration ---------------------------------------------------------
     async def run(self, task_spec, resume=False, rounds=None, scope=(), b0_gate=None):

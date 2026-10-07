@@ -10,9 +10,10 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from darwinagent.config import RunConfig
-from darwinagent.contracts import CorpusBlock, SourceRef, QuestionInput
+from darwinagent.contracts import CorpusBlock, QuestionInput, SourceRef
 from darwinagent.kernel import KernelBundle
 from darwinagent.runtime.artifacts import atomic_json, digest
+
 from .admission import admit_candidate
 from .snapshots import attach_vector, load_frozen_graph, snapshot_digest
 

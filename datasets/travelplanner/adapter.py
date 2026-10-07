@@ -3,14 +3,14 @@
 from __future__ import annotations
 
 import csv
-import hashlib
 import io
 import json
 from pathlib import Path
 
 from darwinagent.contracts import CaseInput, CorpusBlock, QuestionInput, SourceRef
-from .pipeline.data.queries import parse_dates
+
 from .pipeline.data.corpus import reference_chunks
+from .pipeline.data.queries import parse_dates
 
 ROOT = Path(__file__).resolve().parents[2]
 ENVIRONMENT_FILES = (

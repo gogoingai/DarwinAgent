@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import hashlib
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from string import Template
-from typing import Mapping
 
 from darwinagent.contracts import freeze, plain
 from darwinagent.runtime.artifacts import atomic_json, digest
+
 from .spec import KINDS, PROMPT_SLOTS, RESERVED_PREFIX
 
 FORMAT_VERSION = 3

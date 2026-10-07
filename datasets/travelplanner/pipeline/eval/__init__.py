@@ -1,3 +1,3 @@
-from .adapter import TravelPlannerEvaluator, SubsetScores
+from .adapter import SubsetScores, TravelPlannerEvaluator
 
 __all__ = ["TravelPlannerEvaluator", "SubsetScores"]

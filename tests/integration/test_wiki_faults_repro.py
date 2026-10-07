@@ -17,6 +17,7 @@ from dataclasses import replace
 from pathlib import Path
 
 from networkx import freeze
+
 from darwinagent.config import RunConfig
 from darwinagent.contracts import GraphResult
 from darwinagent.experiments import AdoptionPolicy, ExperimentRunner
@@ -351,7 +352,10 @@ class FourthReviewFixtureTests(TravelFaultReproductionTests):
     def test_official_constraints_validate_fixture(self):
         """夹具行程经官方 commonsense+hard 约束校验全部通过（防漂移守卫：
         夹具数据若偏离官方库/约束语义，本测试先红）。"""
-        import subprocess, sys, tempfile
+        import subprocess
+        import sys
+        import tempfile
+
         from datasets.travelplanner.adapter import TravelPlannerAdapter
 
         ex, plan = self._fixture()
@@ -467,7 +471,7 @@ class FourthReviewFixtureTests(TravelFaultReproductionTests):
     def test_archived_fix_residual_abstain_gap_is_exposed(self):
         """如实记录：归档 attempt-4 修复对弃答形态仍误杀（回落字符串→not-an-array）。
         该残余缺陷由契约电池的 abstain 形态当场暴露——历史四标签回放没测过弃答。"""
-        base = base_bundle()
+        _base = base_bundle()
         attempt4 = self._patched_bundle({"c_answer_shape": FIXED_C, "f_flight_pair": FIXED_F})
         report = self._admit(attempt4)
         abstain_rows = [s for s in report["scenarios"] if s.get("scenario_id") == "answer_2"]
@@ -655,7 +659,9 @@ class ReviewFixUnitTests(unittest.TestCase):
             },
         ]
         lessons = _lessons(entries)
-        self.assertFalse([l for l in lessons if l.get("status") == "admission_verified"], lessons)
+        self.assertFalse(
+            [lesson for lesson in lessons if lesson.get("status") == "admission_verified"], lessons
+        )
 
 
 class DynamicTrialGraphTests(unittest.TestCase):
@@ -820,8 +826,8 @@ class RealFaultAdmissionTests(unittest.TestCase):
 
     @classmethod
     def _case_graph(cls):
-        from datasets.locomo.adapter import LocomoAdapter
         from darwinagent.experiments.snapshots import load_frozen_graph
+        from datasets.locomo.adapter import LocomoAdapter
 
         case = LocomoAdapter(Path("datasets/locomo/data/locomo10_zh.json")).generation_input(
             "conv-30"

@@ -4,8 +4,8 @@ import asyncio
 import unittest
 from unittest.mock import patch
 
-from datasets.locomo.pipeline.data import QA
 from datasets.locomo.pipeline import judge
+from datasets.locomo.pipeline.data import QA
 from datasets.locomo.pipeline.evaluation_dispatch import grade_all_dispatched
 
 

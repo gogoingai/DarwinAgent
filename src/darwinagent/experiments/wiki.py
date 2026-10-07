@@ -2,17 +2,17 @@
 
 from __future__ import annotations
 
+import inspect
 import json
 import re
-import inspect
 from collections import Counter
 from pathlib import Path
 
-from darwinagent.operators.data import DataCapabilities
-from darwinagent.operators.sandbox import DATA_CAPABILITIES, BUILTINS
 from darwinagent.agents.protocol import ModelSession
-from darwinagent.runtime.artifacts import atomic_json, digest
 from darwinagent.contracts import freeze
+from darwinagent.operators.data import DataCapabilities
+from darwinagent.operators.sandbox import BUILTINS, DATA_CAPABILITIES
+from darwinagent.runtime.artifacts import atomic_json, digest
 
 
 def safe_scores(scores):

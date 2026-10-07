@@ -7,10 +7,11 @@ import asyncio
 from darwinagent.contracts import AnswerResult, plain
 from darwinagent.kernel.functions import DataCapabilities
 from darwinagent.kernel.validation import validate_candidate, validate_published
+
 from .protocol import (
     ANSWER_PROTOCOL,
-    TOOLS_PROTOCOL,
     REVIEW_PROTOCOL,
+    TOOLS_PROTOCOL,
     ModelSession,
     ProtocolError,
     validate_review,
@@ -185,7 +186,7 @@ class AnswerAgent:
                         "visible_evidence": [caps.rows[x] for x in sorted(visible)],
                         "feedback": feedback,
                     },
-                    lambda obj: self._candidate(obj, visible),
+                    lambda obj, visible=visible: self._candidate(obj, visible),
                 )
                 if candidate["status"] == "abstained" and not any(
                     t["read_operations"] for t in tool_results
@@ -269,7 +270,7 @@ class AnswerAgent:
                         self.config.review_role,
                         REVIEW_PROTOCOL + "\n任务语义审查指引：\n" + self.runtime.prompt("review"),
                         review_input,
-                        lambda obj: validate_review(obj, candidate["status"]),
+                        lambda obj, candidate=candidate: validate_review(obj, candidate["status"]),
                     )
                     trace.append({"stage": "review", "attempt": attempt, **review})
                     if not review["accepted"]:

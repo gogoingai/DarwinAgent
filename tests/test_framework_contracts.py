@@ -3,11 +3,12 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
+
 from darwinagent.config import Config
 from darwinagent.kg.graph import (
     EntityCandidate,
-    RelationCandidate,
     GraphValidationError,
+    RelationCandidate,
     build_graph,
     node_id,
 )
@@ -15,7 +16,6 @@ from darwinagent.llm.client import BudgetExceeded, LLMClient
 from darwinagent.runtime import atomic_json
 from darwinagent.schema.model import Schema
 from darwinagent.schema.owlcheck import check_schema
-
 
 YAML = """entity_types:
   Person:

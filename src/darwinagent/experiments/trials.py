@@ -1,14 +1,10 @@
 """Experiment trials helpers; independent of the controller."""
 
 from __future__ import annotations
-import asyncio
-import json
-import time
-from pathlib import Path
+
 from collections.abc import Mapping
+
 from darwinagent.contracts import plain
-from darwinagent.kernel.revision import training_id
-from darwinagent.runtime.artifacts import atomic_json, digest
 
 
 def stress_trial_samples(base_inputs, graph):
@@ -17,8 +13,6 @@ def stress_trial_samples(base_inputs, graph):
     历史回归两大根因修复：①真实 trial_inputs 是冻结映射与元组——按 Mapping 判定并
     plain() 解包，否则样本恒空（电池空转事故）；②自扫描型 F 不收 rows——必须扫标量
     宽值（subject='' → 内部扫描命中全图 → 预算爆/列表字段流过 str() 当场触发）。"""
-    from collections.abc import Mapping
-    from darwinagent.contracts import plain
     from darwinagent.operators.data import DataCapabilities
 
     rows = list(DataCapabilities(graph).rows.values())

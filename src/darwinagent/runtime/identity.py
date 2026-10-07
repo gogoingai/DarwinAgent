@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 from pathlib import Path
 
-from .artifacts import digest, verify_files
+from .artifacts import digest
 
 
 def snapshot_files(paths):

@@ -1,4 +1,4 @@
-from .model import Schema, EntityType, RelationType, Attribute, Axiom, SchemaParseError
+from .model import Attribute, Axiom, EntityType, RelationType, Schema, SchemaParseError
 from .owlcheck import check_schema
 
 __all__ = [

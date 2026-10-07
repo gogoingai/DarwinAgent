@@ -8,8 +8,8 @@ from pathlib import Path
 from darwinagent.agents import ExtractionAgent
 from darwinagent.config import RunConfig
 from darwinagent.kernel.assets import KernelAssets
-from darwinagent.kernel.execution import KernelRuntime
 from darwinagent.kernel.counterexamples import run_probes
+from darwinagent.kernel.execution import KernelRuntime
 from darwinagent.kernel.validation import validate_graph
 from darwinagent.operators.sandbox import Interpreter, Limits, SandboxError, admit
 from tests.fixtures import case, client, spec

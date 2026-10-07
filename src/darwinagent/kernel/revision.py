@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from darwinagent.runtime.artifacts import atomic_json
+
 from .assets import Asset, KernelAssets, KernelBundle
 from .validation import validate_bundle
 

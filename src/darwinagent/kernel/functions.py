@@ -6,9 +6,10 @@ import json
 import time
 from collections.abc import Mapping
 
+from darwinagent.contracts import plain
 from darwinagent.operators.data import DataCapabilities
 from darwinagent.operators.sandbox import Interpreter, Limits, admit
-from darwinagent.contracts import plain
+
 from .spec import validate_value
 
 

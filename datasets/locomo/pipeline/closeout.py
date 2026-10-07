@@ -15,11 +15,11 @@ from __future__ import annotations
 import asyncio
 import json
 import sys
-from pathlib import Path
+
+from darwinagent.llm.client import LLMClient
 
 from .config import load_locomo_config
 from .data import load_conversation
-from darwinagent.llm.client import LLMClient
 
 CLOSEOUT_DIR_NAME = "closeout"
 THRESHOLD_PER_100 = 6.0  # 北极星：评测外 ≤ 6 题 / 100 题
@@ -150,7 +150,9 @@ async def run(conv_id: str, tag: str) -> dict:
     conv = load_conversation(lc.dataset_path, conv_id)
     out_dir = lc.runs_dir / conv_id / tag
     failures = [
-        json.loads(l) for l in (out_dir / "failures.jsonl").read_text().splitlines() if l.strip()
+        json.loads(line)
+        for line in (out_dir / "failures.jsonl").read_text().splitlines()
+        if line.strip()
     ]
     report = json.loads((out_dir / "report.json").read_text())
     client = LLMClient(lc.cfg)

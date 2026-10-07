@@ -11,7 +11,7 @@ from pathlib import Path
 
 from .agent import QAOutput
 from .build import FactRecord
-from .data import Conversation, QA
+from .data import QA, Conversation
 
 
 def attribute_failures(

@@ -6,6 +6,7 @@ from darwinagent.agents.protocol import ModelSession
 from darwinagent.kernel.assets import Asset
 from darwinagent.kernel.revision import AssetPatch, training_id
 from darwinagent.runtime.artifacts import atomic_json
+
 from .bootstrap import revision_protocol
 
 

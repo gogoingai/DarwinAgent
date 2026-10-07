@@ -10,7 +10,6 @@ from collections import Counter
 from pathlib import Path
 
 from darwinagent.config import Config, RunConfig
-from darwinagent.experiments.spec import precheck_identity
 from darwinagent.contracts import EvaluationResult
 from darwinagent.experiments import (
     AdoptionPolicy,
@@ -18,6 +17,7 @@ from darwinagent.experiments import (
     ExperimentSpec,
     SelectionPolicy,
 )
+from darwinagent.experiments.spec import precheck_identity
 from darwinagent.kernel import KernelBundle, TaskSpec
 from darwinagent.kernel.registration import load_assets
 from darwinagent.kernel.revision import training_id

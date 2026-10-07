@@ -1,6 +1,5 @@
 from pathlib import Path
 
-from darwinagent.config import RunConfig
 from darwinagent.contracts import CaseInput, CorpusBlock, QuestionInput, SourceRef
 from darwinagent.kernel import TaskSpec
 from darwinagent.kernel.registration import load_assets

@@ -1,23 +1,23 @@
 """Public CLI and real HTTP transport acceptance against a localhost fake endpoint."""
 
 import asyncio
-from contextlib import contextmanager, redirect_stdout, redirect_stderr
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import io
 import json
 import os
-from pathlib import Path
 import tempfile
 import threading
 import time
 import unittest
+from contextlib import contextmanager, redirect_stderr, redirect_stdout
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 from unittest.mock import patch
 
-from darwinagent import Config, EvaluationResult, RunResult, AnswerResult, SourceRef
+from darwinagent import AnswerResult, Config, RunResult, SourceRef
 from darwinagent.cli import main
 from darwinagent.demo import MaintenanceEvaluator, ScriptedTransport
-from darwinagent.llm.client import LLMClient, BudgetExceeded, TransportExhausted
-from darwinagent.llm.registry import resolve, request_policy
+from darwinagent.llm.client import BudgetExceeded, LLMClient, TransportExhausted
+from darwinagent.llm.registry import request_policy, resolve
 
 
 @contextmanager
@@ -301,7 +301,8 @@ class TransportLimits(unittest.TestCase):
                         self.assertNotIn(secret.encode(), path.read_bytes(), str(path))
 
     def test_connection_failure_cause_redacted_without_changing_exception_type(self):
-        import openai, httpx
+        import httpx
+        import openai
 
         secret = "sentinel-connection-secret"
 

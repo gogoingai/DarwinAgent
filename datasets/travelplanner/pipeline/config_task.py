@@ -7,13 +7,13 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 from dotenv import load_dotenv
 
+from darwinagent.config import MODEL_ROLES, Config  # noqa: F401  （MODEL_ROLES 重导出兼容旧引用）
 from darwinagent.presets import legacy_benchmark_config
-from darwinagent.config import Config, MODEL_ROLES  # noqa: F401  （MODEL_ROLES 重导出兼容旧引用）
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 

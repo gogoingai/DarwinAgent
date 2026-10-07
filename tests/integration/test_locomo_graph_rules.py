@@ -4,7 +4,6 @@
 投影词汇的 S 在 build_graph 被拒）、向量命中校验、缓存键不含题目/资产版本。
 """
 
-import json
 import unittest
 from pathlib import Path
 
@@ -111,9 +110,10 @@ class FactProjectionTests(unittest.TestCase):
         """出处映射：corpus 给定时，事实行节点 __sources__ 是真实语料块 id，
         `graph.sources[s]` 逐个可解析（答题/审查证据解析契约）；派生节点来源＝
         关联事实来源并集；未登记出处＝拒绝。"""
+        from pathlib import Path as _P
+
         from datasets.locomo.adapter import LocomoAdapter
         from datasets.locomo.graph_rules import project_candidates, rebuild_graph
-        from pathlib import Path as _P
 
         case = LocomoAdapter(_P("datasets/locomo/data/locomo10_zh.json")).generation_input(
             "conv-26"

@@ -22,10 +22,9 @@ from darwinagent.experiments.runner import (
     promote_verified_check_replay,
 )
 from darwinagent.experiments.wiki import _lessons
-from darwinagent.kernel import KernelBundle, TaskSpec
+from darwinagent.kernel import TaskSpec
 from darwinagent.kernel.validation import capability_names
 from darwinagent.runtime.artifacts import digest
-
 from tests.integration.test_wiki_faults_repro import (
     COMPLETE_C,
     FIXED_F,
@@ -351,7 +350,7 @@ class VerifiedFixBindingTests(unittest.TestCase):
             },
         ]
         lessons = _lessons(entries)
-        verified = [l for l in lessons if l.get("status") == "admission_verified"]
+        verified = [lesson for lesson in lessons if lesson.get("status") == "admission_verified"]
         self.assertEqual(len(verified), 1, lessons)
         reproduced = verified[0]["verified_fix"].get("reproduced_checks")
         self.assertTrue(reproduced, verified[0]["verified_fix"])
@@ -462,7 +461,7 @@ class ArchivedAttributionTests(unittest.TestCase):
                 maintainer = WikiMaintainer(
                     tmp,
                     "offline-attribution",
-                    lambda _: client,
+                    lambda _, client=client: client,
                     RunConfig(protocol_attempts=1),
                     limit=10,
                 )
@@ -560,7 +559,9 @@ class VerifiedFixBindingRefTests(unittest.TestCase):
             ),
         ]
         lessons = _lessons(entries)
-        self.assertFalse([l for l in lessons if l.get("status") == "admission_verified"], lessons)
+        self.assertFalse(
+            [lesson for lesson in lessons if lesson.get("status") == "admission_verified"], lessons
+        )
 
     def test_same_ref_does_verify_replay_lesson(self):
         from darwinagent.experiments.wiki import _lessons
@@ -580,7 +581,9 @@ class VerifiedFixBindingRefTests(unittest.TestCase):
             ),
         ]
         lessons = _lessons(entries)
-        self.assertTrue([l for l in lessons if l.get("status") == "admission_verified"], lessons)
+        self.assertTrue(
+            [lesson for lesson in lessons if lesson.get("status") == "admission_verified"], lessons
+        )
 
     def test_structure_row_pass_does_not_verify(self):
         from darwinagent.experiments.wiki import _lessons
@@ -606,7 +609,9 @@ class VerifiedFixBindingRefTests(unittest.TestCase):
         entries[1]["facts"]["asset_changes"][0]["after"]["id"] = "c_shape"
         entries[1]["facts"]["asset_changes"][0]["after"]["kind"] = "C"
         lessons = _lessons(entries)
-        self.assertFalse([l for l in lessons if l.get("status") == "admission_verified"], lessons)
+        self.assertFalse(
+            [lesson for lesson in lessons if lesson.get("status") == "admission_verified"], lessons
+        )
 
 
 class ThirdReviewFixTests(unittest.TestCase):
@@ -809,7 +814,9 @@ class ThirdReviewFixTests(unittest.TestCase):
                 ),
             ]
         )
-        self.assertFalse([l for l in lessons if l.get("status") == "admission_verified"])
+        self.assertFalse(
+            [lesson for lesson in lessons if lesson.get("status") == "admission_verified"]
+        )
         # 原参数在 base 场景成功（跨场景同 digest）→ 四次复查「绑定场景」后不再
         # 验证（翻转三审断言：stress 失败只能由 stress 族通过行验证；见
         # FourthReviewBindingTests.test_same_case_cross_scenario_same_params_does_not_verify）
@@ -829,7 +836,9 @@ class ThirdReviewFixTests(unittest.TestCase):
                 ),
             ]
         )
-        self.assertFalse([l for l in lessons if l.get("status") == "admission_verified"])
+        self.assertFalse(
+            [lesson for lesson in lessons if lesson.get("status") == "admission_verified"]
+        )
 
     def test_loop6_failure_summary_keeps_rejection_reason(self):
         """三次复查 P1：真实 loop6 R1 attempt 的 C 拒绝理由（issues）必须在维护
@@ -1013,7 +1022,9 @@ class FourthReviewBindingTests(unittest.TestCase):
                 ),
             ]
         )
-        self.assertFalse([l for l in lessons if l.get("status") == "admission_verified"], lessons)
+        self.assertFalse(
+            [lesson for lesson in lessons if lesson.get("status") == "admission_verified"], lessons
+        )
 
     def test_same_case_cross_scenario_same_params_does_not_verify(self):
         """场景绑定：同 case 同 digest 但不同场景族（stress 失败、base 通过）
@@ -1036,7 +1047,9 @@ class FourthReviewBindingTests(unittest.TestCase):
                 ),
             ]
         )
-        self.assertFalse([l for l in lessons if l.get("status") == "admission_verified"], lessons)
+        self.assertFalse(
+            [lesson for lesson in lessons if lesson.get("status") == "admission_verified"], lessons
+        )
 
     def test_graph_digest_mismatch_does_not_verify(self):
         """数据图身份：同 case 同场景同 digest，但验证运行的数据图与失败时不同
@@ -1061,7 +1074,9 @@ class FourthReviewBindingTests(unittest.TestCase):
                 ),
             ]
         )
-        self.assertFalse([l for l in lessons if l.get("status") == "admission_verified"], lessons)
+        self.assertFalse(
+            [lesson for lesson in lessons if lesson.get("status") == "admission_verified"], lessons
+        )
         # 图一致时仍验证（既有用例不回退）
         lessons = _lessons(
             [
@@ -1080,7 +1095,9 @@ class FourthReviewBindingTests(unittest.TestCase):
                 ),
             ]
         )
-        self.assertTrue([l for l in lessons if l.get("status") == "admission_verified"], lessons)
+        self.assertTrue(
+            [lesson for lesson in lessons if lesson.get("status") == "admission_verified"], lessons
+        )
 
     def test_same_case_same_scenario_same_digest_verifies(self):
         """守门（既有行为不回退）：同 case＋同场景族＋同 digest＋同图 → 验证成立。"""
@@ -1102,7 +1119,9 @@ class FourthReviewBindingTests(unittest.TestCase):
                 ),
             ]
         )
-        self.assertTrue([l for l in lessons if l.get("status") == "admission_verified"], lessons)
+        self.assertTrue(
+            [lesson for lesson in lessons if lesson.get("status") == "admission_verified"], lessons
+        )
 
     def test_real_check_replay_ref_shape_verifies(self):
         """真实 check_replay ref 形态（case:question_id:<12hex>，第二段是题号而非
@@ -1131,7 +1150,9 @@ class FourthReviewBindingTests(unittest.TestCase):
                 ),
             ]
         )
-        self.assertTrue([l for l in lessons if l.get("status") == "admission_verified"], lessons)
+        self.assertTrue(
+            [lesson for lesson in lessons if lesson.get("status") == "admission_verified"], lessons
+        )
 
 
 if __name__ == "__main__":

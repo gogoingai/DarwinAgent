@@ -23,6 +23,7 @@ from darwinagent.operators.data import DataCapabilities
 from darwinagent.operators.sandbox import Limits
 from darwinagent.runtime.artifacts import atomic_json, digest
 from darwinagent.runtime.identity import snapshot_files
+
 from .admission_rules import loop_carried_capability_errors
 
 
@@ -237,14 +238,19 @@ def _pressure_graph(asset, params, graph, tag):
     if not tag.startswith("high_degree_") or _traversal_shape(asset)[0]:
         return graph
     import networkx as nx
+
     from darwinagent.contracts import GraphResult
 
     direction = tag.removeprefix("high_degree_")
     edges = graph.graph.in_edges if direction == "in" else graph.graph.out_edges
     relations = _traversal_relations(asset, params)
-    degree = lambda n: sum(
-        not relations or attrs.get("relation") in relations for _, _, attrs in edges(n, data=True)
-    )
+
+    def degree(n):
+        return sum(
+            not relations or attrs.get("relation") in relations
+            for _, _, attrs in edges(n, data=True)
+        )
+
     ordered = sorted(graph.graph.nodes, key=degree, reverse=True)
     copy = nx.MultiDiGraph()
     copy.graph.update(graph.graph.graph)

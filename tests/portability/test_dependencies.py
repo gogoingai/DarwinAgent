@@ -1,6 +1,6 @@
 import ast
 import unittest
-from pathlib import Path
+
 from tests.fixtures import ROOT
 
 

@@ -9,8 +9,9 @@ import asyncio
 import json
 import time
 
-from .config import NS_PROBE, load_locomo_config
 from darwinagent.llm.client import LLMClient
+
+from .config import NS_PROBE, load_locomo_config
 
 
 async def _probe(client: LLMClient, role: str, json_mode: bool) -> dict:

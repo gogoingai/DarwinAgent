@@ -314,7 +314,9 @@ def rebuild_snapshot_graph(snapshot_dir, schema, corpus=(), embedder_factory=Non
     （sources＝corpus 映射，证据解析直达语料块）→ 挂冻结向量索引 → 命中映射校验
     （任一事实行无向量记录＝硬失败，不静默降级）。"""
     from types import MappingProxyType
+
     import networkx as nx
+
     from darwinagent.contracts import GraphResult
     from darwinagent.experiments.snapshots import attach_vector
 

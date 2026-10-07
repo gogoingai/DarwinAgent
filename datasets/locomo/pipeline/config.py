@@ -9,13 +9,13 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 from dotenv import load_dotenv
 
-from darwinagent.presets import legacy_benchmark_config
 from darwinagent.config import Config
+from darwinagent.presets import legacy_benchmark_config
 
 LOCOMO_ROOT = Path(__file__).resolve().parent  # datasets/locomo/pipeline
 LOCOMO_TASK_DIR = LOCOMO_ROOT.parent  # datasets/locomo

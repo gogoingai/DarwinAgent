@@ -9,9 +9,10 @@ from pathlib import Path
 
 from darwinagent.contracts import EvaluationResult
 from darwinagent.runtime.artifacts import atomic_json, verify_files
+
 from .pipeline.data import load_conversation
-from .pipeline.protocol import aggregate, dual_grade_batch
 from .pipeline.experiment import transcript
+from .pipeline.protocol import aggregate, dual_grade_batch
 
 ROOT = Path(__file__).resolve().parents[2]
 LOCK_PATH = ROOT / "datasets/locomo/evaluation_lock.governance-20261007.json"

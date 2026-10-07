@@ -30,7 +30,7 @@ class LocalVectorStore:
 
     # ---------------------------------------------------------------- 持久化
     @classmethod
-    def load(cls, path: Path) -> "LocalVectorStore":
+    def load(cls, path: Path) -> LocalVectorStore:
         s = cls()
         if not path.exists():
             raise FileNotFoundError(f"向量库不存在：{path}")

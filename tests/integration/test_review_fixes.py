@@ -7,7 +7,9 @@ import unittest
 from dataclasses import replace
 from pathlib import Path
 
+from darwinagent.config import Config as _Cfg
 from darwinagent.config import RunConfig
+from darwinagent.config import RunConfig as _RC
 from darwinagent.contracts import (
     AtomicFact,
     CorpusBlock,
@@ -19,11 +21,8 @@ from darwinagent.contracts import (
     MemoryResult,
     SourceRef,
 )
-from darwinagent.kg.assembler import GraphAssembler, anchoring_invariants
-from darwinagent.kg.graph import node_id
-from darwinagent.kernel.assets import Asset, KernelAssets
 from darwinagent.experiments.spec import precheck_identity
-from darwinagent.config import Config as _Cfg, RunConfig as _RC
+from darwinagent.kernel.assets import Asset, KernelAssets
 from darwinagent.kernel.counterexamples import run_probes
 from darwinagent.kernel.execution import KernelRuntime
 from darwinagent.kernel.revision import (
@@ -32,10 +31,11 @@ from darwinagent.kernel.revision import (
     parse_training_id,
     training_id,
 )
+from darwinagent.kg.assembler import GraphAssembler, anchoring_invariants
+from darwinagent.kg.graph import node_id
 from darwinagent.operators.sandbox import Interpreter, admit
 from darwinagent.runtime.artifacts import digest
 from darwinagent.schema.model import Schema
-
 from tests.unit.test_fact_memory import SEED, block, travel_view_schema
 
 
@@ -157,10 +157,10 @@ class AnchoredPipelineChecksTaskC(unittest.TestCase):
         }
 
     def run_pipeline(self, graph_check_ok):
+        from darwinagent.contracts import CaseInput, QuestionInput
         from darwinagent.engine import Pipeline
         from darwinagent.kernel import TaskSpec
         from darwinagent.llm.recorded import RecordedClient
-        from darwinagent.contracts import CaseInput, QuestionInput
 
         td = tempfile.TemporaryDirectory()
         self.addCleanup(td.cleanup)
@@ -390,8 +390,7 @@ class ProbeRenameScope(unittest.TestCase):
 
 class BudgetReserveBeforeExecution(unittest.TestCase):
     def test_cap_refuses_next_round_before_it_runs(self):
-        from tests.integration.test_campaign import RecordedCampaign, protocol, SERIALS
-        import tests.integration.test_campaign as tc
+        from tests.integration.test_campaign import RecordedCampaign, protocol
 
         td = tempfile.TemporaryDirectory()
         self.addCleanup(td.cleanup)
@@ -525,7 +524,7 @@ class StructuralEdgeIntegrity(unittest.TestCase):
         graph, memory, f1, f2 = self.build_two_facts()
         broken = nx.MultiDiGraph(graph.graph)
         n1 = node_id("AtomicFact", {"id": f1.id})
-        n2 = node_id("AtomicFact", {"id": f2.id})
+        _n2 = node_id("AtomicFact", {"id": f2.id})
         s2 = node_id(
             "EvidenceSpan",
             {
@@ -569,7 +568,6 @@ class ReviewRoundThree(unittest.TestCase):
 
     def test_edge_label_mismatch_rejected(self):
         broken, memory, schema, fact = self.seed_graph()
-        import networkx as nx
 
         nid = node_id("AtomicFact", {"id": fact.id})
         for h, t, key in list(broken.out_edges(nid, keys=True)):
@@ -768,8 +766,8 @@ class ReviewRoundFour(unittest.TestCase):
 
 class GenericFeedbackContract(unittest.TestCase):
     def test_dataset_specific_diagnostics_flow_through(self):
-        from darwinagent.experiments.runner import training_feedback
         from darwinagent.contracts import AnswerResult, EvaluationResult, RunResult
+        from darwinagent.experiments.runner import training_feedback
 
         # 旅行式诊断（预算/人数/约束），框架不得丢弃或改读 LoCoMo 字段
         rows = (
@@ -795,8 +793,8 @@ class GenericFeedbackContract(unittest.TestCase):
         self.assertIn("feasible", feedback["scores"]["metrics"])
 
     def test_passed_rows_skipped_and_budget_capped(self):
-        from darwinagent.experiments.runner import training_feedback, FEEDBACK_BUDGET_CHARS
-        from darwinagent.contracts import AnswerResult, EvaluationResult, RunResult
+        from darwinagent.contracts import EvaluationResult, RunResult
+        from darwinagent.experiments.runner import FEEDBACK_BUDGET_CHARS, training_feedback
 
         rows = tuple({"i": i, "passed": True, "payload": "x"} for i in range(3)) + (
             {"i": 9, "payload": "y" * 100},
@@ -826,8 +824,10 @@ class ReviewRoundSix(unittest.TestCase):
 
     def test_resume_with_stop_restores_adopted_round_and_pointer(self):
         import asyncio
+        import contextlib
+        import io
+
         from tests.integration.test_experiment import RecordedExperiment
-        import contextlib, io
 
         td = tempfile.TemporaryDirectory()
         self.addCleanup(td.cleanup)
@@ -856,13 +856,13 @@ class ReviewRoundSix(unittest.TestCase):
         self.assertFalse((root / "R2").exists())
 
     def test_feedback_budget_covers_entire_payload(self):
-        from darwinagent.experiments.runner import training_feedback, FEEDBACK_BUDGET_CHARS
         from darwinagent.contracts import AnswerResult, EvaluationResult, RunResult, SourceRef
+        from darwinagent.experiments.runner import FEEDBACK_BUDGET_CHARS, training_feedback
 
         class C:
             id = "c"
 
-        ev = (SourceRef("t", "c", "1"),)
+        _ev = (SourceRef("t", "c", "1"),)
         huge_rows = tuple({"i": i, "payload": "x" * 2000} for i in range(40))
         failures_mass = [
             AnswerResult(f"q{i}", "execution_error", "", error="E" * 5000) for i in range(20)
@@ -877,9 +877,10 @@ class ReviewRoundSix(unittest.TestCase):
         self.assertEqual(feedback["generation_failures_total"], 20)
 
     def test_composite_question_identity_in_admission(self):
+        from dataclasses import replace
+
         from darwinagent.kernel.revision import AssetPatch, AssetRevisionService
         from tests.fixtures import spec
-        from dataclasses import replace
 
         td = tempfile.TemporaryDirectory()
         self.addCleanup(td.cleanup)
@@ -957,10 +958,12 @@ class ReviewRoundSeven(unittest.TestCase):
         ]
 
     def run_rounds(self, root, rounds, resume=False, runner_cls=None):
-        from tests.integration.test_experiment import RecordedExperiment
-        from tests.fixtures import TASK
-        import contextlib, io
+        import contextlib
+        import io
+
         from darwinagent.kernel import TaskSpec
+        from tests.fixtures import TASK
+        from tests.integration.test_experiment import RecordedExperiment
 
         cls = runner_cls or RecordedExperiment
         runner = cls(root, evaluator=lambda transport, path: StageTaggedEvaluator(path))
@@ -1018,8 +1021,8 @@ class ReviewRoundSeven(unittest.TestCase):
         self.assertEqual([r["diagnostic"]["stage_tag"] for r in r3["diagnostics"]], ["R1"])
 
     def test_many_short_records_bounded_by_complete_payload(self):
-        from darwinagent.experiments.runner import training_feedback, FEEDBACK_BUDGET_CHARS
         from darwinagent.contracts import EvaluationResult, RunResult
+        from darwinagent.experiments.runner import FEEDBACK_BUDGET_CHARS, training_feedback
 
         class C:
             id = "c"
@@ -1034,8 +1037,8 @@ class ReviewRoundSeven(unittest.TestCase):
         self.assertEqual(feedback["diagnostic_rows_total"], 3000)
 
     def test_few_long_records_bounded_by_complete_payload(self):
-        from darwinagent.experiments.runner import training_feedback, FEEDBACK_BUDGET_CHARS
         from darwinagent.contracts import EvaluationResult, RunResult
+        from darwinagent.experiments.runner import FEEDBACK_BUDGET_CHARS, training_feedback
 
         class C:
             id = "c"
@@ -1052,8 +1055,8 @@ class ReviewRoundSeven(unittest.TestCase):
         self.assertTrue(all("_row_truncated" in r["diagnostic"] for r in feedback["diagnostics"]))
 
     def test_mixed_sections_bounded_by_complete_payload(self):
-        from darwinagent.experiments.runner import training_feedback, FEEDBACK_BUDGET_CHARS
         from darwinagent.contracts import AnswerResult, EvaluationResult, RunResult
+        from darwinagent.experiments.runner import FEEDBACK_BUDGET_CHARS, training_feedback
 
         class C:
             id = "c"
@@ -1085,8 +1088,8 @@ class ReviewRoundSeven(unittest.TestCase):
                 parse_training_id(bad)
 
     def test_question_identity_uses_the_encoder(self):
+        from darwinagent.contracts import CaseInput, QuestionInput, SourceRef
         from darwinagent.experiments.runner import question_identity
-        from darwinagent.contracts import CaseInput, CorpusBlock, QuestionInput, SourceRef
 
         b = CorpusBlock(SourceRef("message_text", "c", "1"), "文本。")
         case = CaseInput(
@@ -1113,10 +1116,12 @@ class ReviewRoundEight(unittest.TestCase):
     revision protocol matches the bundle's real graph mode."""
 
     def test_train_stage_faults_surface_in_run_status(self):
-        from tests.integration.test_experiment import RecordedExperiment
-        from tests.fixtures import TASK
-        import contextlib, io
+        import contextlib
+        import io
+
         from darwinagent.kernel import TaskSpec
+        from tests.fixtures import TASK
+        from tests.integration.test_experiment import RecordedExperiment
 
         td = tempfile.TemporaryDirectory()
         self.addCleanup(td.cleanup)
@@ -1180,12 +1185,14 @@ class ReviewRoundEight(unittest.TestCase):
         self.assertEqual(unhealthy["train/R1"]["case"], "train-case")
 
     def test_report_persisted_before_seal_and_rebuilds_from_artifacts(self):
-        from tests.integration.test_campaign import RecordedCampaign, protocol
-        from tests.fixtures import TASK
-        from darwinagent.kernel import TaskSpec
+        import contextlib
+        import io
         from unittest import mock
-        import contextlib, io
+
         import darwinagent.experiments.campaign as camp
+        from darwinagent.kernel import TaskSpec
+        from tests.fixtures import TASK
+        from tests.integration.test_campaign import RecordedCampaign, protocol
 
         td = tempfile.TemporaryDirectory()
         self.addCleanup(td.cleanup)
@@ -1232,8 +1239,8 @@ class ReviewRoundEight(unittest.TestCase):
         self.assertIn("sealed", str(caught.exception))
 
     def test_oversize_scores_skeleton_refuses_feedback(self):
-        from darwinagent.experiments.runner import training_feedback
         from darwinagent.contracts import EvaluationResult, RunResult
+        from darwinagent.experiments.runner import training_feedback
 
         class C:
             id = "c"
@@ -1285,10 +1292,12 @@ class ReviewRoundEight(unittest.TestCase):
         self.assertNotIn("fact-anchored", recorded["protocol"])
 
     def run_rounds_proxy(self, root):
-        from tests.integration.test_experiment import RecordedExperiment
-        from tests.fixtures import TASK
-        import contextlib, io
+        import contextlib
+        import io
+
         from darwinagent.kernel import TaskSpec
+        from tests.fixtures import TASK
+        from tests.integration.test_experiment import RecordedExperiment
 
         runner = RecordedExperiment(root)
         with contextlib.redirect_stdout(io.StringIO()):

@@ -4,8 +4,10 @@ from __future__ import annotations
 
 from datetime import date
 from types import MappingProxyType
+
 from darwinagent.contracts import plain
 from darwinagent.kg.graph import node_view
+
 from .sandbox import DATA_CAPABILITIES
 
 

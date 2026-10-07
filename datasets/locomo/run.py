@@ -25,8 +25,9 @@ from darwinagent.experiments.spec import precheck_identity
 from darwinagent.kernel import KernelBundle, TaskSpec
 from darwinagent.llm.client import LLMClient
 from darwinagent.llm.settings import load_legacy_connection as load_connection
+
 from .adapter import LocomoAdapter
-from .evaluator import LocomoEvaluator, AUDITED, LOCK_PATH
+from .evaluator import AUDITED, LOCK_PATH, LocomoEvaluator
 from .exports import write
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -79,7 +80,7 @@ def memory_structure_sample(snapshot_dir, max_facts=30):
     node_types = Counter(nd.get("etype") for _, nd in g.nodes(data=True))
     relations = Counter(ed.get("relation") for _, _, ed in g.edges(data=True))
     facts = []
-    sample_row = None
+    _sample_row = None
     for _nid, nd in sorted(g.nodes(data=True)):
         if nd.get("etype") == "原子事实" and len(facts) < max_facts:
             facts.append(
@@ -327,11 +328,14 @@ async def run_arm(args):
         optimization_mode=args.optimization_mode,
     )
     controller.bootstrap_trial_graph = bootstrap_trial_graph(adapter)
+
     # 冷启动轮 B0 门＝「可评分基线」：完成度≥90% 即锚定迭代起点（v10：93/100 被旧 95% 门
     # 拦出冷启动死锁——7 题确定性 F 契约故障只有 R1 修资产才能清，而 R1 要 B0 过门才开）。
     # 故障如实进评分与 unhealthy_stages，由采纳门（零故障才可采纳）与迭代清零。
     # 框架默认门（全完+双故障零）不变，仅本轮传入放宽版。
-    cold_gate = lambda scores: scores.completed >= max(1, int(scores.total * 0.90))
+    def cold_gate(scores):
+        return scores.completed >= max(1, int(scores.total * 0.90))
+
     summary = await controller.run(
         task, resume=args.resume, scope=SCOPE[args.scope], b0_gate=cold_gate
     )

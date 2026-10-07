@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import httpx
+
 from darwinagent.runtime.deadline import bounded_timeout, remaining_seconds
 
 
@@ -101,7 +102,8 @@ class Embedder:
             return
         # 并发写者各用唯一临时名，再原子改名——共享固定 .tmp 名会在并发缓存未命中时
         # 互相抢文件（conv-47 外测 17 题 FileNotFoundError 事故，2026-10-04）。
-        import os, threading
+        import os
+        import threading
 
         tmp = self.cache_path.with_name(
             f"{self.cache_path.name}.{os.getpid()}.{threading.get_ident()}.tmp"

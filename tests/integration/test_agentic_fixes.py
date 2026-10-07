@@ -5,6 +5,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest import mock
 
 from darwinagent.config import RunConfig
@@ -17,11 +18,9 @@ from darwinagent.contracts import (
     SourceRef,
 )
 from darwinagent.kernel.assets import Asset, KernelAssets
-from darwinagent.kernel import KernelBundle
 from darwinagent.kernel.validation import capability_floor_errors, capability_names
 from darwinagent.llm.recorded import RecordedClient
 from darwinagent.runtime.artifacts import digest
-from types import SimpleNamespace
 
 
 class BatchedFaultRetryTests(unittest.TestCase):
@@ -303,7 +302,7 @@ class TraceGapTests(unittest.TestCase):
         self.assertEqual(evidence[0]["source_ids"], ["s1", "s2"])
 
     def test_truncation_is_marked(self):
-        from darwinagent.experiments.runner import _retrieval_trace, _TRACE_CHARS
+        from darwinagent.experiments.runner import _retrieval_trace
 
         events = tuple(
             {
@@ -334,7 +333,7 @@ class CrossCaseTraceTests(unittest.TestCase):
 
         def make(tool):
             raw = (
-                '{"action":"call","asset_id":"%s","parameters":{"query":"q"}}' % tool,
+                f'{{"action":"call","asset_id":"{tool}","parameters":{{"query":"q"}}}}',
                 '{"action":"ready"}',
                 '{"status":"answered","answer":"ok"}',
                 '{"accepted":true}',
@@ -599,6 +598,7 @@ class EmbedderCacheConcurrencyTests(unittest.TestCase):
         # conv-47 事故回归：共享固定 .tmp 名在并发缓存未命中时互相抢文件 →
         # FileNotFoundError 记为整题故障。唯一临时名后并发 flush 必须全部成功。
         import threading
+
         from darwinagent.vector.embedder import Embedder
 
         emb = Embedder.__new__(Embedder)
@@ -638,6 +638,7 @@ class AbstentionAuditScopeTests(unittest.TestCase):
         # 评审#5：融合版拒答审计不得读全图——covers_full_graph=False、证据＝已召回行；
         # 需要补证只能显式调用登记工具（调用与返回都在轨迹里）。
         import asyncio
+
         from darwinagent.engine import Pipeline
         from darwinagent.kernel import TaskSpec
         from darwinagent.llm.recorded import RecordedClient
@@ -707,8 +708,8 @@ class AdmissionRetryThenSuccessTests(unittest.TestCase):
         import asyncio
         import contextlib
         import io
-        from tests.integration.test_experiment import LedgerRecordedClient, RecordedExperiment
-        from darwinagent.experiments.runner import ExperimentRunner
+
+        from tests.integration.test_experiment import RecordedExperiment
 
         class RetryOnceExperiment(RecordedExperiment):
             def __init__(self, root):
@@ -755,6 +756,7 @@ class FaultRetryInvalidatesEvaluationTests(unittest.TestCase):
         # 不得沿用基于故障答案集的旧检查点
         import asyncio
         from types import SimpleNamespace
+
         from darwinagent.experiments import runner as R
 
         class FakeClient:
@@ -907,6 +909,7 @@ class GraphCheckBudgetTests(unittest.TestCase):
     def test_stage_skip_and_preflight(self):
         import asyncio
         from types import SimpleNamespace
+
         from darwinagent.experiments import runner as R
 
         # (a) 图阶段全局失败：不进入分批重试（FakePipeline 只被调用一次）
@@ -917,7 +920,7 @@ class GraphCheckBudgetTests(unittest.TestCase):
             def ledger_summary(self):
                 return {"total_calls": 0}
 
-        ev = (SourceRef("m", "c", "1"),)
+        _ev = (SourceRef("m", "c", "1"),)
         graph_failed = RunResult(
             "c",
             "i",
@@ -967,14 +970,13 @@ class PreflightCapabilityTests(unittest.TestCase):
         return asyncio.run(runner._preflight(*args, **kwargs))
 
     def _runner_with_graph(self, root):
-        import asyncio
         from darwinagent.experiments.runner import ExperimentRunner
         from darwinagent.experiments.snapshots import load_frozen_graph
         from tests.integration.test_agentic_round import (
             FakeEmbedder,
             build_snapshot,
-            corpus,
             cold_bundle,
+            corpus,
         )
 
         snapshot, _ = build_snapshot(root)
@@ -1002,7 +1004,6 @@ class PreflightCapabilityTests(unittest.TestCase):
     def test_untriggered_capability_rejected_before_stage(self):
         # 评审③反例：semantic_search 在未执行分支里（AST 有调用），试跑只执行 nodes
         # ——候选预检必须拒绝
-        from dataclasses import replace
         from darwinagent.kernel import TaskSpec
         from tests.integration.test_agentic_round import ROOT
 
@@ -1036,7 +1037,6 @@ class PreflightCapabilityTests(unittest.TestCase):
                 description="关系遍历",
             )
             others = [a for a in bundle.assets.assets if a.id != "f_semantic"] + [traverse]
-            import tempfile as _tf
 
             fake_bundle = self._export(root, tuple(others + [fake]))
             with self.assertRaises(ValueError) as caught:
@@ -1048,7 +1048,6 @@ class PreflightCapabilityTests(unittest.TestCase):
 
     def _export(self, root, assets):
         import tempfile as _tf
-        from darwinagent.kernel.assets import KernelAssets
 
         return KernelAssets(assets).export(Path(_tf.mkdtemp(prefix="pf-")) / "exported")
 
@@ -1062,14 +1061,11 @@ class ExternalEntryTests(unittest.TestCase):
     否决＋能力试跑）到报告生成，不只测 aggregate_report。"""
 
     def _setup(self, td, with_traverse=True, bad_c=False):
-        import asyncio
         from darwinagent.engine import Pipeline  # noqa: F401  确认入口依赖可导入
-        from darwinagent.experiments.snapshots import load_frozen_graph
         from darwinagent.kernel import TaskSpec
-        from darwinagent.kernel.assets import Asset, KernelAssets
+        from darwinagent.kernel.assets import Asset
         from tests.integration.test_agentic_round import (
             ROOT,
-            FakeEmbedder,
             build_snapshot,
             cold_bundle,
             corpus,
@@ -1125,6 +1121,7 @@ class ExternalEntryTests(unittest.TestCase):
 
     def test_entry_end_to_end_offline(self):
         import tempfile
+
         from datasets.locomo.scripts.external_test import (
             aggregate_report,
             baseline_compatibility,
@@ -1171,6 +1168,7 @@ class ExternalEntryTests(unittest.TestCase):
 
     def test_entry_rejects_missing_capability_and_bad_c(self):
         import tempfile
+
         from datasets.locomo.scripts.external_test import preflight
         from tests.integration.test_agentic_round import FakeEmbedder
 
@@ -1210,9 +1208,9 @@ class PreflightStagingTests(unittest.TestCase):
         import asyncio
         import contextlib
         import io
-        from tests.integration.test_experiment import RecordedExperiment
+
         from darwinagent.kernel import TaskSpec
-        from tests.integration.test_experiment import TASK
+        from tests.integration.test_experiment import TASK, RecordedExperiment
 
         class PreflightFailOnce(RecordedExperiment):
             def __init__(self, root):
@@ -1252,9 +1250,9 @@ class PreflightStagingTests(unittest.TestCase):
         import asyncio
         import contextlib
         import io
-        from tests.integration.test_experiment import RecordedExperiment, TASK
+
         from darwinagent.kernel import TaskSpec
-        from tests.integration.test_agentic_round import cold_bundle
+        from tests.integration.test_experiment import TASK, RecordedExperiment
 
         class Recording(RecordedExperiment):
             def __init__(self, root):
@@ -1487,8 +1485,9 @@ class TrimmedEvaluateTests(unittest.TestCase):
     所以没拦住。asked 语义＝按本轮实际出题集核对；None 保持全会话要求。"""
 
     def _evaluator(self, n_qas, audited=False):
+        from dataclasses import dataclass
+
         import datasets.locomo.evaluator as ev
-        from dataclasses import dataclass, field
 
         @dataclass
         class Q:
@@ -1515,10 +1514,16 @@ class TrimmedEvaluateTests(unittest.TestCase):
             evaluator = ev.LocomoEvaluator(
                 None, tdp / "work", audited_path=aud or tdp / "x.json", lock_path=lock
             )
-            fake_aggregate = lambda rows, disputed: {
-                "overall": {"lenient": {"correct": len(rows)}, "precise": {"correct": len(rows)}},
-                "grades": [{"idx": row["idx"], "status": "ok"} for row in rows],
-            }
+
+            def fake_aggregate(rows, disputed):
+                return {
+                    "overall": {
+                        "lenient": {"correct": len(rows)},
+                        "precise": {"correct": len(rows)},
+                    },
+                    "grades": [{"idx": row["idx"], "status": "ok"} for row in rows],
+                }
+
             with (
                 mock.patch.object(ev, "verify_files"),
                 mock.patch.object(ev, "load_conversation", return_value=conv),
@@ -1645,9 +1650,10 @@ class SmokeThresholdTests(unittest.TestCase):
     ≥2/3 执行错误或 0 有效作答才拒；单题故障由 B0 冷门（≥95% 完成度）吸收。"""
 
     def test_single_fault_passes_double_fault_rejects(self):
-        from dataclasses import dataclass, replace as dcreplace
-        from darwinagent.experiments.runner import ExperimentRunner
+        from dataclasses import dataclass
+
         import darwinagent.experiments.runner as R
+        from darwinagent.experiments.runner import ExperimentRunner
 
         @dataclass
         class Q:
@@ -1701,8 +1707,8 @@ class SmokeJudgeContractTests(unittest.TestCase):
     evaluation_faults 写成 eval_faults，冒烟判题一处崩溃整轮作废）。"""
 
     def test_smoke_judge_maps_evaluation_result_fields(self):
-        import datasets.locomo.run as R
         import datasets.locomo.evaluator as EV
+        import datasets.locomo.run as R
         from darwinagent.contracts import EvaluationResult
 
         async def fake_evaluate(self, result, asked=None):
@@ -1720,9 +1726,10 @@ class EvidenceBoundaryTests(unittest.TestCase):
 
     def test_returned_rows_only_plus_fabrication_guard(self):
         import tempfile
-        from darwinagent.experiments.snapshots import load_frozen_graph, attach_vector
+
+        from darwinagent.experiments.snapshots import attach_vector, load_frozen_graph
+        from darwinagent.kernel.assets import Asset
         from darwinagent.kernel.functions import FunctionRegistry
-        from darwinagent.kernel.assets import Asset, KernelAssets
         from darwinagent.operators.sandbox import Limits
         from tests.integration.test_agentic_round import FakeEmbedder, build_snapshot, corpus
 
@@ -1761,7 +1768,7 @@ class EvidenceBoundaryTests(unittest.TestCase):
             bundle = KernelAssets(tuple(keep + [f])).export(root / "b2")
             reg = FunctionRegistry(bundle, Limits(30000, 15.0, 180000))
             result = reg.call("f_pick", {}, graph)
-            caps_rows = graph  # 快照图行集来自 load_frozen_graph 的 DataCapabilities
+            _caps_rows = graph  # 快照图行集来自 load_frozen_graph 的 DataCapabilities
             from darwinagent.operators.data import DataCapabilities
 
             all_read = DataCapabilities(graph).rows
@@ -1780,10 +1787,8 @@ class DeterministicFaultTests(unittest.TestCase):
 
     def test_deterministic_error_skips_retry(self):
         import asyncio
-        from tests.integration.test_experiment import TASK
-        from darwinagent.kernel import TaskSpec
+
         import darwinagent.experiments.runner as R
-        from tests.integration.test_agentic_round import build_snapshot, corpus
 
         scripted = [
             RunResult(
@@ -1843,13 +1848,14 @@ class DeterministicFaultTests(unittest.TestCase):
                 client_factory=lambda s: StubClient(),
             )
             spec = SimpleNamespace(bundle=SimpleNamespace(version="v"))
-            import contextlib, io
+            import contextlib
+            import io
 
             with (
                 mock.patch.object(R, "Pipeline", FakePipeline),
                 mock.patch.object(
                     R, "batched_fault_retry", side_effect=AssertionError("不应触发重试")
-                ) as no_retry,
+                ) as _no_retry,
                 contextlib.redirect_stdout(io.StringIO()) as out,
             ):
                 results, scores = asyncio.run(runner._stage("B0", [C()], spec))
@@ -1896,8 +1902,9 @@ class ToolTelemetryTests(unittest.TestCase):
     逐调用新增证据增量（new_node_ids）与重复调用标记（repeat_call）。"""
 
     def test_new_ids_and_repeat_flag(self):
-        from darwinagent.experiments.runner import _retrieval_trace
         from types import SimpleNamespace as NS
+
+        from darwinagent.experiments.runner import _retrieval_trace
 
         params = {"query": "甲"}
         trace = (
@@ -1935,8 +1942,8 @@ class CrossRoundRejectionFeedbackTests(unittest.TestCase):
     轮内重试看得到 admission_error，跨轮以前看不到，导致每轮摔新坑不带记忆。"""
 
     def test_previous_round_rejection_enters_feedback(self):
-        from darwinagent.experiments.runner import training_feedback
         from darwinagent.contracts import RunResult
+        from darwinagent.experiments.runner import training_feedback
 
         result = RunResult("c", "i", "v", (), (), ())
         payload = training_feedback(
@@ -1964,15 +1971,14 @@ class PatchNormalizationTests(unittest.TestCase):
     格式类错误不再消耗重试预算（用户拍板重试上限 50 次，留给内容类问题）。"""
 
     def test_extra_keys_dropped_and_noted(self):
-        from darwinagent.experiments.proposal import ProposalGenerator
         import inspect
+
+        from darwinagent.experiments.proposal import ProposalGenerator
 
         src = inspect.getsource(ProposalGenerator)
         self.assertIn("dropped", src)
         # 直接驱动 valid：构造带多余键的补丁载荷
-        import asyncio
         from darwinagent.kernel.assets import Asset
-        from darwinagent.llm.recorded import RecordedClient
 
         item = {
             "id": "p_x",
@@ -1991,10 +1997,9 @@ class PatchNormalizationTests(unittest.TestCase):
             async def request(self, *a, **k):
                 raise AssertionError("不经会话")
 
-        gen = ProposalGenerator.__new__(ProposalGenerator)
-        valid = None
+        _gen = ProposalGenerator.__new__(ProposalGenerator)
+        _valid = None
         # 通过类内部协议函数直接验证剥离逻辑（不整段伪造会话）
-        from darwinagent.experiments.proposal import AssetPatch
         import dataclasses
 
         fields = {f.name for f in dataclasses.fields(Asset)}
@@ -2012,10 +2017,11 @@ class RetryVarianceTests(unittest.TestCase):
 
     def test_admission_error_carries_attempt_number(self):
         import inspect
+
         from darwinagent.experiments import runner
 
         src = inspect.getsource(runner)
-        self.assertIn("重试 {attempt+1}/{ADMISSION_ATTEMPTS}", src)
+        self.assertRegex(src, r"重试 \{attempt\s*\+\s*1\}/\{ADMISSION_ATTEMPTS\}")
 
 
 class FUnitTestsTests(unittest.TestCase):
@@ -2025,16 +2031,16 @@ class FUnitTestsTests(unittest.TestCase):
     def test_stress_samples_expose_unsupported_container_conversion(self):
         """Current sandbox rejects container string conversion; stress trials must expose it."""
         import tempfile
+
         from darwinagent.experiments.runner import stress_trial_samples
         from darwinagent.experiments.snapshots import load_frozen_graph
-        from darwinagent.kernel.assets import Asset, KernelAssets
+        from darwinagent.kernel.assets import Asset
         from darwinagent.kernel.functions import FunctionRegistry
         from darwinagent.operators.sandbox import Limits
         from tests.integration.test_agentic_round import (
-            FakeEmbedder,
             build_snapshot,
-            corpus,
             cold_bundle,
+            corpus,
         )
 
         with tempfile.TemporaryDirectory() as td:
@@ -2080,6 +2086,7 @@ class FUnitTestsTests(unittest.TestCase):
 
     def test_stress_samples_shapes(self):
         import tempfile
+
         from darwinagent.experiments.runner import stress_trial_samples
         from tests.integration.test_agentic_round import build_snapshot
 
@@ -2113,9 +2120,8 @@ class ContainerStringificationTests(unittest.TestCase):
 
         src = "def run(params):\n return {'s': str(params['rows'][0].get('source_ids', []))}\n"
         fn = admit(src, "F", ["q?"])
-        from darwinagent.operators.data import DataCapabilities
 
-        caps = None  # 无能力依赖
+        _caps = None  # 无能力依赖
         interp = Interpreter(fn, {}, Limits(30000, 15.0, 180000))
         from darwinagent.operators.sandbox import SandboxError
 

@@ -195,11 +195,9 @@ def _hermit_consistent(world) -> bool:
         return False
 
 
-def _owl_worker(schema_yaml: str, q: "mp.Queue") -> None:
+def _owl_worker(schema_yaml: str, q: mp.Queue) -> None:
     """在子进程内跑完整 HermiT 检查 + pinpoint。"""
     try:
-        import owlready2 as owl
-
         schema = Schema.from_yaml(schema_yaml)
         world, onto, cls, oprops, dprops = _build_owl(schema)
 

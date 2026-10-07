@@ -1,6 +1,7 @@
 """Load a declarative asset index, never a module or a task callback."""
 
 from pathlib import Path
+
 import yaml
 
 from .assets import Asset, KernelAssets

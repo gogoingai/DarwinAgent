@@ -15,7 +15,7 @@ from darwinagent.kernel.execution import KernelRuntime
 from darwinagent.kernel.registration import load_assets
 from darwinagent.kg.graph import EntityCandidate, build_graph
 from darwinagent.operators.data import DataCapabilities
-from datasets.travelplanner.pipeline.data.queries import parse_dates, applicable_hc_keys
+from datasets.travelplanner.pipeline.data.queries import applicable_hc_keys, parse_dates
 
 ROOT = Path(__file__).resolve().parents[3]
 

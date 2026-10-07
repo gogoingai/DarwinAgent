@@ -4,16 +4,16 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-from pathlib import Path
 import tempfile
+from pathlib import Path
 
 from darwinagent.config import RunConfig
 from darwinagent.contracts import CaseInput, CorpusBlock, EvaluationResult, QuestionInput, SourceRef
+from darwinagent.demo import TASK_ROOT
 from darwinagent.engine import Pipeline
 from darwinagent.kernel import TaskSpec
 from darwinagent.kernel.registration import load_assets
 from darwinagent.llm.recorded import RecordedClient
-from darwinagent.demo import TASK_ROOT
 
 
 class MaintenanceAdapter:

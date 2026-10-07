@@ -1,6 +1,7 @@
 """Apply declared S axioms to graph instances, independently of optimizable C."""
 
 from collections import defaultdict
+
 from darwinagent.kg.graph import node_view
 
 

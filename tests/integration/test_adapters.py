@@ -1,23 +1,17 @@
 import ast
-import asyncio
-import hashlib
 import json
 import tempfile
 import unittest
 from pathlib import Path
 
-from darwinagent.contracts import DatasetAdapter, Evaluator, QuestionInput
-from darwinagent.config import RunConfig
-from darwinagent.engine import Pipeline
+from darwinagent.contracts import DatasetAdapter
 from darwinagent.kernel import TaskSpec
-from darwinagent.kernel.registration import load_assets
-from darwinagent.llm.recorded import RecordedClient
 from darwinagent.runtime.artifacts import verify_files
 from datasets.locomo.adapter import LocomoAdapter
-from datasets.locomo.evaluator import LocomoEvaluator, LOCK_PATH
+from datasets.locomo.evaluator import LOCK_PATH, LocomoEvaluator
 from datasets.travelplanner.adapter import TravelPlannerAdapter
 from datasets.travelplanner.evaluator import TravelPlannerEvaluator
-from tests.fixtures import ROOT, case, client, spec
+from tests.fixtures import ROOT, case
 
 
 class DatasetBoundary(unittest.TestCase):
@@ -91,7 +85,7 @@ class DatasetBoundary(unittest.TestCase):
         self.assertEqual(sorted(p.name for p in files), ["schema.yaml", "task.yaml"])
 
     def test_generation_contract_rejects_evaluation_metadata(self):
-        from darwinagent.contracts import CaseInput, CorpusBlock, SourceRef
+        from darwinagent.contracts import CaseInput, CorpusBlock
         from darwinagent.kernel.validation import validate_case
 
         c = case()

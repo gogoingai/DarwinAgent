@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from ..config_task import Config
-from ..data.queries import Query, applicable_hc_keys, CS_KEY_COUNT
+from ..data.queries import CS_KEY_COUNT, Query, applicable_hc_keys
 
 WORKER = Path(__file__).parent / "_worker.py"
 

@@ -8,21 +8,21 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from darwinagent import (
-    CaseInput,
-    CorpusBlock,
-    QuestionInput,
-    SourceRef,
-    EvaluationResult,
-    Config,
-    RunConfig,
-    ExperimentRunner,
     AdoptionPolicy,
+    CaseInput,
+    Config,
+    CorpusBlock,
+    EvaluationResult,
+    ExperimentRunner,
+    QuestionInput,
+    RunConfig,
+    SourceRef,
     TaskSpec,
 )
-from darwinagent.kernel import KernelBundle
+from darwinagent.kernel import KernelBundle as KernelBundle
 from darwinagent.kernel.assets import KernelAssets
 from darwinagent.kernel.registration import load_assets
-from darwinagent.kernel.revision import training_id
+from darwinagent.kernel.revision import training_id as training_id
 from darwinagent.runtime.artifacts import atomic_json
 
 TASK_ROOT = Path(__file__).resolve().parent / "device_maintenance"

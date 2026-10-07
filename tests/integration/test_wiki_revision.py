@@ -6,27 +6,26 @@ import io
 import json
 import tempfile
 import unittest
-from pathlib import Path
 from dataclasses import replace
+from pathlib import Path
 
 from darwinagent.config import RunConfig
 from darwinagent.contracts import CaseInput, GraphResult, QuestionInput
 from darwinagent.experiments.admission import (
     AdmissionError,
-    admit_candidate,
     _pressure_graph,
-    _samples,
     _traversal_shape,
+    admit_candidate,
 )
 from darwinagent.experiments.wiki import WikiMaintainer
+from darwinagent.kernel import TaskSpec
 from darwinagent.kernel.assets import Asset, KernelAssets
 from darwinagent.kernel.functions import FunctionRegistry
-from tests.integration.test_agentic_round import cold_bundle, corpus, gvtest_graph
-from tests.integration.test_wiki_optimization import WikiRecordedExperiment
-from tests.integration.test_experiment import LedgerRecordedClient
-from tests.fixtures import TASK
-from darwinagent.kernel import TaskSpec
 from datasets.locomo.run import _trimmed_train_adapter
+from tests.fixtures import TASK
+from tests.integration.test_agentic_round import cold_bundle, corpus, gvtest_graph
+from tests.integration.test_experiment import LedgerRecordedClient
+from tests.integration.test_wiki_optimization import WikiRecordedExperiment
 
 
 class InterfaceAdmissionRegression(unittest.TestCase):
@@ -178,7 +177,7 @@ class InterfaceAdmissionRegression(unittest.TestCase):
 
 class WikiEvidenceRegression(unittest.TestCase):
     def test_late_fault_survives_both_trace_budgets_and_is_runtime_experience(self):
-        from darwinagent.experiments.wiki import bounded_trace, _context_facts
+        from darwinagent.experiments.wiki import _context_facts, bounded_trace
 
         trace = [{"stage": "tool", "asset_id": "f", "parameters": {"limit": i}} for i in range(9)]
         trace.append(
@@ -314,8 +313,8 @@ class WikiEvidenceRegression(unittest.TestCase):
             self.assertEqual(row["parameters"], {"days": 3})
 
     def test_frozen_json_container_types_are_executable_and_documented(self):
-        from darwinagent.operators.sandbox import Interpreter, admit
         from darwinagent.experiments.bootstrap import _CORE_RULES
+        from darwinagent.operators.sandbox import Interpreter, admit
 
         code = "def check(candidate):\n rows=candidate['structured_answer']\n issues=[]\n if not isinstance(rows,(list,tuple)):\n  issues.append('not array')\n for row in rows:\n  local=dict(row)\n  if not isinstance(local,dict):\n   issues.append('not object')\n return {'ok':not issues,'issues':issues}"
         snapshot = {"structured_answer": [{"days": 1}]}

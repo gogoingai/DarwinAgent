@@ -1,20 +1,20 @@
 import asyncio
+import unittest
 from datetime import date
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
-import unittest
 
 from datasets.locomo.pipeline.data import QA
 from datasets.locomo.pipeline.dates import answer_equivalent, resolve_relative
-from datasets.locomo.pipeline.judge import deterministic_grade, is_clean_refusal, _aggregate, Grade
+from datasets.locomo.pipeline.judge import Grade, _aggregate, deterministic_grade, is_clean_refusal
 from datasets.locomo.pipeline.protocol import (
     aggregate,
     checked_json,
-    validate_verdict,
-    dual_grade,
     complete_equal,
+    dual_grade,
     dual_grade_batch,
+    validate_verdict,
 )
 
 
@@ -114,6 +114,7 @@ class ProtocolTests(unittest.TestCase):
 
     def test_batch_uses_complete_dialogue_and_keeps_ids(self):
         import json
+
         from datasets.locomo.pipeline.experiment import context_for
 
         conv = SimpleNamespace(
@@ -162,8 +163,8 @@ class ProtocolTests(unittest.TestCase):
             self.assertEqual(r, again)
 
     def test_source_preserves_caption_but_excludes_search_intent(self):
-        from datasets.locomo.pipeline.experiment import transcript
         from datasets.locomo.pipeline.data import load_conversation
+        from datasets.locomo.pipeline.experiment import transcript
 
         conv = load_conversation(Path("datasets/locomo/data/locomo10.json"), "conv-26")
         source = transcript(conv)

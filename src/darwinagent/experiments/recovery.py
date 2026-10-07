@@ -1,11 +1,14 @@
 """Experiment recovery helpers; independent of the controller."""
 
 from __future__ import annotations
+
 import asyncio
 import json
 import time
 from pathlib import Path
-from collections.abc import Mapping
+
+from darwinagent.contracts import plain
+from darwinagent.runtime.artifacts import atomic_json, digest
 
 _TRANSIENT_ERRORS = frozenset(
     {
@@ -17,9 +20,6 @@ _TRANSIENT_ERRORS = frozenset(
     }
 )
 _DETERMINISTIC_ERRORS = frozenset({"SandboxError", "ValueError", "TypeError", "KeyError"})
-from darwinagent.contracts import plain
-from darwinagent.kernel.revision import training_id
-from darwinagent.runtime.artifacts import atomic_json, digest
 
 
 async def batched_fault_retry(

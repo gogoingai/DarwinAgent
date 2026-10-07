@@ -3,7 +3,6 @@ vector store round-trip, snapshot import + frozen-snapshot pipeline injection, v
 baseline isolation, cold-start S constraints and iteration scope gating. All offline."""
 
 import asyncio
-import hashlib
 import json
 import tempfile
 import unittest
@@ -13,7 +12,7 @@ from darwinagent.config import RunConfig
 from darwinagent.contracts import CaseInput, CorpusBlock, QuestionInput, SourceRef
 from darwinagent.kernel.assets import Asset, KernelAssets
 from darwinagent.kernel.revision import AssetPatch, AssetRevisionService
-from darwinagent.kernel.validation import atomic_memory_errors, validate_bundle
+from darwinagent.kernel.validation import atomic_memory_errors
 from darwinagent.operators.data import DataCapabilities
 from darwinagent.operators.dates import resolve_relative
 from darwinagent.schema.model import Schema
@@ -309,7 +308,7 @@ class ColdStartConstraints(unittest.TestCase):
             dropped = replace(a, content=a.content + " 更谨慎。")
             good = svc.propose(
                 base,
-                [AssetPatch(good_patch := dropped, a.fingerprint, "r", ("1:c::q1",))],
+                [AssetPatch(_good_patch := dropped, a.fingerprint, "r", ("1:c::q1",))],
                 root / "c1",
                 ["1:c::q1"],
             )
@@ -355,8 +354,8 @@ class ColdStartConstraints(unittest.TestCase):
 
 def build_snapshot(root, conv="conv-x"):
     """Import-path fixture: a gvtest-shaped source tree + adapter, run through the importer."""
-    from datasets.locomo.scripts.import_snapshots import import_conv
     from darwinagent.kg.graph import save_graph
+    from datasets.locomo.scripts.import_snapshots import import_conv
 
     src = root / "source"
     gdir = src / "runs" / conv / "graph_test01"

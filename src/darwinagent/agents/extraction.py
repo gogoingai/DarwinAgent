@@ -22,6 +22,7 @@ from darwinagent.contracts import (
     plain,
 )
 from darwinagent.kg.graph import EntityCandidate, RelationCandidate, build_graph
+
 from .protocol import ENTITY_EXTRACT_PROTOCOL, FACT_EXTRACT_PROTOCOL, ModelSession, ProtocolError
 
 # A slice of one corpus block; bisection keeps original offsets so quotes stay locatable.
@@ -162,8 +163,8 @@ def _canonical_value(where, obj):
             raise ValueError(f"{where}.value: 日期须为 ISO 字符串")
         try:
             date.fromisoformat(value)
-        except ValueError:
-            raise ValueError(f"{where}.value: {value!r} 不是合法 ISO 日期")
+        except ValueError as exc:
+            raise ValueError(f"{where}.value: {value!r} 不是合法 ISO 日期") from exc
         return value
     raise ValueError(f"{where}.value.dtype: 未知类型 {dtype!r}（允许 {sorted(FACT_VALUE_DTYPES)}）")
 
@@ -310,7 +311,7 @@ def _make_validator(segments, classes):
                     evidence=tuple(evidence),
                 )
             except ValueError as exc:
-                raise ValueError(f"{where}: {exc}")
+                raise ValueError(f"{where}: {exc}") from exc
             facts.append(fact)
         return facts
 
@@ -448,8 +449,9 @@ class ExtractionAgent:
     async def extract_entities(self, corpus):
         """Direct entity/relation extraction into a typed graph: the path for tasks that do not
         declare the fact-anchoring hook (no meta.anchoring in S). Same agent, same transport."""
-        import networkx as nx
         from types import MappingProxyType
+
+        import networkx as nx
 
         sources = {b.source.id: b for b in corpus}
         batches = [

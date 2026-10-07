@@ -8,12 +8,12 @@ from .assembler import (
 )
 from .graph import (
     build_graph,
+    derive_relations,
+    graph_samples,
+    graph_stats,
+    load_graph,
     node_id,
     save_graph,
-    load_graph,
-    graph_stats,
-    graph_samples,
-    derive_relations,
 )
 
 __all__ = [

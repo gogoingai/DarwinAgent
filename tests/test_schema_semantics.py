@@ -1,7 +1,7 @@
 import unittest
 
 from darwinagent.schema.model import Schema
-from darwinagent.schema.owlcheck import _build_owl, static_checks
+from darwinagent.schema.owlcheck import _build_owl
 
 
 class SchemaSemantics(unittest.TestCase):

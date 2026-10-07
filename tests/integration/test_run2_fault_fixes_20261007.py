@@ -11,20 +11,18 @@ import asyncio
 import json
 import tempfile
 import unittest
-from pathlib import Path
 
+from darwinagent.agents.answer import AnswerAgent
 from darwinagent.config import RunConfig
 from darwinagent.contracts import EvaluationResult
 from darwinagent.kernel import TaskSpec
 from darwinagent.kernel.execution import KernelRuntime
 from darwinagent.kg.graph import load_graph
-from darwinagent.agents.answer import AnswerAgent
-
 from tests.integration.test_wiki_faults_repro import (
-    FIXTURES,
-    TASK_YAML,
     FIXED_C,
     FIXED_F,
+    FIXTURES,
+    TASK_YAML,
     base_bundle,
     candidate_bundle,
     legal_candidate,

@@ -382,8 +382,8 @@ class AssetBootstrapper:
                 }
             assets = KernelAssets.from_payload({"assets": items}, origin)
             # Static admission inside model feedback, before a version exists.
-            from darwinagent.schema.model import Schema
             from darwinagent.operators.sandbox import admit
+            from darwinagent.schema.model import Schema
 
             schema = Schema.from_yaml(next(a.content for a in assets.assets if a.kind == "S"))
             if schema.validate():
@@ -420,6 +420,7 @@ class AssetBootstrapper:
                     admit(a.content, a.kind, [q.text for q in questions])
             if trial_graph is not None or snapshot_root is not None or trial_supply is not None:
                 import tempfile
+
                 from darwinagent.experiments.admission import AdmissionError, admit_candidate
 
                 with tempfile.TemporaryDirectory() as trial_dir:
@@ -443,7 +444,7 @@ class AssetBootstrapper:
                                         f" 与 归属于(原子事实→人物)/属于主题/记录于 的 "
                                         f"domain/range，或简化类型与提示）: "
                                         f"{type(exc).__name__}: {str(exc)[:400]}"
-                                    )
+                                    ) from None
                                 admit_candidate(
                                     trial_bundle,
                                     cases[:1],

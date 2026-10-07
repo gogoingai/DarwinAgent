@@ -1,8 +1,8 @@
 """Explicit recorded transport for offline framework tests; never an experiment fallback."""
 
+import json
 from collections import deque
 from types import SimpleNamespace
-import json
 
 
 class RecordedClient:

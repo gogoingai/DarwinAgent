@@ -7,9 +7,10 @@ complete conversations as long as the three splits stay disjoint."""
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 
-from darwinagent.contracts import EvaluationResult, plain
+from darwinagent.contracts import EvaluationResult
+
 from .policy import AdoptionPolicy
 
 
@@ -139,9 +140,10 @@ class ExperimentSpec:
 def precheck_identity(connection_config, run_config):
     """Identity a passing precheck is bound to: model routing, frozen run config and
     framework code. A record from any other identity cannot authorize a campaign."""
-    from darwinagent.runtime.identity import snapshot_files, transport_identity
-    from darwinagent.runtime.artifacts import digest
     from pathlib import Path
+
+    from darwinagent.runtime.artifacts import digest
+    from darwinagent.runtime.identity import snapshot_files, transport_identity
 
     return {
         "transport": transport_identity(type("Connection", (), {"cfg": connection_config})()),

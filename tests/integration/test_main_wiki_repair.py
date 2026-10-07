@@ -1,24 +1,24 @@
 """Regression probes for the four bugs found after merging Wiki (no real model)."""
 
 import asyncio
-from dataclasses import replace
 import contextlib
 import io
 import json
-from pathlib import Path
 import tempfile
 import time
 import unittest
+from dataclasses import replace
+from pathlib import Path
 from unittest import mock
 
-from datasets.locomo.adapter import LocomoAdapter
-from datasets.locomo.graph_rules import _session_dates
-from datasets.locomo.scripts import question_split
 from darwinagent.experiments.proposal import ProposalGenerator
 from darwinagent.experiments.wiki import WikiMaintainer, _lessons
 from darwinagent.kernel import TaskSpec
 from darwinagent.runtime.deadline import ROUND_DEADLINE, RoundDeadlineExceeded
 from darwinagent.vector.embedder import Embedder
+from datasets.locomo.adapter import LocomoAdapter
+from datasets.locomo.graph_rules import _session_dates
+from datasets.locomo.scripts import question_split
 from tests.fixtures import TASK
 from tests.integration.test_fastloop_mode import FastLoopExperiment, _run
 
@@ -229,11 +229,14 @@ class ColonCaseBindingTests(unittest.TestCase):
         ):
             with self.subTest(kwargs=kwargs):
                 self.assertFalse(
-                    any(l["status"] == "admission_verified" for l in self.lessons(**kwargs))
+                    any(
+                        lesson["status"] == "admission_verified"
+                        for lesson in self.lessons(**kwargs)
+                    )
                 )
 
     def test_matching_colon_case_verifies_actual_reproduction(self):
-        self.assertTrue(any(l["status"] == "admission_verified" for l in self.lessons()))
+        self.assertTrue(any(lesson["status"] == "admission_verified" for lesson in self.lessons()))
 
 
 if __name__ == "__main__":
