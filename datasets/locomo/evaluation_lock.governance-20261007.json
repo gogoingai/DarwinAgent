@@ -2,5 +2,7 @@
   "datasets/locomo/evaluator.py": "8ac1f7036669816cfcd11f5e8204c49ddbcb28014bfb510cba8f4464f6cf1f35",
   "datasets/locomo/pipeline/protocol.py": "a4ef41ab7d76d8bd15a3300abf54ff62d67e6a48b4a1eeff4dc5106de7268185",
   "datasets/locomo/pipeline/data.py": "186f5e74b867f7ec9d1569c474e9e74d5450cd819f107ce330d857c74bbee073",
-  "datasets/locomo/pipeline/experiment.py": "6501df32283076bf607148ccc3234bf85d7e8844945db579e5067ffaf7d6ca9f"
+  "datasets/locomo/pipeline/experiment.py": "6501df32283076bf607148ccc3234bf85d7e8844945db579e5067ffaf7d6ca9f",
+  "datasets/locomo/pipeline/dates.py": "3b1e6cac19500f5491aef459a1d85394e73461d5141e1aff729d93979d0bdaed",
+  "src/darwinagent/operators/calendar.py": "d544e2bf7ec1a68f8d4e6d4f64c3b40c074ab6985ffb44bb83e6b68033741f73"
 }
