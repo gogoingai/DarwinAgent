@@ -14,7 +14,7 @@ Earlier [acceptance](../acceptance/2026-10-07.md), reports, original locks and r
 - Wiki persistence stays in `WikiMaintainer`; evidence, lessons and context have separate owners. Admission samples, checks, functions, composition and reporting preserve ordered trial checkpoints. Entry files are 325 and 171 lines respectively.
 - The controller facade is 411 lines after formatting (1,941 immediately before extraction). Lifecycle, stages, optimization, rounds and graph trials receive explicit dependencies/callbacks. Private iteration state commits after durable decision/publication; hooks and public signatures remain.
 - Eleven identical calendar/normalization helpers share one module. Both domains retain their relative resolver and answer-equivalence bodies, including their intentional scoring differences. Adapters/evaluators/run/exports retain domain boundaries; the other active task code received scoped format/import cleanup without policy changes.
-- Static guards cover core-to-domain/test/baseline imports, helper-to-runner imports and support-to-scenario imports, including aliased dynamic imports. Fresh-process package import is checked against credential reads, model-client construction and directory creation. Wheel contents are checked separately.
+- Static guards cover core-to-domain/test/baseline imports and helper-to-runner imports. Support-to-scenario guards also cover literal dynamic imports and import aliases; the core/helper guards currently inspect static imports only. Fresh-process package import is checked against credential reads, model-client construction and directory creation. Wheel contents are checked separately.
 
 ## Source and evaluator provenance
 
