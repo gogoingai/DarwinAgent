@@ -14,7 +14,7 @@ import httpx
 import openai
 
 from darwinagent.config import Config
-from darwinagent.experiments.runner import _retryable_answer
+from darwinagent.experiments.recovery import _retryable_answer
 from darwinagent.llm.client import LLMClient, TransportExhausted
 
 

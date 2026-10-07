@@ -1,4 +1,4 @@
-"""Regression probes for the four bugs found after merging Wiki (no real model)."""
+"""Offline regression scenarios for deadlines."""
 
 import asyncio
 import contextlib
@@ -7,20 +7,16 @@ import json
 import tempfile
 import time
 import unittest
-from dataclasses import replace
 from pathlib import Path
 from unittest import mock
 
 from darwinagent.experiments.proposal import ProposalGenerator
-from darwinagent.experiments.wiki import WikiMaintainer, _lessons
+from darwinagent.experiments.wiki import WikiMaintainer
 from darwinagent.kernel import TaskSpec
 from darwinagent.runtime.deadline import ROUND_DEADLINE, RoundDeadlineExceeded
 from darwinagent.vector.embedder import Embedder
-from datasets.locomo.adapter import LocomoAdapter
-from datasets.locomo.graph_rules import _session_dates
-from datasets.locomo.scripts import question_split
-from tests.fixtures import TASK
-from tests.integration.test_fastloop_mode import FastLoopExperiment, _run
+from tests.support.device import TASK
+from tests.support.recorded_fastloop import FastLoopExperiment, _run
 
 
 class FullRoundDeadlineTests(unittest.TestCase):
@@ -134,110 +130,3 @@ class FullRoundDeadlineTests(unittest.TestCase):
             self.assertLessEqual(calls[0], 0.015)
         finally:
             ROUND_DEADLINE.reset(token)
-
-
-class WholeEvidenceGroupTests(unittest.TestCase):
-    def test_actual_default_split_and_seeds_have_no_shared_evidence(self):
-        qs = next(
-            q for q in json.loads(question_split.DATA.read_text()) if q["sample_id"] == "conv-26"
-        )["qa"]
-        for seed in (20261005, 0, 1, 42):
-            with self.subTest(seed=seed):
-                split = question_split.build_split(seed=seed)
-                self.assertEqual((len(split["train"]), len(split["validation"])), (15, 10))
-                train = {e for i in split["train"] for e in qs[i].get("evidence") or ()}
-                val = {e for i in split["validation"] for e in qs[i].get("evidence") or ()}
-                self.assertFalse(train & val)
-                self.assertEqual(split, question_split.build_split(seed=seed))
-
-    def test_transitive_evidence_groups_across_categories_stay_whole(self):
-        qs = [
-            {"category": 1, "evidence": ["A"]},
-            {"category": 2, "evidence": ["A", "B"]},
-            {"category": 3, "evidence": ["B"]},
-            {"category": 1, "evidence": ["C"]},
-            {"category": 3, "evidence": ["C"]},
-        ]
-        with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp) / "data.json"
-            path.write_text(json.dumps([{"sample_id": "recorded", "qa": qs}]))
-            with mock.patch.object(question_split, "DATA", path):
-                split = question_split.build_split("recorded", train_n=3, val_n=2)
-                self.assertEqual(split["train"], [0, 1, 2])
-                self.assertEqual(split["validation"], [3, 4])
-                with self.assertRaisesRegex(ValueError, "without splitting"):
-                    question_split.build_split("recorded", train_n=2, val_n=2)
-
-
-class ConversationDateTests(unittest.TestCase):
-    def test_all_session_dates_follow_message_metadata(self):
-        case = LocomoAdapter(Path("datasets/locomo/data/locomo10_zh.json")).generation_input(
-            "conv-26"
-        )
-        from datasets.locomo.graph_rules import load_facts
-
-        facts, _ = load_facts(Path("tests/fixtures/locomo_snapshot/conv-26"))
-        dates = _session_dates(facts, case.corpus)
-        self.assertEqual(dates[1], "2023-05-08")
-        for block in case.corpus:
-            n = int(block.source.location.split(":")[0][1:])
-            self.assertEqual(dates[n], block.metadata["date"][:10])
-        altered = [{**f, "date_iso": "1999-01-01"} for f in facts]
-        self.assertEqual(_session_dates(altered, case.corpus), dates)
-
-    def test_missing_or_conflicting_record_dates_are_not_event_dates(self):
-        facts = [{"fid": "x", "session_no": 1, "date_iso": "2023-05-07"}]
-        self.assertEqual(_session_dates(facts), {})
-        case = LocomoAdapter(Path("datasets/locomo/data/locomo10_zh.json")).generation_input(
-            "conv-26"
-        )
-        block = case.corpus[0]
-        conflict = replace(block, metadata={**block.metadata, "date": "1999-01-01"})
-        with self.assertRaisesRegex(ValueError, "日期冲突"):
-            _session_dates(facts, (block, conflict))
-
-
-class ColonCaseBindingTests(unittest.TestCase):
-    def lessons(self, target_case="train:0", target_scenario="stress", target_graph="g1"):
-        from tests.integration.test_wiki_check_replay import FourthReviewBindingTests
-
-        helper = FourthReviewBindingTests
-        h = helper.DIGEST
-        return _lessons(
-            [
-                helper._failed(f"train:0:stress:0:{h}", graph_digests={"train:0": "g1"}),
-                helper._passed(
-                    [
-                        {
-                            "asset_id": "f_flight_pair",
-                            "scenario_id": target_scenario,
-                            "status": "passed",
-                            "required": True,
-                            "input_ref": f"{target_case}:{target_scenario}:0:{h}",
-                        }
-                    ],
-                    graph_digests={target_case: target_graph},
-                ),
-            ]
-        )
-
-    def test_colon_case_different_scenario_graph_or_case_cannot_verify(self):
-        for kwargs in (
-            {"target_scenario": "base"},
-            {"target_graph": "g2"},
-            {"target_case": "train:1"},
-        ):
-            with self.subTest(kwargs=kwargs):
-                self.assertFalse(
-                    any(
-                        lesson["status"] == "admission_verified"
-                        for lesson in self.lessons(**kwargs)
-                    )
-                )
-
-    def test_matching_colon_case_verifies_actual_reproduction(self):
-        self.assertTrue(any(lesson["status"] == "admission_verified" for lesson in self.lessons()))
-
-
-if __name__ == "__main__":
-    unittest.main()

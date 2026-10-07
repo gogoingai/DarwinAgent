@@ -12,7 +12,7 @@ from darwinagent.kernel.counterexamples import run_probes
 from darwinagent.kernel.execution import KernelRuntime
 from darwinagent.kernel.validation import validate_graph
 from darwinagent.operators.sandbox import Interpreter, Limits, SandboxError, admit
-from tests.fixtures import case, client, spec
+from tests.support.device import case, client, spec
 
 
 class RuntimeGuardTests(unittest.TestCase):

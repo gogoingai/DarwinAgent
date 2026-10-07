@@ -9,7 +9,7 @@ from darwinagent.agents.protocol import ProtocolError
 from darwinagent.config import RunConfig
 from darwinagent.kernel.assets import KernelAssets
 from darwinagent.kernel.execution import KernelRuntime
-from tests.fixtures import case, client, spec
+from tests.support.device import case, client, spec
 
 
 class GraphAxiomAcceptance(unittest.TestCase):

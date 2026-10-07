@@ -1,7 +1,7 @@
 import ast
 import unittest
 
-from tests.fixtures import ROOT
+from tests.support.device import ROOT
 
 
 class DependencyBoundaries(unittest.TestCase):

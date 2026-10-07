@@ -10,7 +10,7 @@ from darwinagent.kernel import Asset, KernelBundle, TaskSpec
 from darwinagent.kernel.registration import load_assets
 from darwinagent.kernel.revision import AssetPatch, AssetRevisionService, training_id
 from darwinagent.operators.sandbox import Interpreter, Limits, SandboxError, admit
-from tests.fixtures import TASK
+from tests.support.device import TASK
 
 
 class AssetBoundary(unittest.TestCase):

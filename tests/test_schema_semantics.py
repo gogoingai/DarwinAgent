@@ -6,7 +6,7 @@ from darwinagent.schema.owlcheck import _build_owl
 
 class SchemaSemantics(unittest.TestCase):
     def test_invalid_cardinality_does_not_reach_reasoner(self):
-        from test_framework_contracts import YAML
+        from tests.support.schemas import YAML
 
         schema = Schema.from_yaml(
             YAML

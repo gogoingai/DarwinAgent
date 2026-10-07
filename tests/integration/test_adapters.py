@@ -11,7 +11,7 @@ from datasets.locomo.adapter import LocomoAdapter
 from datasets.locomo.evaluator import LOCK_PATH, LocomoEvaluator
 from datasets.travelplanner.adapter import TravelPlannerAdapter
 from datasets.travelplanner.evaluator import TravelPlannerEvaluator
-from tests.fixtures import ROOT, case
+from tests.support.device import ROOT, case
 
 
 class DatasetBoundary(unittest.TestCase):

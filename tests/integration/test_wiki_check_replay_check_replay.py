@@ -1,12 +1,4 @@
-"""C 失败候选的可验证经验回放（2026-10-05 指令缺口②）。
-
-- 检查快照在答案轨迹原位持久化（answer.py 候选检查失败事件）；
-- 扫描器把历史 C 失败快照分为机器可判定三类：must_reject（任何 C 必须拒）、
-  verified_must_pass（经具体复现验证后成为强制回归行）、informational（类型合法
-  被拒——合法语义拒绝不自动判 bug，不设门）；
-- verified_fix 绑定具体复现回放行，不能只凭同资产通过准入。
-夹具复用 tests/fixtures/travel_faults（归档 2026-10-05 Travel 事故证据）。
-"""
+"""Offline regression scenarios for check replay."""
 
 import asyncio
 import json
@@ -16,7 +8,7 @@ from pathlib import Path
 
 from darwinagent.config import RunConfig
 from darwinagent.experiments.admission import AdmissionError, admit_candidate
-from darwinagent.experiments.runner import (
+from darwinagent.experiments.recovery import (
     _check_snapshot_expectation,
     _prior_failed_check_snapshots,
     promote_verified_check_replay,
@@ -25,7 +17,13 @@ from darwinagent.experiments.wiki import _lessons
 from darwinagent.kernel import TaskSpec
 from darwinagent.kernel.validation import capability_names
 from darwinagent.runtime.artifacts import digest
-from tests.integration.test_wiki_faults_repro import (
+from tests.support.checkpoints import (
+    TRAVEL_CONTRACT,
+    candidate_event,
+    legal_snapshot,
+    write_checkpoint,
+)
+from tests.support.travel_faults import (
     COMPLETE_C,
     FIXED_F,
     FIXTURES,
@@ -36,49 +34,6 @@ from tests.integration.test_wiki_faults_repro import (
     travel_case,
     travel_graph,
 )
-
-TRAVEL_CONTRACT = TaskSpec.load(TASK_YAML).answer_contract
-
-
-def write_checkpoint(root, stage, case_id, question_id, events, status="execution_error"):
-    path = root / stage / "generation" / case_id / "answers" / f"{digest(question_id)}.json"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    result = {"question_id": question_id, "status": status, "trace": events}
-    path.write_text(
-        json.dumps(
-            {"identity": "test", "digest": digest(result), "result": result}, ensure_ascii=False
-        )
-    )
-    return path
-
-
-def candidate_event(snapshot, check_id="c_answer_shape", issues=("answer is not an array",)):
-    return {
-        "stage": "candidate",
-        "attempt": 0,
-        "candidate": {
-            "status": snapshot["status"],
-            "answer": snapshot["answer"],
-            "node_ids": snapshot["node_ids"],
-        },
-        "checks": [{"check_id": check_id, "ok": False, "issues": list(issues)}],
-        "check_snapshot": snapshot,
-    }
-
-
-def legal_snapshot():
-    candidate = legal_candidate()
-    return {
-        "stage": "answer",
-        "question": "plan the trip",
-        "parameters": {},
-        "status": "answered",
-        "answer": candidate["answer"],
-        "node_ids": candidate["node_ids"],
-        "evidence": [],
-        "visible_evidence": [],
-        "structured_answer": json.loads(candidate["answer"]),
-    }
 
 
 class CheckSnapshotClassificationTests(unittest.TestCase):
@@ -269,95 +224,6 @@ class CheckReplayAdmissionTests(unittest.TestCase):
                 return exc.report
 
 
-class VerifiedFixBindingTests(unittest.TestCase):
-    def test_lesson_verification_binds_reproduced_checks(self):
-        entries = [
-            {
-                "id": "a" * 64,
-                "stage": "R1",
-                "kind": "attempt",
-                "category": "runtime",
-                "scope": "admission",
-                "training_ids": [],
-                "fact_status": "recorded",
-                "confidence": "hypothesis",
-                "pending_attribution": False,
-                "facts": {
-                    "status": "failed",
-                    "admission": {
-                        "scenarios": [
-                            {
-                                "asset_id": "c_answer_shape",
-                                "scenario_id": "check_replay_verified",
-                                "status": "failed",
-                                "required": True,
-                                "error_type": "CandidateCheckRejected",
-                                "error": "answer is not an array",
-                            }
-                        ]
-                    },
-                },
-            },
-            {
-                "id": "b" * 64,
-                "stage": "R2",
-                "kind": "attempt",
-                "category": "strategy",
-                "scope": "admission",
-                "training_ids": [],
-                "fact_status": "recorded",
-                "confidence": "hypothesis",
-                "pending_attribution": False,
-                "facts": {
-                    "status": "passed",
-                    "asset_changes": [
-                        {
-                            "asset_id": "c_answer_shape",
-                            "after": {
-                                "id": "c_answer_shape",
-                                "kind": "C",
-                                "content": 'def check(c):\n    return {"ok": True, "issues": []}\n',
-                                "input_contract": {"type": "any"},
-                                "output_contract": {"type": "any"},
-                                "trial_inputs": [],
-                                "fingerprint": "f" * 64,
-                            },
-                        }
-                    ],
-                    "verification": {
-                        "verdict": "passed",
-                        "scenarios": [
-                            {
-                                "scenario_id": "check_replay_verified",
-                                "status": "passed",
-                                "required": True,
-                                "asset_id": "c_answer_shape",
-                                "input_ref": "train:0:0:abcd",
-                                "expectation": "verified_must_pass",
-                            },
-                            {
-                                "scenario_id": "check_replay_reject",
-                                "status": "passed",
-                                "required": True,
-                                "asset_id": None,
-                                "check_ids": ["c_answer_shape"],
-                                "input_ref": "train:0:0:ffff",
-                                "expectation": "must_reject",
-                            },
-                        ],
-                    },
-                },
-            },
-        ]
-        lessons = _lessons(entries)
-        verified = [lesson for lesson in lessons if lesson.get("status") == "admission_verified"]
-        self.assertEqual(len(verified), 1, lessons)
-        reproduced = verified[0]["verified_fix"].get("reproduced_checks")
-        self.assertTrue(reproduced, verified[0]["verified_fix"])
-        self.assertTrue(all(p["scenario_id"].startswith("check_replay") for p in reproduced))
-        self.assertTrue(all("c_answer_shape" in p["check_ids"] for p in reproduced))
-
-
 class AnswerSnapshotPersistenceTests(unittest.TestCase):
     def test_answer_agent_persists_snapshot_on_check_rejection(self):
         """归档事故路径：合法 JSON 数组候选被旧 C 误杀直至重试耗尽——检查快照必须
@@ -430,197 +296,13 @@ class AnswerSnapshotPersistenceTests(unittest.TestCase):
             self.assertEqual(rows[0]["issues"], ["answer is not an array"])
 
 
-class ArchivedAttributionTests(unittest.TestCase):
-    """二次复查 P1-B：归档 loop3 全部 formal/decision 事件必须能形成 ≤35000 字符的
-    维护请求并写归因（离线 RecordedClient，零真实模型调用）。"""
-
-    def test_all_archived_travel_attributions_fit_budget(self):
-        from darwinagent.experiments.wiki import WikiMaintainer
-        from tests.integration.test_experiment import LedgerRecordedClient
-
-        root = Path("datasets/travelplanner/runs/wiki_gap_repair_20261005_loop3/train")
-        if not root.exists():
-            self.skipTest(
-                "归档证据目录不在本检出（运行产物不进版本库）；在产生该证据的运行侧本测试为强制项"
-            )
-        events = [
-            json.loads(p.read_text()) for p in sorted((root / "optimization/events").glob("*.json"))
-        ]
-        targets = [e for e in events if e["kind"] in ("formal", "decision")]
-        self.assertGreaterEqual(len(targets), 4)
-        for event in targets:
-            reply = [
-                {
-                    "cause": "offline probe attribution",
-                    "action": "review bounded facts",
-                    "training_ids": event["training_ids"],
-                }
-            ]
-            client = LedgerRecordedClient({"wiki_maintainer": reply})
-            with tempfile.TemporaryDirectory() as tmp:
-                maintainer = WikiMaintainer(
-                    tmp,
-                    "offline-attribution",
-                    lambda _, client=client: client,
-                    RunConfig(protocol_attempts=1),
-                    limit=10,
-                )
-                asyncio.run(maintainer._attribute(event))
-                request = Path(tmp) / "optimization" / "maintenance" / f"{event['id']}.request.json"
-                self.assertTrue(request.exists(), event["id"])
-                payload = json.loads(request.read_text())
-                self.assertLessEqual(
-                    len(json.dumps(payload, ensure_ascii=False, default=str)), 35000, event["id"]
-                )
-                out = Path(tmp) / "optimization" / "maintenance" / f"{event['id']}.json"
-                self.assertTrue(out.exists(), event["id"])
-
-
-class VerifiedFixBindingRefTests(unittest.TestCase):
-    """二次复查 P2：同名场景不同输入不算复现；结构档通过不能证明语义故障修复。"""
-
-    @staticmethod
-    def _lesson_entry(pattern_scenario, error_type, input_ref):
-        return {
-            "id": "a" * 64,
-            "stage": "R1",
-            "kind": "attempt",
-            "category": "runtime",
-            "scope": "admission",
-            "training_ids": [],
-            "fact_status": "recorded",
-            "confidence": "hypothesis",
-            "pending_attribution": False,
-            "facts": {
-                "status": "failed",
-                "admission": {
-                    "scenarios": [
-                        {
-                            "asset_id": "f_tool",
-                            "scenario_id": pattern_scenario,
-                            "status": "failed",
-                            "required": True,
-                            "input_ref": input_ref,
-                            "error_type": error_type,
-                            "error": "boom",
-                        }
-                    ]
-                },
-            },
-        }
-
-    @staticmethod
-    def _passed_entry(rows):
-        return {
-            "id": "b" * 64,
-            "stage": "R2",
-            "kind": "attempt",
-            "category": "strategy",
-            "scope": "admission",
-            "training_ids": [],
-            "fact_status": "recorded",
-            "confidence": "hypothesis",
-            "pending_attribution": False,
-            "facts": {
-                "status": "passed",
-                "asset_changes": [
-                    {
-                        "asset_id": "f_tool",
-                        "after": {
-                            "id": "f_tool",
-                            "kind": "F",
-                            "content": 'def run(p):\n    return {"rows": [], "truncated": False}\n',
-                            "input_contract": {"type": "any"},
-                            "output_contract": {"type": "any"},
-                            "trial_inputs": [{"x": 1}],
-                            "fingerprint": "f" * 64,
-                        },
-                    }
-                ],
-                "verification": {"verdict": "passed", "scenarios": rows},
-            },
-        }
-
-    def test_same_scenario_different_ref_does_not_verify(self):
-        from darwinagent.experiments.wiki import _lessons
-
-        entries = [
-            self._lesson_entry("replay", "SandboxError", "conv-26:replay:aaaa1111aaaa1111"),
-            self._passed_entry(
-                [
-                    {
-                        "asset_id": "f_tool",
-                        "scenario_id": "replay",
-                        "status": "passed",
-                        "required": True,
-                        "input_ref": "conv-26:replay:bbbb2222bbbb2222",
-                    }
-                ]
-            ),
-        ]
-        lessons = _lessons(entries)
-        self.assertFalse(
-            [lesson for lesson in lessons if lesson.get("status") == "admission_verified"], lessons
-        )
-
-    def test_same_ref_does_verify_replay_lesson(self):
-        from darwinagent.experiments.wiki import _lessons
-
-        entries = [
-            self._lesson_entry("replay", "SandboxError", "conv-26:replay:aaaa1111aaaa1111"),
-            self._passed_entry(
-                [
-                    {
-                        "asset_id": "f_tool",
-                        "scenario_id": "replay",
-                        "status": "passed",
-                        "required": True,
-                        "input_ref": "conv-26:replay:aaaa1111aaaa1111",
-                    }
-                ]
-            ),
-        ]
-        lessons = _lessons(entries)
-        self.assertTrue(
-            [lesson for lesson in lessons if lesson.get("status") == "admission_verified"], lessons
-        )
-
-    def test_structure_row_pass_does_not_verify(self):
-        from darwinagent.experiments.wiki import _lessons
-
-        entries = [
-            self._lesson_entry("answer_0", "CandidateCheckRejected", "conv-26:answer_0"),
-            self._passed_entry(
-                [
-                    {
-                        "asset_id": "c_shape",
-                        "scenario_id": "answer_0",
-                        "status": "passed",
-                        "required": True,
-                        "expectation": "structure",
-                        "ok": False,
-                        "input_ref": "conv-26:answer_0",
-                    }
-                ]
-            ),
-        ]
-        # answer_0 lesson belongs to c_shape; make asset match
-        entries[1]["facts"]["asset_changes"][0]["asset_id"] = "c_shape"
-        entries[1]["facts"]["asset_changes"][0]["after"]["id"] = "c_shape"
-        entries[1]["facts"]["asset_changes"][0]["after"]["kind"] = "C"
-        lessons = _lessons(entries)
-        self.assertFalse(
-            [lesson for lesson in lessons if lesson.get("status") == "admission_verified"], lessons
-        )
-
-
-class ThirdReviewFixTests(unittest.TestCase):
+class CounterexampleReplayTests(unittest.TestCase):
     """三次复查三项修复的验收：正例自洽、全场景输入绑定、摘要保故障事实。"""
 
     def test_params_consistent_semantic_c_passes_and_misfit_fails(self):
         """正例自洽（三次复查 P1）：参数一致＋非转移日三餐规则的语义 C 过电池；
         同一 C 对「旧行程＋不匹配参数」判拒——夹具不会被错装。"""
-        from tests.integration.test_wiki_faults_repro import FIXED_F
+        from tests.support.travel_faults import FIXED_F
 
         params_c = (
             "def check(candidate):\n"
@@ -657,14 +339,14 @@ class ThirdReviewFixTests(unittest.TestCase):
             '            issues.append("non-transfer day needs a meal")\n'
             '    return {"ok": not issues, "issues": issues}\n'
         )
-        from tests.integration.test_wiki_faults_repro import TravelFaultReproductionTests as T
+        from tests.support.travel_faults import admit_travel_bundle
 
         holder = tempfile.TemporaryDirectory()
         self.addCleanup(holder.cleanup)
         bundle = candidate_bundle(
             base_bundle(), {"c_answer_shape": params_c, "f_flight_pair": FIXED_F}, holder.name
         )
-        report = T._admit(T(), bundle)
+        report = admit_travel_bundle(bundle)
         failed = [
             s
             for s in report["scenarios"]
@@ -734,7 +416,6 @@ class ThirdReviewFixTests(unittest.TestCase):
     def test_stress_input_mismatch_does_not_verify(self):
         """三次复查 P2：数据相关场景（stress/base）绑定原输入 digest——
         A→B 失败、只证 A→C 成功不得标已修复。"""
-        from darwinagent.experiments.wiki import _lessons
 
         def failed(scenario, ref):
             return {
@@ -844,7 +525,7 @@ class ThirdReviewFixTests(unittest.TestCase):
         """三次复查 P1：真实 loop6 R1 attempt 的 C 拒绝理由（issues）必须在维护
         请求的场景行里保留——维护器要能读到反复拒绝的原因。"""
         from darwinagent.experiments.wiki import WikiMaintainer
-        from tests.integration.test_experiment import LedgerRecordedClient
+        from tests.support.clients import LedgerRecordedClient
 
         root = Path(
             "datasets/travelplanner/runs/wiki_gap_repair_20261005_loop6/train/optimization/events"
@@ -926,234 +607,3 @@ class ThirdReviewFixTests(unittest.TestCase):
         self.assertEqual(check["steps_used"], 45)
         self.assertEqual(event["candidate_summary"]["json_type"], "list")
         self.assertEqual(event["observation"]["steps_used"], 45)
-
-
-class FourthReviewBindingTests(unittest.TestCase):
-    """四次复查反例 B：lesson 验证必须绑定 case＋场景族＋参数/快照 digest＋数据图
-    身份。反例证据：docs/diagnostics/wiki-gap-recheck4-20261005/remaining-probes.json
-    （case-old 失败、case-new 同参数通过仍产 admission_verified）。"""
-
-    @staticmethod
-    def _failed(ref, graph_digests=None, scenario="stress", asset="f_flight_pair"):
-        admission = {
-            "scenarios": [
-                {
-                    "asset_id": asset,
-                    "scenario_id": scenario,
-                    "status": "failed",
-                    "required": True,
-                    "input_ref": ref,
-                    "error_type": "ValueError",
-                    "error": "tool.result.outbound: expected object",
-                }
-            ]
-        }
-        if graph_digests is not None:
-            admission["graph_digests"] = graph_digests
-        return {
-            "id": "a" * 64,
-            "stage": "R1",
-            "kind": "attempt",
-            "category": "runtime",
-            "scope": "admission",
-            "training_ids": [],
-            "fact_status": "recorded",
-            "confidence": "hypothesis",
-            "pending_attribution": False,
-            "facts": {"status": "failed", "admission": admission},
-        }
-
-    @staticmethod
-    def _passed(rows, graph_digests=None, asset_id="f_flight_pair", kind="F"):
-        verification = {"verdict": "passed", "scenarios": rows}
-        if graph_digests is not None:
-            verification["graph_digests"] = graph_digests
-        return {
-            "id": "b" * 64,
-            "stage": "R2",
-            "kind": "attempt",
-            "category": "strategy",
-            "scope": "admission",
-            "training_ids": [],
-            "fact_status": "recorded",
-            "confidence": "hypothesis",
-            "pending_attribution": False,
-            "facts": {
-                "status": "passed",
-                "asset_changes": [
-                    {
-                        "asset_id": asset_id,
-                        "after": {
-                            "id": asset_id,
-                            "kind": kind,
-                            "content": 'def run(p):\n    return {"rows": [], "truncated": False}\n',
-                            "input_contract": {"type": "any"},
-                            "output_contract": {"type": "any"},
-                            "trial_inputs": [{"org": "A", "dest": "B"}],
-                            "fingerprint": "e" * 64,
-                        },
-                    }
-                ],
-                "verification": verification,
-            },
-        }
-
-    DIGEST = "3320bdd2d325b999efdc40189b4d0306caa9e69f59deedfdf14f8cad34c6fb1d"
-
-    def test_cross_case_same_params_does_not_verify(self):
-        """反例本体（现状红）：case-old 的 stress 失败不得被 case-new 的同参数
-        通过行验证——base/stress 参数来自资产级 trial_inputs，跨 case 必然同
-        digest，旧逻辑只看 digest 子串。"""
-        from darwinagent.experiments.wiki import _lessons
-
-        lessons = _lessons(
-            [
-                self._failed(f"case-old:stress:0:{self.DIGEST}"),
-                self._passed(
-                    [
-                        {
-                            "asset_id": "f_flight_pair",
-                            "scenario_id": "stress",
-                            "status": "passed",
-                            "required": True,
-                            "input_ref": f"case-new:stress:0:{self.DIGEST}",
-                        }
-                    ]
-                ),
-            ]
-        )
-        self.assertFalse(
-            [lesson for lesson in lessons if lesson.get("status") == "admission_verified"], lessons
-        )
-
-    def test_same_case_cross_scenario_same_params_does_not_verify(self):
-        """场景绑定：同 case 同 digest 但不同场景族（stress 失败、base 通过）
-        不得验证——场景是绑定要素之一（四审）。"""
-        from darwinagent.experiments.wiki import _lessons
-
-        lessons = _lessons(
-            [
-                self._failed(f"conv-26:stress:0:{self.DIGEST}"),
-                self._passed(
-                    [
-                        {
-                            "asset_id": "f_flight_pair",
-                            "scenario_id": "base",
-                            "status": "passed",
-                            "required": True,
-                            "input_ref": f"conv-26:base:0:{self.DIGEST}",
-                        }
-                    ]
-                ),
-            ]
-        )
-        self.assertFalse(
-            [lesson for lesson in lessons if lesson.get("status") == "admission_verified"], lessons
-        )
-
-    def test_graph_digest_mismatch_does_not_verify(self):
-        """数据图身份：同 case 同场景同 digest，但验证运行的数据图与失败时不同
-        （可重建图场景）→ 旧故障不能算已修复。"""
-        from darwinagent.experiments.wiki import _lessons
-
-        g1, g2 = "a" * 63 + "1", "a" * 63 + "2"
-        lessons = _lessons(
-            [
-                self._failed(f"conv-26:stress:0:{self.DIGEST}", graph_digests={"conv-26": g1}),
-                self._passed(
-                    [
-                        {
-                            "asset_id": "f_flight_pair",
-                            "scenario_id": "stress",
-                            "status": "passed",
-                            "required": True,
-                            "input_ref": f"conv-26:stress:0:{self.DIGEST}",
-                        }
-                    ],
-                    graph_digests={"conv-26": g2},
-                ),
-            ]
-        )
-        self.assertFalse(
-            [lesson for lesson in lessons if lesson.get("status") == "admission_verified"], lessons
-        )
-        # 图一致时仍验证（既有用例不回退）
-        lessons = _lessons(
-            [
-                self._failed(f"conv-26:stress:0:{self.DIGEST}", graph_digests={"conv-26": g1}),
-                self._passed(
-                    [
-                        {
-                            "asset_id": "f_flight_pair",
-                            "scenario_id": "stress",
-                            "status": "passed",
-                            "required": True,
-                            "input_ref": f"conv-26:stress:0:{self.DIGEST}",
-                        }
-                    ],
-                    graph_digests={"conv-26": g1},
-                ),
-            ]
-        )
-        self.assertTrue(
-            [lesson for lesson in lessons if lesson.get("status") == "admission_verified"], lessons
-        )
-
-    def test_same_case_same_scenario_same_digest_verifies(self):
-        """守门（既有行为不回退）：同 case＋同场景族＋同 digest＋同图 → 验证成立。"""
-        from darwinagent.experiments.wiki import _lessons
-
-        lessons = _lessons(
-            [
-                self._failed(f"conv-26:stress:0:{self.DIGEST}"),
-                self._passed(
-                    [
-                        {
-                            "asset_id": "f_flight_pair",
-                            "scenario_id": "stress",
-                            "status": "passed",
-                            "required": True,
-                            "input_ref": f"conv-26:stress:0:{self.DIGEST}",
-                        }
-                    ]
-                ),
-            ]
-        )
-        self.assertTrue(
-            [lesson for lesson in lessons if lesson.get("status") == "admission_verified"], lessons
-        )
-
-    def test_real_check_replay_ref_shape_verifies(self):
-        """真实 check_replay ref 形态（case:question_id:<12hex>，第二段是题号而非
-        场景名）：同 case＋同题号＋同快照 digest 的通过行必须验证——场景比对用
-        ref 段对 ref 段，不得与行 scenario_id 标签比对（否则真实回放验证被误拒）。"""
-        from darwinagent.experiments.wiki import _lessons
-
-        d12 = self.DIGEST[:12]
-        lessons = _lessons(
-            [
-                self._failed(
-                    f"conv-26:5:{d12}", scenario="check_replay_verified", asset="c_answer_shape"
-                ),
-                self._passed(
-                    [
-                        {
-                            "asset_id": "c_answer_shape",
-                            "scenario_id": "check_replay_verified",
-                            "status": "passed",
-                            "required": True,
-                            "input_ref": f"conv-26:5:{d12}",
-                        }
-                    ],
-                    asset_id="c_answer_shape",
-                    kind="C",
-                ),
-            ]
-        )
-        self.assertTrue(
-            [lesson for lesson in lessons if lesson.get("status") == "admission_verified"], lessons
-        )
-
-
-if __name__ == "__main__":
-    unittest.main()

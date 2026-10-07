@@ -16,17 +16,7 @@ from darwinagent.llm.client import BudgetExceeded, LLMClient
 from darwinagent.runtime import atomic_json
 from darwinagent.schema.model import Schema
 from darwinagent.schema.owlcheck import check_schema
-
-YAML = """entity_types:
-  Person:
-    primary_key: [name]
-    attributes: [{name: name, dtype: string}, {name: age, dtype: int}]
-  Machine:
-    primary_key: [serial]
-    attributes: [{name: serial, dtype: string}]
-relation_types:
-  owns: {domain: Person, range: Machine, functional: true}
-"""
+from tests.support.schemas import YAML
 
 
 class GraphContracts(unittest.TestCase):

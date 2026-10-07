@@ -9,7 +9,7 @@ from darwinagent.config import RunConfig
 from darwinagent.contracts import AnswerResult
 from darwinagent.engine import Pipeline
 from darwinagent.kernel.assets import KernelAssets
-from tests.fixtures import case, client, extraction, review, spec
+from tests.support.device import case, client, extraction, review, spec
 
 
 class FixedPipeline(unittest.TestCase):

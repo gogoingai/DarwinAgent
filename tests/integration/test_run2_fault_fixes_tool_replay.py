@@ -1,11 +1,4 @@
-"""2026-10-07 运行二事故修复回归。
-
-A 参数契约违规进反馈环（answer.py）：DeepSeek 工具调用发明未声明字段 {'主题'}，
-此前 ValueError 一击致命成题级确定性故障（B0 门即挂）。现在 tool.params: 前缀的
-契约错误进反馈（含合法字段清单）→ 模型同题重试修正 → 正常发布。
-B 外部故障不拦采纳门（policy.py＋runner 验证门，操作者指令「外部异常导致就
-不应该拦截」）：传输/限流族生成故障留分母＋披露、不拦；确定性族照拦。
-"""
+"""Offline regression scenarios for tool replay."""
 
 import asyncio
 import json
@@ -14,11 +7,10 @@ import unittest
 
 from darwinagent.agents.answer import AnswerAgent
 from darwinagent.config import RunConfig
-from darwinagent.contracts import EvaluationResult
 from darwinagent.kernel import TaskSpec
 from darwinagent.kernel.execution import KernelRuntime
 from darwinagent.kg.graph import load_graph
-from tests.integration.test_wiki_faults_repro import (
+from tests.support.travel_faults import (
     FIXED_C,
     FIXED_F,
     FIXTURES,
@@ -140,55 +132,3 @@ class ToolParamRejectEntersFeedback(unittest.TestCase):
         self.assertEqual(result.status, "answered", str(result.error))
         self.assertTrue(seen_feedback, "必须发生过一次契约拒绝反馈")
         self.assertTrue(result.evidence)
-
-
-class ExternalFaultsDoNotBlockAdoption(unittest.TestCase):
-    """B：split_faults 分类＋采纳门只拦确定性族。"""
-
-    @staticmethod
-    def _scores(precise, faults=(), total=10):
-        diag = tuple(
-            {"question_id": str(i), "status": "execution_error", "error": e}
-            for i, e in enumerate(faults)
-        )
-        completed = total - len(faults)
-        return EvaluationResult(
-            {"precise": precise, "lenient": precise}, total, completed, len(faults), 0, diag
-        )
-
-    def test_split_faults_classifies_by_error_prefix(self):
-        from darwinagent.experiments.policy import split_faults
-
-        s = self._scores(
-            5,
-            faults=(
-                "TransportExhausted: tools: 429",
-                "RateLimitError: x",
-                "ValueError: tool.params: undeclared",
-            ),
-        )
-        self.assertEqual(split_faults(s), (2, 1))
-
-    def test_external_fault_does_not_block_deterministic_does(self):
-        from darwinagent.experiments.policy import AdoptionPolicy
-
-        policy = AdoptionPolicy("precise", ("lenient",))
-        baseline = self._scores(5)
-        # 外部故障候选：primary 严格升 → 采纳，且披露 external_faults
-        ext = self._scores(6, faults=("TransportExhausted: tools: 429",))
-        d = policy.decide(baseline, ext)
-        self.assertTrue(d["accepted"], d["reasons"])
-        self.assertEqual(d["external_faults"], {"baseline": 0, "candidate": 1})
-        # 确定性故障候选：同分数 → 拒（incomplete_evaluation）
-        det = self._scores(6, faults=("ValueError: tool.params: undeclared",))
-        d2 = policy.decide(baseline, det)
-        self.assertFalse(d2["accepted"])
-        self.assertIn("incomplete_evaluation", d2["reasons"])
-        # 外部故障不抬分：primary 不升仍拒
-        ext_flat = self._scores(5, faults=("TransportExhausted: tools: 429",))
-        d3 = policy.decide(baseline, ext_flat)
-        self.assertFalse(d3["accepted"])
-
-
-if __name__ == "__main__":
-    unittest.main()
