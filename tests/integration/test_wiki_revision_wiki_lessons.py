@@ -21,7 +21,8 @@ from tests.support.recorded_wiki import WikiRecordedExperiment
 
 class WikiEvidenceRegression(unittest.TestCase):
     def test_late_fault_survives_both_trace_budgets_and_is_runtime_experience(self):
-        from darwinagent.experiments.wiki import _context_facts, bounded_trace
+        from darwinagent.experiments.wiki import bounded_trace
+        from darwinagent.experiments.wiki_context import _context_facts
 
         trace = [{"stage": "tool", "asset_id": "f", "parameters": {"limit": i}} for i in range(9)]
         trace.append(
@@ -115,7 +116,7 @@ class WikiEvidenceRegression(unittest.TestCase):
             self.assertTrue(all(e["confidence"] == "hypothesis" for e in wiki["entries"]))
 
     def test_candidate_check_rejections_survive_compression_and_retain_check_identity(self):
-        from darwinagent.experiments.wiki import _context_facts
+        from darwinagent.experiments.wiki_context import _context_facts
 
         trace = [{"stage": "tool", "asset_id": "f"} for _ in range(10)]
         trace.append(

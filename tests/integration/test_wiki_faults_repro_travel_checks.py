@@ -37,7 +37,7 @@ class ReviewFixUnitTests(unittest.TestCase):
         self.assertTrue(any(isinstance(p, dict) and p.get("limit", 0) >= 500 for p in out), out)
 
     def test_wiki_evidence_compression_keeps_facts(self):
-        from darwinagent.experiments.wiki import _compress_training_evidence
+        from darwinagent.experiments.wiki_evidence import _compress_training_evidence
 
         facts = {
             "training_examples": [
@@ -73,7 +73,7 @@ class ReviewFixUnitTests(unittest.TestCase):
 
     def test_verified_fix_requires_scenario_reproduction(self):
         """审查 P2 反例：旧 C 失败＋同资产过门＋空 scenarios 不得标记已验证修复。"""
-        from darwinagent.experiments.wiki import _lessons
+        from darwinagent.experiments.wiki_lessons import _lessons
 
         entries = [
             {

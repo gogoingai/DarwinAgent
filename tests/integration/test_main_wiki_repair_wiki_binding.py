@@ -2,7 +2,7 @@
 
 import unittest
 
-from darwinagent.experiments.wiki import _lessons
+from darwinagent.experiments.wiki_lessons import _lessons
 from tests.support import wiki_events as helper
 
 

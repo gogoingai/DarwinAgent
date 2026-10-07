@@ -2,9 +2,7 @@
 
 import unittest
 
-from darwinagent.experiments.admission import (
-    _traversal_shape,
-)
+from darwinagent.experiments.admission_samples import _traversal_shape
 from darwinagent.kernel.assets import Asset
 
 

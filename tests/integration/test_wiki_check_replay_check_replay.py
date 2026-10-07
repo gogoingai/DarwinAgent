@@ -13,7 +13,7 @@ from darwinagent.experiments.recovery import (
     _prior_failed_check_snapshots,
     promote_verified_check_replay,
 )
-from darwinagent.experiments.wiki import _lessons
+from darwinagent.experiments.wiki_lessons import _lessons
 from darwinagent.kernel import TaskSpec
 from darwinagent.kernel.validation import capability_names
 from darwinagent.runtime.artifacts import digest
@@ -563,7 +563,7 @@ class CounterexampleReplayTests(unittest.TestCase):
     def test_tight_budget_keeps_nested_failure_facts(self):
         """5000 字符级预算下，candidate 事件的 checks[].check_id/ok/issues/步数、
         candidate_summary.json_type、observation 预算事实仍然保留。"""
-        from darwinagent.experiments.wiki import _compress_training_evidence
+        from darwinagent.experiments.wiki_evidence import _compress_training_evidence
 
         facts = {
             "training_examples": [

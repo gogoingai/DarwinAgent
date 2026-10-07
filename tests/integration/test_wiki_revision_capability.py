@@ -7,11 +7,8 @@ from pathlib import Path
 
 from darwinagent.config import RunConfig
 from darwinagent.contracts import CaseInput, GraphResult, QuestionInput
-from darwinagent.experiments.admission import (
-    AdmissionError,
-    _pressure_graph,
-    admit_candidate,
-)
+from darwinagent.experiments.admission import AdmissionError, admit_candidate
+from darwinagent.experiments.admission_samples import _pressure_graph
 from darwinagent.kernel.assets import Asset, KernelAssets
 from darwinagent.kernel.functions import FunctionRegistry
 from tests.support.graphs import cold_bundle, corpus, gvtest_graph

@@ -11,7 +11,8 @@ from darwinagent.config import RunConfig
 from darwinagent.contracts import (
     QuestionInput,
 )
-from darwinagent.experiments.admission import AdmissionError, _samples
+from darwinagent.experiments.admission import AdmissionError
+from darwinagent.experiments.admission_samples import _samples
 from darwinagent.experiments.runner import ExperimentRunner
 from darwinagent.experiments.snapshots import load_frozen_graph
 from darwinagent.kernel.assets import Asset, KernelAssets

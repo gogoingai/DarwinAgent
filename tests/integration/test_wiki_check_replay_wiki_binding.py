@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 
 from darwinagent.config import RunConfig
-from darwinagent.experiments.wiki import _lessons
+from darwinagent.experiments.wiki_lessons import _lessons
 from tests.support.wiki_events import failed_attempt, passed_attempt
 
 
@@ -212,7 +212,7 @@ class VerifiedFixBindingRefTests(unittest.TestCase):
         }
 
     def test_same_scenario_different_ref_does_not_verify(self):
-        from darwinagent.experiments.wiki import _lessons
+        from darwinagent.experiments.wiki_lessons import _lessons
 
         entries = [
             self._lesson_entry("replay", "SandboxError", "conv-26:replay:aaaa1111aaaa1111"),
@@ -234,7 +234,7 @@ class VerifiedFixBindingRefTests(unittest.TestCase):
         )
 
     def test_same_ref_does_verify_replay_lesson(self):
-        from darwinagent.experiments.wiki import _lessons
+        from darwinagent.experiments.wiki_lessons import _lessons
 
         entries = [
             self._lesson_entry("replay", "SandboxError", "conv-26:replay:aaaa1111aaaa1111"),
@@ -256,7 +256,7 @@ class VerifiedFixBindingRefTests(unittest.TestCase):
         )
 
     def test_structure_row_pass_does_not_verify(self):
-        from darwinagent.experiments.wiki import _lessons
+        from darwinagent.experiments.wiki_lessons import _lessons
 
         entries = [
             self._lesson_entry("answer_0", "CandidateCheckRejected", "conv-26:answer_0"),
@@ -299,7 +299,7 @@ class AdmissionFixIdentityTests(unittest.TestCase):
         """反例本体（现状红）：case-old 的 stress 失败不得被 case-new 的同参数
         通过行验证——base/stress 参数来自资产级 trial_inputs，跨 case 必然同
         digest，旧逻辑只看 digest 子串。"""
-        from darwinagent.experiments.wiki import _lessons
+        from darwinagent.experiments.wiki_lessons import _lessons
 
         lessons = _lessons(
             [
@@ -324,7 +324,7 @@ class AdmissionFixIdentityTests(unittest.TestCase):
     def test_same_case_cross_scenario_same_params_does_not_verify(self):
         """场景绑定：同 case 同 digest 但不同场景族（stress 失败、base 通过）
         不得验证——场景是绑定要素之一（四审）。"""
-        from darwinagent.experiments.wiki import _lessons
+        from darwinagent.experiments.wiki_lessons import _lessons
 
         lessons = _lessons(
             [
@@ -349,7 +349,7 @@ class AdmissionFixIdentityTests(unittest.TestCase):
     def test_graph_digest_mismatch_does_not_verify(self):
         """数据图身份：同 case 同场景同 digest，但验证运行的数据图与失败时不同
         （可重建图场景）→ 旧故障不能算已修复。"""
-        from darwinagent.experiments.wiki import _lessons
+        from darwinagent.experiments.wiki_lessons import _lessons
 
         g1, g2 = "a" * 63 + "1", "a" * 63 + "2"
         lessons = _lessons(
@@ -396,7 +396,7 @@ class AdmissionFixIdentityTests(unittest.TestCase):
 
     def test_same_case_same_scenario_same_digest_verifies(self):
         """守门（既有行为不回退）：同 case＋同场景族＋同 digest＋同图 → 验证成立。"""
-        from darwinagent.experiments.wiki import _lessons
+        from darwinagent.experiments.wiki_lessons import _lessons
 
         lessons = _lessons(
             [
@@ -422,7 +422,7 @@ class AdmissionFixIdentityTests(unittest.TestCase):
         """真实 check_replay ref 形态（case:question_id:<12hex>，第二段是题号而非
         场景名）：同 case＋同题号＋同快照 digest 的通过行必须验证——场景比对用
         ref 段对 ref 段，不得与行 scenario_id 标签比对（否则真实回放验证被误拒）。"""
-        from darwinagent.experiments.wiki import _lessons
+        from darwinagent.experiments.wiki_lessons import _lessons
 
         d12 = self.DIGEST[:12]
         lessons = _lessons(
