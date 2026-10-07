@@ -2,9 +2,17 @@
 name = "darwinagent"
 version = "0.1.0"
 description = "Evolution for the Agent Era: experience-driven recursive self-improvement for agents"
-readme = "README.md"
+readme = "README.pypi.md"
 license = "MIT"
 requires-python = ">=3.11"
+keywords = ["agents", "recursive-self-improvement", "agent-memory", "darwinagent"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
 dependencies = [
     "openai>=1.40",
     "httpx>=0.27",
@@ -78,3 +86,13 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/darwinagent"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/src/darwinagent",
+    "/pyproject.toml",
+    "/README.pypi.md",
+    "/README.md",
+    "/README.zh-CN.md",
+    "/LICENSE",
+]

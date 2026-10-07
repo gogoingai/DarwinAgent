@@ -1,0 +1,73 @@
+name: Publish to PyPI
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Package version to publish (must match pyproject.toml)
+        required: true
+        type: string
+        default: '0.1.0'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pypi-publish
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Verify the requested package version
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          python - <<'PY'
+          import os
+          import tomllib
+          from pathlib import Path
+
+          project = tomllib.loads(Path('pyproject.toml').read_text())['project']
+          assert project['name'] == 'darwinagent'
+          assert project['version'] == os.environ['RELEASE_VERSION'], 'Version mismatch'
+          PY
+      - name: Build and check distributions
+        run: |
+          python -m pip install build twine
+          python -m build
+          python -m twine check --strict dist/*
+      - name: Verify the installed wheel outside the checkout
+        run: |
+          python -m venv /tmp/darwinagent-wheel
+          /tmp/darwinagent-wheel/bin/python -m pip install dist/*.whl
+          /tmp/darwinagent-wheel/bin/python scripts/check_installed.py
+      - uses: actions/upload-artifact@v5
+        with:
+          name: pypi-distributions
+          path: dist/
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/darwinagent/
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v6
+        with:
+          name: pypi-distributions
+          path: dist/
+      - name: Publish through PyPI Trusted Publishing
+        uses: pypa/gh-action-pypi-publish@release/v1
