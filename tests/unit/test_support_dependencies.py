@@ -40,6 +40,8 @@ class SupportDependencyTests(unittest.TestCase):
             "from .test_experiment import RecordedExperiment",
             "importlib.import_module('tests.integration.test_campaign')",
             "__import__('tests.unit.test_fact_memory')",
+            "import importlib as loader; loader.import_module('tests.integration.test_campaign')",
+            "from importlib import import_module as load; load('tests.integration.test_campaign')",
             "from unittest import TestCase as Fixture\nclass Builder(Fixture): pass",
             "import unittest as u\nclass Builder(u.TestCase): pass",
         )

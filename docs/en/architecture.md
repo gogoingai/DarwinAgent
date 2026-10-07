@@ -10,7 +10,33 @@ DarwinAgent 0.1 uses a common graph-based task runtime. The dataset boundary imp
 
 `TaskSpec` declares assets; `KernelBundle` carries relocatable, fingerprinted versions. S defines schema; F queries via read-only operators and a restricted AST interpreter; C checks graph or answer snapshots; P fills registered role slots. The [asset boundary](#asset-boundary) defines what proposals cannot change.
 
-`ExperimentRunner` owns B0, proposals, candidate execution, adoption, Wiki, and resume. `CampaignController` adds the three-set protocol. `feedback.py`, `trials.py`, `recovery.py`, and `statistics.py` organize training feedback, trials, recovery, and persisted stability statistics. They do not redefine evaluator metrics.
+`ExperimentRunner` is the public composition facade; its original hooks remain usable by
+recorded runners and task injections. `CampaignController` adds the three-set protocol.
+
+| Experiment module | Responsibility |
+| --- | --- |
+| `runner` | Validation, dependency assembly and thin extension hooks |
+| `lifecycle` | Declaration/source identity, seed or cold-start B0 and baseline preparation |
+| `stages` | Execution, independent scoring/checkpoints and smoke/preflight |
+| `optimization` | Wiki/legacy proposals, recovery and admission attempts |
+| `rounds` | Round budget, validation, decision, Wiki and publication coordination |
+| `graph_trials` | Frozen/dynamic/rebuilt graph supply and cache |
+| `constants` | Shared feedback budget and default admission attempts |
+| `feedback`, `recovery`, `trials`, `statistics`, `snapshots` | Training evidence, recovery, trials, statistics and snapshots |
+
+Helpers receive explicit dependencies and callbacks without importing the runner facade.
+Private iteration state updates after durable decision/publication and adds no serialized fields.
+Recovery precedes STOP/round limits; resumed rounds retain their original budgets.
+
+`WikiMaintainer` owns event persistence, deduplication, attribution and refresh. `wiki_evidence`,
+`wiki_lessons` and `wiki_context` process bounded evidence, verified lessons and proposal context.
+Admission samples/checks/functions/composition return ordered batches; the entrypoint/reporting
+collector preserves checkpoints and fail-closed rejection.
+
+Adapters transform domain inputs; evaluators hold references; run entries assemble components;
+exports convert outputs. `operators/calendar.py` shares identical primitives only; domain
+resolvers and answer equivalence stay separate. Reusable offline fixtures live in `tests/support`,
+independent of TestCase/scenario files. See the [governance report](engineering-governance.md).
 
 ## Asset boundary
 

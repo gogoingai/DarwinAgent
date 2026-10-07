@@ -1,0 +1,3846 @@
+[
+  {
+    "old_id": "integration.test_adapters.DatasetBoundary.test_adapters_do_not_call_model_or_modify_answers",
+    "new_id": "integration.test_adapters.DatasetBoundary.test_adapters_do_not_call_model_or_modify_answers",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_adapters.DatasetBoundary.test_both_implement_contract",
+    "new_id": "integration.test_adapters.DatasetBoundary.test_both_implement_contract",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 4,
+    "assertion_count_after": 4,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_adapters.DatasetBoundary.test_dataset_entries_use_same_pipeline",
+    "new_id": "integration.test_adapters.DatasetBoundary.test_dataset_entries_use_same_pipeline",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_adapters.DatasetBoundary.test_exports_preserve_published_content",
+    "new_id": "integration.test_adapters.DatasetBoundary.test_exports_preserve_published_content",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_adapters.DatasetBoundary.test_generation_contract_rejects_evaluation_metadata",
+    "new_id": "integration.test_adapters.DatasetBoundary.test_generation_contract_rejects_evaluation_metadata",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_adapters.DatasetBoundary.test_locked_evaluator_unchanged",
+    "new_id": "integration.test_adapters.DatasetBoundary.test_locked_evaluator_unchanged",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 0,
+    "assertion_count_after": 0,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_adapters.DatasetBoundary.test_locomo_reference_change_cannot_change_generation_input",
+    "new_id": "integration.test_adapters.DatasetBoundary.test_locomo_reference_change_cannot_change_generation_input",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 5,
+    "assertion_count_after": 5,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_adapters.DatasetBoundary.test_no_preseeded_conversation_assets",
+    "new_id": "integration.test_adapters.DatasetBoundary.test_no_preseeded_conversation_assets",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_adapters.DatasetBoundary.test_travel_level_cannot_change_generation_input",
+    "new_id": "integration.test_adapters.DatasetBoundary.test_travel_level_cannot_change_generation_input",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 4,
+    "assertion_count_after": 4,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_agentic_fixes.AbstentionAuditScopeTests.test_agentic_refusal_audit_stays_within_retrieved_evidence",
+    "new_id": "integration.test_agentic_fixes_admission.AbstentionAuditScopeTests.test_agentic_refusal_audit_stays_within_retrieved_evidence",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 6,
+    "assertion_count_after": 6,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_agentic_fixes.ActiveStagesFeedbackTests.test_frozen_snapshot_marks_extract_skipped",
+    "new_id": "integration.test_agentic_fixes_proposal_feedback.ActiveStagesFeedbackTests.test_frozen_snapshot_marks_extract_skipped",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 3,
+    "assertion_count_after": 3,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_agentic_fixes.AdmissionRetryThenSuccessTests.test_stale_fingerprint_feeds_back_and_second_call_admits",
+    "new_id": "integration.test_agentic_fixes_admission.AdmissionRetryThenSuccessTests.test_stale_fingerprint_feeds_back_and_second_call_admits",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 3,
+    "assertion_count_after": 3,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_agentic_fixes.AnswerCheckAdmissionTests.test_rejecting_c_fails_admission",
+    "new_id": "integration.test_agentic_fixes_check_replay.AnswerCheckAdmissionTests.test_rejecting_c_fails_admission",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_agentic_fixes.AnswerCheckAdmissionTests.test_synthetic_snapshot_is_well_formed",
+    "new_id": "integration.test_agentic_fixes_check_replay.AnswerCheckAdmissionTests.test_synthetic_snapshot_is_well_formed",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 3,
+    "assertion_count_after": 3,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_agentic_fixes.BaselineCompatibilityTests.test_expected_arm_differences_stay_compatible",
+    "new_id": "integration.test_agentic_fixes_checkpoints.BaselineCompatibilityTests.test_expected_arm_differences_stay_compatible",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_agentic_fixes.BaselineCompatibilityTests.test_real_differences_rejected",
+    "new_id": "integration.test_agentic_fixes_checkpoints.BaselineCompatibilityTests.test_real_differences_rejected",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_agentic_fixes.BatchedFaultRetryTests.test_all_recovered_final_set_recomputed",
+    "new_id": "integration.test_agentic_fixes_recovery.BatchedFaultRetryTests.test_all_recovered_final_set_recomputed",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 5,
+    "assertion_count_after": 5,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_agentic_fixes.BatchedFaultRetryTests.test_persistent_faults_reported_from_final_set",
+    "new_id": "integration.test_agentic_fixes_recovery.BatchedFaultRetryTests.test_persistent_faults_reported_from_final_set",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_agentic_fixes.CarriedCheckpointTests.test_carry_rebase_answer_path_drift_detected",
+    "new_id": "integration.test_agentic_fixes_checkpoints.CarriedCheckpointTests.test_carry_rebase_answer_path_drift_detected",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_agentic_fixes.CarriedCheckpointTests.test_no_sidecar_accepts_only_current_identity",
+    "new_id": "integration.test_agentic_fixes_checkpoints.CarriedCheckpointTests.test_no_sidecar_accepts_only_current_identity",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_agentic_fixes.CarriedCheckpointTests.test_sidecar_accepts_old_identity_when_answer_path_identical",
+    "new_id": "integration.test_agentic_fixes_checkpoints.CarriedCheckpointTests.test_sidecar_accepts_old_identity_when_answer_path_identical",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_agentic_fixes.CarriedCheckpointTests.test_sidecar_rejects_when_answer_path_changed",
+    "new_id": "integration.test_agentic_fixes_checkpoints.CarriedCheckpointTests.test_sidecar_rejects_when_answer_path_changed",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_agentic_fixes.ContainerStringificationTests.test_container_conversion_is_rejected",
+    "new_id": "integration.test_agentic_fixes_capability.ContainerStringificationTests.test_container_conversion_is_rejected",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_agentic_fixes.CrossCaseTraceTests.test_same_question_id_keeps_case_local_trace",
+    "new_id": "integration.test_agentic_fixes_proposal_feedback.CrossCaseTraceTests.test_same_question_id_keeps_case_local_trace",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_agentic_fixes.CrossRoundRejectionFeedbackTests.test_previous_round_rejection_enters_feedback",
+    "new_id": "integration.test_agentic_fixes_proposal_feedback.CrossRoundRejectionFeedbackTests.test_previous_round_rejection_enters_feedback",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_agentic_fixes.DecorativeCheckTests.test_all_ok_check_rejected_and_flagging_check_passes",
+    "new_id": "integration.test_agentic_fixes_check_replay.DecorativeCheckTests.test_all_ok_check_rejected_and_flagging_check_passes",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_agentic_fixes.DecorativeCheckTests.test_invalid_variant_shape",
+    "new_id": "integration.test_agentic_fixes_check_replay.DecorativeCheckTests.test_invalid_variant_shape",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 3,
+    "assertion_count_after": 3,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_agentic_fixes.DeterministicFaultTests.test_deterministic_error_skips_retry",
+    "new_id": "integration.test_agentic_fixes_recovery.DeterministicFaultTests.test_deterministic_error_skips_retry",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_agentic_fixes.EmbedderCacheConcurrencyTests.test_concurrent_flush_never_loses_tmp",
+    "new_id": "integration.test_agentic_fixes_capability.EmbedderCacheConcurrencyTests.test_concurrent_flush_never_loses_tmp",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 4,
+    "assertion_count_after": 4,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_agentic_fixes.EvidenceBoundaryTests.test_returned_rows_only_plus_fabrication_guard",
+    "new_id": "integration.test_agentic_fixes_admission.EvidenceBoundaryTests.test_returned_rows_only_plus_fabrication_guard",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 5,
+    "assertion_count_after": 5,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_agentic_fixes.ExternalEntryTests.test_entry_end_to_end_offline",
+    "new_id": "integration.test_agentic_fixes_domain_evaluation.ExternalEntryTests.test_entry_end_to_end_offline",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 3,
+    "assertion_count_after": 3,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_agentic_fixes.ExternalEntryTests.test_entry_rejects_missing_capability_and_bad_c",
+    "new_id": "integration.test_agentic_fixes_domain_evaluation.ExternalEntryTests.test_entry_rejects_missing_capability_and_bad_c",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 4,
+    "assertion_count_after": 4,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_agentic_fixes.ExternalReportTests.test_macro_micro_and_delta_use_rates",
+    "new_id": "integration.test_agentic_fixes_domain_evaluation.ExternalReportTests.test_macro_micro_and_delta_use_rates",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 11,
+    "assertion_count_after": 11,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_agentic_fixes.FUnitTestsTests.test_stress_samples_expose_unsupported_container_conversion",
+    "new_id": "integration.test_agentic_fixes_capability.FUnitTestsTests.test_stress_samples_expose_unsupported_container_conversion",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_agentic_fixes.FUnitTestsTests.test_stress_samples_shapes",
+    "new_id": "integration.test_agentic_fixes_capability.FUnitTestsTests.test_stress_samples_shapes",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 4,
+    "assertion_count_after": 4,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_agentic_fixes.FaultRetryInvalidatesEvaluationTests.test_recovered_answers_force_re_evaluation",
+    "new_id": "integration.test_agentic_fixes_recovery.FaultRetryInvalidatesEvaluationTests.test_recovered_answers_force_re_evaluation",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 3,
+    "assertion_count_after": 3,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_agentic_fixes.GraphCheckBudgetTests.test_budget_scales_with_snapshot",
+    "new_id": "integration.test_agentic_fixes_admission.GraphCheckBudgetTests.test_budget_scales_with_snapshot",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 4,
+    "assertion_count_after": 4,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_agentic_fixes.GraphCheckBudgetTests.test_stage_skip_and_preflight",
+    "new_id": "integration.test_agentic_fixes_admission.GraphCheckBudgetTests.test_stage_skip_and_preflight",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_agentic_fixes.PatchNormalizationTests.test_extra_keys_dropped_and_noted",
+    "new_id": "integration.test_agentic_fixes_proposal_feedback.PatchNormalizationTests.test_extra_keys_dropped_and_noted",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 4,
+    "assertion_count_after": 4,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_agentic_fixes.PreflightCapabilityTests.test_untriggered_capability_rejected_before_stage",
+    "new_id": "integration.test_agentic_fixes_capability.PreflightCapabilityTests.test_untriggered_capability_rejected_before_stage",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_agentic_fixes.PreflightStagingTests.test_first_preflight_failure_second_attempt_admits",
+    "new_id": "integration.test_agentic_fixes_admission.PreflightStagingTests.test_first_preflight_failure_second_attempt_admits",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 5,
+    "assertion_count_after": 5,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_agentic_fixes.PreflightStagingTests.test_resume_revalidates_existing_candidate",
+    "new_id": "integration.test_agentic_fixes_admission.PreflightStagingTests.test_resume_revalidates_existing_candidate",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_agentic_fixes.ProposalFeedbackTests.test_budget_rotates_across_cases",
+    "new_id": "integration.test_agentic_fixes_proposal_feedback.ProposalFeedbackTests.test_budget_rotates_across_cases",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": false
+  },
+  {
+    "old_id": "integration.test_agentic_fixes.ProposalFeedbackTests.test_failure_first_compressed_with_trace",
+    "new_id": "integration.test_agentic_fixes_proposal_feedback.ProposalFeedbackTests.test_failure_first_compressed_with_trace",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 9,
+    "assertion_count_after": 9,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_agentic_fixes.ProposalPayloadContract.test_scope_and_admission_error_reach_the_model",
+    "new_id": "integration.test_agentic_fixes_proposal_feedback.ProposalPayloadContract.test_scope_and_admission_error_reach_the_model",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 4,
+    "assertion_count_after": 4,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_agentic_fixes.RetrievalFloorTests.test_capability_names_mapping",
+    "new_id": "integration.test_agentic_fixes_capability.RetrievalFloorTests.test_capability_names_mapping",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 3,
+    "assertion_count_after": 3,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_agentic_fixes.RetrievalFloorTests.test_comment_only_mentions_rejected",
+    "new_id": "integration.test_agentic_fixes_capability.RetrievalFloorTests.test_comment_only_mentions_rejected",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_agentic_fixes.RetrievalFloorTests.test_floor_requires_both_classes",
+    "new_id": "integration.test_agentic_fixes_capability.RetrievalFloorTests.test_floor_requires_both_classes",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_agentic_fixes.RetrievalFloorTests.test_real_calls_pass",
+    "new_id": "integration.test_agentic_fixes_capability.RetrievalFloorTests.test_real_calls_pass",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_agentic_fixes.RetrievalFloorTests.test_trial_floor_requires_positive_execution",
+    "new_id": "integration.test_agentic_fixes_capability.RetrievalFloorTests.test_trial_floor_requires_positive_execution",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 3,
+    "assertion_count_after": 3,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_agentic_fixes.RetryVarianceTests.test_admission_error_carries_attempt_number",
+    "new_id": "integration.test_agentic_fixes_admission.RetryVarianceTests.test_admission_error_carries_attempt_number",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 6,
+    "assertion_ast_identical": false,
+    "scenario_ast_identical_except_imports": false
+  },
+  {
+    "old_id": "integration.test_agentic_fixes.SmokeJudgeContractTests.test_smoke_judge_maps_evaluation_result_fields",
+    "new_id": "integration.test_agentic_fixes_admission.SmokeJudgeContractTests.test_smoke_judge_maps_evaluation_result_fields",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_agentic_fixes.SmokeThresholdTests.test_single_fault_passes_double_fault_rejects",
+    "new_id": "integration.test_agentic_fixes_admission.SmokeThresholdTests.test_single_fault_passes_double_fault_rejects",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_agentic_fixes.ToolTelemetryTests.test_new_ids_and_repeat_flag",
+    "new_id": "integration.test_agentic_fixes_proposal_feedback.ToolTelemetryTests.test_new_ids_and_repeat_flag",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 5,
+    "assertion_count_after": 5,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_agentic_fixes.TraceGapTests.test_evidence_excerpts_and_sources_visible",
+    "new_id": "integration.test_agentic_fixes_proposal_feedback.TraceGapTests.test_evidence_excerpts_and_sources_visible",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 3,
+    "assertion_count_after": 3,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_agentic_fixes.TraceGapTests.test_frozen_check_reasons_visible",
+    "new_id": "integration.test_agentic_fixes_proposal_feedback.TraceGapTests.test_frozen_check_reasons_visible",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_agentic_fixes.TraceGapTests.test_params_come_from_execution_record_not_rejected_calls",
+    "new_id": "integration.test_agentic_fixes_proposal_feedback.TraceGapTests.test_params_come_from_execution_record_not_rejected_calls",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_agentic_fixes.TraceGapTests.test_truncation_is_marked",
+    "new_id": "integration.test_agentic_fixes_proposal_feedback.TraceGapTests.test_truncation_is_marked",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_agentic_fixes.TraceReturnTypesTests.test_scalar_and_object_returns",
+    "new_id": "integration.test_agentic_fixes_proposal_feedback.TraceReturnTypesTests.test_scalar_and_object_returns",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 5,
+    "assertion_count_after": 5,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_agentic_fixes.TraceSummaryTests.test_empty_result_and_review_rejection_visible",
+    "new_id": "integration.test_agentic_fixes_proposal_feedback.TraceSummaryTests.test_empty_result_and_review_rejection_visible",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_agentic_fixes.TraceSummaryTests.test_tool_calls_distinct_from_model_outputs",
+    "new_id": "integration.test_agentic_fixes_proposal_feedback.TraceSummaryTests.test_tool_calls_distinct_from_model_outputs",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 6,
+    "assertion_count_after": 6,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_agentic_fixes.TrimmedEvaluateTests.test_asked_subset_passes_and_grades_only_asked",
+    "new_id": "integration.test_agentic_fixes_domain_evaluation.TrimmedEvaluateTests.test_asked_subset_passes_and_grades_only_asked",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 3,
+    "assertion_count_after": 3,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_agentic_fixes.TrimmedEvaluateTests.test_audited_gold_aligned_to_asked_subset",
+    "new_id": "integration.test_agentic_fixes_domain_evaluation.TrimmedEvaluateTests.test_audited_gold_aligned_to_asked_subset",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 3,
+    "assertion_count_after": 3,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_agentic_fixes.TrimmedEvaluateTests.test_full_set_still_required_without_asked",
+    "new_id": "integration.test_agentic_fixes_domain_evaluation.TrimmedEvaluateTests.test_full_set_still_required_without_asked",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_agentic_fixes.TrimmedEvaluateTests.test_missing_answer_within_asked_still_rejected",
+    "new_id": "integration.test_agentic_fixes_domain_evaluation.TrimmedEvaluateTests.test_missing_answer_within_asked_still_rejected",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_agentic_round.ColdStartConstraints.test_atomic_memory_floor",
+    "new_id": "integration.test_agentic_round_capability.ColdStartConstraints.test_atomic_memory_floor",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 4,
+    "assertion_count_after": 4,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_agentic_round.ColdStartConstraints.test_c_free_bundle_admits",
+    "new_id": "integration.test_agentic_round_capability.ColdStartConstraints.test_c_free_bundle_admits",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_agentic_round.ColdStartConstraints.test_revision_freezes_atomic_memory_and_scope",
+    "new_id": "integration.test_agentic_round_capability.ColdStartConstraints.test_revision_freezes_atomic_memory_and_scope",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 6,
+    "assertion_count_after": 6,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_agentic_round.DatesKernel.test_capability_wrapper",
+    "new_id": "integration.test_agentic_round_conversation_dates.DatesKernel.test_capability_wrapper",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_agentic_round.DatesKernel.test_relative_resolution",
+    "new_id": "integration.test_agentic_round_conversation_dates.DatesKernel.test_relative_resolution",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 5,
+    "assertion_count_after": 5,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_agentic_round.SemanticSearchCapability.test_hits_resolve_to_rows_with_lineage",
+    "new_id": "integration.test_agentic_round_capability.SemanticSearchCapability.test_hits_resolve_to_rows_with_lineage",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 4,
+    "assertion_count_after": 4,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_agentic_round.SemanticSearchCapability.test_subject_filter_and_missing_index",
+    "new_id": "integration.test_agentic_round_capability.SemanticSearchCapability.test_subject_filter_and_missing_index",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_agentic_round.SnapshotPipeline.test_frozen_snapshot_injection_and_identity",
+    "new_id": "integration.test_agentic_round_snapshots.SnapshotPipeline.test_frozen_snapshot_injection_and_identity",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 4,
+    "assertion_count_after": 4,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_agentic_round.SnapshotPipeline.test_snapshot_digest_guards_identity",
+    "new_id": "integration.test_agentic_round_snapshots.SnapshotPipeline.test_snapshot_digest_guards_identity",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_agentic_round.SnapshotPipeline.test_vector_once_baseline",
+    "new_id": "integration.test_agentic_round_snapshots.SnapshotPipeline.test_vector_once_baseline",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 4,
+    "assertion_count_after": 4,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_agentic_round.VectorStoreRoundTrip.test_save_load_search",
+    "new_id": "integration.test_agentic_round_vectors.VectorStoreRoundTrip.test_save_load_search",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_campaign.ThreeSetCampaign.test_adopt_validate_select_test_and_ledger",
+    "new_id": "integration.test_campaign.ThreeSetCampaign.test_adopt_validate_select_test_and_ledger",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 8,
+    "assertion_count_after": 8,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_campaign.ThreeSetCampaign.test_missing_precheck_refuses_to_start",
+    "new_id": "integration.test_campaign.ThreeSetCampaign.test_missing_precheck_refuses_to_start",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_campaign.ThreeSetCampaign.test_multi_case_splits_aggregate_and_ledger",
+    "new_id": "integration.test_campaign.ThreeSetCampaign.test_multi_case_splits_aggregate_and_ledger",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 7,
+    "assertion_count_after": 7,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_campaign.ThreeSetCampaign.test_operator_stop_locks_b0_and_single_test_run",
+    "new_id": "integration.test_campaign.ThreeSetCampaign.test_operator_stop_locks_b0_and_single_test_run",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 7,
+    "assertion_count_after": 7,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_campaign.ThreeSetCampaign.test_precheck_wrong_identity_refused",
+    "new_id": "integration.test_campaign.ThreeSetCampaign.test_precheck_wrong_identity_refused",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_campaign.ThreeSetCampaign.test_resume_after_completion_is_sealed",
+    "new_id": "integration.test_campaign.ThreeSetCampaign.test_resume_after_completion_is_sealed",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 3,
+    "assertion_count_after": 3,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_campaign.ThreeSetCampaign.test_safety_cap_blocks_before_overshoot",
+    "new_id": "integration.test_campaign.ThreeSetCampaign.test_safety_cap_blocks_before_overshoot",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_experiment.FullExperimentControl.test_full_bootstrap_proposal_score_adopt_then_reject_tie",
+    "new_id": "integration.test_experiment.FullExperimentControl.test_full_bootstrap_proposal_score_adopt_then_reject_tie",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 8,
+    "assertion_count_after": 8,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_experiment.FullExperimentControl.test_stale_candidate_rejected_without_generation_or_publication",
+    "new_id": "integration.test_experiment.FullExperimentControl.test_stale_candidate_rejected_without_generation_or_publication",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 5,
+    "assertion_count_after": 5,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_fastloop_mode.PExtractMarkingTests.test_extract_patch_marked_not_effective_in_rebuild_mode",
+    "new_id": "integration.test_fastloop_mode_proposal_feedback.PExtractMarkingTests.test_extract_patch_marked_not_effective_in_rebuild_mode",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_fastloop_mode.RebuildSupplyCacheTests.test_rebuild_cache_reuses_same_schema_and_rebuilds_on_change",
+    "new_id": "integration.test_fastloop_mode_graph_supply.RebuildSupplyCacheTests.test_rebuild_cache_reuses_same_schema_and_rebuilds_on_change",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_fastloop_mode.RoundBudgetTests.test_proposal_attempts_cap_exhausts_before_fifty",
+    "new_id": "integration.test_fastloop_mode_deadlines.RoundBudgetTests.test_proposal_attempts_cap_exhausts_before_fifty",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 4,
+    "assertion_count_after": 4,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_fastloop_mode.RoundBudgetTests.test_round_deadline_persists_and_is_not_formal",
+    "new_id": "integration.test_fastloop_mode_deadlines.RoundBudgetTests.test_round_deadline_persists_and_is_not_formal",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 6,
+    "assertion_count_after": 6,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_fastloop_mode.ValidationSelectionTests.test_validation_improvement_still_accepts",
+    "new_id": "integration.test_fastloop_mode_validation_selection.ValidationSelectionTests.test_validation_improvement_still_accepts",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 5,
+    "assertion_count_after": 5,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_fastloop_mode.ValidationSelectionTests.test_validation_regression_rejects_and_aggregates_persisted",
+    "new_id": "integration.test_fastloop_mode_validation_selection.ValidationSelectionTests.test_validation_regression_rejects_and_aggregates_persisted",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 8,
+    "assertion_count_after": 8,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_gap_repairs_20261006.MaxRetriesDefault.test_transport_retries_now_ten",
+    "new_id": "integration.test_gap_repairs_recovery.MaxRetriesDefault.test_transport_retries_now_ten",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_gap_repairs_20261006.PublishRejectEntersFeedback.test_unsourced_citation_retries_then_publishes",
+    "new_id": "integration.test_gap_repairs_publication.PublishRejectEntersFeedback.test_unsourced_citation_retries_then_publishes",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 6,
+    "assertion_count_after": 6,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_gap_repairs_20261006.ScoredRoundsAndIdentity.test_legacy_declaration_with_rounds_key_resumes",
+    "new_id": "integration.test_gap_repairs_decisions.ScoredRoundsAndIdentity.test_legacy_declaration_with_rounds_key_resumes",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 3,
+    "assertion_count_after": 3,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_gap_repairs_20261006.ScoredRoundsAndIdentity.test_timeout_iteration_does_not_consume_round",
+    "new_id": "integration.test_gap_repairs_decisions.ScoredRoundsAndIdentity.test_timeout_iteration_does_not_consume_round",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_gap_repairs_20261006.SeedAssetsAnchor.test_seed_skips_bootstrap_and_records_identity",
+    "new_id": "integration.test_gap_repairs_checkpoints.SeedAssetsAnchor.test_seed_skips_bootstrap_and_records_identity",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 5,
+    "assertion_count_after": 5,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_locomo_graph_rules.FactProjectionTests.test_cache_key_binds_facts_schema_projection_only",
+    "new_id": "integration.test_locomo_graph_rules.FactProjectionTests.test_cache_key_binds_facts_schema_projection_only",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 4,
+    "assertion_count_after": 4,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_locomo_graph_rules.FactProjectionTests.test_corpus_sources_resolve_to_real_blocks",
+    "new_id": "integration.test_locomo_graph_rules.FactProjectionTests.test_corpus_sources_resolve_to_real_blocks",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 5,
+    "assertion_count_after": 5,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_locomo_graph_rules.FactProjectionTests.test_projection_is_deterministic_and_traceable",
+    "new_id": "integration.test_locomo_graph_rules.FactProjectionTests.test_projection_is_deterministic_and_traceable",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 6,
+    "assertion_count_after": 6,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_locomo_graph_rules.FactProjectionTests.test_rebuild_graph_and_vector_hits",
+    "new_id": "integration.test_locomo_graph_rules.FactProjectionTests.test_rebuild_graph_and_vector_hits",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 4,
+    "assertion_count_after": 4,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_locomo_graph_rules.FactProjectionTests.test_schema_shapes_the_graph",
+    "new_id": "integration.test_locomo_graph_rules.FactProjectionTests.test_schema_shapes_the_graph",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 4,
+    "assertion_count_after": 4,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_locomo_graph_rules.FactProjectionTests.test_snapshot_graph_builder_returns_ready_graph_result",
+    "new_id": "integration.test_locomo_graph_rules.FactProjectionTests.test_snapshot_graph_builder_returns_ready_graph_result",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 4,
+    "assertion_count_after": 4,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_locomo_graph_rules.FactProjectionTests.test_undeclared_schema_is_rejected",
+    "new_id": "integration.test_locomo_graph_rules.FactProjectionTests.test_undeclared_schema_is_rejected",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_locomo_graph_rules.FactProjectionTests.test_wrong_fact_primary_key_is_rejected",
+    "new_id": "integration.test_locomo_graph_rules.FactProjectionTests.test_wrong_fact_primary_key_is_rejected",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_main_wiki_repair.ColonCaseBindingTests.test_colon_case_different_scenario_graph_or_case_cannot_verify",
+    "new_id": "integration.test_main_wiki_repair_wiki_binding.ColonCaseBindingTests.test_colon_case_different_scenario_graph_or_case_cannot_verify",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_main_wiki_repair.ColonCaseBindingTests.test_matching_colon_case_verifies_actual_reproduction",
+    "new_id": "integration.test_main_wiki_repair_wiki_binding.ColonCaseBindingTests.test_matching_colon_case_verifies_actual_reproduction",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_main_wiki_repair.ConversationDateTests.test_all_session_dates_follow_message_metadata",
+    "new_id": "integration.test_main_wiki_repair_conversation_dates.ConversationDateTests.test_all_session_dates_follow_message_metadata",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 3,
+    "assertion_count_after": 3,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_main_wiki_repair.ConversationDateTests.test_missing_or_conflicting_record_dates_are_not_event_dates",
+    "new_id": "integration.test_main_wiki_repair_conversation_dates.ConversationDateTests.test_missing_or_conflicting_record_dates_are_not_event_dates",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_main_wiki_repair.FullRoundDeadlineTests.test_formal_score_overrun_does_not_publish",
+    "new_id": "integration.test_main_wiki_repair_deadlines.FullRoundDeadlineTests.test_formal_score_overrun_does_not_publish",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_main_wiki_repair.FullRoundDeadlineTests.test_inflight_proposal_cancelled_before_formal_score",
+    "new_id": "integration.test_main_wiki_repair_deadlines.FullRoundDeadlineTests.test_inflight_proposal_cancelled_before_formal_score",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_main_wiki_repair.FullRoundDeadlineTests.test_native_embedding_uses_remaining_budget_without_retries",
+    "new_id": "integration.test_main_wiki_repair_deadlines.FullRoundDeadlineTests.test_native_embedding_uses_remaining_budget_without_retries",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 3,
+    "assertion_count_after": 3,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_main_wiki_repair.FullRoundDeadlineTests.test_resume_keeps_consumed_budget",
+    "new_id": "integration.test_main_wiki_repair_deadlines.FullRoundDeadlineTests.test_resume_keeps_consumed_budget",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_main_wiki_repair.FullRoundDeadlineTests.test_wiki_overrun_does_not_publish_completed_score",
+    "new_id": "integration.test_main_wiki_repair_deadlines.FullRoundDeadlineTests.test_wiki_overrun_does_not_publish_completed_score",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 4,
+    "assertion_count_after": 4,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_main_wiki_repair.WholeEvidenceGroupTests.test_actual_default_split_and_seeds_have_no_shared_evidence",
+    "new_id": "integration.test_main_wiki_repair_evidence_budget.WholeEvidenceGroupTests.test_actual_default_split_and_seeds_have_no_shared_evidence",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 3,
+    "assertion_count_after": 3,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_main_wiki_repair.WholeEvidenceGroupTests.test_transitive_evidence_groups_across_categories_stay_whole",
+    "new_id": "integration.test_main_wiki_repair_evidence_budget.WholeEvidenceGroupTests.test_transitive_evidence_groups_across_categories_stay_whole",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 3,
+    "assertion_count_after": 3,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_pipeline.FixedPipeline.test_checkpoint_tamper_rejected",
+    "new_id": "integration.test_pipeline.FixedPipeline.test_checkpoint_tamper_rejected",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_pipeline.FixedPipeline.test_common_agents_and_assets_execute",
+    "new_id": "integration.test_pipeline.FixedPipeline.test_common_agents_and_assets_execute",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 6,
+    "assertion_count_after": 6,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_pipeline.FixedPipeline.test_concurrent_sources_are_isolated",
+    "new_id": "integration.test_pipeline.FixedPipeline.test_concurrent_sources_are_isolated",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_pipeline.FixedPipeline.test_fake_source_and_illegal_graph_fail_all_questions",
+    "new_id": "integration.test_pipeline.FixedPipeline.test_fake_source_and_illegal_graph_fail_all_questions",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_pipeline.FixedPipeline.test_function_tamper_rejected",
+    "new_id": "integration.test_pipeline.FixedPipeline.test_function_tamper_rejected",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_pipeline.FixedPipeline.test_parse_error_never_refusal_and_preserves_raw",
+    "new_id": "integration.test_pipeline.FixedPipeline.test_parse_error_never_refusal_and_preserves_raw",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 3,
+    "assertion_count_after": 3,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_pipeline.FixedPipeline.test_prompt_cannot_skip_fixed_review_or_budget",
+    "new_id": "integration.test_pipeline.FixedPipeline.test_prompt_cannot_skip_fixed_review_or_budget",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_pipeline.FixedPipeline.test_public_status_invariants",
+    "new_id": "integration.test_pipeline.FixedPipeline.test_public_status_invariants",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_pipeline.FixedPipeline.test_refusal_rejected_then_regenerated",
+    "new_id": "integration.test_pipeline.FixedPipeline.test_refusal_rejected_then_regenerated",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 3,
+    "assertion_count_after": 3,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_pipeline.FixedPipeline.test_review_error_never_selects_first_candidate",
+    "new_id": "integration.test_pipeline.FixedPipeline.test_review_error_never_selects_first_candidate",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 3,
+    "assertion_count_after": 3,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_pipeline.FixedPipeline.test_same_identity_resume_and_cross_identity_rejection",
+    "new_id": "integration.test_pipeline.FixedPipeline.test_same_identity_resume_and_cross_identity_rejection",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 3,
+    "assertion_count_after": 3,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_pipeline.FixedPipeline.test_semantically_unsupported_rejected",
+    "new_id": "integration.test_pipeline.FixedPipeline.test_semantically_unsupported_rejected",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_pipeline.FixedPipeline.test_task_check_rejection_never_published",
+    "new_id": "integration.test_pipeline.FixedPipeline.test_task_check_rejection_never_published",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_pipeline.FixedPipeline.test_unknown_tool_is_execution_error",
+    "new_id": "integration.test_pipeline.FixedPipeline.test_unknown_tool_is_execution_error",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_pipeline.FixedPipeline.test_unseen_evidence_rejected",
+    "new_id": "integration.test_pipeline.FixedPipeline.test_unseen_evidence_rejected",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_review_fixes.AnchoredPipelineChecksTaskC.test_passing_check_answers",
+    "new_id": "integration.test_review_fixes_anchored_pipeline.AnchoredPipelineChecksTaskC.test_passing_check_answers",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_review_fixes.AnchoredPipelineChecksTaskC.test_rejecting_graph_check_fails_fresh_run_too",
+    "new_id": "integration.test_review_fixes_anchored_pipeline.AnchoredPipelineChecksTaskC.test_rejecting_graph_check_fails_fresh_run_too",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 3,
+    "assertion_count_after": 3,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_review_fixes.AnchoringModeFrozen.test_s_patch_cannot_flip_mode",
+    "new_id": "integration.test_review_fixes_anchored_pipeline.AnchoringModeFrozen.test_s_patch_cannot_flip_mode",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_review_fixes.BudgetReserveBeforeExecution.test_cap_refuses_next_round_before_it_runs",
+    "new_id": "integration.test_review_fixes_campaign_budget.BudgetReserveBeforeExecution.test_cap_refuses_next_round_before_it_runs",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 5,
+    "assertion_count_after": 5,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_review_fixes.BudgetReserveBeforeExecution.test_decision_scan_skips_resultless_rounds",
+    "new_id": "integration.test_review_fixes_campaign_budget.BudgetReserveBeforeExecution.test_decision_scan_skips_resultless_rounds",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 3,
+    "assertion_count_after": 3,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_review_fixes.BudgetReserveBeforeExecution.test_reserve_is_idempotent_and_settle_does_not_recharge",
+    "new_id": "integration.test_review_fixes_campaign_budget.BudgetReserveBeforeExecution.test_reserve_is_idempotent_and_settle_does_not_recharge",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_review_fixes.GenericFeedbackContract.test_dataset_specific_diagnostics_flow_through",
+    "new_id": "integration.test_review_fixes_feedback_budget.GenericFeedbackContract.test_dataset_specific_diagnostics_flow_through",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 4,
+    "assertion_count_after": 4,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_review_fixes.GenericFeedbackContract.test_passed_rows_skipped_and_budget_capped",
+    "new_id": "integration.test_review_fixes_feedback_budget.GenericFeedbackContract.test_passed_rows_skipped_and_budget_capped",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 4,
+    "assertion_count_after": 4,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_review_fixes.GraphMemoryConsistency.test_visible_attributes_must_match_fact_definition",
+    "new_id": "integration.test_review_fixes_graph_integrity.GraphMemoryConsistency.test_visible_attributes_must_match_fact_definition",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_review_fixes.InterpreterFixes.test_isinstance_resolves_type_names",
+    "new_id": "integration.test_review_fixes_capability.InterpreterFixes.test_isinstance_resolves_type_names",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_review_fixes.InterpreterFixes.test_unknown_name_still_rejected",
+    "new_id": "integration.test_review_fixes_capability.InterpreterFixes.test_unknown_name_still_rejected",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_review_fixes.MaterializationSemantics.test_conflicting_values_are_not_silently_picked",
+    "new_id": "integration.test_review_fixes_graph_integrity.MaterializationSemantics.test_conflicting_values_are_not_silently_picked",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_review_fixes.MaterializationSemantics.test_negative_fact_does_not_materialize",
+    "new_id": "integration.test_review_fixes_graph_integrity.MaterializationSemantics.test_negative_fact_does_not_materialize",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_review_fixes.ProbeRenameScope.test_numeric_and_hexish_names_do_not_corrupt_probes",
+    "new_id": "integration.test_review_fixes_graph_integrity.ProbeRenameScope.test_numeric_and_hexish_names_do_not_corrupt_probes",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_review_fixes.ReviewRoundEight.test_bootstrap_protocols_carry_single_output_format",
+    "new_id": "integration.test_review_fixes_protocol_identity.RevisionProtocolIdentityTests.test_bootstrap_protocols_carry_single_output_format",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_review_fixes.ReviewRoundEight.test_oversize_scores_skeleton_refuses_feedback",
+    "new_id": "integration.test_review_fixes_protocol_identity.RevisionProtocolIdentityTests.test_oversize_scores_skeleton_refuses_feedback",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_review_fixes.ReviewRoundEight.test_proposal_call_records_mode_consistent_protocol",
+    "new_id": "integration.test_review_fixes_protocol_identity.RevisionProtocolIdentityTests.test_proposal_call_records_mode_consistent_protocol",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 3,
+    "assertion_count_after": 3,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_review_fixes.ReviewRoundEight.test_report_persisted_before_seal_and_rebuilds_from_artifacts",
+    "new_id": "integration.test_review_fixes_protocol_identity.RevisionProtocolIdentityTests.test_report_persisted_before_seal_and_rebuilds_from_artifacts",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 8,
+    "assertion_count_after": 8,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_review_fixes.ReviewRoundEight.test_revision_protocol_matches_bundle_mode",
+    "new_id": "integration.test_review_fixes_protocol_identity.RevisionProtocolIdentityTests.test_revision_protocol_matches_bundle_mode",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 10,
+    "assertion_count_after": 10,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_review_fixes.ReviewRoundEight.test_train_stage_faults_surface_in_run_status",
+    "new_id": "integration.test_review_fixes_protocol_identity.RevisionProtocolIdentityTests.test_train_stage_faults_surface_in_run_status",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 3,
+    "assertion_count_after": 3,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_review_fixes.ReviewRoundEight.test_train_stages_surface_in_campaign_statuses",
+    "new_id": "integration.test_review_fixes_protocol_identity.RevisionProtocolIdentityTests.test_train_stages_surface_in_campaign_statuses",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 3,
+    "assertion_count_after": 3,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_review_fixes.ReviewRoundFour.test_entity_sources_missing_or_extra_rejected",
+    "new_id": "integration.test_review_fixes_checkpoint_resume.ResumeIntegrityTests.test_entity_sources_missing_or_extra_rejected",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_review_fixes.ReviewRoundFour.test_fact_sources_swapped_to_other_registered_source_rejected",
+    "new_id": "integration.test_review_fixes_checkpoint_resume.ResumeIntegrityTests.test_fact_sources_swapped_to_other_registered_source_rejected",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_review_fixes.ReviewRoundFour.test_tool_source_ids_match_fact_evidence_on_good_graph",
+    "new_id": "integration.test_review_fixes_checkpoint_resume.ResumeIntegrityTests.test_tool_source_ids_match_fact_evidence_on_good_graph",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_review_fixes.ReviewRoundFour.test_view_extra_attribute_rejected",
+    "new_id": "integration.test_review_fixes_checkpoint_resume.ResumeIntegrityTests.test_view_extra_attribute_rejected",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_review_fixes.ReviewRoundFour.test_view_missing_planned_attribute_rejected",
+    "new_id": "integration.test_review_fixes_checkpoint_resume.ResumeIntegrityTests.test_view_missing_planned_attribute_rejected",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_review_fixes.ReviewRoundSeven.test_few_long_records_bounded_by_complete_payload",
+    "new_id": "integration.test_review_fixes_feedback_isolation.FeedbackIsolationTests.test_few_long_records_bounded_by_complete_payload",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 4,
+    "assertion_count_after": 4,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_review_fixes.ReviewRoundSeven.test_many_short_records_bounded_by_complete_payload",
+    "new_id": "integration.test_review_fixes_feedback_isolation.FeedbackIsolationTests.test_many_short_records_bounded_by_complete_payload",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 3,
+    "assertion_count_after": 3,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_review_fixes.ReviewRoundSeven.test_mixed_sections_bounded_by_complete_payload",
+    "new_id": "integration.test_review_fixes_feedback_isolation.FeedbackIsolationTests.test_mixed_sections_bounded_by_complete_payload",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 5,
+    "assertion_count_after": 5,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_review_fixes.ReviewRoundSeven.test_proposal_diagnostics_follow_last_adopted",
+    "new_id": "integration.test_review_fixes_feedback_isolation.FeedbackIsolationTests.test_proposal_diagnostics_follow_last_adopted",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 6,
+    "assertion_count_after": 6,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_review_fixes.ReviewRoundSeven.test_question_identity_uses_the_encoder",
+    "new_id": "integration.test_review_fixes_feedback_isolation.FeedbackIsolationTests.test_question_identity_uses_the_encoder",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_review_fixes.ReviewRoundSeven.test_resume_keeps_diagnostic_source",
+    "new_id": "integration.test_review_fixes_feedback_isolation.FeedbackIsolationTests.test_resume_keeps_diagnostic_source",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 3,
+    "assertion_count_after": 3,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_review_fixes.ReviewRoundSeven.test_training_id_is_collision_free_and_parseable",
+    "new_id": "integration.test_review_fixes_feedback_isolation.FeedbackIsolationTests.test_training_id_is_collision_free_and_parseable",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 4,
+    "assertion_count_after": 4,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_review_fixes.ReviewRoundSix.test_composite_question_identity_in_admission",
+    "new_id": "integration.test_review_fixes_publication.PublicationAndScoredRoundTests.test_composite_question_identity_in_admission",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_review_fixes.ReviewRoundSix.test_feedback_budget_covers_entire_payload",
+    "new_id": "integration.test_review_fixes_publication.PublicationAndScoredRoundTests.test_feedback_budget_covers_entire_payload",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 4,
+    "assertion_count_after": 4,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_review_fixes.ReviewRoundSix.test_resume_with_stop_restores_adopted_round_and_pointer",
+    "new_id": "integration.test_review_fixes_publication.PublicationAndScoredRoundTests.test_resume_with_stop_restores_adopted_round_and_pointer",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 6,
+    "assertion_count_after": 6,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_review_fixes.ReviewRoundSix.test_stage_statuses_per_case_layout",
+    "new_id": "integration.test_review_fixes_publication.PublicationAndScoredRoundTests.test_stage_statuses_per_case_layout",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 4,
+    "assertion_count_after": 4,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_review_fixes.ReviewRoundThree.test_edge_label_mismatch_rejected",
+    "new_id": "integration.test_review_fixes_checkpoint_feedback.CheckpointFeedbackTests.test_edge_label_mismatch_rejected",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_review_fixes.ReviewRoundThree.test_source_date_tamper_rejected",
+    "new_id": "integration.test_review_fixes_checkpoint_feedback.CheckpointFeedbackTests.test_source_date_tamper_rejected",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_review_fixes.ReviewRoundThree.test_spurious_anchor_on_anchorless_time_rejected",
+    "new_id": "integration.test_review_fixes_checkpoint_feedback.CheckpointFeedbackTests.test_spurious_anchor_on_anchorless_time_rejected",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_review_fixes.ReviewRoundThree.test_view_attribute_tamper_rejected",
+    "new_id": "integration.test_review_fixes_checkpoint_feedback.CheckpointFeedbackTests.test_view_attribute_tamper_rejected",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_review_fixes.StructuralEdgeIntegrity.test_moved_evidence_edge_rejected",
+    "new_id": "integration.test_review_fixes_graph_integrity.StructuralEdgeIntegrity.test_moved_evidence_edge_rejected",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_review_fixes.StructuralEdgeIntegrity.test_rewritten_time_node_rejected",
+    "new_id": "integration.test_review_fixes_graph_integrity.StructuralEdgeIntegrity.test_rewritten_time_node_rejected",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_review_fixes.StructuralEdgeIntegrity.test_swapped_subject_edges_rejected",
+    "new_id": "integration.test_review_fixes_graph_integrity.StructuralEdgeIntegrity.test_swapped_subject_edges_rejected",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_run2_fault_fixes_20261007.ExternalFaultsDoNotBlockAdoption.test_external_fault_does_not_block_deterministic_does",
+    "new_id": "integration.test_run2_fault_fixes_admission.ExternalFaultsDoNotBlockAdoption.test_external_fault_does_not_block_deterministic_does",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 5,
+    "assertion_count_after": 5,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_run2_fault_fixes_20261007.ExternalFaultsDoNotBlockAdoption.test_split_faults_classifies_by_error_prefix",
+    "new_id": "integration.test_run2_fault_fixes_admission.ExternalFaultsDoNotBlockAdoption.test_split_faults_classifies_by_error_prefix",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_run2_fault_fixes_20261007.ToolParamRejectEntersFeedback.test_undeclared_param_feedbacks_then_publishes",
+    "new_id": "integration.test_run2_fault_fixes_tool_replay.ToolParamRejectEntersFeedback.test_undeclared_param_feedbacks_then_publishes",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 6,
+    "assertion_count_after": 6,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_stability_admission.FrozenCandidateAdmissionTests.test_answer_check_sees_actual_function_output_shape",
+    "new_id": "integration.test_stability_admission.AdmissionTests.test_answer_check_sees_actual_function_output_shape",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_stability_admission.FrozenCandidateAdmissionTests.test_bad_function_fails_pressure_and_independent_checks_continue",
+    "new_id": "integration.test_stability_worker_isolation.WorkerIsolationTests.test_bad_function_fails_pressure_and_independent_checks_continue",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 6,
+    "assertion_count_after": 6,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_stability_admission.FrozenCandidateAdmissionTests.test_blocked_child_is_killed_and_timeout_is_reported",
+    "new_id": "integration.test_stability_worker_isolation.WorkerIsolationTests.test_blocked_child_is_killed_and_timeout_is_reported",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 4,
+    "assertion_count_after": 4,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_stability_admission.FrozenCandidateAdmissionTests.test_bootstrap_immediate_feedback_uses_frozen_worker",
+    "new_id": "integration.test_stability_admission.AdmissionTests.test_bootstrap_immediate_feedback_uses_frozen_worker",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 4,
+    "assertion_count_after": 4,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_stability_admission.FrozenCandidateAdmissionTests.test_candidate_smoke_keeps_each_risk_category_when_dates_dominate",
+    "new_id": "integration.test_stability_risk_smoke.RiskSmokeTests.test_candidate_smoke_keeps_each_risk_category_when_dates_dominate",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 3,
+    "assertion_count_after": 3,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_stability_admission.FrozenCandidateAdmissionTests.test_candidate_smoke_recovers_transient_but_blocks_tool_failure",
+    "new_id": "integration.test_stability_risk_smoke.RiskSmokeTests.test_candidate_smoke_recovers_transient_but_blocks_tool_failure",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 3,
+    "assertion_count_after": 3,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_stability_admission.FrozenCandidateAdmissionTests.test_date_object_and_projection_keep_returned_evidence",
+    "new_id": "integration.test_stability_capability.CapabilityTests.test_date_object_and_projection_keep_returned_evidence",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 10,
+    "assertion_count_after": 10,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_stability_admission.FrozenCandidateAdmissionTests.test_failed_worker_preserves_detailed_admission_errors",
+    "new_id": "integration.test_stability_worker_isolation.WorkerIsolationTests.test_failed_worker_preserves_detailed_admission_errors",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_stability_admission.FrozenCandidateAdmissionTests.test_function_chain_failure_rejects_individually_passing_assets",
+    "new_id": "integration.test_stability_admission.AdmissionTests.test_function_chain_failure_rejects_individually_passing_assets",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 3,
+    "assertion_count_after": 3,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_stability_admission.FrozenCandidateAdmissionTests.test_high_degree_empty_traversal_is_not_coverage",
+    "new_id": "integration.test_stability_capability.CapabilityTests.test_high_degree_empty_traversal_is_not_coverage",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_stability_admission.FrozenCandidateAdmissionTests.test_high_degree_samples_use_public_row_ids",
+    "new_id": "integration.test_stability_capability.CapabilityTests.test_high_degree_samples_use_public_row_ids",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 6,
+    "assertion_count_after": 6,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_stability_admission.FrozenCandidateAdmissionTests.test_missing_frozen_graph_writes_incomplete_report",
+    "new_id": "integration.test_stability_admission.AdmissionTests.test_missing_frozen_graph_writes_incomplete_report",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 4,
+    "assertion_count_after": 4,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_stability_admission.FrozenCandidateAdmissionTests.test_missing_remote_vector_keeps_local_replay_evidence",
+    "new_id": "integration.test_stability_admission.AdmissionTests.test_missing_remote_vector_keeps_local_replay_evidence",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 5,
+    "assertion_count_after": 5,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_stability_admission.FrozenCandidateAdmissionTests.test_mixed_faults_and_reserved_retry_settlement",
+    "new_id": "integration.test_stability_recovery.RecoveryTests.test_mixed_faults_and_reserved_retry_settlement",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 6,
+    "assertion_count_after": 6,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_stability_admission.FrozenCandidateAdmissionTests.test_model_session_corrects_invalid_model_parameters",
+    "new_id": "integration.test_stability_model_transport.ModelTransportTests.test_model_session_corrects_invalid_model_parameters",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_stability_admission.FrozenCandidateAdmissionTests.test_model_session_does_not_reclassify_client_value_error",
+    "new_id": "integration.test_stability_model_transport.ModelTransportTests.test_model_session_does_not_reclassify_client_value_error",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 3,
+    "assertion_count_after": 3,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_stability_admission.FrozenCandidateAdmissionTests.test_real_frozen_worker_accepts_good_and_keeps_bad_report",
+    "new_id": "integration.test_stability_worker_isolation.WorkerIsolationTests.test_real_frozen_worker_accepts_good_and_keeps_bad_report",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 9,
+    "assertion_count_after": 9,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_stability_admission.FrozenCandidateAdmissionTests.test_saved_tool_failure_becomes_next_candidate_replay",
+    "new_id": "integration.test_stability_tool_replay.ToolReplayTests.test_saved_tool_failure_becomes_next_candidate_replay",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_stability_admission.FrozenCandidateAdmissionTests.test_stability_metrics_do_not_treat_zero_admissions_as_success",
+    "new_id": "integration.test_stability_admission.AdmissionTests.test_stability_metrics_do_not_treat_zero_admissions_as_success",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 5,
+    "assertion_count_after": 5,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_stability_admission.FrozenCandidateAdmissionTests.test_stage_mixed_fault_retries_only_transient_checkpoint",
+    "new_id": "integration.test_stability_recovery.RecoveryTests.test_stage_mixed_fault_retries_only_transient_checkpoint",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 6,
+    "assertion_count_after": 6,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_stability_admission.FrozenCandidateAdmissionTests.test_stage_resume_does_not_reissue_reserved_mixed_fault",
+    "new_id": "integration.test_stability_recovery.RecoveryTests.test_stage_resume_does_not_reissue_reserved_mixed_fault",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 4,
+    "assertion_count_after": 4,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_stability_admission.FrozenCandidateAdmissionTests.test_timeout_preserves_independent_completed_checks",
+    "new_id": "integration.test_stability_worker_isolation.WorkerIsolationTests.test_timeout_preserves_independent_completed_checks",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 3,
+    "assertion_count_after": 3,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_stability_admission.FrozenCandidateAdmissionTests.test_unmigrated_historical_params_block_admission",
+    "new_id": "integration.test_stability_tool_replay.ToolReplayTests.test_unmigrated_historical_params_block_admission",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 6,
+    "assertion_count_after": 6,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_stability_admission.FrozenCandidateAdmissionTests.test_worker_failure_replaces_stale_passed_report",
+    "new_id": "integration.test_stability_worker_isolation.WorkerIsolationTests.test_worker_failure_replaces_stale_passed_report",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 4,
+    "assertion_count_after": 4,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_stability_admission.FrozenCandidateAdmissionTests.test_zero_exit_without_report_does_not_admit",
+    "new_id": "integration.test_stability_worker_isolation.WorkerIsolationTests.test_zero_exit_without_report_does_not_admit",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 3,
+    "assertion_count_after": 3,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_transient_faults.OverloadRetryTests.test_529_is_retried_at_transport_layer",
+    "new_id": "integration.test_transient_faults.OverloadRetryTests.test_529_is_retried_at_transport_layer",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_transient_faults.OverloadRetryTests.test_persistent_529_wraps_into_transport_exhausted",
+    "new_id": "integration.test_transient_faults.OverloadRetryTests.test_persistent_529_wraps_into_transport_exhausted",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_transient_faults.RetryableAnswerTests.test_deterministic_and_protocol_stay_non_retryable",
+    "new_id": "integration.test_transient_faults.RetryableAnswerTests.test_deterministic_and_protocol_stay_non_retryable",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_transient_faults.RetryableAnswerTests.test_service_transient_family_is_retryable",
+    "new_id": "integration.test_transient_faults.RetryableAnswerTests.test_service_transient_family_is_retryable",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_transient_faults.RetryableAnswerTests.test_tool_error_trace_overrides_transient_final_error",
+    "new_id": "integration.test_transient_faults.RetryableAnswerTests.test_tool_error_trace_overrides_transient_final_error",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_travel_evaluator.TravelEvaluationIsolation.test_mismatched_case_answer_rejected",
+    "new_id": "integration.test_travel_evaluator.TravelEvaluationIsolation.test_mismatched_case_answer_rejected",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_travel_evaluator.TravelEvaluationIsolation.test_missing_reference_does_not_download_or_fall_back",
+    "new_id": "integration.test_travel_evaluator.TravelEvaluationIsolation.test_missing_reference_does_not_download_or_fall_back",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_travel_evaluator.TravelEvaluationIsolation.test_reads_explicit_independent_reference_directory",
+    "new_id": "integration.test_travel_evaluator.TravelEvaluationIsolation.test_reads_explicit_independent_reference_directory",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 3,
+    "assertion_count_after": 3,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_travel_evaluator.TravelEvaluationIsolation.test_relative_runtime_paths_are_resolved_before_worker_changes_directory",
+    "new_id": "integration.test_travel_evaluator.TravelEvaluationIsolation.test_relative_runtime_paths_are_resolved_before_worker_changes_directory",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 3,
+    "assertion_count_after": 3,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_travel_evaluator.TravelEvaluationIsolation.test_truncated_official_result_is_not_complete",
+    "new_id": "integration.test_travel_evaluator.TravelEvaluationIsolation.test_truncated_official_result_is_not_complete",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_travel_evaluator.TravelEvaluationIsolation.test_worker_failure_remains_evaluation_failure",
+    "new_id": "integration.test_travel_evaluator.TravelEvaluationIsolation.test_worker_failure_remains_evaluation_failure",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_wiki_check_replay.AnswerSnapshotPersistenceTests.test_answer_agent_persists_snapshot_on_check_rejection",
+    "new_id": "integration.test_wiki_check_replay_check_replay.AnswerSnapshotPersistenceTests.test_answer_agent_persists_snapshot_on_check_rejection",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 7,
+    "assertion_count_after": 7,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_wiki_check_replay.ArchivedAttributionTests.test_all_archived_travel_attributions_fit_budget",
+    "new_id": "integration.test_wiki_check_replay_wiki_binding.ArchivedAttributionTests.test_all_archived_travel_attributions_fit_budget",
+    "old_status": "skipped",
+    "new_status": "skipped",
+    "assertion_count_before": 4,
+    "assertion_count_after": 4,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true,
+    "skip_reason_before": "\u5f52\u6863\u8bc1\u636e\u76ee\u5f55\u4e0d\u5728\u672c\u68c0\u51fa\uff08\u8fd0\u884c\u4ea7\u7269\u4e0d\u8fdb\u7248\u672c\u5e93\uff09\uff1b\u5728\u4ea7\u751f\u8be5\u8bc1\u636e\u7684\u8fd0\u884c\u4fa7\u672c\u6d4b\u8bd5\u4e3a\u5f3a\u5236\u9879",
+    "skip_reason_after": "\u5f52\u6863\u8bc1\u636e\u76ee\u5f55\u4e0d\u5728\u672c\u68c0\u51fa\uff08\u8fd0\u884c\u4ea7\u7269\u4e0d\u8fdb\u7248\u672c\u5e93\uff09\uff1b\u5728\u4ea7\u751f\u8be5\u8bc1\u636e\u7684\u8fd0\u884c\u4fa7\u672c\u6d4b\u8bd5\u4e3a\u5f3a\u5236\u9879"
+  },
+  {
+    "old_id": "integration.test_wiki_check_replay.CheckReplayAdmissionTests.test_informational_rows_record_but_do_not_gate",
+    "new_id": "integration.test_wiki_check_replay_check_replay.CheckReplayAdmissionTests.test_informational_rows_record_but_do_not_gate",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 4,
+    "assertion_count_after": 4,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_wiki_check_replay.CheckReplayAdmissionTests.test_must_reject_row_gates_and_passes_correct_c",
+    "new_id": "integration.test_wiki_check_replay_check_replay.CheckReplayAdmissionTests.test_must_reject_row_gates_and_passes_correct_c",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_wiki_check_replay.CheckReplayAdmissionTests.test_verified_row_blocks_misjudging_c_and_passes_fixed_c",
+    "new_id": "integration.test_wiki_check_replay_check_replay.CheckReplayAdmissionTests.test_verified_row_blocks_misjudging_c_and_passes_fixed_c",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 4,
+    "assertion_count_after": 4,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_wiki_check_replay.CheckSnapshotClassificationTests.test_machine_decidable_expectations",
+    "new_id": "integration.test_wiki_check_replay_check_replay.CheckSnapshotClassificationTests.test_machine_decidable_expectations",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 5,
+    "assertion_count_after": 5,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_wiki_check_replay.CheckSnapshotClassificationTests.test_promotion_binds_verified_rows_idempotently",
+    "new_id": "integration.test_wiki_check_replay_check_replay.CheckSnapshotClassificationTests.test_promotion_binds_verified_rows_idempotently",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_wiki_check_replay.CheckSnapshotClassificationTests.test_scanner_reads_checkpoints_and_dedups",
+    "new_id": "integration.test_wiki_check_replay_check_replay.CheckSnapshotClassificationTests.test_scanner_reads_checkpoints_and_dedups",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 4,
+    "assertion_count_after": 4,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_wiki_check_replay.FourthReviewBindingTests.test_cross_case_same_params_does_not_verify",
+    "new_id": "integration.test_wiki_check_replay_wiki_binding.AdmissionFixIdentityTests.test_cross_case_same_params_does_not_verify",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_wiki_check_replay.FourthReviewBindingTests.test_graph_digest_mismatch_does_not_verify",
+    "new_id": "integration.test_wiki_check_replay_wiki_binding.AdmissionFixIdentityTests.test_graph_digest_mismatch_does_not_verify",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_wiki_check_replay.FourthReviewBindingTests.test_real_check_replay_ref_shape_verifies",
+    "new_id": "integration.test_wiki_check_replay_wiki_binding.AdmissionFixIdentityTests.test_real_check_replay_ref_shape_verifies",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_wiki_check_replay.FourthReviewBindingTests.test_same_case_cross_scenario_same_params_does_not_verify",
+    "new_id": "integration.test_wiki_check_replay_wiki_binding.AdmissionFixIdentityTests.test_same_case_cross_scenario_same_params_does_not_verify",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_wiki_check_replay.FourthReviewBindingTests.test_same_case_same_scenario_same_digest_verifies",
+    "new_id": "integration.test_wiki_check_replay_wiki_binding.AdmissionFixIdentityTests.test_same_case_same_scenario_same_digest_verifies",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_wiki_check_replay.ThirdReviewFixTests.test_loop6_failure_summary_keeps_rejection_reason",
+    "new_id": "integration.test_wiki_check_replay_check_replay.CounterexampleReplayTests.test_loop6_failure_summary_keeps_rejection_reason",
+    "old_status": "skipped",
+    "new_status": "skipped",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true,
+    "skip_reason_before": "\u5f52\u6863\u8bc1\u636e\u76ee\u5f55\u4e0d\u5728\u672c\u68c0\u51fa\uff08\u8fd0\u884c\u4ea7\u7269\u4e0d\u8fdb\u7248\u672c\u5e93\uff09\uff1b\u5728\u4ea7\u751f\u8be5\u8bc1\u636e\u7684\u8fd0\u884c\u4fa7\u672c\u6d4b\u8bd5\u4e3a\u5f3a\u5236\u9879",
+    "skip_reason_after": "\u5f52\u6863\u8bc1\u636e\u76ee\u5f55\u4e0d\u5728\u672c\u68c0\u51fa\uff08\u8fd0\u884c\u4ea7\u7269\u4e0d\u8fdb\u7248\u672c\u5e93\uff09\uff1b\u5728\u4ea7\u751f\u8be5\u8bc1\u636e\u7684\u8fd0\u884c\u4fa7\u672c\u6d4b\u8bd5\u4e3a\u5f3a\u5236\u9879"
+  },
+  {
+    "old_id": "integration.test_wiki_check_replay.ThirdReviewFixTests.test_params_consistent_semantic_c_passes_and_misfit_fails",
+    "new_id": "integration.test_wiki_check_replay_check_replay.CounterexampleReplayTests.test_params_consistent_semantic_c_passes_and_misfit_fails",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": false
+  },
+  {
+    "old_id": "integration.test_wiki_check_replay.ThirdReviewFixTests.test_stress_input_mismatch_does_not_verify",
+    "new_id": "integration.test_wiki_check_replay_check_replay.CounterexampleReplayTests.test_stress_input_mismatch_does_not_verify",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_wiki_check_replay.ThirdReviewFixTests.test_tight_budget_keeps_nested_failure_facts",
+    "new_id": "integration.test_wiki_check_replay_check_replay.CounterexampleReplayTests.test_tight_budget_keeps_nested_failure_facts",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 7,
+    "assertion_count_after": 7,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_wiki_check_replay.VerifiedFixBindingRefTests.test_same_ref_does_verify_replay_lesson",
+    "new_id": "integration.test_wiki_check_replay_wiki_binding.VerifiedFixBindingRefTests.test_same_ref_does_verify_replay_lesson",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_wiki_check_replay.VerifiedFixBindingRefTests.test_same_scenario_different_ref_does_not_verify",
+    "new_id": "integration.test_wiki_check_replay_wiki_binding.VerifiedFixBindingRefTests.test_same_scenario_different_ref_does_not_verify",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_wiki_check_replay.VerifiedFixBindingRefTests.test_structure_row_pass_does_not_verify",
+    "new_id": "integration.test_wiki_check_replay_wiki_binding.VerifiedFixBindingRefTests.test_structure_row_pass_does_not_verify",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_wiki_check_replay.VerifiedFixBindingTests.test_lesson_verification_binds_reproduced_checks",
+    "new_id": "integration.test_wiki_check_replay_wiki_binding.VerifiedFixBindingTests.test_lesson_verification_binds_reproduced_checks",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 4,
+    "assertion_count_after": 4,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_wiki_faults_repro.DynamicTrialGraphTests.test_c_only_patch_reuses_adopted_graph_s_patch_forces_rebuild",
+    "new_id": "integration.test_wiki_faults_repro_travel_graph_supply.DynamicTrialGraphTests.test_c_only_patch_reuses_adopted_graph_s_patch_forces_rebuild",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_wiki_faults_repro.DynamicTrialGraphTests.test_extract_cache_reused_across_candidates_sharing_extraction_face",
+    "new_id": "integration.test_wiki_faults_repro_travel_graph_supply.DynamicTrialGraphTests.test_extract_cache_reused_across_candidates_sharing_extraction_face",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_wiki_faults_repro.FourthReviewFixtureTests.test_archived_fix_residual_abstain_gap_is_exposed",
+    "new_id": "integration.test_wiki_faults_repro_travel_faults.TravelFixtureSemanticsTests.test_archived_fix_residual_abstain_gap_is_exposed",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_wiki_faults_repro.FourthReviewFixtureTests.test_battery_blocks_reject_all_and_container_bug_c",
+    "new_id": "integration.test_wiki_faults_repro_travel_faults.TravelFixtureSemanticsTests.test_battery_blocks_reject_all_and_container_bug_c",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_wiki_faults_repro.FourthReviewFixtureTests.test_battery_ideal_c_passes_and_semantic_rejection_is_legal",
+    "new_id": "integration.test_wiki_faults_repro_travel_faults.TravelFixtureSemanticsTests.test_battery_ideal_c_passes_and_semantic_rejection_is_legal",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 3,
+    "assertion_count_after": 3,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_wiki_faults_repro.FourthReviewFixtureTests.test_battery_rejects_gutted_and_abstain_broken_c",
+    "new_id": "integration.test_wiki_faults_repro_travel_faults.TravelFixtureSemanticsTests.test_battery_rejects_gutted_and_abstain_broken_c",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 3,
+    "assertion_count_after": 3,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_wiki_faults_repro.FourthReviewFixtureTests.test_grounded_c_rejects_ungrounded_and_mismatch",
+    "new_id": "integration.test_wiki_faults_repro_travel_faults.TravelFixtureSemanticsTests.test_grounded_c_rejects_ungrounded_and_mismatch",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_wiki_faults_repro.FourthReviewFixtureTests.test_grounded_official_semantics_c_accepts_fixture",
+    "new_id": "integration.test_wiki_faults_repro_travel_faults.TravelFixtureSemanticsTests.test_grounded_official_semantics_c_accepts_fixture",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_wiki_faults_repro.FourthReviewFixtureTests.test_official_constraints_validate_fixture",
+    "new_id": "integration.test_wiki_faults_repro_travel_faults.TravelFixtureSemanticsTests.test_official_constraints_validate_fixture",
+    "old_status": "skipped",
+    "new_status": "skipped",
+    "assertion_count_before": 4,
+    "assertion_count_after": 4,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true,
+    "skip_reason_before": "External evidence: requires third_party/TravelPlanner official evaluator and database",
+    "skip_reason_after": "External evidence: requires third_party/TravelPlanner official evaluator and database"
+  },
+  {
+    "old_id": "integration.test_wiki_faults_repro.FourthReviewFixtureTests.test_t1_dynamic_preflight_intercepts_broken_bundle",
+    "new_id": "integration.test_wiki_faults_repro_travel_faults.TravelFixtureSemanticsTests.test_t1_dynamic_preflight_intercepts_broken_bundle",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 3,
+    "assertion_count_after": 3,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_wiki_faults_repro.FourthReviewFixtureTests.test_t1_null_contract_violation_reproduces",
+    "new_id": "integration.test_wiki_faults_repro_travel_faults.TravelFixtureSemanticsTests.test_t1_null_contract_violation_reproduces",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 3,
+    "assertion_count_after": 3,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_wiki_faults_repro.FourthReviewFixtureTests.test_t2_old_c_misjudges_archived_legal_candidate",
+    "new_id": "integration.test_wiki_faults_repro_travel_faults.TravelFixtureSemanticsTests.test_t2_old_c_misjudges_archived_legal_candidate",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 4,
+    "assertion_count_after": 4,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_wiki_faults_repro.FourthReviewFixtureTests.test_t3_attempt2_day_object_misjudgment_remains_a_fact",
+    "new_id": "integration.test_wiki_faults_repro_travel_faults.TravelFixtureSemanticsTests.test_t3_attempt2_day_object_misjudgment_remains_a_fact",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_wiki_faults_repro.FourthReviewFixtureTests.test_t4_malformed_rejected_by_all_variants",
+    "new_id": "integration.test_wiki_faults_repro_travel_faults.TravelFixtureSemanticsTests.test_t4_malformed_rejected_by_all_variants",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_wiki_faults_repro.FourthReviewFixtureTests.test_t5_unregistered_names_rejected",
+    "new_id": "integration.test_wiki_faults_repro_travel_faults.TravelFixtureSemanticsTests.test_t5_unregistered_names_rejected",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_wiki_faults_repro.FourthReviewFixtureTests.test_verified_replay_blocks_misjudging_c_beyond_battery",
+    "new_id": "integration.test_wiki_faults_repro_travel_faults.TravelFixtureSemanticsTests.test_verified_replay_blocks_misjudging_c_beyond_battery",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_wiki_faults_repro.RealFaultAdmissionTests.test_fixed_f_passes_same_budget_with_truncation",
+    "new_id": "integration.test_wiki_faults_repro_travel_admission.RealFaultAdmissionTests.test_fixed_f_passes_same_budget_with_truncation",
+    "old_status": "skipped",
+    "new_status": "skipped",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true,
+    "skip_reason_before": "External archived evidence missing: datasets/locomo/runs/wiki_gap_repair_20261005_mc/train/B0/assets/manifest.json, datasets/locomo/snapshots/gvtest_v1/conv-30/manifest.json, datasets/locomo/snapshots/gvtest_v1/conv-30/graph.json",
+    "skip_reason_after": "External archived evidence missing: datasets/locomo/runs/wiki_gap_repair_20261005_mc/train/B0/assets/manifest.json, datasets/locomo/snapshots/gvtest_v1/conv-30/manifest.json, datasets/locomo/snapshots/gvtest_v1/conv-30/graph.json"
+  },
+  {
+    "old_id": "integration.test_wiki_faults_repro.RealFaultAdmissionTests.test_original_fault_f_blocked_at_admission",
+    "new_id": "integration.test_wiki_faults_repro_travel_admission.RealFaultAdmissionTests.test_original_fault_f_blocked_at_admission",
+    "old_status": "skipped",
+    "new_status": "skipped",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true,
+    "skip_reason_before": "External archived evidence missing: datasets/locomo/runs/wiki_gap_repair_20261005_mc/train/B0/assets/manifest.json, datasets/locomo/snapshots/gvtest_v1/conv-30/manifest.json, datasets/locomo/snapshots/gvtest_v1/conv-30/graph.json",
+    "skip_reason_after": "External archived evidence missing: datasets/locomo/runs/wiki_gap_repair_20261005_mc/train/B0/assets/manifest.json, datasets/locomo/snapshots/gvtest_v1/conv-30/manifest.json, datasets/locomo/snapshots/gvtest_v1/conv-30/graph.json"
+  },
+  {
+    "old_id": "integration.test_wiki_faults_repro.RealFaultAdmissionTests.test_stress_combo_covers_real_fault_shape",
+    "new_id": "integration.test_wiki_faults_repro_travel_admission.RealFaultAdmissionTests.test_stress_combo_covers_real_fault_shape",
+    "old_status": "skipped",
+    "new_status": "skipped",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true,
+    "skip_reason_before": "External archived evidence missing: datasets/locomo/runs/wiki_gap_repair_20261005_mc/train/B0/assets/manifest.json, datasets/locomo/snapshots/gvtest_v1/conv-30/manifest.json, datasets/locomo/snapshots/gvtest_v1/conv-30/graph.json",
+    "skip_reason_after": "External archived evidence missing: datasets/locomo/runs/wiki_gap_repair_20261005_mc/train/B0/assets/manifest.json, datasets/locomo/snapshots/gvtest_v1/conv-30/manifest.json, datasets/locomo/snapshots/gvtest_v1/conv-30/graph.json"
+  },
+  {
+    "old_id": "integration.test_wiki_faults_repro.ReviewFixUnitTests.test_large_numeric_stress_variant",
+    "new_id": "integration.test_wiki_faults_repro_travel_checks.ReviewFixUnitTests.test_large_numeric_stress_variant",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_wiki_faults_repro.ReviewFixUnitTests.test_multi_instance_days_are_varied",
+    "new_id": "integration.test_wiki_faults_repro_travel_checks.ReviewFixUnitTests.test_multi_instance_days_are_varied",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_wiki_faults_repro.ReviewFixUnitTests.test_verified_fix_requires_scenario_reproduction",
+    "new_id": "integration.test_wiki_faults_repro_travel_checks.ReviewFixUnitTests.test_verified_fix_requires_scenario_reproduction",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_wiki_faults_repro.ReviewFixUnitTests.test_wiki_evidence_compression_keeps_facts",
+    "new_id": "integration.test_wiki_faults_repro_travel_checks.ReviewFixUnitTests.test_wiki_evidence_compression_keeps_facts",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 8,
+    "assertion_count_after": 8,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_wiki_faults_repro.TravelFaultReproductionTests.test_battery_blocks_reject_all_and_container_bug_c",
+    "new_id": "integration.test_wiki_faults_repro_travel_faults.TravelFaultReproductionTests.test_battery_blocks_reject_all_and_container_bug_c",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_wiki_faults_repro.TravelFaultReproductionTests.test_battery_ideal_c_passes_and_semantic_rejection_is_legal",
+    "new_id": "integration.test_wiki_faults_repro_travel_faults.TravelFaultReproductionTests.test_battery_ideal_c_passes_and_semantic_rejection_is_legal",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 3,
+    "assertion_count_after": 3,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_wiki_faults_repro.TravelFaultReproductionTests.test_battery_rejects_gutted_and_abstain_broken_c",
+    "new_id": "integration.test_wiki_faults_repro_travel_faults.TravelFaultReproductionTests.test_battery_rejects_gutted_and_abstain_broken_c",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 3,
+    "assertion_count_after": 3,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_wiki_faults_repro.TravelFaultReproductionTests.test_t1_dynamic_preflight_intercepts_broken_bundle",
+    "new_id": "integration.test_wiki_faults_repro_travel_faults.TravelFaultReproductionTests.test_t1_dynamic_preflight_intercepts_broken_bundle",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 3,
+    "assertion_count_after": 3,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_wiki_faults_repro.TravelFaultReproductionTests.test_t1_null_contract_violation_reproduces",
+    "new_id": "integration.test_wiki_faults_repro_travel_faults.TravelFaultReproductionTests.test_t1_null_contract_violation_reproduces",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 3,
+    "assertion_count_after": 3,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_wiki_faults_repro.TravelFaultReproductionTests.test_t2_old_c_misjudges_archived_legal_candidate",
+    "new_id": "integration.test_wiki_faults_repro_travel_faults.TravelFaultReproductionTests.test_t2_old_c_misjudges_archived_legal_candidate",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 4,
+    "assertion_count_after": 4,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_wiki_faults_repro.TravelFaultReproductionTests.test_verified_replay_blocks_misjudging_c_beyond_battery",
+    "new_id": "integration.test_wiki_faults_repro_travel_faults.TravelFaultReproductionTests.test_verified_replay_blocks_misjudging_c_beyond_battery",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_wiki_optimization.WikiOptimizationTests.test_bootstrap_feedback_covers_all_distinct_errors_past_first_twelve",
+    "new_id": "integration.test_wiki_optimization.WikiOptimizationTests.test_bootstrap_feedback_covers_all_distinct_errors_past_first_twelve",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 4,
+    "assertion_count_after": 4,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_wiki_optimization.WikiOptimizationTests.test_bootstrap_feedback_names_traversal_coverage_gap",
+    "new_id": "integration.test_wiki_optimization.WikiOptimizationTests.test_bootstrap_feedback_names_traversal_coverage_gap",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 5,
+    "assertion_count_after": 5,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_wiki_optimization.WikiOptimizationTests.test_failed_attempt_is_available_to_next_proposal_only_through_wiki",
+    "new_id": "integration.test_wiki_optimization.WikiOptimizationTests.test_failed_attempt_is_available_to_next_proposal_only_through_wiki",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 4,
+    "assertion_count_after": 4,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_wiki_optimization.WikiOptimizationTests.test_failed_b0_consumes_saved_trial_before_terminal_failure",
+    "new_id": "integration.test_wiki_optimization.WikiOptimizationTests.test_failed_b0_consumes_saved_trial_before_terminal_failure",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 3,
+    "assertion_count_after": 3,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_wiki_optimization.WikiOptimizationTests.test_failed_b0_persists_protocol_evidence_and_uses_ten_calls",
+    "new_id": "integration.test_wiki_optimization.WikiOptimizationTests.test_failed_b0_persists_protocol_evidence_and_uses_ten_calls",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 4,
+    "assertion_count_after": 4,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_wiki_optimization.WikiOptimizationTests.test_maintenance_cap_keeps_fact_recording_after_exhaustion",
+    "new_id": "integration.test_wiki_optimization.WikiOptimizationTests.test_maintenance_cap_keeps_fact_recording_after_exhaustion",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 3,
+    "assertion_count_after": 3,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_wiki_optimization.WikiOptimizationTests.test_maintenance_failure_and_recovery_do_not_duplicate_facts_or_calls",
+    "new_id": "integration.test_wiki_optimization.WikiOptimizationTests.test_maintenance_failure_and_recovery_do_not_duplicate_facts_or_calls",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 4,
+    "assertion_count_after": 4,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_wiki_optimization.WikiOptimizationTests.test_resume_after_decision_persisted_only_backfills_wiki",
+    "new_id": "integration.test_wiki_optimization.WikiOptimizationTests.test_resume_after_decision_persisted_only_backfills_wiki",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 4,
+    "assertion_count_after": 4,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_wiki_optimization.WikiOptimizationTests.test_resume_after_proposal_and_candidate_export_reuses_saved_model_output",
+    "new_id": "integration.test_wiki_optimization.WikiOptimizationTests.test_resume_after_proposal_and_candidate_export_reuses_saved_model_output",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 6,
+    "assertion_count_after": 6,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_wiki_optimization.WikiOptimizationTests.test_same_attempt_accepts_joint_s_f_c_p_patch",
+    "new_id": "integration.test_wiki_optimization.WikiOptimizationTests.test_same_attempt_accepts_joint_s_f_c_p_patch",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_wiki_optimization.WikiOptimizationTests.test_sanitized_grades_exclude_answer_derived_fields",
+    "new_id": "integration.test_wiki_optimization.WikiOptimizationTests.test_sanitized_grades_exclude_answer_derived_fields",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_wiki_optimization.WikiOptimizationTests.test_saved_report_requires_matching_identity_and_separate_smoke",
+    "new_id": "integration.test_wiki_optimization.WikiOptimizationTests.test_saved_report_requires_matching_identity_and_separate_smoke",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 5,
+    "assertion_count_after": 5,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_wiki_optimization.WikiOptimizationTests.test_ten_recorded_rounds_keep_rejected_experience_without_candidate_carryover",
+    "new_id": "integration.test_wiki_optimization.WikiOptimizationTests.test_ten_recorded_rounds_keep_rejected_experience_without_candidate_carryover",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 6,
+    "assertion_count_after": 6,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_wiki_optimization.WikiOptimizationTests.test_wiki_drives_next_proposal_and_retains_rejected_scores",
+    "new_id": "integration.test_wiki_optimization.WikiOptimizationTests.test_wiki_drives_next_proposal_and_retains_rejected_scores",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 9,
+    "assertion_count_after": 9,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_wiki_revision.BootstrapFeedbackRegression.test_resource_feedback_contains_real_input_steps_and_matched_edges",
+    "new_id": "integration.test_wiki_revision_proposal_feedback.BootstrapFeedbackRegression.test_resource_feedback_contains_real_input_steps_and_matched_edges",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_wiki_revision.BootstrapFeedbackRegression.test_unsupported_union_types_are_reported_together_before_data_execution",
+    "new_id": "integration.test_wiki_revision_proposal_feedback.BootstrapFeedbackRegression.test_unsupported_union_types_are_reported_together_before_data_execution",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 4,
+    "assertion_count_after": 4,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_wiki_revision.CurrentAssetReferenceRegression.test_literal_wrong_hash_is_rejected_and_legacy_literal_remains_valid",
+    "new_id": "integration.test_wiki_revision_checkpoints.CurrentAssetReferenceRegression.test_literal_wrong_hash_is_rejected_and_legacy_literal_remains_valid",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_wiki_revision.CurrentAssetReferenceRegression.test_reference_cannot_select_other_asset_or_change_kind",
+    "new_id": "integration.test_wiki_revision_checkpoints.CurrentAssetReferenceRegression.test_reference_cannot_select_other_asset_or_change_kind",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_wiki_revision.CurrentAssetReferenceRegression.test_reference_resolves_exact_current_fingerprint_and_saved_reply",
+    "new_id": "integration.test_wiki_revision_checkpoints.CurrentAssetReferenceRegression.test_reference_resolves_exact_current_fingerprint_and_saved_reply",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 3,
+    "assertion_count_after": 3,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_wiki_revision.EvaluatorInterfaceRegression.test_generic_non_numeric_question_and_opt_in_subset",
+    "new_id": "integration.test_wiki_revision_domain_evaluation.EvaluatorInterfaceRegression.test_generic_non_numeric_question_and_opt_in_subset",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 3,
+    "assertion_count_after": 3,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_wiki_revision.InterfaceAdmissionRegression.test_internal_seed_resource_failure_remains_rejected",
+    "new_id": "integration.test_wiki_revision_capability.InterfaceAdmissionRegression.test_internal_seed_resource_failure_remains_rejected",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_wiki_revision.InterfaceAdmissionRegression.test_internal_seed_uses_copy_and_reaches_high_degree_before_limit",
+    "new_id": "integration.test_wiki_revision_capability.InterfaceAdmissionRegression.test_internal_seed_uses_copy_and_reaches_high_degree_before_limit",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 7,
+    "assertion_count_after": 7,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_wiki_revision.InterfaceAdmissionRegression.test_one_empty_selector_does_not_invalidate_a_covered_pressure_path",
+    "new_id": "integration.test_wiki_revision_capability.InterfaceAdmissionRegression.test_one_empty_selector_does_not_invalidate_a_covered_pressure_path",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 3,
+    "assertion_count_after": 3,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_wiki_revision.InterfaceAdmissionRegression.test_seed_direction_aliases_receive_identical_required_coverage",
+    "new_id": "integration.test_wiki_revision_capability.InterfaceAdmissionRegression.test_seed_direction_aliases_receive_identical_required_coverage",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 3,
+    "assertion_count_after": 3,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_wiki_revision.SelectorSliceRegression.test_external_seed_slice_preserves_only_identity_parameter",
+    "new_id": "integration.test_wiki_revision_validation_selection.SelectorSliceRegression.test_external_seed_slice_preserves_only_identity_parameter",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_wiki_revision.SelectorSliceRegression.test_row_slice_limit_is_not_external_seed",
+    "new_id": "integration.test_wiki_revision_validation_selection.SelectorSliceRegression.test_row_slice_limit_is_not_external_seed",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_wiki_revision.WikiEvidenceRegression.test_candidate_check_rejections_survive_compression_and_retain_check_identity",
+    "new_id": "integration.test_wiki_revision_wiki_lessons.WikiEvidenceRegression.test_candidate_check_rejections_survive_compression_and_retain_check_identity",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 5,
+    "assertion_count_after": 5,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_wiki_revision.WikiEvidenceRegression.test_decision_attribution_has_training_ids_code_and_generated_evidence",
+    "new_id": "integration.test_wiki_revision_wiki_lessons.WikiEvidenceRegression.test_decision_attribution_has_training_ids_code_and_generated_evidence",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 10,
+    "assertion_count_after": 10,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_wiki_revision.WikiEvidenceRegression.test_failed_candidate_payload_type_is_evidence_not_a_guessed_cause",
+    "new_id": "integration.test_wiki_revision_wiki_lessons.WikiEvidenceRegression.test_failed_candidate_payload_type_is_evidence_not_a_guessed_cause",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 4,
+    "assertion_count_after": 4,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_wiki_revision.WikiEvidenceRegression.test_fixed_ten_question_selection_does_not_change_holdout",
+    "new_id": "integration.test_wiki_revision_wiki_lessons.WikiEvidenceRegression.test_fixed_ten_question_selection_does_not_change_holdout",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 3,
+    "assertion_count_after": 3,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_wiki_revision.WikiEvidenceRegression.test_frozen_json_container_types_are_executable_and_documented",
+    "new_id": "integration.test_wiki_revision_wiki_lessons.WikiEvidenceRegression.test_frozen_json_container_types_are_executable_and_documented",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 5,
+    "assertion_count_after": 5,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_wiki_revision.WikiEvidenceRegression.test_late_fault_survives_both_trace_budgets_and_is_runtime_experience",
+    "new_id": "integration.test_wiki_revision_wiki_lessons.WikiEvidenceRegression.test_late_fault_survives_both_trace_budgets_and_is_runtime_experience",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 6,
+    "assertion_count_after": 6,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "integration.test_wiki_revision.WikiEvidenceRegression.test_new_error_pattern_triggers_maintenance_without_repeating_known_error",
+    "new_id": "integration.test_wiki_revision_wiki_lessons.WikiEvidenceRegression.test_new_error_pattern_triggers_maintenance_without_repeating_known_error",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 5,
+    "assertion_count_after": 5,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "portability.test_cli.PublicCLI.test_cli_reads_local_dotenv_without_exporting_credentials",
+    "new_id": "portability.test_cli.PublicCLI.test_cli_reads_local_dotenv_without_exporting_credentials",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 3,
+    "assertion_count_after": 3,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "portability.test_cli.PublicCLI.test_doctor_and_replay_without_credentials_and_resume",
+    "new_id": "portability.test_cli.PublicCLI.test_doctor_and_replay_without_credentials_and_resume",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 9,
+    "assertion_count_after": 9,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "portability.test_cli.PublicCLI.test_evaluator_is_output_based_not_stage_based",
+    "new_id": "portability.test_cli.PublicCLI.test_evaluator_is_output_based_not_stage_based",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "portability.test_cli.PublicCLI.test_live_error_has_no_replay_fallback_and_whole_run_timeout",
+    "new_id": "portability.test_cli.PublicCLI.test_live_error_has_no_replay_fallback_and_whole_run_timeout",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 4,
+    "assertion_count_after": 4,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "portability.test_cli.PublicCLI.test_live_full_controller_uses_single_fake_chat_endpoint",
+    "new_id": "portability.test_cli.PublicCLI.test_live_full_controller_uses_single_fake_chat_endpoint",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 8,
+    "assertion_count_after": 8,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "portability.test_cli.PublicCLI.test_live_missing_config_and_doctor_probe_fail_clearly",
+    "new_id": "portability.test_cli.PublicCLI.test_live_missing_config_and_doctor_probe_fail_clearly",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 3,
+    "assertion_count_after": 3,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "portability.test_cli.TransportLimits.test_absolute_deadline_includes_semaphore_wait_and_closes_active_stream",
+    "new_id": "portability.test_cli.TransportLimits.test_absolute_deadline_includes_semaphore_wait_and_closes_active_stream",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 5,
+    "assertion_count_after": 5,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "portability.test_cli.TransportLimits.test_absolute_deadline_interrupts_continuous_stream_and_prevents_retries",
+    "new_id": "portability.test_cli.TransportLimits.test_absolute_deadline_interrupts_continuous_stream_and_prevents_retries",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 6,
+    "assertion_count_after": 6,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "portability.test_cli.TransportLimits.test_auth_failure_redacts_console_and_all_persisted_demo_artifacts",
+    "new_id": "portability.test_cli.TransportLimits.test_auth_failure_redacts_console_and_all_persisted_demo_artifacts",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 8,
+    "assertion_count_after": 8,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "portability.test_cli.TransportLimits.test_connection_failure_cause_redacted_without_changing_exception_type",
+    "new_id": "portability.test_cli.TransportLimits.test_connection_failure_cause_redacted_without_changing_exception_type",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 3,
+    "assertion_count_after": 3,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "portability.test_cli.TransportLimits.test_doctor_wraps_whole_model_check_in_explicit_time_limit",
+    "new_id": "portability.test_cli.TransportLimits.test_doctor_wraps_whole_model_check_in_explicit_time_limit",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 3,
+    "assertion_count_after": 3,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "portability.test_cli.TransportLimits.test_error_metadata_and_retry_exhaustion_redact_all_configured_key_tiers",
+    "new_id": "portability.test_cli.TransportLimits.test_error_metadata_and_retry_exhaustion_redact_all_configured_key_tiers",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 7,
+    "assertion_count_after": 7,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "portability.test_cli.TransportLimits.test_expired_deadline_sends_no_http_request",
+    "new_id": "portability.test_cli.TransportLimits.test_expired_deadline_sends_no_http_request",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 3,
+    "assertion_count_after": 3,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "portability.test_cli.TransportLimits.test_generic_model_names_do_not_silently_enable_vendor_routing",
+    "new_id": "portability.test_cli.TransportLimits.test_generic_model_names_do_not_silently_enable_vendor_routing",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "portability.test_cli.TransportLimits.test_retry_attempts_are_counted_and_capped_before_http_dispatch",
+    "new_id": "portability.test_cli.TransportLimits.test_retry_attempts_are_counted_and_capped_before_http_dispatch",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "portability.test_cli.TransportLimits.test_successful_model_text_is_preserved",
+    "new_id": "portability.test_cli.TransportLimits.test_successful_model_text_is_preserved",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "portability.test_dependencies.DependencyBoundaries.test_agents_invoke_assets_through_runtime",
+    "new_id": "portability.test_dependencies.DependencyBoundaries.test_agents_invoke_assets_through_runtime",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 4,
+    "assertion_count_after": 4,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "portability.test_dependencies.DependencyBoundaries.test_core_does_not_import_tasks_or_datasets",
+    "new_id": "portability.test_dependencies.DependencyBoundaries.test_core_does_not_import_tasks_or_datasets",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "portability.test_dependencies.DependencyBoundaries.test_no_dataset_flow_classes",
+    "new_id": "portability.test_dependencies.DependencyBoundaries.test_no_dataset_flow_classes",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "portability.test_dependencies.DependencyBoundaries.test_wheel_contains_core_only",
+    "new_id": "portability.test_dependencies.DependencyBoundaries.test_wheel_contains_core_only",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "test_evaluation_dispatch.EvaluationDispatchContract.test_dispatch_matches_original_report",
+    "new_id": "test_evaluation_dispatch.EvaluationDispatchContract.test_dispatch_matches_original_report",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "test_framework_contracts.GraphContracts.test_functional_conflict",
+    "new_id": "test_framework_contracts.GraphContracts.test_functional_conflict",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "test_framework_contracts.GraphContracts.test_identity_boundaries_and_types",
+    "new_id": "test_framework_contracts.GraphContracts.test_identity_boundaries_and_types",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 4,
+    "assertion_count_after": 4,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "test_framework_contracts.GraphContracts.test_isolation_is_explicit_and_reported",
+    "new_id": "test_framework_contracts.GraphContracts.test_isolation_is_explicit_and_reported",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "test_framework_contracts.GraphContracts.test_legal_merge_and_types",
+    "new_id": "test_framework_contracts.GraphContracts.test_legal_merge_and_types",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "test_framework_contracts.GraphContracts.test_relations_cannot_inject_bad_types_or_signatures",
+    "new_id": "test_framework_contracts.GraphContracts.test_relations_cannot_inject_bad_types_or_signatures",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "test_framework_contracts.GraphContracts.test_undeclared_and_incomplete_entities",
+    "new_id": "test_framework_contracts.GraphContracts.test_undeclared_and_incomplete_entities",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "test_framework_contracts.RuntimeContracts.test_budget_atomic_and_restart_preserved",
+    "new_id": "test_framework_contracts.RuntimeContracts.test_budget_atomic_and_restart_preserved",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 3,
+    "assertion_count_after": 3,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "test_framework_contracts.RuntimeContracts.test_cache_distinguishes_site_and_effective_policy",
+    "new_id": "test_framework_contracts.RuntimeContracts.test_cache_distinguishes_site_and_effective_policy",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "test_framework_contracts.RuntimeContracts.test_multiple_clients_cannot_each_spend_last_scope_credit",
+    "new_id": "test_framework_contracts.RuntimeContracts.test_multiple_clients_cannot_each_spend_last_scope_credit",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "test_framework_contracts.RuntimeContracts.test_unverified_formal_check_is_not_pass",
+    "new_id": "test_framework_contracts.RuntimeContracts.test_unverified_formal_check_is_not_pass",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "test_schema_semantics.SchemaSemantics.test_invalid_cardinality_does_not_reach_reasoner",
+    "new_id": "test_schema_semantics.SchemaSemantics.test_invalid_cardinality_does_not_reach_reasoner",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "test_schema_semantics.SchemaSemantics.test_union_domain_and_actual_cardinality_translation",
+    "new_id": "test_schema_semantics.SchemaSemantics.test_union_domain_and_actual_cardinality_translation",
+    "old_status": "skipped",
+    "new_status": "skipped",
+    "assertion_count_before": 3,
+    "assertion_count_after": 3,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true,
+    "skip_reason_before": "optional formal dependency",
+    "skip_reason_after": "optional formal dependency"
+  },
+  {
+    "old_id": "unit.test_assets.AssetBoundary.test_atomic_revision_and_tamper",
+    "new_id": "unit.test_assets.AssetBoundary.test_atomic_revision_and_tamper",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 4,
+    "assertion_count_after": 4,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "unit.test_assets.AssetBoundary.test_fixed_check_namespace",
+    "new_id": "unit.test_assets.AssetBoundary.test_fixed_check_namespace",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "unit.test_assets.AssetBoundary.test_manifest_path_escape",
+    "new_id": "unit.test_assets.AssetBoundary.test_manifest_path_escape",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "unit.test_assets.AssetBoundary.test_no_declared_permission_grant",
+    "new_id": "unit.test_assets.AssetBoundary.test_no_declared_permission_grant",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "unit.test_assets.AssetBoundary.test_only_sfcp",
+    "new_id": "unit.test_assets.AssetBoundary.test_only_sfcp",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "unit.test_assets.AssetBoundary.test_prompt_slots_closed",
+    "new_id": "unit.test_assets.AssetBoundary.test_prompt_slots_closed",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "unit.test_assets.AssetBoundary.test_runconfig_is_frozen",
+    "new_id": "unit.test_assets.AssetBoundary.test_runconfig_is_frozen",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "unit.test_assets.AssetBoundary.test_stale_patch_and_non_train_rejected",
+    "new_id": "unit.test_assets.AssetBoundary.test_stale_patch_and_non_train_rejected",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "unit.test_assets.RestrictedExecution.test_c_cannot_query_or_launch",
+    "new_id": "unit.test_assets.RestrictedExecution.test_c_cannot_query_or_launch",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "unit.test_assets.RestrictedExecution.test_frozen_input_item_assignment_rejected_at_execution",
+    "new_id": "unit.test_assets.RestrictedExecution.test_frozen_input_item_assignment_rejected_at_execution",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "unit.test_assets.RestrictedExecution.test_immutable_input_alias",
+    "new_id": "unit.test_assets.RestrictedExecution.test_immutable_input_alias",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "unit.test_assets.RestrictedExecution.test_literal_complete_question_rejected",
+    "new_id": "unit.test_assets.RestrictedExecution.test_literal_complete_question_rejected",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "unit.test_assets.RestrictedExecution.test_local_computation",
+    "new_id": "unit.test_assets.RestrictedExecution.test_local_computation",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "unit.test_assets.RestrictedExecution.test_no_cpython_exec",
+    "new_id": "unit.test_assets.RestrictedExecution.test_no_cpython_exec",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "unit.test_assets.RestrictedExecution.test_permissions_and_unsupported_syntax",
+    "new_id": "unit.test_assets.RestrictedExecution.test_permissions_and_unsupported_syntax",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "unit.test_assets.RestrictedExecution.test_primitive_output_only",
+    "new_id": "unit.test_assets.RestrictedExecution.test_primitive_output_only",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "unit.test_assets.RestrictedExecution.test_step_range_size_limits",
+    "new_id": "unit.test_assets.RestrictedExecution.test_step_range_size_limits",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "unit.test_fact_memory.AssemblyTests.test_anchored_structure_and_roundtrip",
+    "new_id": "unit.test_fact_memory.AssemblyTests.test_anchored_structure_and_roundtrip",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 6,
+    "assertion_count_after": 6,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "unit.test_fact_memory.AssemblyTests.test_deterministic_rebuild",
+    "new_id": "unit.test_fact_memory.AssemblyTests.test_deterministic_rebuild",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "unit.test_fact_memory.AssemblyTests.test_orphan_structure_rejected",
+    "new_id": "unit.test_fact_memory.AssemblyTests.test_orphan_structure_rejected",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "unit.test_fact_memory.AssemblyTests.test_schema_must_keep_anchor",
+    "new_id": "unit.test_fact_memory.AssemblyTests.test_schema_must_keep_anchor",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 3,
+    "assertion_count_after": 3,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "unit.test_fact_memory.AssemblyTests.test_shared_evidence_deduplicates_and_anchors_time",
+    "new_id": "unit.test_fact_memory.AssemblyTests.test_shared_evidence_deduplicates_and_anchors_time",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 3,
+    "assertion_count_after": 3,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "unit.test_fact_memory.AssemblyTests.test_tampered_fact_node_rejected",
+    "new_id": "unit.test_fact_memory.AssemblyTests.test_tampered_fact_node_rejected",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "unit.test_fact_memory.BatchingTests.test_bisect_keeps_offsets",
+    "new_id": "unit.test_fact_memory.BatchingTests.test_bisect_keeps_offsets",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 4,
+    "assertion_count_after": 4,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "unit.test_fact_memory.BatchingTests.test_message_boundary_and_oversized",
+    "new_id": "unit.test_fact_memory.BatchingTests.test_message_boundary_and_oversized",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "unit.test_fact_memory.BatchingTests.test_truncation_detection",
+    "new_id": "unit.test_fact_memory.BatchingTests.test_truncation_detection",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 5,
+    "assertion_count_after": 5,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "unit.test_fact_memory.ExtractionTests.test_final_batch_failure_raises",
+    "new_id": "unit.test_fact_memory.ExtractionTests.test_final_batch_failure_raises",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "unit.test_fact_memory.ExtractionTests.test_multi_message_batches_and_value_objects",
+    "new_id": "unit.test_fact_memory.ExtractionTests.test_multi_message_batches_and_value_objects",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "unit.test_fact_memory.ExtractionTests.test_pointed_feedback_then_correction",
+    "new_id": "unit.test_fact_memory.ExtractionTests.test_pointed_feedback_then_correction",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 4,
+    "assertion_count_after": 4,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "unit.test_fact_memory.ExtractionTests.test_unknown_class_rejected_with_allowed_list",
+    "new_id": "unit.test_fact_memory.ExtractionTests.test_unknown_class_rejected_with_allowed_list",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "unit.test_fact_memory.ExtractionTests.test_valid_reply_yields_memory_with_offsets",
+    "new_id": "unit.test_fact_memory.ExtractionTests.test_valid_reply_yields_memory_with_offsets",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 7,
+    "assertion_count_after": 7,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "unit.test_fact_memory.MaterializedViewTests.test_anchoring_is_opt_in_per_task",
+    "new_id": "unit.test_fact_memory.MaterializedViewTests.test_anchoring_is_opt_in_per_task",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 4,
+    "assertion_count_after": 4,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "unit.test_fact_memory.MaterializedViewTests.test_entity_missing_key_predicate_skips_view",
+    "new_id": "unit.test_fact_memory.MaterializedViewTests.test_entity_missing_key_predicate_skips_view",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "unit.test_fact_memory.MaterializedViewTests.test_view_rebuilt_from_fact_predicates_and_traceable",
+    "new_id": "unit.test_fact_memory.MaterializedViewTests.test_view_rebuilt_from_fact_predicates_and_traceable",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 3,
+    "assertion_count_after": 3,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "unit.test_graph_axioms.GraphAxiomAcceptance.test_cardinality_instance_constraint_is_mandatory_and_keeps_raw",
+    "new_id": "unit.test_graph_axioms.GraphAxiomAcceptance.test_cardinality_instance_constraint_is_mandatory_and_keeps_raw",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 3,
+    "assertion_count_after": 3,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "unit.test_graph_axioms.GraphAxiomAcceptance.test_static_disjoint_subclasses_rejected",
+    "new_id": "unit.test_graph_axioms.GraphAxiomAcceptance.test_static_disjoint_subclasses_rejected",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "unit.test_model_registry.ClientSitePools.test_same_site_shares_pool",
+    "new_id": "unit.test_model_registry.ClientSitePools.test_same_site_shares_pool",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "unit.test_model_registry.RegistryResolution.test_longest_prefix_and_site_resolution",
+    "new_id": "unit.test_model_registry.RegistryResolution.test_longest_prefix_and_site_resolution",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 8,
+    "assertion_count_after": 8,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "unit.test_model_registry.RegistryResolution.test_unknown_model_falls_back_conservatively",
+    "new_id": "unit.test_model_registry.RegistryResolution.test_unknown_model_falls_back_conservatively",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 4,
+    "assertion_count_after": 4,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "unit.test_model_registry.RequestPolicyMatrix.test_effort_minimax",
+    "new_id": "unit.test_model_registry.RequestPolicyMatrix.test_effort_minimax",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 4,
+    "assertion_count_after": 4,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "unit.test_model_registry.RequestPolicyMatrix.test_offable_deepseek",
+    "new_id": "unit.test_model_registry.RequestPolicyMatrix.test_offable_deepseek",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 4,
+    "assertion_count_after": 4,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "unit.test_model_registry.RequestPolicyMatrix.test_offable_glm",
+    "new_id": "unit.test_model_registry.RequestPolicyMatrix.test_offable_glm",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 4,
+    "assertion_count_after": 4,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "unit.test_policy.AdoptionTests.test_any_other_metric_decrease_rejected",
+    "new_id": "unit.test_policy.AdoptionTests.test_any_other_metric_decrease_rejected",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "unit.test_policy.AdoptionTests.test_fault_or_incomplete_rejected",
+    "new_id": "unit.test_policy.AdoptionTests.test_fault_or_incomplete_rejected",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "unit.test_policy.AdoptionTests.test_strict_increase_only",
+    "new_id": "unit.test_policy.AdoptionTests.test_strict_increase_only",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 2,
+    "assertion_count_after": 2,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "unit.test_runtime_guards.RuntimeGuardTests.test_actual_graph_type_contract_and_source_checks",
+    "new_id": "unit.test_runtime_guards.RuntimeGuardTests.test_actual_graph_type_contract_and_source_checks",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "unit.test_runtime_guards.RuntimeGuardTests.test_behavior_probe_rejects_subject_lookup_constant",
+    "new_id": "unit.test_runtime_guards.RuntimeGuardTests.test_behavior_probe_rejects_subject_lookup_constant",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "unit.test_runtime_guards.RuntimeGuardTests.test_behavior_probe_tolerates_partial_dates",
+    "new_id": "unit.test_runtime_guards.RuntimeGuardTests.test_behavior_probe_tolerates_partial_dates",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "unit.test_runtime_guards.RuntimeGuardTests.test_check_cannot_mutate_snapshot",
+    "new_id": "unit.test_runtime_guards.RuntimeGuardTests.test_check_cannot_mutate_snapshot",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "unit.test_runtime_guards.RuntimeGuardTests.test_check_must_not_return_candidate",
+    "new_id": "unit.test_runtime_guards.RuntimeGuardTests.test_check_must_not_return_candidate",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "unit.test_runtime_guards.RuntimeGuardTests.test_prompt_does_not_expand_visible_inputs",
+    "new_id": "unit.test_runtime_guards.RuntimeGuardTests.test_prompt_does_not_expand_visible_inputs",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "unit.test_runtime_guards.RuntimeGuardTests.test_timeout_bound_and_native_output_bound",
+    "new_id": "unit.test_runtime_guards.RuntimeGuardTests.test_timeout_bound_and_native_output_bound",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 3,
+    "assertion_count_after": 3,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  },
+  {
+    "old_id": "unit.test_runtime_guards.RuntimeGuardTests.test_wrong_function_result_type",
+    "new_id": "unit.test_runtime_guards.RuntimeGuardTests.test_wrong_function_result_type",
+    "old_status": "passed",
+    "new_status": "passed",
+    "assertion_count_before": 1,
+    "assertion_count_after": 1,
+    "assertion_ast_identical": true,
+    "scenario_ast_identical_except_imports": true
+  }
+]

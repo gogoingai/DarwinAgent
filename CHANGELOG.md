@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased — engineering governance
+
+- Pin Ruff 0.16.10, editor conventions and an independent CI quality gate; preserve runtime dependency versions.
+- Extract Wiki evidence/lessons/context and ordered admission trials/reporting.
+- Compose experiment lifecycle, execution stages, optimization, graph supply and round state without changing public APIs.
+- Organize behavioral tests and reusable support; retain all 383 original scenarios and seven resource skips.
+- Share identical calendar primitives while retaining domain resolvers/scoring; preserve the historical evaluation lock and add the governance lock with six source dependencies.
+- Document ownership, source-identity migration and offline acceptance in both languages.
+
 ## 0.1.0 — experimental source version (2026-10-07)
 
 This experimental source version is available on `main`. It has not been published to PyPI or as a GitHub Release.

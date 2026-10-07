@@ -8,16 +8,28 @@ DarwinAgent 0.1.0 是实验版本。欢迎提交可复现的问题、独立任�
 
 ```bash
 uv sync --frozen --group test
-uv run python -m unittest discover -s tests -v
-uv run python -m unittest discover -s datasets/locomo/tests -v
-uv run python -m unittest discover -s datasets/travelplanner/tests -v
-uv run python examples/third_domain.py
+uv run --frozen --group test ruff check .
+uv run --frozen --group test ruff format --check .
+uv run --frozen --group test python -m unittest discover -s tests -v
+uv run --frozen --group test python -m unittest discover -s datasets/locomo/tests -v
+uv run --frozen --group test python -m unittest discover -s datasets/travelplanner/tests -v
+uv run --frozen --group test python examples/third_domain.py
 uv build --wheel
 ```
 
 运行与改动相关的检查，报告实际结果和缺失依赖。涉及安装包时，还应使用 [scripts/check_installed.py](scripts/check_installed.py) 在源码目录外验证 wheel。当前完整测试有七项需要历史／官方／形式验证资源的显式跳过，详见[验收记录](docs/acceptance/2026-10-07.md)。
 
 ## 设计边界
+
+统一使用 Ruff 0.16.10 做格式和静态检查，目标为 Python 3.11、100 字符行宽。
+格式化命令是 `uv run --frozen --group test ruff format .`。冻结 S/F/C/P 资源、
+历史脚本、数据和独立基线不参与自动格式化，它们的字节属于证据身份。
+继续提交 `uv.lock`，新增工具时避免顺带升级已有依赖。
+
+录制客户端、图和产物构造器放在 `tests/support`，其中不能定义 TestCase 或导入
+测试场景文件。测试从生产辅助函数实际所属模块导入；新场景按行为组织，移动时
+保留原断言。详见[模块职责](docs/zh-CN/architecture.md)和
+[工程治理报告](docs/zh-CN/engineering-governance.md)。
 
 - 内核不能依赖仓库数据集或测试模块；生成输入与评测参考必须分开。
 - S/F/C/P 修改要遵守固定执行能力、检查和评测契约。不能为了采纳候选而放宽规则。

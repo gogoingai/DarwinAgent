@@ -11,6 +11,16 @@ def dependency_violations(source, *, support=False):
     discovery and encourages borrowing TestCase instances as fixture builders.
     """
     tree = ast.parse(source)
+    aliases = {}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                if alias.name == "importlib":
+                    aliases[alias.asname or "importlib"] = "importlib"
+        elif isinstance(node, ast.ImportFrom) and node.module == "importlib":
+            for alias in node.names:
+                if alias.name == "import_module":
+                    aliases[alias.asname or alias.name] = "importlib.import_module"
     modules = []
     violations = []
     for node in ast.walk(tree):
@@ -22,6 +32,8 @@ def dependency_violations(source, *, support=False):
             modules.extend((node.lineno, base + "." + alias.name) for alias in node.names)
         elif isinstance(node, ast.Call):
             function = ast.unparse(node.func)
+            head, separator, tail = function.partition(".")
+            function = aliases.get(head, head) + (separator + tail if separator else "")
             if function in ("__import__", "importlib.import_module", "import_module"):
                 if node.args and isinstance(node.args[0], ast.Constant):
                     modules.append((node.lineno, str(node.args[0].value)))

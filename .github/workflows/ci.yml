@@ -7,8 +7,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
       - run: uv sync --frozen --group test --python 3.13
-      - run: uv run --frozen --group test ruff check src tests datasets examples scripts/check_installed.py
-      - run: uv run --frozen --group test ruff format --check src tests datasets examples scripts/check_installed.py
+      - run: uv run --frozen --group test ruff check .
+      - run: uv run --frozen --group test ruff format --check .
   offline:
     runs-on: ubuntu-latest
     strategy:

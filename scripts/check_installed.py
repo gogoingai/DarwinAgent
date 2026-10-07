@@ -25,6 +25,11 @@ def check():
         first = command("demo", "--mode", "replay", "--rounds", "2", "--output", str(root / "demo"))
         result = json.loads((root / "demo/demo-summary.json").read_text())
         assert [d["accepted"] for d in result["summary"]["rounds"]] == [True, False]
+        rounds = result["summary"]["rounds"]
+        assert rounds[0]["baseline"]["metrics"]["accuracy"] == 0.5
+        assert [d["candidate"]["metrics"]["accuracy"] for d in rounds] == [1.0, 1.0]
+        assert rounds[1]["base_version"] == rounds[0]["candidate_version"]
+        assert result["summary"]["adopted_version"] == rounds[0]["candidate_version"]
         before = (root / "demo/optimization/wiki.json").read_bytes()
         command(
             "demo", "--mode", "replay", "--rounds", "2", "--output", str(root / "demo"), "--resume"

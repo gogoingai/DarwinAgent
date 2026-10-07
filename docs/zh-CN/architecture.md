@@ -10,7 +10,31 @@ DarwinAgent 0.1 使用基于图的共同任务运行时。数据集边界只实�
 
 资产由 `TaskSpec` 描述，`KernelBundle` 保存可搬移的指纹版本。S 声明模式，F 在只读算子及受限 AST 下查询，C 检查图或回答快照，P 填充固定角色槽位。[资产边界](#资产边界)明确优化器不能改什么。
 
-`ExperimentRunner` 负责 B0、提案、候选执行、采纳、Wiki 和续跑。`CampaignController` 在其上执行三集合协议。`feedback.py`、`trials.py`、`recovery.py`、`statistics.py` 分别组织训练反馈、试跑、恢复和持久化稳定性统计。它们不改变评测器定义的指标。
+`ExperimentRunner` 是公开装配入口，原有钩子继续支持录制运行器和任务注入。
+`CampaignController` 在其上执行三集合协议。
+
+| 实验模块 | 职责 |
+| --- | --- |
+| `runner` | 参数校验、依赖装配和薄扩展钩子 |
+| `lifecycle` | 声明与源码身份、种子或冷启动 B0、基线准备 |
+| `stages` | 执行、独立评分与检查点、冒烟与预检 |
+| `optimization` | Wiki／legacy 提案、恢复和准入尝试 |
+| `rounds` | 单轮预算、验证、决策、Wiki 和发布协调 |
+| `graph_trials` | 冻结、动态、重建图的供应与缓存 |
+| `constants` | 反馈预算与默认准入次数 |
+| `feedback`、`recovery`、`trials`、`statistics`、`snapshots` | 训练证据、恢复、试验、统计和快照 |
+
+辅助模块接收显式依赖和回调，不反向导入控制器。内部采纳状态在决策与发布完成后
+更新，不增加序列化字段；恢复优先于 STOP 和轮数限制，续跑保留原始预算。
+
+`WikiMaintainer` 管理事件持久化、去重、归因和刷新；`wiki_evidence`、`wiki_lessons`、
+`wiki_context` 分别处理有界证据、已验证经验和提案上下文。准入的样本、检查、函数、
+组合模块返回有序批次，入口与报告收集器保留原落盘点和失败拒绝规则。
+
+Adapter 转换领域输入，Evaluator 持有参考答案，Run 装配组件，Exports 转换输出。
+`operators/calendar.py` 只共用相同的辅助函数，领域日期入口和答案等价规则分别保留。
+离线夹具放在 `tests/support`，不能依赖 TestCase 或场景文件。
+详见[治理报告](engineering-governance.md)。
 
 ## 资产边界
 

@@ -11,3 +11,16 @@ DarwinAgent 0.1.0 has a new package identity; earlier historical framework versi
 5. The core wheel excludes root datasets, historical outputs, tests, and third-party environments. Demo resources are packaged.
 
 The [history index](../history/README.md) retains earlier docs and research outputs. Historical scripts remain byte-preserved and may require their original checkout. Start with the current [quickstart](quickstart.md); old docs do not describe the current API.
+
+## Engineering governance source identity
+
+The package stays at 0.1.0; source identity changes when implementations move or are formatted.
+Use a new output directory for this checkout. Matching new-source checkpoints can resume;
+old-source checkpoints must fail identity validation without rewriting the original declaration.
+
+LoCoMo defaults to `evaluation_lock.governance-20261007.json`, covering its original four files
+plus `pipeline/dates.py` and the shared `operators/calendar.py`. The historical
+`evaluation_lock.json` remains byte-for-byte intact and intentionally rejects current source.
+The evaluator's explicit `lock_path` remains available for runs with their corresponding source.
+The new lock records source identity, not a new benchmark result or a changed scoring policy.
+See [provenance and acceptance](engineering-governance.md).
