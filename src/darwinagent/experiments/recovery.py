@@ -227,4 +227,3 @@ def promote_verified_check_replay(root, entries):
     store.parent.mkdir(parents=True,exist_ok=True)
     atomic_json(store,current)
     return current
-

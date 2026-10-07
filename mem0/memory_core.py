@@ -14,7 +14,7 @@
 - 无 UPDATE/DELETE/图/procedural/平台客户端/遥测——只保留 ADD 路径；
 - 向量库用内置 TinyVectorStore（JSONL + 余弦线性扫描）替代 Chroma，接口
   （insert/search）与 mem0 的 vector_store 抽象同形，量级（百~千条记忆）无压力；
-- LLM 提取直连 oak.llm.LLMClient（复用框架的路由/缓存/重试），role=mem0_extract；
+- LLM 提取直连 darwinagent.llm.LLMClient（复用框架的路由/缓存/重试），role=mem0_extract；
 - 嵌入走 OpenAI 兼容 /embeddings（env：MEM0_EMBED_BASE_URL/KEY/MODEL）。
 """
 from __future__ import annotations
@@ -31,7 +31,7 @@ from pathlib import Path
 
 import httpx
 
-from oak.llm.client import LLMClient
+from darwinagent.llm.client import LLMClient
 
 from .prompts import (ADDITIVE_EXTRACTION_PROMPT, CUSTOM_INSTRUCTIONS_ZH,
                       generate_additive_user_prompt, parse_extraction)

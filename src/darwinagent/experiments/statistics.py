@@ -42,4 +42,3 @@ def stability_metrics(root):
                 x.get('final_error_type')==x.get('initial_error_type')
                 for x in retry_rows if x.get('initial_error_type')
                 and 'final_error_type' in x)}
-

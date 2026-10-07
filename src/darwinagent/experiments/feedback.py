@@ -349,4 +349,3 @@ def _per_case_feedback_facts(root, name, cases):
             diagnostics = plain(json.loads(path.read_text())['scores'].get('diagnostics', ()))
         rows.append((case.id, diagnostics))
     return rows
-

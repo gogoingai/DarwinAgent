@@ -117,4 +117,3 @@ def stress_trial_samples(base_inputs, graph):
                     variant['rows'] = [dict(r) for r in shape_rows]
                 out.append(variant)
     return out
-
