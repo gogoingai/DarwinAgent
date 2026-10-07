@@ -1,0 +1,10 @@
+name: device_maintenance
+description: Answer who maintained a device and when, using attributed maintenance records.
+source_kinds: [maintenance_record]
+metadata_keys: []
+parameter_contract:
+  type: object
+  properties: {serial: {type: string}}
+  required: [serial]
+answer_format: text
+answer_contract: {type: string}

@@ -13,15 +13,15 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from oak.config import RunConfig
-from oak.experiments.admission import AdmissionError, admit_candidate
-from oak.experiments.runner import (_check_snapshot_expectation,
+from darwinagent.config import RunConfig
+from darwinagent.experiments.admission import AdmissionError, admit_candidate
+from darwinagent.experiments.runner import (_check_snapshot_expectation,
                                     _prior_failed_check_snapshots,
                                     promote_verified_check_replay)
-from oak.experiments.wiki import _lessons
-from oak.kernel import KernelBundle, TaskSpec
-from oak.kernel.validation import capability_names
-from oak.runtime.artifacts import digest
+from darwinagent.experiments.wiki import _lessons
+from darwinagent.kernel import KernelBundle, TaskSpec
+from darwinagent.kernel.validation import capability_names
+from darwinagent.runtime.artifacts import digest
 
 from tests.integration.test_wiki_faults_repro import (COMPLETE_C, FIXED_F, FIXTURES,
                                                       TASK_YAML, base_bundle,
@@ -225,7 +225,7 @@ class AnswerSnapshotPersistenceTests(unittest.TestCase):
     def test_answer_agent_persists_snapshot_on_check_rejection(self):
         """归档事故路径：合法 JSON 数组候选被旧 C 误杀直至重试耗尽——检查快照必须
         随轨迹留存，扫描器必须能从写出的检查点把它变成回放行。"""
-        from oak.agents.answer import AnswerAgent
+        from darwinagent.agents.answer import AnswerAgent
 
         case = travel_case()
         question = case.questions[0]
@@ -259,7 +259,7 @@ class AnswerSnapshotPersistenceTests(unittest.TestCase):
 
         spec = TaskSpec.load(TASK_YAML, base_bundle())
         config = RunConfig(protocol_attempts=1, answer_attempts=2)
-        from oak.kernel.execution import KernelRuntime
+        from darwinagent.kernel.execution import KernelRuntime
         runtime = KernelRuntime(base_bundle(), config)
         agent = AnswerAgent(runtime, StubClient(), config, spec, 'repro')
         result = asyncio.run(agent.answer(question, travel_graph(case)))
@@ -284,7 +284,7 @@ class ArchivedAttributionTests(unittest.TestCase):
     维护请求并写归因（离线 RecordedClient，零真实模型调用）。"""
 
     def test_all_archived_travel_attributions_fit_budget(self):
-        from oak.experiments.wiki import WikiMaintainer
+        from darwinagent.experiments.wiki import WikiMaintainer
         from tests.integration.test_experiment import LedgerRecordedClient
         root = Path('datasets/travelplanner/runs/wiki_gap_repair_20261005_loop3/train')
         if not root.exists():
@@ -339,7 +339,7 @@ class VerifiedFixBindingRefTests(unittest.TestCase):
                     'verification': {'verdict': 'passed', 'scenarios': rows}}}
 
     def test_same_scenario_different_ref_does_not_verify(self):
-        from oak.experiments.wiki import _lessons
+        from darwinagent.experiments.wiki import _lessons
         entries = [
             self._lesson_entry('replay', 'SandboxError', 'conv-26:replay:aaaa1111aaaa1111'),
             self._passed_entry([{'asset_id': 'f_tool', 'scenario_id': 'replay',
@@ -351,7 +351,7 @@ class VerifiedFixBindingRefTests(unittest.TestCase):
                          lessons)
 
     def test_same_ref_does_verify_replay_lesson(self):
-        from oak.experiments.wiki import _lessons
+        from darwinagent.experiments.wiki import _lessons
         entries = [
             self._lesson_entry('replay', 'SandboxError', 'conv-26:replay:aaaa1111aaaa1111'),
             self._passed_entry([{'asset_id': 'f_tool', 'scenario_id': 'replay',
@@ -363,7 +363,7 @@ class VerifiedFixBindingRefTests(unittest.TestCase):
                         lessons)
 
     def test_structure_row_pass_does_not_verify(self):
-        from oak.experiments.wiki import _lessons
+        from darwinagent.experiments.wiki import _lessons
         entries = [
             self._lesson_entry('answer_0', 'CandidateCheckRejected', 'conv-26:answer_0'),
             self._passed_entry([{'asset_id': 'c_shape', 'scenario_id': 'answer_0',
@@ -436,20 +436,20 @@ class ThirdReviewFixTests(unittest.TestCase):
         spec = TaskSpec.load(TASK_YAML)
         fixture = spec.answer_examples[0]
         graph = travel_graph(travel_case())
-        from oak.kernel.checks import counterexample_snapshot
+        from darwinagent.kernel.checks import counterexample_snapshot
         snapshot = counterexample_snapshot(
             {**fixture, 'candidate': {'status': 'answered',
                                       'answer': json.dumps(json.loads(
                                           legal_candidate()['answer']), ensure_ascii=False),
                                       'node_ids': [next(iter(
-                                          __import__('oak.kernel.functions',
+                                          __import__('darwinagent.kernel.functions',
                                                      fromlist=['DataCapabilities'])
                                           .DataCapabilities(graph).rows))]}},
             [{'node_id': next(iter(
-                __import__('oak.kernel.functions', fromlist=['DataCapabilities'])
+                __import__('darwinagent.kernel.functions', fromlist=['DataCapabilities'])
                 .DataCapabilities(graph).rows))}],
             fixture['question'], fixture['parameters'])
-        from oak.kernel.execution import KernelRuntime
+        from darwinagent.kernel.execution import KernelRuntime
         runtime = KernelRuntime(bundle, RunConfig())
         _, opinions = runtime.check_candidate(
             type('Q', (), {'text': fixture['question'],
@@ -460,7 +460,7 @@ class ThirdReviewFixTests(unittest.TestCase):
     def test_stress_input_mismatch_does_not_verify(self):
         """三次复查 P2：数据相关场景（stress/base）绑定原输入 digest——
         A→B 失败、只证 A→C 成功不得标已修复。"""
-        from oak.experiments.wiki import _lessons
+        from darwinagent.experiments.wiki import _lessons
         def failed(scenario, ref):
             return {'id': 'a' * 64, 'stage': 'R1', 'kind': 'attempt', 'category': 'runtime',
                     'scope': 'admission', 'training_ids': [], 'fact_status': 'recorded',
@@ -500,7 +500,7 @@ class ThirdReviewFixTests(unittest.TestCase):
     def test_loop6_failure_summary_keeps_rejection_reason(self):
         """三次复查 P1：真实 loop6 R1 attempt 的 C 拒绝理由（issues）必须在维护
         请求的场景行里保留——维护器要能读到反复拒绝的原因。"""
-        from oak.experiments.wiki import WikiMaintainer
+        from darwinagent.experiments.wiki import WikiMaintainer
         from tests.integration.test_experiment import LedgerRecordedClient
         root = Path('datasets/travelplanner/runs/wiki_gap_repair_20261005_loop6/train/optimization/events')
         if not root.exists():
@@ -524,7 +524,7 @@ class ThirdReviewFixTests(unittest.TestCase):
     def test_tight_budget_keeps_nested_failure_facts(self):
         """5000 字符级预算下，candidate 事件的 checks[].check_id/ok/issues/步数、
         candidate_summary.json_type、observation 预算事实仍然保留。"""
-        from oak.experiments.wiki import _compress_training_evidence
+        from darwinagent.experiments.wiki import _compress_training_evidence
         facts = {'training_examples': [{
             'question_id': '0', 'parameters': {'org': 'A'},
             'generated_answer': 'x' * 4000, 'source_text': [{'text': 'y' * 2000}],
@@ -591,7 +591,7 @@ class FourthReviewBindingTests(unittest.TestCase):
         """反例本体（现状红）：case-old 的 stress 失败不得被 case-new 的同参数
         通过行验证——base/stress 参数来自资产级 trial_inputs，跨 case 必然同
         digest，旧逻辑只看 digest 子串。"""
-        from oak.experiments.wiki import _lessons
+        from darwinagent.experiments.wiki import _lessons
         lessons = _lessons([
             self._failed(f'case-old:stress:0:{self.DIGEST}'),
             self._passed([{'asset_id': 'f_flight_pair', 'scenario_id': 'stress',
@@ -603,7 +603,7 @@ class FourthReviewBindingTests(unittest.TestCase):
     def test_same_case_cross_scenario_same_params_does_not_verify(self):
         """场景绑定：同 case 同 digest 但不同场景族（stress 失败、base 通过）
         不得验证——场景是绑定要素之一（四审）。"""
-        from oak.experiments.wiki import _lessons
+        from darwinagent.experiments.wiki import _lessons
         lessons = _lessons([
             self._failed(f'conv-26:stress:0:{self.DIGEST}'),
             self._passed([{'asset_id': 'f_flight_pair', 'scenario_id': 'base',
@@ -615,7 +615,7 @@ class FourthReviewBindingTests(unittest.TestCase):
     def test_graph_digest_mismatch_does_not_verify(self):
         """数据图身份：同 case 同场景同 digest，但验证运行的数据图与失败时不同
         （可重建图场景）→ 旧故障不能算已修复。"""
-        from oak.experiments.wiki import _lessons
+        from darwinagent.experiments.wiki import _lessons
         g1, g2 = 'a' * 63 + '1', 'a' * 63 + '2'
         lessons = _lessons([
             self._failed(f'conv-26:stress:0:{self.DIGEST}',
@@ -639,7 +639,7 @@ class FourthReviewBindingTests(unittest.TestCase):
 
     def test_same_case_same_scenario_same_digest_verifies(self):
         """守门（既有行为不回退）：同 case＋同场景族＋同 digest＋同图 → 验证成立。"""
-        from oak.experiments.wiki import _lessons
+        from darwinagent.experiments.wiki import _lessons
         lessons = _lessons([
             self._failed(f'conv-26:stress:0:{self.DIGEST}'),
             self._passed([{'asset_id': 'f_flight_pair', 'scenario_id': 'stress',
@@ -652,7 +652,7 @@ class FourthReviewBindingTests(unittest.TestCase):
         """真实 check_replay ref 形态（case:question_id:<12hex>，第二段是题号而非
         场景名）：同 case＋同题号＋同快照 digest 的通过行必须验证——场景比对用
         ref 段对 ref 段，不得与行 scenario_id 标签比对（否则真实回放验证被误拒）。"""
-        from oak.experiments.wiki import _lessons
+        from darwinagent.experiments.wiki import _lessons
         d12 = self.DIGEST[:12]
         lessons = _lessons([
             self._failed(f'conv-26:5:{d12}', scenario='check_replay_verified',

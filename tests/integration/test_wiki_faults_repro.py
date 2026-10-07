@@ -16,24 +16,26 @@ from dataclasses import replace
 from pathlib import Path
 
 from networkx import freeze
-from oak.config import RunConfig
-from oak.contracts import GraphResult
-from oak.experiments import AdoptionPolicy, ExperimentRunner
-from oak.experiments.admission import AdmissionError, admit_candidate
-from oak.kernel import KernelBundle, TaskSpec
-from oak.kernel.checks import CheckRegistry
-from oak.kernel.execution import KernelRuntime
-from oak.kernel.revision import AssetPatch, AssetRevisionService, training_id
-from oak.kernel.validation import capability_names
-from oak.kg.graph import load_graph
+from darwinagent.config import RunConfig
+from darwinagent.contracts import GraphResult
+from darwinagent.experiments import AdoptionPolicy, ExperimentRunner
+from darwinagent.experiments.admission import AdmissionError, admit_candidate
+from darwinagent.kernel import KernelBundle, TaskSpec
+from darwinagent.kernel.checks import CheckRegistry
+from darwinagent.kernel.execution import KernelRuntime
+from darwinagent.kernel.revision import AssetPatch, AssetRevisionService, training_id
+from darwinagent.kernel.validation import capability_names
+from darwinagent.kg.graph import load_graph
 
 FIXTURES = Path(__file__).resolve().parents[1] / 'fixtures' / 'travel_faults'
 TASK_YAML = Path('tasks/travel_planning/task.yaml')
 
 
 def travel_case():
-    from datasets.travelplanner.adapter import TravelPlannerAdapter
-    return TravelPlannerAdapter().generation_input('train:0')
+    from darwinagent.contracts import CaseInput, CorpusBlock, QuestionInput, SourceRef
+    raw = json.loads((FIXTURES / 'case_input.json').read_text())
+    blocks = tuple(CorpusBlock(SourceRef(**b['source']), b['text'], b['metadata']) for b in raw['corpus'])
+    return CaseInput(raw['id'], blocks, tuple(QuestionInput(**q) for q in raw['questions']))
 
 
 def travel_graph(case):
@@ -130,7 +132,7 @@ class TravelFaultReproductionTests(unittest.TestCase):
             generation.mkdir(parents=True)
             (generation / 'graph.json').write_text((FIXTURES / 'graph.json').read_text())
             payload = json.loads((generation / 'graph.json').read_text())
-            from oak.runtime.artifacts import digest
+            from darwinagent.runtime.artifacts import digest
             (generation / 'graph.complete.json').write_text(json.dumps(
                 {'digest': digest(payload)}))
             (root / 'B0' / 'stage.json').write_text(json.dumps(
@@ -292,6 +294,8 @@ class FourthReviewFixtureTests(TravelFaultReproductionTests):
                                       'room type': None, 'transportation': None},
                  'budget': 2000, 'people_number': 1}
         tp_root = TravelPlannerAdapter().tp_root
+        if not (tp_root / 'evaluation').is_dir():
+            self.skipTest('External evidence: requires third_party/TravelPlanner official evaluator and database')
         with tempfile.TemporaryDirectory() as tmp:
             inp, out = Path(tmp) / 'in.json', Path(tmp) / 'out.json'
             inp.write_text(json.dumps({'queries': [query], 'plans': [plan]}))
@@ -327,7 +331,7 @@ class FourthReviewFixtureTests(TravelFaultReproductionTests):
         """接地 C 的否决面：旧 Springfield 形态（虚构实体、空餐）与参数错配
         （夹具问题＋他人行程/虚构航班/虚构餐厅）都必须被拒——修复不得以放松 C
         为代价。证据行用夹具自带行集（构造口径与电池一致）。"""
-        from oak.kernel.checks import counterexample_snapshot
+        from darwinagent.kernel.checks import counterexample_snapshot
         ex, _ = self._fixture()
         old_style = [{'days': 1, 'current_city': 'Rockford',
                       'transportation': 'Flight F100 from Rockford to Springfield',
@@ -399,7 +403,7 @@ class FourthReviewFixtureTests(TravelFaultReproductionTests):
     def test_t5_unregistered_names_rejected(self):
         """沙箱白名单：C 代码使用未注册名（hasattr）在静态准入即被拒
         （AssetRevisionService.propose 内的 validate_bundle 就会拦，轮不到执行）。"""
-        from oak.operators.sandbox import SandboxError
+        from darwinagent.operators.sandbox import SandboxError
         with self.assertRaises(SandboxError):
             self._patched_bundle(
                 {'c_answer_shape': 'def check(candidate):\n'
@@ -413,7 +417,7 @@ class ReviewFixUnitTests(unittest.TestCase):
     维护证据压缩、verified_fix 场景绑定。"""
 
     def test_multi_instance_days_are_varied(self):
-        from oak.kernel.checks import synthetic_answer_battery
+        from darwinagent.kernel.checks import synthetic_answer_battery
         spec = TaskSpec.load(TASK_YAML)
         battery = synthetic_answer_battery([{'node_id': 'n1', 'x': 1}], 'q', {},
                                            spec.answer_contract)
@@ -424,7 +428,7 @@ class ReviewFixUnitTests(unittest.TestCase):
         self.assertEqual(days, [1, 2])  # 内部一致的天序，不再复制出 days=[1,1]
 
     def test_large_numeric_stress_variant(self):
-        from oak.experiments.runner import stress_trial_samples
+        from darwinagent.experiments.runner import stress_trial_samples
         graph = travel_graph(travel_case())
         out = stress_trial_samples(
             [{'subject': 'x', 'fact_type': '', 'date_prefix': '', 'limit': 20}], graph)
@@ -432,7 +436,7 @@ class ReviewFixUnitTests(unittest.TestCase):
                         out)
 
     def test_wiki_evidence_compression_keeps_facts(self):
-        from oak.experiments.wiki import _compress_training_evidence
+        from darwinagent.experiments.wiki import _compress_training_evidence
         facts = {'training_examples': [{
             'question_id': '0', 'parameters': {'a': 1}, 'answer': 'x' * 50000,
             'baseline_answer': 'y' * 5000, 'rows': [{'r': i} for i in range(50)],
@@ -455,7 +459,7 @@ class ReviewFixUnitTests(unittest.TestCase):
 
     def test_verified_fix_requires_scenario_reproduction(self):
         """审查 P2 反例：旧 C 失败＋同资产过门＋空 scenarios 不得标记已验证修复。"""
-        from oak.experiments.wiki import _lessons
+        from darwinagent.experiments.wiki import _lessons
         entries = [
             {'id': 'a' * 64, 'stage': 'R1', 'kind': 'attempt', 'category': 'runtime',
              'scope': 'admission', 'training_ids': [], 'fact_status': 'recorded',
@@ -499,7 +503,7 @@ class DynamicTrialGraphTests(unittest.TestCase):
         generation = root / 'B0' / 'generation' / 'train:0'
         generation.mkdir(parents=True, exist_ok=True)
         (generation / 'graph.json').write_text((FIXTURES / 'graph.json').read_text())
-        from oak.runtime.artifacts import digest
+        from darwinagent.runtime.artifacts import digest
         payload = json.loads((generation / 'graph.json').read_text())
         (generation / 'graph.complete.json').write_text(json.dumps({'digest': digest(payload)}))
         (root / 'B0' / 'stage.json').write_text(json.dumps(
@@ -527,14 +531,14 @@ class DynamicTrialGraphTests(unittest.TestCase):
                 return travel_graph(travel_case())
 
         runner = self._runner(root, case)
-        with mock.patch('oak.agents.ExtractionAgent', CountingAgent):
+        with mock.patch('darwinagent.agents.ExtractionAgent', CountingAgent):
             c_only = candidate_bundle(base, {'c_answer_shape': COMPLETE_C}, str(root / 'c1'))
             asyncio.run(runner._dynamic_trial_graphs(c_only, [case]))
             self.assertEqual(CountingAgent.calls, 0, '未触碰 S/P.extract 必须复用已采纳图')
 
             tampered = replace(schema_asset,
                                content=schema_asset.content + '\n# candidate schema edit\n')
-            from oak.kernel.revision import AssetPatch
+            from darwinagent.kernel.revision import AssetPatch
             s_patch = AssetRevisionService().propose(
                 base, [AssetPatch(tampered, schema_asset.fingerprint,
                                   'S 扩展', (training_id('train:0', '0'),))],
@@ -564,7 +568,7 @@ class DynamicTrialGraphTests(unittest.TestCase):
         runner = self._runner(root, case)
         two = [candidate_bundle(base, {'c_answer_shape': COMPLETE_C}, str(root / f'c{i}'))
                for i in range(2)]
-        with mock.patch('oak.agents.ExtractionAgent', CountingAgent):
+        with mock.patch('darwinagent.agents.ExtractionAgent', CountingAgent):
             for bundle in two:
                 asyncio.run(runner._dynamic_trial_graphs(bundle, [case]))
         self.assertEqual(CountingAgent.calls, 1, '同 (case,S,P.extract,config,transport) 只抽一次')
@@ -578,9 +582,12 @@ class RealFaultAdmissionTests(unittest.TestCase):
     MC_B0 = Path('datasets/locomo/runs/wiki_gap_repair_20261005_mc/train/B0/assets')
 
     def setUp(self):
-        if not self.MC_B0.exists():
-            self.skipTest('归档证据目录不在本检出（运行产物不进版本库）；'
-                          '在产生该证据的运行侧本测试为强制项')
+        required = (self.MC_B0/'manifest.json',
+                    Path('datasets/locomo/snapshots/gvtest_v1/conv-30/manifest.json'),
+                    Path('datasets/locomo/snapshots/gvtest_v1/conv-30/graph.json'))
+        missing = [str(p) for p in required if not p.is_file()]
+        if missing:
+            self.skipTest('External archived evidence missing: '+', '.join(missing))
 
     FIXED_FILTER_F = '''def run(params):
     filters = {}
@@ -617,7 +624,7 @@ class RealFaultAdmissionTests(unittest.TestCase):
     @classmethod
     def _case_graph(cls):
         from datasets.locomo.adapter import LocomoAdapter
-        from oak.experiments.snapshots import load_frozen_graph
+        from darwinagent.experiments.snapshots import load_frozen_graph
         case = LocomoAdapter(Path('datasets/locomo/data/locomo10_zh.json')).generation_input('conv-30')
         graph = load_frozen_graph(Path('datasets/locomo/snapshots/gvtest_v1/conv-30'), case.corpus)
         return case, graph
@@ -659,7 +666,7 @@ class RealFaultAdmissionTests(unittest.TestCase):
                         [s for s in rows if s.get('status') == 'failed'])
 
     def test_stress_combo_covers_real_fault_shape(self):
-        from oak.experiments.runner import stress_trial_samples
+        from darwinagent.experiments.runner import stress_trial_samples
         _, graph = self._case_graph()
         out = stress_trial_samples(
             [{'subject': '乔恩', 'fact_type': '事件', 'date_prefix': '2023-05', 'limit': 20}],

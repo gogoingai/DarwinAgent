@@ -7,7 +7,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from oak.contracts import CaseInput, CorpusBlock, QuestionInput, SourceRef
+from darwinagent.contracts import CaseInput, CorpusBlock, QuestionInput, SourceRef
 from .pipeline.dates import parse_session_datetime
 
 

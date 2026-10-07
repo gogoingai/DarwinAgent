@@ -8,14 +8,14 @@ import unittest
 from collections import Counter
 from pathlib import Path
 
-from oak.config import Config, RunConfig
-from oak.experiments.spec import precheck_identity
-from oak.contracts import EvaluationResult
-from oak.experiments import AdoptionPolicy, CampaignController, ExperimentSpec, SelectionPolicy
-from oak.kernel import KernelBundle, TaskSpec
-from oak.kernel.registration import load_assets
-from oak.kernel.revision import training_id
-from oak.llm.recorded import RecordedClient
+from darwinagent.config import Config, RunConfig
+from darwinagent.experiments.spec import precheck_identity
+from darwinagent.contracts import EvaluationResult
+from darwinagent.experiments import AdoptionPolicy, CampaignController, ExperimentSpec, SelectionPolicy
+from darwinagent.kernel import KernelBundle, TaskSpec
+from darwinagent.kernel.registration import load_assets
+from darwinagent.kernel.revision import training_id
+from darwinagent.llm.recorded import RecordedClient
 from tests.fixtures import TASK, review
 
 SERIALS = {'train-case': 'D-17', 'train-case-2': 'D-27', 'val-case': 'D-18', 'val-case-2': 'D-28', 'test-case': 'D-19', 'test-case-2': 'D-29'}
@@ -23,7 +23,7 @@ SERIALS = {'train-case': 'D-17', 'train-case-2': 'D-27', 'val-case': 'D-18', 'va
 
 class StubAdapter:
     def generation_input(self, case_id):
-        from oak.contracts import CaseInput, CorpusBlock, QuestionInput, SourceRef
+        from darwinagent.contracts import CaseInput, CorpusBlock, QuestionInput, SourceRef
         serial = SERIALS[case_id]
         return CaseInput(case_id, (CorpusBlock(SourceRef('maintenance_record', case_id, 'row-1'),
             f'设备 {serial} 于 2026-09-01 由林维护。'),),
@@ -187,7 +187,7 @@ class ThreeSetCampaign(unittest.TestCase):
             {'passed': True, 'checks': {},
              'identity': {'transport': {}, 'config': 'deadbeef', 'framework': 'deadbeef'}}))
         controller = RecordedCampaign(root, spec=protocol(rounds=1))
-        from oak.kernel import TaskSpec
+        from darwinagent.kernel import TaskSpec
         with self.assertRaises(ValueError) as caught:
             asyncio.run(controller.run(TaskSpec.load(TASK / 'task.yaml')))
         self.assertIn('identity mismatch', str(caught.exception))

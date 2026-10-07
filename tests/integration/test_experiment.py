@@ -7,13 +7,13 @@ import unittest
 from collections import Counter
 from pathlib import Path
 
-from oak.config import Config,RunConfig
-from oak.contracts import EvaluationResult
-from oak.experiments import AdoptionPolicy,ExperimentRunner
-from oak.kernel import KernelBundle,TaskSpec
-from oak.kernel.registration import load_assets
-from oak.kernel.revision import training_id
-from oak.llm.recorded import RecordedClient
+from darwinagent.config import Config,RunConfig
+from darwinagent.contracts import EvaluationResult
+from darwinagent.experiments import AdoptionPolicy,ExperimentRunner
+from darwinagent.kernel import KernelBundle,TaskSpec
+from darwinagent.kernel.registration import load_assets
+from darwinagent.kernel.revision import training_id
+from darwinagent.llm.recorded import RecordedClient
 from tests.fixtures import TASK,case,client
 
 

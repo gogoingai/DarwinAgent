@@ -10,7 +10,7 @@ import json
 import re
 from dataclasses import dataclass, field
 
-from oak.llm.client import LLMClient
+from darwinagent.llm.client import LLMClient
 
 from .config import LOCOMO_TASK_DIR, ns
 from .data import CATEGORY_MAP, QA, TOPIC_CATEGORIES

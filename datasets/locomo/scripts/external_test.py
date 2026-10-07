@@ -9,12 +9,12 @@ import asyncio
 import json
 from pathlib import Path
 
-from oak.config import RunConfig
-from oak.contracts import plain
-from oak.engine import Pipeline
-from oak.kernel import KernelBundle, TaskSpec
-from oak.llm.client import LLMClient
-from oak.runtime.artifacts import atomic_json
+from darwinagent.config import RunConfig
+from darwinagent.contracts import plain
+from darwinagent.engine import Pipeline
+from darwinagent.kernel import KernelBundle, TaskSpec
+from darwinagent.llm.client import LLMClient
+from darwinagent.runtime.artifacts import atomic_json
 
 from datasets.locomo.adapter import LocomoAdapter
 from datasets.locomo.evaluator import LocomoEvaluator
@@ -37,7 +37,7 @@ async def evaluate_conversation(case_id, adapter, task, bundle, config, root,
         # 最终故障集以最后一次完整答案集为准（不做批次并集）。
         faulted = [a for a in result.answers if a.status == 'execution_error']
         if faulted:
-            from oak.experiments.runner import batched_fault_retry
+            from darwinagent.experiments.runner import batched_fault_retry
             result, still = await batched_fault_retry(
                 pipeline, case, task.with_bundle(bundle), config,
                 root / case_id / 'generation' / case_id / 'answers', faulted)
@@ -119,12 +119,12 @@ def preflight(bundle, config, task, cases, snap_root=None, embedder_factory=None
     graph_builder 给定时（新图重建模式）试跑图＝按锁定 S 从固定事实重建——与答题
     Pipeline 同一派生规则，不得拿冻结旧图过检当新模式证据。"""
     import tempfile
-    from oak.kernel.checks import CheckRegistry, enforce_opinions
-    from oak.kernel.functions import FunctionRegistry
-    from oak.kernel.validation import capability_floor_errors, capability_names, trial_capability_floor_errors
-    from oak.operators.sandbox import Limits
-    from oak.operators.data import DataCapabilities
-    from oak.experiments.snapshots import attach_vector, load_frozen_graph
+    from darwinagent.kernel.checks import CheckRegistry, enforce_opinions
+    from darwinagent.kernel.functions import FunctionRegistry
+    from darwinagent.kernel.validation import capability_floor_errors, capability_names, trial_capability_floor_errors
+    from darwinagent.operators.sandbox import Limits
+    from darwinagent.operators.data import DataCapabilities
+    from darwinagent.experiments.snapshots import attach_vector, load_frozen_graph
     snap_root = Path(snap_root) if snap_root is not None else SNAPSHOTS
     required = capability_names(task.retrieval_floor)
     problems = capability_floor_errors(bundle.assets, required)
@@ -133,7 +133,7 @@ def preflight(bundle, config, task, cases, snap_root=None, embedder_factory=None
     limits = Limits(config.function_steps, config.function_timeout_s, config.result_bytes)
     schema = None
     if graph_builder is not None:
-        from oak.kernel.validation import validate_bundle
+        from darwinagent.kernel.validation import validate_bundle
         schema = validate_bundle(bundle)
     for case_id, case in cases.items():
         if graph_builder is not None:
@@ -215,10 +215,10 @@ def experiment_identity(bundle, config, conn, cases, snap_root=None,
     冻结判题器文件锁——基线比对时核对共同条件，缺失/不兼容明确报出。
     新图重建模式（graph_builder 给定）加记：投影规则源码摘要、锁定 S 摘要、
     各对话实际重建图摘要——旧图缓存/不同 S 不得冒充同身份（CONTINUE.md 阶段六）。"""
-    from oak.experiments.spec import precheck_identity
+    from darwinagent.experiments.spec import precheck_identity
     from datasets.locomo.evaluator import AUDITED, LOCK_PATH
-    from oak.runtime.artifacts import digest
-    from oak.runtime.identity import snapshot_files
+    from darwinagent.runtime.artifacts import digest
+    from darwinagent.runtime.identity import snapshot_files
     snap_root = Path(snap_root) if snap_root is not None else SNAPSHOTS
     identity = {'asset_version': bundle.version,
                 'transport': precheck_identity(conn, config)['transport'],
@@ -228,8 +228,8 @@ def experiment_identity(bundle, config, conn, cases, snap_root=None,
                 'judge_lock': digest(snapshot_files([AUDITED, LOCK_PATH]))}
     if graph_builder is not None:
         import inspect
-        from oak.kernel.validation import validate_bundle
-        from oak.operators.data import DataCapabilities
+        from darwinagent.kernel.validation import validate_bundle
+        from darwinagent.operators.data import DataCapabilities
         try:
             builder_src = inspect.getsource(graph_builder)
         except (OSError, TypeError):

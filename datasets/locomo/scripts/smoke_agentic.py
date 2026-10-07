@@ -9,11 +9,11 @@ import asyncio
 import json
 from pathlib import Path
 
-from oak.config import RunConfig
-from oak.contracts import CaseInput
-from oak.experiments.bootstrap import AssetBootstrapper
-from oak.kernel import TaskSpec
-from oak.llm.client import LLMClient
+from darwinagent.config import RunConfig
+from darwinagent.contracts import CaseInput
+from darwinagent.experiments.bootstrap import AssetBootstrapper
+from darwinagent.kernel import TaskSpec
+from darwinagent.llm.client import LLMClient
 
 from datasets.locomo.adapter import LocomoAdapter
 from datasets.locomo.run import ROOT, SNAPSHOTS, TASK_DIR, arm_config, connection, memory_structure_sample
@@ -39,7 +39,7 @@ async def main(args):
                          ensure_ascii=False))
         (out / 'bootstrapped-schema.yaml').write_text(schema_yaml)
 
-        from oak.engine import Pipeline
+        from darwinagent.engine import Pipeline
         for arm in ('g1', 'v0'):
             config = arm_config(arm, args.vector_k)
             result = await Pipeline(client, out / arm / 'generation',

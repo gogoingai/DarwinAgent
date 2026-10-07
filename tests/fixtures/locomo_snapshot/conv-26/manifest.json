@@ -1,0 +1,10 @@
+{
+  "n_facts": 4,
+  "n_unsourced_facts": 1,
+  "n_vector_records": 4,
+  "facts_digest": "de8ae6d5bbf9488ef77a22c4e787a549e39c6069d959ba3240533140229b0f60",
+  "vector_digest": "8307962dcc1a94f879057a2948d3e8f1e6ddc3aa48bd02c7bc0f84a7a6872b19",
+  "graph_digest": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+  "snapshot_digest": "a993b97f4dbe52b557da36c74421c10e980455293073dbb5facd25ac3ff61951",
+  "memory_id_field": "编号"
+}

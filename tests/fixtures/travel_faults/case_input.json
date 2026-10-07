@@ -1,0 +1,1603 @@
+{
+  "id": "train:0",
+  "corpus": [
+    {
+      "source": {
+        "kind": "reference_table",
+        "document_id": "train:0",
+        "location": "attractions/0/0"
+      },
+      "source_id": "6cbf59905fca1ea9bc8cc26f2d62a1c45b3d1d36943dfb0fa282beea007f7268",
+      "text": "Name  Latitude  Longitude                                                          Address          Phone                                                                 Website     City\n       Burpee Museum of Natural History 42.277324 -89.088142                           737 N Main St, Rockford, IL 61103, USA (815) 965-3433                                                  http://www.burpee.org/ Rockford\n                  Midway Village Museum 42.280499 -88.984640                        6799 Guilford Rd, Rockford, IL 61107, USA (815) 397-9112                                          https://www.midwayvillage.com/ Rockford\n                Discovery Center Museum 42.277105 -89.089430                           711 N Main St, Rockford, IL 61103, USA (815) 963-6769                                   http://www.discoverycentermuseum.org/ Rockford\nTinker Swiss Cottage Museum and Gardens 42.264110 -89.102796                             411 Kent St, Rockford, IL 61102, USA (815) 964-2424                                           http://www.tinkercottage.com/ Rockford\n              Anderson Japanese Gardens 42.290054 -89.057795                     318 Spring Creek Rd, Rockford, IL 61107, USA (815) 229-9390                                             http://andersongardens.org/ Rockford\n        Nicholas Conservatory & Gardens 42.282293 -89.070704                           1354 N 2nd St, Rockford, IL 61107, USA (815) 987-8858                                    http://www.nicholasconservatory.com/ Rockford\n                   Erlander Home Museum 42.264098 -89.088693                            404 S 3rd St, Rockford, IL 61104, USA (815) 963-5559                                       http://www.swedishhistorical.org/ Rockford\n                 Ethnic Heritage Museum 42.261100 -89.100915                          1129 S Main St, Rockford, IL 61101, USA (815) 962-7402                                   https://www.ethnicheritagemuseum.org/ Rockford\n                       Sinnissippi Park 42.282729 -89.064116                           1401 N 2nd St, Rockford, IL 61107, USA (815) 987-8858                                     http://rockfordparkdistrict.org/ncg Rockford\n       Klehm Arboretum & Botanic Garden 42.244452 -89.112540                          2715 S Main St, Rockford, IL 61102, USA (815) 965-8146                                                   http://www.klehm.org/ Rockford\n         Davis Park at Founders Landing 42.268250 -89.095379                          320 S Wyman St, Rockford, IL 61101, USA (815) 968-5600 https://www.gorockford.com/listings/davis-park-at-founders-landing/275/ Rockford\n     Frank Lloyd Wright's Laurent House 42.299833 -89.024362                    4646 Spring Brook Rd, Rockford, IL 61114, USA (815) 877-2952                                            http://www.laurenthouse.com/ Rockford\n                    Sinnissippi Gardens 42.284031 -89.067901                           1354 N 2nd St, Rockford, IL 61107, USA (815) 987-8858                                       https://nicholasconservatory.com/ Rockford\n                 Riverfront Museum Park 42.276843 -89.088859                    Ste 3, 711 N Main St, Rockford, IL 61103, USA (815) 962-0105                                                                 Unknown Rockford\n                            Searls Park 42.300685 -89.124144                         4950 Safford Rd, Rockford, IL 61101, USA (815) 987-8800                                        http://rockfordparkdistrict.org/ Rockford\n                      La Paloma Gardens 42.293671 -89.034617                       3622 Brookview Rd, Rockford, IL 61107, USA (815) 399-0324                                         http://www.lapalomagardens.com/ Rockford\n                 Rockford Park District 42.268422 -89.097234                           401 S Main St, Rockford, IL 61101, USA (815) 987-8800                                       https://rockfordparkdistrict.org/ Rockford\n                            Aldeen Park 42.274060 -89.022769                         623 N Alpine Rd, Rockford, IL 61107, USA        Unknown                                   https://www.rockfordparkdistrict.org/ Rockford\n      Blackhawk Springs Forest Preserve 42.204694 -88.991636 5360 Mulford Road &, 5801 Perryville Rd, Rockford, IL 61109, USA (815) 877-6100                 http://winnebagoforest.org/preserves/blackhawk-springs/ Rockford",
+      "metadata": {
+        "table": "attractions",
+        "scope": "per_request_reference"
+      }
+    },
+    {
+      "source": {
+        "kind": "reference_table",
+        "document_id": "train:0",
+        "location": "attractions/1/1"
+      },
+      "source_id": "6f83425ed9dad9392a76e67bc748de95fd4f2803b3b0dc12dd4c75fe8c44e87d",
+      "text": "Name  Latitude  Longitude                                                          Address          Phone                                                                 Website     City\n              Ingersoll Centennial Park 42.266298 -89.091439                            315 S 1st St, Rockford, IL 61104, USA (815) 987-8800                                        http://rockfordparkdistrict.org/ Rockford",
+      "metadata": {
+        "table": "attractions",
+        "scope": "per_request_reference"
+      }
+    },
+    {
+      "source": {
+        "kind": "reference_table",
+        "document_id": "train:0",
+        "location": "restaurants/2/0"
+      },
+      "source_id": "96b276d23b82eeceb513019016fd743d13c0bdf4e8598b2bc97d17390b8aea66",
+      "text": "Name  Average Cost                                            Cuisines  Aggregate Rating      City\n39                                   Coco Bambu            72                      Tea, French, Bakery, BBQ, Cafe               4.9  Rockford\n251                                Flying Mango            20                              American, BBQ, Seafood               4.5  Rockford\n2470                           Gajalee Sea Food            49                                         Bakery, BBQ               3.9  Rockford\n2861                 Shree Balaji Chaat Bhandar            97                        French, Bakery, BBQ, Italian               3.2  Rockford\n3052                              Moets Arabica            43                      Tea, Bakery, Indian, Fast Food               3.5  Rockford\n3163                            Cafe Coffee Day            28       Chinese, Desserts, Pizza, Cafe, Mediterranean               0.0  Rockford\n3700                                Nutri Punch            34                        Tea, Chinese, Cafe, Desserts               4.0  Rockford\n4319                              Cafe Southall            56                     Seafood, Pizza, Cafe, Fast Food               4.2  Rockford\n4348  Eggspectation - Jaypee Vasant Continental            77                         Tea, Mediterranean, Seafood               3.6  Rockford\n4542                           Aroma Rest O Bar            58       Bakery, Fast Food, Chinese, American, Seafood               3.6  Rockford\n4735                             Advance Bakery           100  Desserts, Pizza, Mexican, Bakery, Chinese, Seafood               2.9  Rockford\n4789                                Dial A Cake            29             Cafe, American, Mediterranean, Desserts               0.0  Rockford\n5309                                     U Like            32                               Tea, French, Desserts               0.0  Rockford\n5459                                     Subway            42                                 Tea, Chinese, Pizza               3.4  Rockford\n5661                      Aggarwal Sweet Centre            81                Desserts, Tea, Italian, Bakery, Cafe               0.0  Rockford\n6078                     Aggarwal Sweets Centre            73                    Fast Food, Chinese, BBQ, Italian               0.0  Rockford\n6313      Giri Momos Centre & Chinese Fast Food            44                               Cafe, Indian, Seafood               2.4  Rockford\n6388       Mr. Confectioner - Pride Plaza Hotel            74                                    Bakery, Desserts               0.0  Rockford\n6507                                    Faaso's            98                           Bakery, Desserts, Seafood               0.0  Rockford\n6796            Hangchuaa's Chinese Food Corner            64                                   Tea, BBQ, Seafood               3.1  Rockford\n7295         Grappa - Shangri-La's - Eros Hotel            21                           Bakery, Desserts, Italian               3.4  Rockford\n7955                        New Bhappe Di Hatti            76                    Seafood, Mexican, BBQ, Fast Food               0.0  Rockford\n8095                             Dunkin' Donuts            24                          Cafe, Bakery, BBQ, Seafood               0.0  Rockford\n8455                                     Subway            26                        Bakery, Pizza, BBQ, Desserts               3.8  Rockford\n8821                          The Gourmet Shack            77                       Tea, Pizza, Indian, Fast Food               3.3  Rockford\n8844                                Mirchievous            64                      American, Indian, BBQ, Seafood               3.1  Rockford\n9340                                 Chaophraya            74                      Chinese, Pizza, Cafe, Desserts               3.9  Rockford",
+      "metadata": {
+        "table": "restaurants",
+        "scope": "per_request_reference"
+      }
+    },
+    {
+      "source": {
+        "kind": "reference_table",
+        "document_id": "train:0",
+        "location": "accommodations/3/0"
+      },
+      "source_id": "b5e0781090cbf6c3f47fd45ea2517d40b972a6ed027015106cf2a2548c9463e6",
+      "text": "NAME  price       room type                                  house_rules  minimum nights  maximum occupancy  review rate number     city\n                     Spacious 3BDR Prime Location! 1030.0 Entire home/apt                                   No smoking             2.0                  9                 2.0 Rockford\n                Private Room in a two bedroom apt.  210.0    Private room                     No visitors & No smoking             1.0                  2                 4.0 Rockford\n              Private rooms And Matchless Location 1075.0    Private room                         No pets & No parties             2.0                  2                 2.0 Rockford\nPark Side Zen Home - Terrace & next to CentralPark  250.0 Entire home/apt                         No children under 10             3.0                  3                 3.0 Rockford\n        Lux 2 Bedroom NYC Apt on the Hudson River!  737.0 Entire home/apt                                   No smoking            30.0                  4                 5.0 Rockford\n             Modern 1-bedroom apartment in Fordham  377.0 Entire home/apt                                      No pets             7.0                  2                 5.0 Rockford\n                       Private bedroom in BedStuy! 1107.0    Private room                                   No smoking            10.0                  1                 4.0 Rockford\n   Pure luxury one bdrm + sofa bed on Central Park  243.0 Entire home/apt                      No smoking & No parties             2.0                  3                 3.0 Rockford\n           Charming studio in the heart of Astoria  519.0 Entire home/apt                                   No parties             4.0                  4                 4.0 Rockford\n                             The heart of Brooklyn  154.0 Entire home/apt No children under 10 & No visitors & No pets            30.0                  3                 2.0 Rockford\n           Private Stuyvesant Bedroom Madison 1R-2  395.0    Private room            No parties & No children under 10            30.0                  2                 3.0 Rockford\n Sunny big bedroom in lively Brooklyn neighborhood  440.0    Private room                         No pets & No smoking            14.0                  2                 3.0 Rockford\n    Midtown 2 Bed United Nations Loc, Full Kitchen  245.0 Entire home/apt                                  No visitors             3.0                  3                 4.0 Rockford",
+      "metadata": {
+        "table": "accommodations",
+        "scope": "per_request_reference"
+      }
+    },
+    {
+      "source": {
+        "kind": "reference_table",
+        "document_id": "train:0",
+        "location": "flights/4/0"
+      },
+      "source_id": "55981b7425ab426b2e462f8c9ebebb6f761968939e190b0edf83df2b98c0fa17",
+      "text": "Flight Number  Price DepTime ArrTime  ActualElapsedTime FlightDate OriginCityName DestCityName  Distance\n     F3573659    474   15:40   17:04 2 hours 24 minutes 2022-03-16 St. Petersburg     Rockford    1049.0",
+      "metadata": {
+        "table": "flights",
+        "scope": "per_request_reference"
+      }
+    },
+    {
+      "source": {
+        "kind": "reference_table",
+        "document_id": "train:0",
+        "location": "flights/5/0"
+      },
+      "source_id": "a7ecd86878bf5c3fc73d271c58347b2f3b091c8043b6a622614bba1ab5f723e1",
+      "text": "Flight Number  Price DepTime ArrTime  ActualElapsedTime FlightDate OriginCityName   DestCityName  Distance\n     F3573120    346   19:00   22:43 2 hours 43 minutes 2022-03-18       Rockford St. Petersburg    1049.0",
+      "metadata": {
+        "table": "flights",
+        "scope": "per_request_reference"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "background/citySet_with_states.txt:55"
+      },
+      "source_id": "6de1d4f3f8965ff5bf7ab26f794fd25108148f3988c5d4d422635984a31aa52f",
+      "text": "{\"city\": \"St. Petersburg\", \"state\": \"Saint Petersburg\"}",
+      "metadata": {
+        "table": "cities",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "background/citySet_with_states.txt:230"
+      },
+      "source_id": "e60f6c46a25b8ef4db748eef303bed819deba22b021f3c1417e965e25ccb30a5",
+      "text": "{\"city\": \"Rockford\", \"state\": \"Illinois\"}",
+      "metadata": {
+        "table": "cities",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "restaurants/clean_restaurant_2022.csv:41"
+      },
+      "source_id": "efd757a1c9deddfc34227cd5f3cee05e287b7c7cdfd91103936fdf74e299e5ce",
+      "text": "{\"Name\": \"Coco Bambu\", \"City\": \"Rockford\", \"Cuisines\": \"Tea, French, Bakery, BBQ, Cafe\", \"Average Cost\": \"72\", \"Aggregate Rating\": \"4.9\"}",
+      "metadata": {
+        "table": "restaurants",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "restaurants/clean_restaurant_2022.csv:253"
+      },
+      "source_id": "4a304657ea81ee585ed4e2201e8c3855839ce2172b6bfad1fd1dd8af637ef1fb",
+      "text": "{\"Name\": \"Flying Mango\", \"City\": \"Rockford\", \"Cuisines\": \"American, BBQ, Seafood\", \"Average Cost\": \"20\", \"Aggregate Rating\": \"4.5\"}",
+      "metadata": {
+        "table": "restaurants",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "restaurants/clean_restaurant_2022.csv:622"
+      },
+      "source_id": "97e734c8a347aec6e2f81f10655673ad0bd1d7b8f9db65f43fae316954e7bc94",
+      "text": "{\"Name\": \"Applebee's\", \"City\": \"St. Petersburg\", \"Cuisines\": \"Desserts, Tea, Pizza, French, Cafe\", \"Average Cost\": \"62\", \"Aggregate Rating\": \"4.1\"}",
+      "metadata": {
+        "table": "restaurants",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "restaurants/clean_restaurant_2022.csv:648"
+      },
+      "source_id": "3c2edd782c4ce72c73b6b65e6705d300facc2bb3b552cde8cd1de8d811d7656b",
+      "text": "{\"Name\": \"Huber & Holly\", \"City\": \"St. Petersburg\", \"Cuisines\": \"Cafe, Mexican, Bakery, Chinese, Seafood\", \"Average Cost\": \"62\", \"Aggregate Rating\": \"4.5\"}",
+      "metadata": {
+        "table": "restaurants",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "restaurants/clean_restaurant_2022.csv:1547"
+      },
+      "source_id": "fc1812ef0461a7840913fdceb4b36bf82170be319f3f7b579cf6693ea9ac9c6e",
+      "text": "{\"Name\": \"Doughlicious\", \"City\": \"St. Petersburg\", \"Cuisines\": \"Tea, Pizza, French, Cafe, Mediterranean, Seafood\", \"Average Cost\": \"26\", \"Aggregate Rating\": \"3.6\"}",
+      "metadata": {
+        "table": "restaurants",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "restaurants/clean_restaurant_2022.csv:2334"
+      },
+      "source_id": "3ff26a302ba9e6f60985fc3c9eafcf1b50d9ceccea4dc9352f5ea8054ec3a0d7",
+      "text": "{\"Name\": \"Just My Bakes\", \"City\": \"St. Petersburg\", \"Cuisines\": \"Pizza, BBQ, Desserts, Seafood\", \"Average Cost\": \"96\", \"Aggregate Rating\": \"3.9\"}",
+      "metadata": {
+        "table": "restaurants",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "restaurants/clean_restaurant_2022.csv:2449"
+      },
+      "source_id": "7728784bafa944c766fb79427ae20bb085d10696ac47b58191ff8cef2e3ab865",
+      "text": "{\"Name\": \"Kitchen At 95 - Hyatt Regency\", \"City\": \"St. Petersburg\", \"Cuisines\": \"Cafe, Desserts, Seafood\", \"Average Cost\": \"14\", \"Aggregate Rating\": \"4.3\"}",
+      "metadata": {
+        "table": "restaurants",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "restaurants/clean_restaurant_2022.csv:2472"
+      },
+      "source_id": "0b316cae11e0c0b1c05d0941c8b45ab7e03b63bef714f8c640ad4a05b6e146aa",
+      "text": "{\"Name\": \"Gajalee Sea Food\", \"City\": \"Rockford\", \"Cuisines\": \"Bakery, BBQ\", \"Average Cost\": \"49\", \"Aggregate Rating\": \"3.9\"}",
+      "metadata": {
+        "table": "restaurants",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "restaurants/clean_restaurant_2022.csv:2680"
+      },
+      "source_id": "416309870ecf784b2230fc55ac9f1c350828d9227489ac1761747036e8ec2812",
+      "text": "{\"Name\": \"Juniper Bar - Andaz Delhi\", \"City\": \"St. Petersburg\", \"Cuisines\": \"Tea, Pizza, Italian, Bakery, Cafe, Mediterranean\", \"Average Cost\": \"81\", \"Aggregate Rating\": \"3.0\"}",
+      "metadata": {
+        "table": "restaurants",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "restaurants/clean_restaurant_2022.csv:2772"
+      },
+      "source_id": "68df5a5b85752c27f3094ff079f9e8d8f9c53a741199654d1e7d6e63cfc5e490",
+      "text": "{\"Name\": \"Domino's Pizza\", \"City\": \"St. Petersburg\", \"Cuisines\": \"Tea, Seafood, Fast Food, Italian\", \"Average Cost\": \"76\", \"Aggregate Rating\": \"3.3\"}",
+      "metadata": {
+        "table": "restaurants",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "restaurants/clean_restaurant_2022.csv:2863"
+      },
+      "source_id": "f137a38f283f83089e06c158ef85cf30e0f29a48974c9a1c3227b6d04983f3e9",
+      "text": "{\"Name\": \"Shree Balaji Chaat Bhandar\", \"City\": \"Rockford\", \"Cuisines\": \"French, Bakery, BBQ, Italian\", \"Average Cost\": \"97\", \"Aggregate Rating\": \"3.2\"}",
+      "metadata": {
+        "table": "restaurants",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "restaurants/clean_restaurant_2022.csv:2975"
+      },
+      "source_id": "153e590c8f37f42341f561d4c90b647c1a8b01399e6b133d7f4bb9dab050250b",
+      "text": "{\"Name\": \"Hind Bakery & Chinese Fast Food\", \"City\": \"St. Petersburg\", \"Cuisines\": \"Pizza, BBQ, Fast Food, Chinese, Mediterranean, Seafood\", \"Average Cost\": \"94\", \"Aggregate Rating\": \"0.0\"}",
+      "metadata": {
+        "table": "restaurants",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "restaurants/clean_restaurant_2022.csv:3054"
+      },
+      "source_id": "2a48dd2fba22903d9b2537edfb0c72f35ab07ebef870d0a6c7805ebed0c61756",
+      "text": "{\"Name\": \"Moets Arabica\", \"City\": \"Rockford\", \"Cuisines\": \"Tea, Bakery, Indian, Fast Food\", \"Average Cost\": \"43\", \"Aggregate Rating\": \"3.5\"}",
+      "metadata": {
+        "table": "restaurants",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "restaurants/clean_restaurant_2022.csv:3077"
+      },
+      "source_id": "01f3d4f1a377400afb8ac1982d9f24458306f9f39c8a379c1b3c67956fdd7882",
+      "text": "{\"Name\": \"Tamasha\", \"City\": \"St. Petersburg\", \"Cuisines\": \"Tea, French, Bakery\", \"Average Cost\": \"52\", \"Aggregate Rating\": \"3.7\"}",
+      "metadata": {
+        "table": "restaurants",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "restaurants/clean_restaurant_2022.csv:3165"
+      },
+      "source_id": "b3bb255fc774c04be869ace3e20d172cc10f1b56377d91bf35281ad05d94f00b",
+      "text": "{\"Name\": \"Cafe Coffee Day\", \"City\": \"Rockford\", \"Cuisines\": \"Chinese, Desserts, Pizza, Cafe, Mediterranean\", \"Average Cost\": \"28\", \"Aggregate Rating\": \"0.0\"}",
+      "metadata": {
+        "table": "restaurants",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "restaurants/clean_restaurant_2022.csv:3499"
+      },
+      "source_id": "42b10c45ed7bd32c6a00568f64ba32c177fabe2eddf6ad89cb4bde503960465d",
+      "text": "{\"Name\": \"Delhi Pizza Corner\", \"City\": \"St. Petersburg\", \"Cuisines\": \"Tea, Desserts\", \"Average Cost\": \"28\", \"Aggregate Rating\": \"0.0\"}",
+      "metadata": {
+        "table": "restaurants",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "restaurants/clean_restaurant_2022.csv:3702"
+      },
+      "source_id": "f49ddec47e37a2099157f28388276acfc361f4e40211b3aab04ed5a34ee6dc4e",
+      "text": "{\"Name\": \"Nutri Punch\", \"City\": \"Rockford\", \"Cuisines\": \"Tea, Chinese, Cafe, Desserts\", \"Average Cost\": \"34\", \"Aggregate Rating\": \"4.0\"}",
+      "metadata": {
+        "table": "restaurants",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "restaurants/clean_restaurant_2022.csv:4321"
+      },
+      "source_id": "7e39fe516f1c64c23f73afee6bbd28026a0574d3ee4cb25223032c9de3cab082",
+      "text": "{\"Name\": \"Cafe Southall\", \"City\": \"Rockford\", \"Cuisines\": \"Seafood, Pizza, Cafe, Fast Food\", \"Average Cost\": \"56\", \"Aggregate Rating\": \"4.2\"}",
+      "metadata": {
+        "table": "restaurants",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "restaurants/clean_restaurant_2022.csv:4350"
+      },
+      "source_id": "57279cfab1f5a971c000fa93b4010d2268af6f0ea0219aca246d9b0e419a7306",
+      "text": "{\"Name\": \"Eggspectation - Jaypee Vasant Continental\", \"City\": \"Rockford\", \"Cuisines\": \"Tea, Mediterranean, Seafood\", \"Average Cost\": \"77\", \"Aggregate Rating\": \"3.6\"}",
+      "metadata": {
+        "table": "restaurants",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "restaurants/clean_restaurant_2022.csv:4400"
+      },
+      "source_id": "19316ea79b5604f5803b938ef431d55107a23c2ab163204c553f916c753e4bfc",
+      "text": "{\"Name\": \"Cafe Coffee Day\", \"City\": \"St. Petersburg\", \"Cuisines\": \"Tea, Desserts\", \"Average Cost\": \"16\", \"Aggregate Rating\": \"2.9\"}",
+      "metadata": {
+        "table": "restaurants",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "restaurants/clean_restaurant_2022.csv:4544"
+      },
+      "source_id": "0d580755a9de3c18d23779233f9c6541903c22a447abd9c88f02e6e34b095eb6",
+      "text": "{\"Name\": \"Aroma Rest O Bar\", \"City\": \"Rockford\", \"Cuisines\": \"Bakery, Fast Food, Chinese, American, Seafood\", \"Average Cost\": \"58\", \"Aggregate Rating\": \"3.6\"}",
+      "metadata": {
+        "table": "restaurants",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "restaurants/clean_restaurant_2022.csv:4735"
+      },
+      "source_id": "a67165c75bd86c18203b8e675c3e0159c51b227743526c2c8d64d8bd4bb5d6b9",
+      "text": "{\"Name\": \"Aapki Apni Rasoi\", \"City\": \"St. Petersburg\", \"Cuisines\": \"French, Pizza, Indian, BBQ\", \"Average Cost\": \"20\", \"Aggregate Rating\": \"2.9\"}",
+      "metadata": {
+        "table": "restaurants",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "restaurants/clean_restaurant_2022.csv:4737"
+      },
+      "source_id": "772999e4710ed141e193f2fb9bad0ed974f840cdc81fbcb3bbaeecc9d18c61ab",
+      "text": "{\"Name\": \"Advance Bakery\", \"City\": \"Rockford\", \"Cuisines\": \"Desserts, Pizza, Mexican, Bakery, Chinese, Seafood\", \"Average Cost\": \"100\", \"Aggregate Rating\": \"2.9\"}",
+      "metadata": {
+        "table": "restaurants",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "restaurants/clean_restaurant_2022.csv:4773"
+      },
+      "source_id": "add7925d9a2fb7c24f7501a159ccef930422835c81adb9a5e08a584ba55e2266",
+      "text": "{\"Name\": \"Super Snacks\", \"City\": \"St. Petersburg\", \"Cuisines\": \"Pizza, Italian, French, BBQ, Cafe, Seafood\", \"Average Cost\": \"72\", \"Aggregate Rating\": \"3.1\"}",
+      "metadata": {
+        "table": "restaurants",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "restaurants/clean_restaurant_2022.csv:4791"
+      },
+      "source_id": "4422714ceb024c005aab840ab486b285328e62a2e05bceb85035351491f0478f",
+      "text": "{\"Name\": \"Dial A Cake\", \"City\": \"Rockford\", \"Cuisines\": \"Cafe, American, Mediterranean, Desserts\", \"Average Cost\": \"29\", \"Aggregate Rating\": \"0.0\"}",
+      "metadata": {
+        "table": "restaurants",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "restaurants/clean_restaurant_2022.csv:4831"
+      },
+      "source_id": "4fad73e791d4ba957032902abae8f56a06344e931e7110882e0f76f3cb851ade",
+      "text": "{\"Name\": \"Sethi's Restaurant\", \"City\": \"St. Petersburg\", \"Cuisines\": \"French, Mexican, Pizza, BBQ\", \"Average Cost\": \"86\", \"Aggregate Rating\": \"3.4\"}",
+      "metadata": {
+        "table": "restaurants",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "restaurants/clean_restaurant_2022.csv:5311"
+      },
+      "source_id": "4078677963b96c82b78cb3975c522f5b44cec4704aabead1679846f7292311eb",
+      "text": "{\"Name\": \"U Like\", \"City\": \"Rockford\", \"Cuisines\": \"Tea, French, Desserts\", \"Average Cost\": \"32\", \"Aggregate Rating\": \"0.0\"}",
+      "metadata": {
+        "table": "restaurants",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "restaurants/clean_restaurant_2022.csv:5457"
+      },
+      "source_id": "b3b4a903baf88da72a1c57f9548d920cf85d85e306cb799268c6bf3909ae6af0",
+      "text": "{\"Name\": \"Keventers\", \"City\": \"St. Petersburg\", \"Cuisines\": \"Tea, Bakery, Mediterranean, Fast Food\", \"Average Cost\": \"43\", \"Aggregate Rating\": \"3.1\"}",
+      "metadata": {
+        "table": "restaurants",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "restaurants/clean_restaurant_2022.csv:5461"
+      },
+      "source_id": "a2955cfb6f4a27886e145231709262cbe2bc1ff24d86c5e239a7fe6216ac04c1",
+      "text": "{\"Name\": \"Subway\", \"City\": \"Rockford\", \"Cuisines\": \"Tea, Chinese, Pizza\", \"Average Cost\": \"42\", \"Aggregate Rating\": \"3.4\"}",
+      "metadata": {
+        "table": "restaurants",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "restaurants/clean_restaurant_2022.csv:5663"
+      },
+      "source_id": "56be937bc9fb4a8e4247d2bcfd404008f8e85abd8b89b27118e0efcf2c26f6ab",
+      "text": "{\"Name\": \"Aggarwal Sweet Centre\", \"City\": \"Rockford\", \"Cuisines\": \"Desserts, Tea, Italian, Bakery, Cafe\", \"Average Cost\": \"81\", \"Aggregate Rating\": \"0.0\"}",
+      "metadata": {
+        "table": "restaurants",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "restaurants/clean_restaurant_2022.csv:6080"
+      },
+      "source_id": "9d337fcd09db66e6b9fea72229960551557f0bf6123fd1a9dc19cdc31c6b26fe",
+      "text": "{\"Name\": \"Aggarwal Sweets Centre\", \"City\": \"Rockford\", \"Cuisines\": \"Fast Food, Chinese, BBQ, Italian\", \"Average Cost\": \"73\", \"Aggregate Rating\": \"0.0\"}",
+      "metadata": {
+        "table": "restaurants",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "restaurants/clean_restaurant_2022.csv:6302"
+      },
+      "source_id": "cfe1626fed05e787ed441dc1ee5d5631bf11b91b0e208b2def06e3f0d455cb65",
+      "text": "{\"Name\": \"Republic Of Food Lovers\", \"City\": \"St. Petersburg\", \"Cuisines\": \"Desserts, Pizza, French, BBQ, Bakery\", \"Average Cost\": \"76\", \"Aggregate Rating\": \"3.6\"}",
+      "metadata": {
+        "table": "restaurants",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "restaurants/clean_restaurant_2022.csv:6315"
+      },
+      "source_id": "8173107ac5c0e70b726a880f674736659975f0b6f089d8c8df84ea22e93c0ab9",
+      "text": "{\"Name\": \"Giri Momos Centre & Chinese Fast Food\", \"City\": \"Rockford\", \"Cuisines\": \"Cafe, Indian, Seafood\", \"Average Cost\": \"44\", \"Aggregate Rating\": \"2.4\"}",
+      "metadata": {
+        "table": "restaurants",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "restaurants/clean_restaurant_2022.csv:6390"
+      },
+      "source_id": "26cbeabbc9a263b649c337c680f9aefb720be8f9eca1c01f8efb8af9ed9ccb35",
+      "text": "{\"Name\": \"Mr. Confectioner - Pride Plaza Hotel\", \"City\": \"Rockford\", \"Cuisines\": \"Bakery, Desserts\", \"Average Cost\": \"74\", \"Aggregate Rating\": \"0.0\"}",
+      "metadata": {
+        "table": "restaurants",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "restaurants/clean_restaurant_2022.csv:6509"
+      },
+      "source_id": "aec29efa62186273d64a92ffbf3051fefe8a1b753ccb80c88123ebf63159ac9b",
+      "text": "{\"Name\": \"Faaso's\", \"City\": \"Rockford\", \"Cuisines\": \"Bakery, Desserts, Seafood\", \"Average Cost\": \"98\", \"Aggregate Rating\": \"0.0\"}",
+      "metadata": {
+        "table": "restaurants",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "restaurants/clean_restaurant_2022.csv:6798"
+      },
+      "source_id": "9ae65ac60b691b723b4f125b198c1080e2ab22d353ed98b4164c194233cbe720",
+      "text": "{\"Name\": \"Hangchuaa's Chinese Food Corner\", \"City\": \"Rockford\", \"Cuisines\": \"Tea, BBQ, Seafood\", \"Average Cost\": \"64\", \"Aggregate Rating\": \"3.1\"}",
+      "metadata": {
+        "table": "restaurants",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "restaurants/clean_restaurant_2022.csv:7285"
+      },
+      "source_id": "9d4b6613bdf118ef075b4108a4671291cb1344a7c52cc81b1e3e8829b5fca06b",
+      "text": "{\"Name\": \"Madras Dosa & Chinese\", \"City\": \"St. Petersburg\", \"Cuisines\": \"Pizza, Indian, BBQ, Italian\", \"Average Cost\": \"15\", \"Aggregate Rating\": \"0.0\"}",
+      "metadata": {
+        "table": "restaurants",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "restaurants/clean_restaurant_2022.csv:7297"
+      },
+      "source_id": "9a2106bed5b6b347e897601bf1830f3c13f36d36b225bb84bc2924a84530a797",
+      "text": "{\"Name\": \"Grappa - Shangri-La's - Eros Hotel\", \"City\": \"Rockford\", \"Cuisines\": \"Bakery, Desserts, Italian\", \"Average Cost\": \"21\", \"Aggregate Rating\": \"3.4\"}",
+      "metadata": {
+        "table": "restaurants",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "restaurants/clean_restaurant_2022.csv:7711"
+      },
+      "source_id": "345afd14b4b74a26238f33b3f1930217553476374f39dfc5b20f4c063ec979c5",
+      "text": "{\"Name\": \"Sagar Ratna\", \"City\": \"St. Petersburg\", \"Cuisines\": \"Pizza, Indian, BBQ\", \"Average Cost\": \"87\", \"Aggregate Rating\": \"2.8\"}",
+      "metadata": {
+        "table": "restaurants",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "restaurants/clean_restaurant_2022.csv:7957"
+      },
+      "source_id": "714e6df3ff9abd13f15a9f46c59e969956f9832f0b930a42cb4796fd2ef4b41a",
+      "text": "{\"Name\": \"New Bhappe Di Hatti\", \"City\": \"Rockford\", \"Cuisines\": \"Seafood, Mexican, BBQ, Fast Food\", \"Average Cost\": \"76\", \"Aggregate Rating\": \"0.0\"}",
+      "metadata": {
+        "table": "restaurants",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "restaurants/clean_restaurant_2022.csv:8097"
+      },
+      "source_id": "bf26e455c4fc0054922b3d768f2879552a47d9475a3fa201e32779994aac3b07",
+      "text": "{\"Name\": \"Dunkin' Donuts\", \"City\": \"Rockford\", \"Cuisines\": \"Cafe, Bakery, BBQ, Seafood\", \"Average Cost\": \"24\", \"Aggregate Rating\": \"0.0\"}",
+      "metadata": {
+        "table": "restaurants",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "restaurants/clean_restaurant_2022.csv:8457"
+      },
+      "source_id": "2dc861af0ad828d6a8e39ec67e75db1c2f5e6f4f7afecb9ee4f756f21ad55409",
+      "text": "{\"Name\": \"Subway\", \"City\": \"Rockford\", \"Cuisines\": \"Bakery, Pizza, BBQ, Desserts\", \"Average Cost\": \"26\", \"Aggregate Rating\": \"3.8\"}",
+      "metadata": {
+        "table": "restaurants",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "restaurants/clean_restaurant_2022.csv:8823"
+      },
+      "source_id": "5ba3a5b330c591ae09f4ac54f2e1838174ab369f7dc26d16bb2335702059dae4",
+      "text": "{\"Name\": \"The Gourmet Shack\", \"City\": \"Rockford\", \"Cuisines\": \"Tea, Pizza, Indian, Fast Food\", \"Average Cost\": \"77\", \"Aggregate Rating\": \"3.3\"}",
+      "metadata": {
+        "table": "restaurants",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "restaurants/clean_restaurant_2022.csv:8846"
+      },
+      "source_id": "39ecabaf2b1591f1f0be1a056c7907edc9794d7ba79b4f4ad5d603059d973d0a",
+      "text": "{\"Name\": \"Mirchievous\", \"City\": \"Rockford\", \"Cuisines\": \"American, Indian, BBQ, Seafood\", \"Average Cost\": \"64\", \"Aggregate Rating\": \"3.1\"}",
+      "metadata": {
+        "table": "restaurants",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "restaurants/clean_restaurant_2022.csv:9114"
+      },
+      "source_id": "51a136577d3b23e6c0d62f0969531d99991b6d49c4141bb2f6f3e87feff368aa",
+      "text": "{\"Name\": \"The Grand\", \"City\": \"St. Petersburg\", \"Cuisines\": \"Cafe, American, Seafood, Fast Food\", \"Average Cost\": \"70\", \"Aggregate Rating\": \"0.0\"}",
+      "metadata": {
+        "table": "restaurants",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "restaurants/clean_restaurant_2022.csv:9342"
+      },
+      "source_id": "964f458f05d39b51762891c69205bffea1fc92ea98277e369d1fe00422b552ea",
+      "text": "{\"Name\": \"Chaophraya\", \"City\": \"Rockford\", \"Cuisines\": \"Chinese, Pizza, Cafe, Desserts\", \"Average Cost\": \"74\", \"Aggregate Rating\": \"3.9\"}",
+      "metadata": {
+        "table": "restaurants",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "accommodations/clean_accommodations_2022.csv:288"
+      },
+      "source_id": "489e46cae5b80588389d9bb1282c2019f25928f3af5342647a5fa8bf8aef7226",
+      "text": "{\"NAME\": \"Spacious 3BDR Prime Location!\", \"room type\": \"Entire home/apt\", \"price\": \"1030.0\", \"minimum nights\": \"2.0\", \"review rate number\": \"2.0\", \"house_rules\": \"No smoking\", \"maximum occupancy\": \"9\", \"city\": \"Rockford\"}",
+      "metadata": {
+        "table": "accommodations",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "accommodations/clean_accommodations_2022.csv:386"
+      },
+      "source_id": "9767b278682d2ed084216734171cb15d626a447e0040cb2bc40932b1fa1a7c42",
+      "text": "{\"NAME\": \"Magic Brooklyn townhouse room fit for a wizard\", \"room type\": \"Private room\", \"price\": \"624.0\", \"minimum nights\": \"1.0\", \"review rate number\": \"5.0\", \"house_rules\": \"No children under 10 & No parties\", \"maximum occupancy\": \"2\", \"city\": \"St. Petersburg\"}",
+      "metadata": {
+        "table": "accommodations",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "accommodations/clean_accommodations_2022.csv:460"
+      },
+      "source_id": "cc5c6626aa3a36c07eb7b35812f3c68b5333cc5d265127fc2bb0b9671fbc3f92",
+      "text": "{\"NAME\": \"Private Room in a two bedroom apt.\", \"room type\": \"Private room\", \"price\": \"210.0\", \"minimum nights\": \"1.0\", \"review rate number\": \"4.0\", \"house_rules\": \"No visitors & No smoking\", \"maximum occupancy\": \"2\", \"city\": \"Rockford\"}",
+      "metadata": {
+        "table": "accommodations",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "accommodations/clean_accommodations_2022.csv:516"
+      },
+      "source_id": "410704b48608c6cbe6ed6c49d7c7f4f43565cb1ff18a1ba8e7cc41502ab5224c",
+      "text": "{\"NAME\": \"Private rooms And Matchless Location\", \"room type\": \"Private room\", \"price\": \"1075.0\", \"minimum nights\": \"2.0\", \"review rate number\": \"2.0\", \"house_rules\": \"No pets & No parties\", \"maximum occupancy\": \"2\", \"city\": \"Rockford\"}",
+      "metadata": {
+        "table": "accommodations",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "accommodations/clean_accommodations_2022.csv:890"
+      },
+      "source_id": "0cc2ef8e0392c5d83a697e9db6846ca1d981b3807d4c5e5c31a677c617ebacbc",
+      "text": "{\"NAME\": \"Private  room in Manhattan NYC. Train a min away!\", \"room type\": \"Private room\", \"price\": \"135.0\", \"minimum nights\": \"1.0\", \"review rate number\": \"2.0\", \"house_rules\": \"No parties\", \"maximum occupancy\": \"2\", \"city\": \"St. Petersburg\"}",
+      "metadata": {
+        "table": "accommodations",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "accommodations/clean_accommodations_2022.csv:999"
+      },
+      "source_id": "684b8372f9311f845eff1c2e878fb062bb89d9d52f77fd60b5d3a09e1f5b7e4d",
+      "text": "{\"NAME\": \"Beautiful apartment in Gravesend(Girls share room)\", \"room type\": \"Shared room\", \"price\": \"230.0\", \"minimum nights\": \"7.0\", \"review rate number\": \"4.0\", \"house_rules\": \"No pets\", \"maximum occupancy\": \"1\", \"city\": \"St. Petersburg\"}",
+      "metadata": {
+        "table": "accommodations",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "accommodations/clean_accommodations_2022.csv:1319"
+      },
+      "source_id": "337fbcd579fdf3082979d89dd70d023fb73303703f6be93622c431432d273a53",
+      "text": "{\"NAME\": \"XLarge 1BR apartment in EastVillage\", \"room type\": \"Entire home/apt\", \"price\": \"675.0\", \"minimum nights\": \"5.0\", \"review rate number\": \"3.0\", \"house_rules\": \"No visitors & No parties\", \"maximum occupancy\": \"3\", \"city\": \"St. Petersburg\"}",
+      "metadata": {
+        "table": "accommodations",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "accommodations/clean_accommodations_2022.csv:1351"
+      },
+      "source_id": "780ffaacb8ca445360872ffbec865b861b42f7d9c131cab931bd67ad38be0397",
+      "text": "{\"NAME\": \"Park Side Zen Home - Terrace & next to CentralPark\", \"room type\": \"Entire home/apt\", \"price\": \"250.0\", \"minimum nights\": \"3.0\", \"review rate number\": \"3.0\", \"house_rules\": \"No children under 10\", \"maximum occupancy\": \"3\", \"city\": \"Rockford\"}",
+      "metadata": {
+        "table": "accommodations",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "accommodations/clean_accommodations_2022.csv:1428"
+      },
+      "source_id": "ab1da556c81648830ff81c0456c58fc66342f30fe2aa8dbd6d0bd4fc35633e0d",
+      "text": "{\"NAME\": \"Lux 2 Bedroom NYC Apt on the Hudson River!\", \"room type\": \"Entire home/apt\", \"price\": \"737.0\", \"minimum nights\": \"30.0\", \"review rate number\": \"5.0\", \"house_rules\": \"No smoking\", \"maximum occupancy\": \"4\", \"city\": \"Rockford\"}",
+      "metadata": {
+        "table": "accommodations",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "accommodations/clean_accommodations_2022.csv:1463"
+      },
+      "source_id": "3526798fcd8d6c2e0412b53877a81f878d0affdbdacb14503fd168f6c6c0a7e9",
+      "text": "{\"NAME\": \"Modern 1-bedroom apartment in Fordham\", \"room type\": \"Entire home/apt\", \"price\": \"377.0\", \"minimum nights\": \"7.0\", \"review rate number\": \"5.0\", \"house_rules\": \"No pets\", \"maximum occupancy\": \"2\", \"city\": \"Rockford\"}",
+      "metadata": {
+        "table": "accommodations",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "accommodations/clean_accommodations_2022.csv:1605"
+      },
+      "source_id": "c98ecf52a766231976a3dba8ec01ae3cf242155b4ed827fd2c1f75c6910a224f",
+      "text": "{\"NAME\": \"Harlem \\\"Hostel\\\" for Single Travelers\", \"room type\": \"Shared room\", \"price\": \"1199.0\", \"minimum nights\": \"2.0\", \"review rate number\": \"4.0\", \"house_rules\": \"No children under 10 & No pets\", \"maximum occupancy\": \"1\", \"city\": \"St. Petersburg\"}",
+      "metadata": {
+        "table": "accommodations",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "accommodations/clean_accommodations_2022.csv:1813"
+      },
+      "source_id": "a8dd8d40bddd395786993d22e4f93e7c147ce364aae4fcb24c2aa4b7253d1075",
+      "text": "{\"NAME\": \"Private bedroom in BedStuy!\", \"room type\": \"Private room\", \"price\": \"1107.0\", \"minimum nights\": \"10.0\", \"review rate number\": \"4.0\", \"house_rules\": \"No smoking\", \"maximum occupancy\": \"1\", \"city\": \"Rockford\"}",
+      "metadata": {
+        "table": "accommodations",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "accommodations/clean_accommodations_2022.csv:1843"
+      },
+      "source_id": "2ef629d65b48bd63bfe2951be1b036d211ebd05200a12080fe08d614c70f891c",
+      "text": "{\"NAME\": \"Pure luxury one bdrm + sofa bed on Central Park\", \"room type\": \"Entire home/apt\", \"price\": \"243.0\", \"minimum nights\": \"2.0\", \"review rate number\": \"3.0\", \"house_rules\": \"No smoking & No parties\", \"maximum occupancy\": \"3\", \"city\": \"Rockford\"}",
+      "metadata": {
+        "table": "accommodations",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "accommodations/clean_accommodations_2022.csv:2130"
+      },
+      "source_id": "6e461eaaf7d8b3ce2eb0921b78b679b0c1c21e4a31996ba6dca356d487cdc0c6",
+      "text": "{\"NAME\": \"Charming studio in the heart of Astoria\", \"room type\": \"Entire home/apt\", \"price\": \"519.0\", \"minimum nights\": \"4.0\", \"review rate number\": \"4.0\", \"house_rules\": \"No parties\", \"maximum occupancy\": \"4\", \"city\": \"Rockford\"}",
+      "metadata": {
+        "table": "accommodations",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "accommodations/clean_accommodations_2022.csv:2583"
+      },
+      "source_id": "a449096a98f6f021643b84a14a27e9ab39d96ccdf5800de983bbc0f488bfc643",
+      "text": "{\"NAME\": \"Harlem apt\", \"room type\": \"Private room\", \"price\": \"496.0\", \"minimum nights\": \"1.0\", \"review rate number\": \"4.0\", \"house_rules\": \"No children under 10 & No smoking & No pets\", \"maximum occupancy\": \"1\", \"city\": \"St. Petersburg\"}",
+      "metadata": {
+        "table": "accommodations",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "accommodations/clean_accommodations_2022.csv:2889"
+      },
+      "source_id": "4e32ba29df0ba304d2097c752bfcd120c9ad2f97d364972873e8c2e8f553a117",
+      "text": "{\"NAME\": \"Bright, airy loft in Bushwick's street art scene\", \"room type\": \"Entire home/apt\", \"price\": \"1038.0\", \"minimum nights\": \"4.0\", \"review rate number\": \"3.0\", \"house_rules\": \"No pets\", \"maximum occupancy\": \"8\", \"city\": \"St. Petersburg\"}",
+      "metadata": {
+        "table": "accommodations",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "accommodations/clean_accommodations_2022.csv:3025"
+      },
+      "source_id": "74bb5f36691d102f7fb63374e5109a76f95b27d8b78b372c439fc40bd300ea6f",
+      "text": "{\"NAME\": \"Spacious Private Bedroom in the heart of Bushwick!\", \"room type\": \"Private room\", \"price\": \"990.0\", \"minimum nights\": \"30.0\", \"review rate number\": \"5.0\", \"house_rules\": \"No parties & No children under 10\", \"maximum occupancy\": \"2\", \"city\": \"St. Petersburg\"}",
+      "metadata": {
+        "table": "accommodations",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "accommodations/clean_accommodations_2022.csv:3241"
+      },
+      "source_id": "ac4783d0dd8abdf1cab391756556a4b0b754d00ca275122f7a1fe6df01d9baf8",
+      "text": "{\"NAME\": \"The heart of Brooklyn\", \"room type\": \"Entire home/apt\", \"price\": \"154.0\", \"minimum nights\": \"30.0\", \"review rate number\": \"2.0\", \"house_rules\": \"No children under 10 & No visitors & No pets\", \"maximum occupancy\": \"3\", \"city\": \"Rockford\"}",
+      "metadata": {
+        "table": "accommodations",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "accommodations/clean_accommodations_2022.csv:3336"
+      },
+      "source_id": "b6461ea7c34ada6110afd8881427a9e8cb090e326b9f3faf4585e3d31fe785bf",
+      "text": "{\"NAME\": \"Large 3bd 2 bath duplex in prime Greenpoint!\", \"room type\": \"Entire home/apt\", \"price\": \"1049.0\", \"minimum nights\": \"2.0\", \"review rate number\": \"4.0\", \"house_rules\": \"No parties & No children under 10 & No visitors\", \"maximum occupancy\": \"7\", \"city\": \"St. Petersburg\"}",
+      "metadata": {
+        "table": "accommodations",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "accommodations/clean_accommodations_2022.csv:3758"
+      },
+      "source_id": "8f6a0fe5da9df7b47d1fd32ed1878a3b192f1be91cfddf01d5d80730464cdf6e",
+      "text": "{\"NAME\": \"Large Stylish 1.5 BR Noho/Nolita\", \"room type\": \"Entire home/apt\", \"price\": \"767.0\", \"minimum nights\": \"2.0\", \"review rate number\": \"3.0\", \"house_rules\": \"No children under 10\", \"maximum occupancy\": \"7\", \"city\": \"St. Petersburg\"}",
+      "metadata": {
+        "table": "accommodations",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "accommodations/clean_accommodations_2022.csv:3905"
+      },
+      "source_id": "02bbc853ed7c675540f161007331d0a7d8e2c613b4dfcb8bffb6cff460f7c70c",
+      "text": "{\"NAME\": \"HugeTropical Bedrm near Ferry\", \"room type\": \"Private room\", \"price\": \"67.0\", \"minimum nights\": \"1.0\", \"review rate number\": \"5.0\", \"house_rules\": \"No parties & No visitors\", \"maximum occupancy\": \"1\", \"city\": \"St. Petersburg\"}",
+      "metadata": {
+        "table": "accommodations",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "accommodations/clean_accommodations_2022.csv:4169"
+      },
+      "source_id": "01cf9d0e93c84372042550aa396061c852cdc8cf01d95c05c14d7c68757ca190",
+      "text": "{\"NAME\": \"Private Stuyvesant Bedroom Madison 1R-2\", \"room type\": \"Private room\", \"price\": \"395.0\", \"minimum nights\": \"30.0\", \"review rate number\": \"3.0\", \"house_rules\": \"No parties & No children under 10\", \"maximum occupancy\": \"2\", \"city\": \"Rockford\"}",
+      "metadata": {
+        "table": "accommodations",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "accommodations/clean_accommodations_2022.csv:4215"
+      },
+      "source_id": "0da2d781a7758cd0ec410a067f6721281a9db16e0f3145a6e237f471d07ba470",
+      "text": "{\"NAME\": \"Sunny big bedroom in lively Brooklyn neighborhood\", \"room type\": \"Private room\", \"price\": \"440.0\", \"minimum nights\": \"14.0\", \"review rate number\": \"3.0\", \"house_rules\": \"No pets & No smoking\", \"maximum occupancy\": \"2\", \"city\": \"Rockford\"}",
+      "metadata": {
+        "table": "accommodations",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "accommodations/clean_accommodations_2022.csv:4235"
+      },
+      "source_id": "a1b38e070339ac390c1782be699a1ecbbd95c890639e9faea7464ecbe72211a0",
+      "text": "{\"NAME\": \"Luxury loft 2bed 2bath Mulberry st\", \"room type\": \"Private room\", \"price\": \"526.0\", \"minimum nights\": \"31.0\", \"review rate number\": \"4.0\", \"house_rules\": \"No children under 10 & No parties\", \"maximum occupancy\": \"1\", \"city\": \"St. Petersburg\"}",
+      "metadata": {
+        "table": "accommodations",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "accommodations/clean_accommodations_2022.csv:4393"
+      },
+      "source_id": "47db153bd86c13c91a80d616d6280c967b1cf82f841385a61743f91c51415891",
+      "text": "{\"NAME\": \"Cherry Hill House - Blue Room\", \"room type\": \"Private room\", \"price\": \"1008.0\", \"minimum nights\": \"1.0\", \"review rate number\": \"1.0\", \"house_rules\": \"No smoking & No children under 10 & No pets\", \"maximum occupancy\": \"1\", \"city\": \"St. Petersburg\"}",
+      "metadata": {
+        "table": "accommodations",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "accommodations/clean_accommodations_2022.csv:4919"
+      },
+      "source_id": "1d22a7cb0134a00a1ae2e652e011697044098a73f8289f08fec3912aa129e78b",
+      "text": "{\"NAME\": \"Midtown 2 Bed United Nations Loc, Full Kitchen\", \"room type\": \"Entire home/apt\", \"price\": \"245.0\", \"minimum nights\": \"3.0\", \"review rate number\": \"4.0\", \"house_rules\": \"No visitors\", \"maximum occupancy\": \"3\", \"city\": \"Rockford\"}",
+      "metadata": {
+        "table": "accommodations",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "accommodations/clean_accommodations_2022.csv:4920"
+      },
+      "source_id": "737c6610a1defededf4ef6b50080784d9080028538d798066d7791d266e33055",
+      "text": "{\"NAME\": \"Bright mid-century brownstone apt\", \"room type\": \"Entire home/apt\", \"price\": \"902.0\", \"minimum nights\": \"2.0\", \"review rate number\": \"3.0\", \"house_rules\": \"No parties\", \"maximum occupancy\": \"2\", \"city\": \"St. Petersburg\"}",
+      "metadata": {
+        "table": "accommodations",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "attractions/attractions.csv:966"
+      },
+      "source_id": "3e4853a74564e492a20eafa2ab0abfbf1b157a2d440817a005b0ccc4c929b918",
+      "text": "{\"Name\": \"The Dalí (Salvador Dalí Museum)\", \"Latitude\": \"27.76590860000001\", \"Longitude\": \"-82.6315789\", \"Address\": \"1 Dali Blvd, St. Petersburg, FL 33701, USA\", \"Phone\": \"(727) 823-3767\", \"Website\": \"https://thedali.org/\", \"City\": \"St. Petersburg\"}",
+      "metadata": {
+        "table": "attractions",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "attractions/attractions.csv:967"
+      },
+      "source_id": "616f0c1a045ae178a07255b170b3742a3028bd0fed805ada71e0b200cf2ac6a2",
+      "text": "{\"Name\": \"Sunken Gardens\", \"Latitude\": \"27.7897718\", \"Longitude\": \"-82.6378269\", \"Address\": \"1825 4th St N, St. Petersburg, FL 33704, USA\", \"Phone\": \"(727) 551-3102\", \"Website\": \"http://www.stpete.org/sunken/\", \"City\": \"St. Petersburg\"}",
+      "metadata": {
+        "table": "attractions",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "attractions/attractions.csv:968"
+      },
+      "source_id": "fedac87a9a13b8bb815d42bf3d6f46797e32d1eec25b004054a6d493d6a375fb",
+      "text": "{\"Name\": \"St. Pete Pier\", \"Latitude\": \"27.7735842\", \"Longitude\": \"-82.63142069999999\", \"Address\": \"600 2nd Ave NE, St. Petersburg, FL 33701, USA\", \"Phone\": \"(727) 822-7437\", \"Website\": \"https://stpetepier.org/\", \"City\": \"St. Petersburg\"}",
+      "metadata": {
+        "table": "attractions",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "attractions/attractions.csv:969"
+      },
+      "source_id": "90a6a754b4f0cd1326c63ddab3abbed296a3ad5364ccba8e6375ad6dd05183e5",
+      "text": "{\"Name\": \"Vinoy Park\", \"Latitude\": \"27.7791003\", \"Longitude\": \"-82.62572399999999\", \"Address\": \"701 Bayshore Dr NE, St. Petersburg, FL 33701, USA\", \"Phone\": \"(727) 893-7441\", \"Website\": \"http://www.stpeteparksrec.org/vinoypark/\", \"City\": \"St. Petersburg\"}",
+      "metadata": {
+        "table": "attractions",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "attractions/attractions.csv:970"
+      },
+      "source_id": "1bad1d3028ea5e7b38df0d3c92764d77f3513c5f3aa361e282302bbde47b6f47",
+      "text": "{\"Name\": \"Museum of Fine Arts\", \"Latitude\": \"27.774421\", \"Longitude\": \"-82.63188400000001\", \"Address\": \"255 Beach Dr NE, St. Petersburg, FL 33701, USA\", \"Phone\": \"(727) 896-2667\", \"Website\": \"https://mfastpete.org/\", \"City\": \"St. Petersburg\"}",
+      "metadata": {
+        "table": "attractions",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "attractions/attractions.csv:971"
+      },
+      "source_id": "7359b3a5f198917366c753fa36447041bee01a4fda667d560f073f136aed5f49",
+      "text": "{\"Name\": \"Imagine Museum\", \"Latitude\": \"27.7712671\", \"Longitude\": \"-82.6593797\", \"Address\": \"1901 Central Ave, St. Petersburg, FL 33713, USA\", \"Phone\": \"(727) 300-1700\", \"Website\": \"https://www.imaginemuseum.com/\", \"City\": \"St. Petersburg\"}",
+      "metadata": {
+        "table": "attractions",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "attractions/attractions.csv:972"
+      },
+      "source_id": "601c959857c23d77e0fe7036edd48e5916ed0488249c29ad708d80f1ee9bea38",
+      "text": "{\"Name\": \"The Florida Holocaust Museum\", \"Latitude\": \"27.7705345\", \"Longitude\": \"-82.6406366\", \"Address\": \"55 5th St S, St. Petersburg, FL 33701, USA\", \"Phone\": \"(727) 820-0100\", \"Website\": \"http://www.thefhm.org/\", \"City\": \"St. Petersburg\"}",
+      "metadata": {
+        "table": "attractions",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "attractions/attractions.csv:973"
+      },
+      "source_id": "6ea0900d48d2a5e0a016af7c349c72970686ff1dd65365ba1b704a33df3d7b3d",
+      "text": "{\"Name\": \"The monument of Tadeusz Kosciuszko\", \"Latitude\": \"27.7732637\", \"Longitude\": \"-82.6373377\", \"Address\": \"128-198 3rd St N, St. Petersburg, FL 33701, USA\", \"Phone\": \"Unknown\", \"Website\": \"Unknown\", \"City\": \"St. Petersburg\"}",
+      "metadata": {
+        "table": "attractions",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "attractions/attractions.csv:974"
+      },
+      "source_id": "5bc8237548f9a65934bddf046a1ede62bd74a99362771c991914bec667a3c190",
+      "text": "{\"Name\": \"North Straub Park\", \"Latitude\": \"27.7759766\", \"Longitude\": \"-82.6312918\", \"Address\": \"400 Bayshore Dr NE, St. Petersburg, FL 33701, USA\", \"Phone\": \"(727) 893-7441\", \"Website\": \"http://www.stpeteparksrec.org/northstraubpark/\", \"City\": \"St. Petersburg\"}",
+      "metadata": {
+        "table": "attractions",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "attractions/attractions.csv:975"
+      },
+      "source_id": "0b79864eeddb9e02024c5876ecd77a418ee74fcaebbaa0a3aadb1399b6fc0884",
+      "text": "{\"Name\": \"Chihuly Collection\", \"Latitude\": \"27.771026\", \"Longitude\": \"-82.6440401\", \"Address\": \"720 Central Ave, St. Petersburg, FL 33701, USA\", \"Phone\": \"(727) 896-4527\", \"Website\": \"http://www.moreanartscenter.org/chihuly/\", \"City\": \"St. Petersburg\"}",
+      "metadata": {
+        "table": "attractions",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "attractions/attractions.csv:976"
+      },
+      "source_id": "9a230c87ad5ea8b1af70085b804dae7fd30b1bb9dedd8b8d19f707302d3601a5",
+      "text": "{\"Name\": \"Boyd Hill Nature Preserve\", \"Latitude\": \"27.7255753\", \"Longitude\": \"-82.64969649999999\", \"Address\": \"1101 Country Club Way S, St. Petersburg, FL 33705, USA\", \"Phone\": \"(727) 893-7326\", \"Website\": \"http://www.stpeteparksrec.org/boydhillpreserve/\", \"City\": \"St. Petersburg\"}",
+      "metadata": {
+        "table": "attractions",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "attractions/attractions.csv:977"
+      },
+      "source_id": "b991dd4093685af07e5d8a58fe9300163557ad150135c435f8e9772169c84202",
+      "text": "{\"Name\": \"St. Petersburg Museum of History\", \"Latitude\": \"27.77412099999999\", \"Longitude\": \"-82.6305801\", \"Address\": \"335 2nd Ave NE, St. Petersburg, FL 33701, USA\", \"Phone\": \"(727) 894-1052\", \"Website\": \"http://www.spmoh.org/\", \"City\": \"St. Petersburg\"}",
+      "metadata": {
+        "table": "attractions",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "attractions/attractions.csv:978"
+      },
+      "source_id": "54a6c412cb30ac1890aef2d2fcebdc4d4f7c89308d519789881599492310a5df",
+      "text": "{\"Name\": \"The James Museum of Western & Wildlife Art\", \"Latitude\": \"27.7710579\", \"Longitude\": \"-82.63478769999999\", \"Address\": \"150 Central Ave, St. Petersburg, FL 33701, USA\", \"Phone\": \"(727) 892-4200\", \"Website\": \"http://thejamesmuseum.org/\", \"City\": \"St. Petersburg\"}",
+      "metadata": {
+        "table": "attractions",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "attractions/attractions.csv:979"
+      },
+      "source_id": "2669aafd6b77ffeff4fbecd4efe4f0f61d029aa6cf5f2119c43a8430c8022d0f",
+      "text": "{\"Name\": \"St. Petersburg Sundial World’s Largest\", \"Latitude\": \"27.77370359999999\", \"Longitude\": \"-82.63478649999999\", \"Address\": \"101 2nd Ave N, St. Petersburg, FL 33701, USA\", \"Phone\": \"Unknown\", \"Website\": \"Unknown\", \"City\": \"St. Petersburg\"}",
+      "metadata": {
+        "table": "attractions",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "attractions/attractions.csv:980"
+      },
+      "source_id": "94762cc2fa2c656e8c308654a664955ac616995273735b558330a71436cf8d98",
+      "text": "{\"Name\": \"Albert Whitted Park\", \"Latitude\": \"27.76685239999999\", \"Longitude\": \"-82.6282864\", \"Address\": \"480 Bayshore Dr SE, St. Petersburg, FL 33701, USA\", \"Phone\": \"(727) 893-7441\", \"Website\": \"http://www.stpeteparksrec.org/albertwhittedpark/\", \"City\": \"St. Petersburg\"}",
+      "metadata": {
+        "table": "attractions",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "attractions/attractions.csv:981"
+      },
+      "source_id": "9b2fd2891b46a78b098d783dfecd831fbb0a63104885b754df2643b099504dba",
+      "text": "{\"Name\": \"Great Explorations Children's Museum\", \"Latitude\": \"27.7903628\", \"Longitude\": \"-82.6379247\", \"Address\": \"1925 4th St N, St. Petersburg, FL 33704, USA\", \"Phone\": \"(727) 821-8992\", \"Website\": \"http://greatex.org/\", \"City\": \"St. Petersburg\"}",
+      "metadata": {
+        "table": "attractions",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "attractions/attractions.csv:982"
+      },
+      "source_id": "dd2a38cb5a0e61f7eb309e2112ef94bd2c11a2e14ea8eb845a307fe2015669e7",
+      "text": "{\"Name\": \"Sacred Lands\", \"Latitude\": \"27.7875426\", \"Longitude\": \"-82.75356839999999\", \"Address\": \"1700 Park St N #4348, St. Petersburg, FL 33710, USA\", \"Phone\": \"(727) 347-0354\", \"Website\": \"http://www.sacredlandspreservationandeducation.org/\", \"City\": \"St. Petersburg\"}",
+      "metadata": {
+        "table": "attractions",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "attractions/attractions.csv:983"
+      },
+      "source_id": "57e92539becb2891f3302ed6ceacf65cea0b0b6d3e43cb66f615fc67906ba279",
+      "text": "{\"Name\": \"Weedon Island Preserve\", \"Latitude\": \"27.8475889\", \"Longitude\": \"-82.60866299999999\", \"Address\": \"1800 Weedon Dr NE, St. Petersburg, FL 33702, USA\", \"Phone\": \"(727) 453-6500\", \"Website\": \"http://www.weedonislandpreserve.org/\", \"City\": \"St. Petersburg\"}",
+      "metadata": {
+        "table": "attractions",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "attractions/attractions.csv:984"
+      },
+      "source_id": "6466b32d45ffb43a77d57effb98d0923116ee5d2375c05e360ae2d3ce52439f0",
+      "text": "{\"Name\": \"Sawgrass Lake Park\", \"Latitude\": \"27.8379308\", \"Longitude\": \"-82.6674635\", \"Address\": \"7400 25th St N, St. Petersburg, FL 33702, USA\", \"Phone\": \"(727) 582-2100\", \"Website\": \"http://www.pinellascounty.org/park/16_Sawgrass.htm\", \"City\": \"St. Petersburg\"}",
+      "metadata": {
+        "table": "attractions",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "attractions/attractions.csv:985"
+      },
+      "source_id": "5f3b8ba4da9c88022b47b03ee656a31cf30d5f3cea3f7d39f90487e2d0088387",
+      "text": "{\"Name\": \"St. Petersburg Saturday Morning Market\", \"Latitude\": \"27.7681055\", \"Longitude\": \"-82.6330698\", \"Address\": \"Al Lang Stadium, 230 1st St SE, St. Petersburg, FL 33701, USA\", \"Phone\": \"(727) 855-1937\", \"Website\": \"http://www.saturdaymorningmarket.com/\", \"City\": \"St. Petersburg\"}",
+      "metadata": {
+        "table": "attractions",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "attractions/attractions.csv:3845"
+      },
+      "source_id": "67ad5b19de33cf6baf6c4115574181878663e3ce6d58bed68d050b17b1116c35",
+      "text": "{\"Name\": \"Burpee Museum of Natural History\", \"Latitude\": \"42.2773242\", \"Longitude\": \"-89.08814249999999\", \"Address\": \"737 N Main St, Rockford, IL 61103, USA\", \"Phone\": \"(815) 965-3433\", \"Website\": \"http://www.burpee.org/\", \"City\": \"Rockford\"}",
+      "metadata": {
+        "table": "attractions",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "attractions/attractions.csv:3846"
+      },
+      "source_id": "93bdca855160923714433b1e1011141158e8d386f62bf1e77901b156fbd5b65b",
+      "text": "{\"Name\": \"Midway Village Museum\", \"Latitude\": \"42.2804989\", \"Longitude\": \"-88.98463989999999\", \"Address\": \"6799 Guilford Rd, Rockford, IL 61107, USA\", \"Phone\": \"(815) 397-9112\", \"Website\": \"https://www.midwayvillage.com/\", \"City\": \"Rockford\"}",
+      "metadata": {
+        "table": "attractions",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "attractions/attractions.csv:3847"
+      },
+      "source_id": "152d3f7600c81113488f903dfe890ee88ca7e164a3e465b74245284e0ad30f61",
+      "text": "{\"Name\": \"Discovery Center Museum\", \"Latitude\": \"42.2771046\", \"Longitude\": \"-89.0894304\", \"Address\": \"711 N Main St, Rockford, IL 61103, USA\", \"Phone\": \"(815) 963-6769\", \"Website\": \"http://www.discoverycentermuseum.org/\", \"City\": \"Rockford\"}",
+      "metadata": {
+        "table": "attractions",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "attractions/attractions.csv:3848"
+      },
+      "source_id": "be96c3dc1248341ba4e3650d86aa06bcbdf94c061ed67acd4b9ce40138608014",
+      "text": "{\"Name\": \"Tinker Swiss Cottage Museum and Gardens\", \"Latitude\": \"42.26411\", \"Longitude\": \"-89.102796\", \"Address\": \"411 Kent St, Rockford, IL 61102, USA\", \"Phone\": \"(815) 964-2424\", \"Website\": \"http://www.tinkercottage.com/\", \"City\": \"Rockford\"}",
+      "metadata": {
+        "table": "attractions",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "attractions/attractions.csv:3849"
+      },
+      "source_id": "932f96f251b8203e09d30d8c5281a9d02ac256f24061608c2eaa3e70afe53b87",
+      "text": "{\"Name\": \"Anderson Japanese Gardens\", \"Latitude\": \"42.2900539\", \"Longitude\": \"-89.05779539999999\", \"Address\": \"318 Spring Creek Rd, Rockford, IL 61107, USA\", \"Phone\": \"(815) 229-9390\", \"Website\": \"http://andersongardens.org/\", \"City\": \"Rockford\"}",
+      "metadata": {
+        "table": "attractions",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "attractions/attractions.csv:3850"
+      },
+      "source_id": "e8fdf63e82807c2156fa30983475f1359b0929ba2587400e58ebbfe3721cae1e",
+      "text": "{\"Name\": \"Nicholas Conservatory & Gardens\", \"Latitude\": \"42.28229330000001\", \"Longitude\": \"-89.0707044\", \"Address\": \"1354 N 2nd St, Rockford, IL 61107, USA\", \"Phone\": \"(815) 987-8858\", \"Website\": \"http://www.nicholasconservatory.com/\", \"City\": \"Rockford\"}",
+      "metadata": {
+        "table": "attractions",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "attractions/attractions.csv:3851"
+      },
+      "source_id": "0d3abe0c9f9de4c80597673ac1a75254692f4e08af1ac508f5b76942b5118640",
+      "text": "{\"Name\": \"Erlander Home Museum\", \"Latitude\": \"42.26409779999999\", \"Longitude\": \"-89.08869279999999\", \"Address\": \"404 S 3rd St, Rockford, IL 61104, USA\", \"Phone\": \"(815) 963-5559\", \"Website\": \"http://www.swedishhistorical.org/\", \"City\": \"Rockford\"}",
+      "metadata": {
+        "table": "attractions",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "attractions/attractions.csv:3852"
+      },
+      "source_id": "30b65e58caa81655b00086b3014513fd8c1243dd2f851006eb429f0abf1d0f68",
+      "text": "{\"Name\": \"Ethnic Heritage Museum\", \"Latitude\": \"42.2611002\", \"Longitude\": \"-89.100915\", \"Address\": \"1129 S Main St, Rockford, IL 61101, USA\", \"Phone\": \"(815) 962-7402\", \"Website\": \"https://www.ethnicheritagemuseum.org/\", \"City\": \"Rockford\"}",
+      "metadata": {
+        "table": "attractions",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "attractions/attractions.csv:3853"
+      },
+      "source_id": "095e81acbf4aa9f226d45d798344d407488ef4dc40c49d6a01387bd08250acf7",
+      "text": "{\"Name\": \"Sinnissippi Park\", \"Latitude\": \"42.2827292\", \"Longitude\": \"-89.0641156\", \"Address\": \"1401 N 2nd St, Rockford, IL 61107, USA\", \"Phone\": \"(815) 987-8858\", \"Website\": \"http://rockfordparkdistrict.org/ncg\", \"City\": \"Rockford\"}",
+      "metadata": {
+        "table": "attractions",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "attractions/attractions.csv:3854"
+      },
+      "source_id": "b23c00b8612102b69fa888cf760380630ad84f1487006fa7c68f5241851594d6",
+      "text": "{\"Name\": \"Klehm Arboretum & Botanic Garden\", \"Latitude\": \"42.2444523\", \"Longitude\": \"-89.11254020000001\", \"Address\": \"2715 S Main St, Rockford, IL 61102, USA\", \"Phone\": \"(815) 965-8146\", \"Website\": \"http://www.klehm.org/\", \"City\": \"Rockford\"}",
+      "metadata": {
+        "table": "attractions",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "attractions/attractions.csv:3855"
+      },
+      "source_id": "3631fca8605f63d886aa2d689c2a2de7235996025fbeb41ceb3ccf82d1b15644",
+      "text": "{\"Name\": \"Davis Park at Founders Landing\", \"Latitude\": \"42.26825019999999\", \"Longitude\": \"-89.0953792\", \"Address\": \"320 S Wyman St, Rockford, IL 61101, USA\", \"Phone\": \"(815) 968-5600\", \"Website\": \"https://www.gorockford.com/listings/davis-park-at-founders-landing/275/\", \"City\": \"Rockford\"}",
+      "metadata": {
+        "table": "attractions",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "attractions/attractions.csv:3856"
+      },
+      "source_id": "167f643f7b0803c5ab0352e9d3cea530f864c308207e759f4ba79a2f3d46b377",
+      "text": "{\"Name\": \"Frank Lloyd Wright's Laurent House\", \"Latitude\": \"42.2998334\", \"Longitude\": \"-89.0243617\", \"Address\": \"4646 Spring Brook Rd, Rockford, IL 61114, USA\", \"Phone\": \"(815) 877-2952\", \"Website\": \"http://www.laurenthouse.com/\", \"City\": \"Rockford\"}",
+      "metadata": {
+        "table": "attractions",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "attractions/attractions.csv:3857"
+      },
+      "source_id": "c6f7d35821a46add9a0448325be6ab412bdd7012cb6321e17e0f1e9a7f41df37",
+      "text": "{\"Name\": \"Sinnissippi Gardens\", \"Latitude\": \"42.2840305\", \"Longitude\": \"-89.0679007\", \"Address\": \"1354 N 2nd St, Rockford, IL 61107, USA\", \"Phone\": \"(815) 987-8858\", \"Website\": \"https://nicholasconservatory.com/\", \"City\": \"Rockford\"}",
+      "metadata": {
+        "table": "attractions",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "attractions/attractions.csv:3858"
+      },
+      "source_id": "cb606168fbe965d7c380262a5223e1533d04da0a93c6a9202f5461df268bed31",
+      "text": "{\"Name\": \"Riverfront Museum Park\", \"Latitude\": \"42.2768431\", \"Longitude\": \"-89.0888593\", \"Address\": \"Ste 3, 711 N Main St, Rockford, IL 61103, USA\", \"Phone\": \"(815) 962-0105\", \"Website\": \"Unknown\", \"City\": \"Rockford\"}",
+      "metadata": {
+        "table": "attractions",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "attractions/attractions.csv:3859"
+      },
+      "source_id": "a8ce387cc7c9ef3439c2ae74f15036413e31a578f9c6dd259864b70dbfa54760",
+      "text": "{\"Name\": \"Searls Park\", \"Latitude\": \"42.3006848\", \"Longitude\": \"-89.1241445\", \"Address\": \"4950 Safford Rd, Rockford, IL 61101, USA\", \"Phone\": \"(815) 987-8800\", \"Website\": \"http://rockfordparkdistrict.org/\", \"City\": \"Rockford\"}",
+      "metadata": {
+        "table": "attractions",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "attractions/attractions.csv:3860"
+      },
+      "source_id": "162762131db47b19b92a82dfd073c9fb2bab74595091435ecb2c4c5fcccf21c4",
+      "text": "{\"Name\": \"La Paloma Gardens\", \"Latitude\": \"42.2936707\", \"Longitude\": \"-89.0346172\", \"Address\": \"3622 Brookview Rd, Rockford, IL 61107, USA\", \"Phone\": \"(815) 399-0324\", \"Website\": \"http://www.lapalomagardens.com/\", \"City\": \"Rockford\"}",
+      "metadata": {
+        "table": "attractions",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "attractions/attractions.csv:3861"
+      },
+      "source_id": "d7df81f792c24b306b1538bdcca4e266416f8ff90506fada1e58c1399fb8bb69",
+      "text": "{\"Name\": \"Rockford Park District\", \"Latitude\": \"42.268422\", \"Longitude\": \"-89.0972335\", \"Address\": \"401 S Main St, Rockford, IL 61101, USA\", \"Phone\": \"(815) 987-8800\", \"Website\": \"https://rockfordparkdistrict.org/\", \"City\": \"Rockford\"}",
+      "metadata": {
+        "table": "attractions",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "attractions/attractions.csv:3862"
+      },
+      "source_id": "260bbf15111180dedb18bec5d1990018a9713737e9ce12503c47cf6eb64cee40",
+      "text": "{\"Name\": \"Aldeen Park\", \"Latitude\": \"42.2740598\", \"Longitude\": \"-89.0227687\", \"Address\": \"623 N Alpine Rd, Rockford, IL 61107, USA\", \"Phone\": \"Unknown\", \"Website\": \"https://www.rockfordparkdistrict.org/\", \"City\": \"Rockford\"}",
+      "metadata": {
+        "table": "attractions",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "attractions/attractions.csv:3863"
+      },
+      "source_id": "799a6b7d88b8207f5dbfd22b5731e807debb02e7b9daf7637b0f979551cf07e3",
+      "text": "{\"Name\": \"Blackhawk Springs Forest Preserve\", \"Latitude\": \"42.2046939\", \"Longitude\": \"-88.9916363\", \"Address\": \"5360 Mulford Road &, 5801 Perryville Rd, Rockford, IL 61109, USA\", \"Phone\": \"(815) 877-6100\", \"Website\": \"http://winnebagoforest.org/preserves/blackhawk-springs/\", \"City\": \"Rockford\"}",
+      "metadata": {
+        "table": "attractions",
+        "scope": "declared_environment"
+      }
+    },
+    {
+      "source": {
+        "kind": "allowed_environment",
+        "document_id": "train:0",
+        "location": "attractions/attractions.csv:3864"
+      },
+      "source_id": "7069c99fbaee4166801894198a403d6d38f7e8b6e209370f08ee435f92c7cd3c",
+      "text": "{\"Name\": \"Ingersoll Centennial Park\", \"Latitude\": \"42.2662975\", \"Longitude\": \"-89.09143920000001\", \"Address\": \"315 S 1st St, Rockford, IL 61104, USA\", \"Phone\": \"(815) 987-8800\", \"Website\": \"http://rockfordparkdistrict.org/\", \"City\": \"Rockford\"}",
+      "metadata": {
+        "table": "attractions",
+        "scope": "declared_environment"
+      }
+    }
+  ],
+  "questions": [
+    {
+      "id": "0",
+      "text": "Please help me plan a trip from St. Petersburg to Rockford spanning 3 days from March 16th to March 18th, 2022. The travel should be planned for a single person with a budget of $1,700.",
+      "parameters": {
+        "org": "St. Petersburg",
+        "dest": "Rockford",
+        "days": 3,
+        "people_number": 1,
+        "local_constraint": {
+          "house rule": null,
+          "cuisine": null,
+          "room type": null,
+          "transportation": null
+        },
+        "budget": 1700,
+        "visiting_city_number": 1,
+        "date": [
+          "2022-03-16",
+          "2022-03-17",
+          "2022-03-18"
+        ]
+      }
+    }
+  ]
+}

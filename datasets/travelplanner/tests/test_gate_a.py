@@ -8,12 +8,12 @@ from types import MappingProxyType
 
 import networkx as nx
 
-from oak.config import RunConfig
-from oak.contracts import CorpusBlock, GraphResult, SourceRef
-from oak.kernel.execution import KernelRuntime
-from oak.kernel.registration import load_assets
-from oak.kg.graph import EntityCandidate,build_graph
-from oak.operators.data import DataCapabilities
+from darwinagent.config import RunConfig
+from darwinagent.contracts import CorpusBlock, GraphResult, SourceRef
+from darwinagent.kernel.execution import KernelRuntime
+from darwinagent.kernel.registration import load_assets
+from darwinagent.kg.graph import EntityCandidate,build_graph
+from darwinagent.operators.data import DataCapabilities
 from datasets.travelplanner.pipeline.data.queries import parse_dates,applicable_hc_keys
 
 ROOT=Path(__file__).resolve().parents[3]

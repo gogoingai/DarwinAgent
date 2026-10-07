@@ -12,11 +12,11 @@ import json
 import time
 from pathlib import Path
 
-from oak.config import RunConfig
-from oak.contracts import EvaluationResult
-from oak.experiments.spec import precheck_identity
-from oak.llm.client import LLMClient
-from oak.llm.settings import load_connection
+from darwinagent.config import RunConfig
+from darwinagent.contracts import EvaluationResult
+from darwinagent.experiments.spec import precheck_identity
+from darwinagent.llm.client import LLMClient
+from darwinagent.llm.settings import load_legacy_connection as load_connection
 
 from datasets.locomo.run import ROOT, SNAPSHOTS, arm_config, connection
 
@@ -37,9 +37,9 @@ async def probe_tier(client, role):
 def check_snapshots(convs):
     from types import SimpleNamespace
 
-    from oak.kg.graph import load_graph
-    from oak.operators.data import DataCapabilities
-    from oak.vector import LocalVectorStore
+    from darwinagent.kg.graph import load_graph
+    from darwinagent.operators.data import DataCapabilities
+    from darwinagent.vector import LocalVectorStore
     rows = {}
     for conv in convs:
         snap = SNAPSHOTS / conv
@@ -83,7 +83,7 @@ def main():
             checks['strong_tier'] = await probe_tier(client, 'locomo_judge')
             checks['fast_tier_json'] = await probe_tier(client, 'tools')
             try:
-                from oak.vector import load_embedder
+                from darwinagent.vector import load_embedder
                 emb = load_embedder(cache_path=SNAPSHOTS / 'conv-26' / 'vector' / 'embed_cache.json')
                 vec = emb.embed('连通性测试：谁修了打印机')
                 checks['embedding_endpoint'] = {'ok': len(vec) >= 256, 'dim': len(vec), 'model': emb.model}
@@ -92,8 +92,8 @@ def main():
             try:
                 # 快照上的真实 semantic_search 冒烟（嵌入一次查询，行可回图、血缘记录）
                 from datasets.locomo.adapter import LocomoAdapter
-                from oak.experiments.snapshots import attach_vector, load_frozen_graph
-                from oak.operators.data import DataCapabilities
+                from darwinagent.experiments.snapshots import attach_vector, load_frozen_graph
+                from darwinagent.operators.data import DataCapabilities
                 corpus = LocomoAdapter(ROOT / 'datasets/locomo/data/locomo10_zh.json').generation_input('conv-26').corpus
                 gr = load_frozen_graph(SNAPSHOTS / 'conv-26', corpus)
                 attach_vector(gr, SNAPSHOTS / 'conv-26')

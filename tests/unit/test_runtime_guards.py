@@ -5,13 +5,13 @@ import unittest
 from dataclasses import replace
 from pathlib import Path
 
-from oak.agents import ExtractionAgent
-from oak.config import RunConfig
-from oak.kernel.assets import KernelAssets
-from oak.kernel.execution import KernelRuntime
-from oak.kernel.counterexamples import run_probes
-from oak.kernel.validation import validate_graph
-from oak.operators.sandbox import Interpreter, Limits, SandboxError, admit
+from darwinagent.agents import ExtractionAgent
+from darwinagent.config import RunConfig
+from darwinagent.kernel.assets import KernelAssets
+from darwinagent.kernel.execution import KernelRuntime
+from darwinagent.kernel.counterexamples import run_probes
+from darwinagent.kernel.validation import validate_graph
+from darwinagent.operators.sandbox import Interpreter, Limits, SandboxError, admit
 from tests.fixtures import case,client,spec
 
 
@@ -72,5 +72,5 @@ class RuntimeGuardTests(unittest.TestCase):
 
     def test_prompt_does_not_expand_visible_inputs(self):
         root,c,s,runtime,graph=self.setup_graph()
-        from oak.kernel.assets import Asset
+        from darwinagent.kernel.assets import Asset
         with self.assertRaises(ValueError): Asset('prompt','P','${evaluator}',role='answer')

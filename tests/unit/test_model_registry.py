@@ -5,15 +5,15 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from oak.config import Config
-from oak.llm.client import LLMClient
-from oak.llm.registry import FALLBACK_PROFILE, request_policy, resolve
+from darwinagent.config import Config
+from darwinagent.llm.client import LLMClient
+from darwinagent.llm.registry import FALLBACK_PROFILE, request_policy, resolve
 
 
 class RegistryResolution(unittest.TestCase):
     def setUp(self):
         self.td = tempfile.TemporaryDirectory()
-        self.cfg = Config(api_key='k-strong', fast_api_key='k-fast',
+        self.cfg = Config(model_profiles=True, api_base_url='https://default.example/v1', model_strong='glm-5.3', api_key='k-strong', fast_api_key='k-fast',
                           work_dir=Path(self.td.name))
         self.cfg.fast_base_url = 'https://fast.example/v1'
 
@@ -55,7 +55,7 @@ class RegistryResolution(unittest.TestCase):
 class RequestPolicyMatrix(unittest.TestCase):
     def setUp(self):
         self.td = tempfile.TemporaryDirectory()
-        self.cfg = Config(api_key='k-strong', fast_api_key='k-fast',
+        self.cfg = Config(model_profiles=True, api_base_url='https://default.example/v1', model_strong='glm-5.3', api_key='k-strong', fast_api_key='k-fast',
                           work_dir=Path(self.td.name))
         self.cfg.fast_base_url = 'https://fast.example/v1'
 
@@ -96,7 +96,7 @@ class RequestPolicyMatrix(unittest.TestCase):
 class ClientSitePools(unittest.TestCase):
     def test_same_site_shares_pool(self):
         with tempfile.TemporaryDirectory() as td:
-            cfg = Config(api_key='k', work_dir=Path(td))
+            cfg = Config(model_profiles=True, api_base_url='https://default.example/v1', model_strong='glm-5.3', api_key='k', work_dir=Path(td))
             client = LLMClient(cfg)                # fast 未配置 → 与默认同站
             a = client._site_for('glm-5.3')
             b = client._site_for('glm-5.3-flash')

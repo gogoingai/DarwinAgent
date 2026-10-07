@@ -8,7 +8,7 @@ import asyncio
 import json
 from dataclasses import replace
 
-from oak.llm.client import LLMClient
+from darwinagent.llm.client import LLMClient
 from .config import LOCOMO_TASK_DIR, load_locomo_config
 from .data import load_conversation
 from .protocol import aggregate, dual_grade_batch

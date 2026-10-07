@@ -6,12 +6,13 @@ import asyncio
 from pathlib import Path
 import tempfile
 
-from oak.config import RunConfig
-from oak.contracts import CaseInput, CorpusBlock, EvaluationResult, QuestionInput, SourceRef
-from oak.engine import Pipeline
-from oak.kernel import TaskSpec
-from oak.kernel.registration import load_assets
-from oak.llm.recorded import RecordedClient
+from darwinagent.config import RunConfig
+from darwinagent.contracts import CaseInput, CorpusBlock, EvaluationResult, QuestionInput, SourceRef
+from darwinagent.engine import Pipeline
+from darwinagent.kernel import TaskSpec
+from darwinagent.kernel.registration import load_assets
+from darwinagent.llm.recorded import RecordedClient
+from darwinagent.demo import TASK_ROOT
 
 
 class MaintenanceAdapter:
@@ -49,7 +50,7 @@ async def run(task_root,work_dir):
 
 if __name__=='__main__':
     p=argparse.ArgumentParser()
-    p.add_argument('--task-root',type=Path,default=Path(__file__).resolve().parents[1]/'tasks/device_maintenance')
+    p.add_argument('--task-root',type=Path,default=TASK_ROOT)
     p.add_argument('--work-dir',type=Path)
     args=p.parse_args()
     if args.work_dir: asyncio.run(run(args.task_root,args.work_dir))

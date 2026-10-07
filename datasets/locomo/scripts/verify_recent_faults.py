@@ -14,14 +14,14 @@ from types import SimpleNamespace
 
 from datasets.locomo.adapter import LocomoAdapter
 from datasets.locomo.scripts.regress_history import failed_calls
-from oak.config import RunConfig
-from oak.experiments.admission import AdmissionError
-from oak.experiments.runner import ExperimentRunner
-from oak.experiments.snapshots import load_frozen_graph, snapshot_digest
-from oak.kernel import KernelBundle
-from oak.kernel.functions import FunctionRegistry
-from oak.operators.sandbox import Limits
-from oak.runtime.artifacts import atomic_json, digest
+from darwinagent.config import RunConfig
+from darwinagent.experiments.admission import AdmissionError
+from darwinagent.experiments.runner import ExperimentRunner
+from darwinagent.experiments.snapshots import load_frozen_graph, snapshot_digest
+from darwinagent.kernel import KernelBundle
+from darwinagent.kernel.functions import FunctionRegistry
+from darwinagent.operators.sandbox import Limits
+from darwinagent.runtime.artifacts import atomic_json, digest
 
 ROUNDS = (('agentic_v15', 'R6'), ('agentic_v15', 'R7'),
           ('agentic_v15', 'R8'), ('agentic_v16', 'R9'),

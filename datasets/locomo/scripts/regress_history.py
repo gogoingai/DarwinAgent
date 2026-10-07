@@ -54,12 +54,12 @@ def failed_calls(round_dir):
 
 def battery_errors(bundle_dir, graph, sample_cap=14):
     """穷尽电池重放：返回每个 F 触发的错误（asset, 错误类）。"""
-    from oak.experiments.runner import stress_trial_samples
-    from oak.kernel.functions import FunctionRegistry
-    from oak.kernel import KernelBundle
-    from oak.operators.sandbox import Limits
+    from darwinagent.experiments.runner import stress_trial_samples
+    from darwinagent.kernel.functions import FunctionRegistry
+    from darwinagent.kernel import KernelBundle
+    from darwinagent.operators.sandbox import Limits
     bundle = FunctionRegistry(KernelBundle(bundle_dir), Limits(30000, 15.0, 180000))
-    from oak.experiments.admission_rules import loop_carried_capability_errors
+    from darwinagent.experiments.admission_rules import loop_carried_capability_errors
     hits = []
     not_replayed = []
     for aid, (a, _fn) in bundle.functions.items():
@@ -94,7 +94,7 @@ def normalize(err):
 
 def main():
     from datasets.locomo.run import LocomoAdapter, SNAPSHOTS
-    from oak.experiments.snapshots import load_frozen_graph
+    from darwinagent.experiments.snapshots import load_frozen_graph
     adapter = LocomoAdapter(REPO / 'datasets/locomo/data/locomo10_zh.json')
     graph = load_frozen_graph(SNAPSHOTS / 'conv-26',
                               adapter.generation_input('conv-26').corpus)
@@ -111,9 +111,9 @@ def main():
             if not real:
                 continue                      # 无故障轮不作数
             hits, remote_assets = battery_errors(cand, graph)
-            from oak.kernel import KernelBundle
-            from oak.kernel.functions import FunctionRegistry
-            from oak.operators.sandbox import Limits
+            from darwinagent.kernel import KernelBundle
+            from darwinagent.kernel.functions import FunctionRegistry
+            from darwinagent.operators.sandbox import Limits
             registry=FunctionRegistry(KernelBundle(cand),Limits(30000,15.0,180000))
             call_results=[]
             for qid,aid,params,expected in failed_calls(rnd):
@@ -159,7 +159,7 @@ def main():
 if __name__ == '__main__':
     if '--worker' in sys.argv:
         sys.exit(main())
-    from oak.runtime.artifacts import atomic_json
+    from darwinagent.runtime.artifacts import atomic_json
     try:
         worker = subprocess.run(
             [sys.executable, '-m', 'datasets.locomo.scripts.regress_history',

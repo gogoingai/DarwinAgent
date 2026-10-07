@@ -4,11 +4,11 @@ import unittest
 from dataclasses import replace
 from pathlib import Path
 
-from oak.agents import ExtractionAgent
-from oak.config import RunConfig
-from oak.kernel.assets import KernelAssets
-from oak.kernel.execution import KernelRuntime
-from oak.agents.protocol import ProtocolError
+from darwinagent.agents import ExtractionAgent
+from darwinagent.config import RunConfig
+from darwinagent.kernel.assets import KernelAssets
+from darwinagent.kernel.execution import KernelRuntime
+from darwinagent.agents.protocol import ProtocolError
 from tests.fixtures import spec,case,client
 
 
@@ -24,8 +24,8 @@ class GraphAxiomAcceptance(unittest.TestCase):
             self.assertTrue(caught.exception.raw_outputs)
 
     def test_static_disjoint_subclasses_rejected(self):
-        from oak.schema.model import Schema
-        from oak.schema.owlcheck import static_checks
+        from darwinagent.schema.model import Schema
+        from darwinagent.schema.owlcheck import static_checks
         schema=Schema.from_yaml('''entity_types:
   A: {primary_key: [id], attributes: [{name: id, dtype: string}]}
   B: {primary_key: [id], attributes: [{name: id, dtype: string}]}

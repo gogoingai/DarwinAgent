@@ -1,10 +1,10 @@
 from pathlib import Path
 
-from oak.config import RunConfig
-from oak.contracts import CaseInput, CorpusBlock, QuestionInput, SourceRef
-from oak.kernel import TaskSpec
-from oak.kernel.registration import load_assets
-from oak.llm.recorded import RecordedClient
+from darwinagent.config import RunConfig
+from darwinagent.contracts import CaseInput, CorpusBlock, QuestionInput, SourceRef
+from darwinagent.kernel import TaskSpec
+from darwinagent.kernel.registration import load_assets
+from darwinagent.llm.recorded import RecordedClient
 
 ROOT=Path(__file__).resolve().parents[1]
 TASK=ROOT/'tasks/device_maintenance'

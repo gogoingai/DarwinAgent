@@ -2,7 +2,7 @@
 import asyncio
 from pathlib import Path
 
-from oak.contracts import EvaluationResult
+from darwinagent.contracts import EvaluationResult
 from .exports import plan
 from .pipeline.config_task import TPConfig
 from .pipeline.data.queries import _from_local

@@ -6,20 +6,20 @@ import unittest
 from dataclasses import replace
 from pathlib import Path
 
-from oak.config import RunConfig
-from oak.contracts import (AtomicFact, CorpusBlock, EntityRef, EvaluationResult, FactEvidence, FactTime,
+from darwinagent.config import RunConfig
+from darwinagent.contracts import (AtomicFact, CorpusBlock, EntityRef, EvaluationResult, FactEvidence, FactTime,
                            FactValue, MemoryResult, SourceRef)
-from oak.kg.assembler import GraphAssembler, anchoring_invariants
-from oak.kg.graph import node_id
-from oak.kernel.assets import Asset, KernelAssets
-from oak.experiments.spec import precheck_identity
-from oak.config import Config as _Cfg, RunConfig as _RC
-from oak.kernel.counterexamples import run_probes
-from oak.kernel.execution import KernelRuntime
-from oak.kernel.revision import AssetPatch, AssetRevisionService, parse_training_id, training_id
-from oak.operators.sandbox import Interpreter, admit
-from oak.runtime.artifacts import digest
-from oak.schema.model import Schema
+from darwinagent.kg.assembler import GraphAssembler, anchoring_invariants
+from darwinagent.kg.graph import node_id
+from darwinagent.kernel.assets import Asset, KernelAssets
+from darwinagent.experiments.spec import precheck_identity
+from darwinagent.config import Config as _Cfg, RunConfig as _RC
+from darwinagent.kernel.counterexamples import run_probes
+from darwinagent.kernel.execution import KernelRuntime
+from darwinagent.kernel.revision import AssetPatch, AssetRevisionService, parse_training_id, training_id
+from darwinagent.operators.sandbox import Interpreter, admit
+from darwinagent.runtime.artifacts import digest
+from darwinagent.schema.model import Schema
 
 from tests.unit.test_fact_memory import SEED, block, travel_view_schema
 
@@ -71,10 +71,10 @@ class AnchoredPipelineChecksTaskC(unittest.TestCase):
             'review': [review()]}
 
     def run_pipeline(self, graph_check_ok):
-        from oak.engine import Pipeline
-        from oak.kernel import TaskSpec
-        from oak.llm.recorded import RecordedClient
-        from oak.contracts import CaseInput, QuestionInput
+        from darwinagent.engine import Pipeline
+        from darwinagent.kernel import TaskSpec
+        from darwinagent.llm.recorded import RecordedClient
+        from darwinagent.contracts import CaseInput, QuestionInput
         td = tempfile.TemporaryDirectory(); self.addCleanup(td.cleanup)
         root = Path(td.name)
         bundle = self.bundle(root, graph_check_ok)
@@ -207,7 +207,7 @@ class BudgetReserveBeforeExecution(unittest.TestCase):
         (root / 'precheck.json').write_text(json.dumps({'passed': True, 'checks': {},
                                                         'identity': precheck_identity(_Cfg(), _RC(protocol_attempts=1))}))
         controller = RecordedCampaign(root, spec=protocol(rounds=1, cap=1))
-        from oak.kernel import TaskSpec
+        from darwinagent.kernel import TaskSpec
         with self.assertRaises(ValueError) as caught:
             asyncio.run(controller.run(TaskSpec.load(Path(__file__).resolve().parents[2] / 'tasks/device_maintenance/task.yaml')))
         self.assertIn('cap exceeded', str(caught.exception))
@@ -446,7 +446,7 @@ class ReviewRoundFour(unittest.TestCase):
         self.assertTrue(any('来源追踪与结构不符' in e for e in errs))
 
     def test_tool_source_ids_match_fact_evidence_on_good_graph(self):
-        from oak.operators.data import DataCapabilities
+        from darwinagent.operators.data import DataCapabilities
         schema = Schema.from_yaml(SEED.read_text())
         b1, _ = self.seed_two_blocks()
         fact = AtomicFact.create(text='甲修打印机', subject=EntityRef('person', '甲'), predicate='维修',
@@ -463,8 +463,8 @@ class ReviewRoundFour(unittest.TestCase):
 
 class GenericFeedbackContract(unittest.TestCase):
     def test_dataset_specific_diagnostics_flow_through(self):
-        from oak.experiments.runner import training_feedback
-        from oak.contracts import AnswerResult, EvaluationResult, RunResult
+        from darwinagent.experiments.runner import training_feedback
+        from darwinagent.contracts import AnswerResult, EvaluationResult, RunResult
         # 旅行式诊断（预算/人数/约束），框架不得丢弃或改读 LoCoMo 字段
         rows = ({'query_id': 'q7', 'budget_exceeded': True, 'people': 3,
                  'constraint': 'no flight', 'plan_issues': ['超预算']},)
@@ -479,8 +479,8 @@ class GenericFeedbackContract(unittest.TestCase):
         self.assertIn('feasible', feedback['scores']['metrics'])
 
     def test_passed_rows_skipped_and_budget_capped(self):
-        from oak.experiments.runner import training_feedback, FEEDBACK_BUDGET_CHARS
-        from oak.contracts import AnswerResult, EvaluationResult, RunResult
+        from darwinagent.experiments.runner import training_feedback, FEEDBACK_BUDGET_CHARS
+        from darwinagent.contracts import AnswerResult, EvaluationResult, RunResult
         rows = tuple({'i': i, 'passed': True, 'payload': 'x'} for i in range(3)) + \
                ({'i': 9, 'payload': 'y' * 100},)
         big = {'i': 10, 'payload': 'z' * (FEEDBACK_BUDGET_CHARS + 10)}
@@ -509,7 +509,7 @@ class ReviewRoundSix(unittest.TestCase):
         td = tempfile.TemporaryDirectory(); self.addCleanup(td.cleanup)
         root = Path(td.name)
         runner = RecordedExperiment(root)
-        from oak.kernel import TaskSpec
+        from darwinagent.kernel import TaskSpec
         task = TaskSpec.load(Path(__file__).resolve().parents[2] / 'tasks/device_maintenance/task.yaml')
         with contextlib.redirect_stdout(io.StringIO()):
             first = asyncio.run(runner.run(runner.case.id, task, rounds=1))
@@ -528,8 +528,8 @@ class ReviewRoundSix(unittest.TestCase):
         self.assertFalse((root / 'R2').exists())
 
     def test_feedback_budget_covers_entire_payload(self):
-        from oak.experiments.runner import training_feedback, FEEDBACK_BUDGET_CHARS
-        from oak.contracts import AnswerResult, EvaluationResult, RunResult, SourceRef
+        from darwinagent.experiments.runner import training_feedback, FEEDBACK_BUDGET_CHARS
+        from darwinagent.contracts import AnswerResult, EvaluationResult, RunResult, SourceRef
         class C:  id='c'
         ev = (SourceRef('t', 'c', '1'),)
         huge_rows = tuple({'i': i, 'payload': 'x' * 2000} for i in range(40))
@@ -545,7 +545,7 @@ class ReviewRoundSix(unittest.TestCase):
         self.assertEqual(feedback['generation_failures_total'], 20)
 
     def test_composite_question_identity_in_admission(self):
-        from oak.kernel.revision import AssetPatch, AssetRevisionService
+        from darwinagent.kernel.revision import AssetPatch, AssetRevisionService
         from tests.fixtures import spec
         from dataclasses import replace
         td = tempfile.TemporaryDirectory(); self.addCleanup(td.cleanup)
@@ -604,7 +604,7 @@ class ReviewRoundSeven(unittest.TestCase):
         from tests.integration.test_experiment import RecordedExperiment
         from tests.fixtures import TASK
         import contextlib, io
-        from oak.kernel import TaskSpec
+        from darwinagent.kernel import TaskSpec
         cls = runner_cls or RecordedExperiment
         runner = cls(root, evaluator=lambda transport, path: StageTaggedEvaluator(path))
         spec = TaskSpec.load(TASK / 'task.yaml')
@@ -652,8 +652,8 @@ class ReviewRoundSeven(unittest.TestCase):
         self.assertEqual([r['diagnostic']['stage_tag'] for r in r3['diagnostics']], ['R1'])
 
     def test_many_short_records_bounded_by_complete_payload(self):
-        from oak.experiments.runner import training_feedback, FEEDBACK_BUDGET_CHARS
-        from oak.contracts import EvaluationResult, RunResult
+        from darwinagent.experiments.runner import training_feedback, FEEDBACK_BUDGET_CHARS
+        from darwinagent.contracts import EvaluationResult, RunResult
         class C:  id = 'c'
         rows = tuple({'i': i, 'payload': 'x' * 60} for i in range(3000))
         baseline = EvaluationResult({'m': 0}, 0, 0, 0, 0, rows)
@@ -663,8 +663,8 @@ class ReviewRoundSeven(unittest.TestCase):
         self.assertEqual(feedback['diagnostic_rows_total'], 3000)
 
     def test_few_long_records_bounded_by_complete_payload(self):
-        from oak.experiments.runner import training_feedback, FEEDBACK_BUDGET_CHARS
-        from oak.contracts import EvaluationResult, RunResult
+        from darwinagent.experiments.runner import training_feedback, FEEDBACK_BUDGET_CHARS
+        from darwinagent.contracts import EvaluationResult, RunResult
         class C:  id = 'c'
         rows = tuple({'i': i, 'payload': 'y' * 20000} for i in range(8))
         baseline = EvaluationResult({'m': 0}, 0, 0, 0, 0, rows)
@@ -676,8 +676,8 @@ class ReviewRoundSeven(unittest.TestCase):
         self.assertTrue(all('_row_truncated' in r['diagnostic'] for r in feedback['diagnostics']))
 
     def test_mixed_sections_bounded_by_complete_payload(self):
-        from oak.experiments.runner import training_feedback, FEEDBACK_BUDGET_CHARS
-        from oak.contracts import AnswerResult, EvaluationResult, RunResult
+        from darwinagent.experiments.runner import training_feedback, FEEDBACK_BUDGET_CHARS
+        from darwinagent.contracts import AnswerResult, EvaluationResult, RunResult
         class C:  id = 'c'
         rows = tuple({'i': i, 'payload': 'd' * 300} for i in range(200))
         failures = tuple(AnswerResult(f'q{i}', 'execution_error', '', error='E' * 400) for i in range(30))
@@ -704,8 +704,8 @@ class ReviewRoundSeven(unittest.TestCase):
                 parse_training_id(bad)
 
     def test_question_identity_uses_the_encoder(self):
-        from oak.experiments.runner import question_identity
-        from oak.contracts import CaseInput, CorpusBlock, QuestionInput, SourceRef
+        from darwinagent.experiments.runner import question_identity
+        from darwinagent.contracts import CaseInput, CorpusBlock, QuestionInput, SourceRef
         b = CorpusBlock(SourceRef('message_text', 'c', '1'), '文本。')
         case = CaseInput('case-a', (b,), (QuestionInput('q::1', '问题'), QuestionInput('q1', '问题2')))
         ids = question_identity(case)
@@ -731,7 +731,7 @@ class ReviewRoundEight(unittest.TestCase):
         from tests.integration.test_experiment import RecordedExperiment
         from tests.fixtures import TASK
         import contextlib, io
-        from oak.kernel import TaskSpec
+        from darwinagent.kernel import TaskSpec
         td = tempfile.TemporaryDirectory(); self.addCleanup(td.cleanup)
         root = Path(td.name)
         runner = RecordedExperiment(root, evaluator=lambda transport, path: FaultyStageEvaluator(path))
@@ -765,10 +765,10 @@ class ReviewRoundEight(unittest.TestCase):
     def test_report_persisted_before_seal_and_rebuilds_from_artifacts(self):
         from tests.integration.test_campaign import RecordedCampaign, protocol
         from tests.fixtures import TASK
-        from oak.kernel import TaskSpec
+        from darwinagent.kernel import TaskSpec
         from unittest import mock
         import contextlib, io
-        import oak.experiments.campaign as camp
+        import darwinagent.experiments.campaign as camp
         td = tempfile.TemporaryDirectory(); self.addCleanup(td.cleanup)
         root = Path(td.name)
         task = TaskSpec.load(TASK / 'task.yaml')
@@ -806,8 +806,8 @@ class ReviewRoundEight(unittest.TestCase):
         self.assertIn('sealed', str(caught.exception))
 
     def test_oversize_scores_skeleton_refuses_feedback(self):
-        from oak.experiments.runner import training_feedback
-        from oak.contracts import EvaluationResult, RunResult
+        from darwinagent.experiments.runner import training_feedback
+        from darwinagent.contracts import EvaluationResult, RunResult
         class C:  id = 'c'
         huge = EvaluationResult({f'm{i}': 0 for i in range(4000)}, 0, 0, 0, 0, ())
         with self.assertRaises(ValueError) as caught:
@@ -818,7 +818,7 @@ class ReviewRoundEight(unittest.TestCase):
         return AnchoredPipelineChecksTaskC().bundle(root / 'anchored')
 
     def test_revision_protocol_matches_bundle_mode(self):
-        from oak.experiments.bootstrap import revision_protocol
+        from darwinagent.experiments.bootstrap import revision_protocol
         from tests.fixtures import spec
         td = tempfile.TemporaryDirectory(); self.addCleanup(td.cleanup)
         root = Path(td.name)
@@ -836,7 +836,7 @@ class ReviewRoundEight(unittest.TestCase):
         self.assertNotIn('do not generate, extend or patch it', anchored)  # 矛盾指令已消除
 
     def test_bootstrap_protocols_carry_single_output_format(self):
-        from oak.experiments.bootstrap import ASSET_PROTOCOL, LEGACY_ASSET_PROTOCOL
+        from darwinagent.experiments.bootstrap import ASSET_PROTOCOL, LEGACY_ASSET_PROTOCOL
         for proto in (ASSET_PROTOCOL, LEGACY_ASSET_PROTOCOL):
             self.assertIn('shaped {"assets":[...]}', proto)
             self.assertNotIn('patches', proto)
@@ -855,7 +855,7 @@ class ReviewRoundEight(unittest.TestCase):
         from tests.integration.test_experiment import RecordedExperiment
         from tests.fixtures import TASK
         import contextlib, io
-        from oak.kernel import TaskSpec
+        from darwinagent.kernel import TaskSpec
         runner = RecordedExperiment(root)
         with contextlib.redirect_stdout(io.StringIO()):
             asyncio.run(runner.run(runner.case.id, TaskSpec.load(TASK / 'task.yaml'), rounds=1))

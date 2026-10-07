@@ -18,7 +18,7 @@ from pathlib import Path
 
 from .config import load_locomo_config
 from .data import load_conversation
-from oak.llm.client import LLMClient
+from darwinagent.llm.client import LLMClient
 
 CLOSEOUT_DIR_NAME = "closeout"
 THRESHOLD_PER_100 = 6.0          # 北极星：评测外 ≤ 6 题 / 100 题

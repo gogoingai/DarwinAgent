@@ -1,4 +1,4 @@
-"""locomo 配置：复用 oak 的 Config/LLMClient，但产物目录与模型路由独立。
+"""locomo 配置：复用 darwinagent 的 Config/LLMClient，但产物目录与模型路由独立。
 
 模型路由（双档，无自动回退——网关不可用即报错，保证 campaign 模型同质）：
 - strong = glm-5.3（智谱直连，本体起草 / 终答 / 判题）
@@ -13,7 +13,8 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from oak.config import Config
+from darwinagent.presets import legacy_benchmark_config
+from darwinagent.config import Config
 
 LOCOMO_ROOT = Path(__file__).resolve().parent          # datasets/locomo/pipeline
 LOCOMO_TASK_DIR = LOCOMO_ROOT.parent                        # datasets/locomo
@@ -28,7 +29,7 @@ NS_SCHEMA = "lc_schema"
 
 @dataclass
 class LocomoConfig:
-    cfg: Config                        # oak Config（含 LLMClient 所需一切）
+    cfg: Config                        # darwinagent Config（含 LLMClient 所需一切）
     dataset_path: Path
     anchor_id: str = "conv-26"
     react_max_steps: int = 10
@@ -49,7 +50,7 @@ class LocomoConfig:
 
 def load_locomo_config() -> LocomoConfig:
     load_dotenv(PROJECT_ROOT / ".env")
-    cfg = Config()
+    cfg = legacy_benchmark_config()
     cfg.role_tiers.update({"locomo_schema": "strong", "locomo_answer": "strong",
                            "locomo_review": "strong", "locomo_judge": "strong",
                            "locomo_extract": "fast", "locomo_util": "fast",

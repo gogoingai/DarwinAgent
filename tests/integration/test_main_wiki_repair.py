@@ -13,11 +13,11 @@ from unittest import mock
 from datasets.locomo.adapter import LocomoAdapter
 from datasets.locomo.graph_rules import _session_dates
 from datasets.locomo.scripts import question_split
-from oak.experiments.proposal import ProposalGenerator
-from oak.experiments.wiki import WikiMaintainer, _lessons
-from oak.kernel import TaskSpec
-from oak.runtime.deadline import ROUND_DEADLINE, RoundDeadlineExceeded
-from oak.vector.embedder import Embedder
+from darwinagent.experiments.proposal import ProposalGenerator
+from darwinagent.experiments.wiki import WikiMaintainer, _lessons
+from darwinagent.kernel import TaskSpec
+from darwinagent.runtime.deadline import ROUND_DEADLINE, RoundDeadlineExceeded
+from darwinagent.vector.embedder import Embedder
 from tests.fixtures import TASK
 from tests.integration.test_fastloop_mode import FastLoopExperiment, _run
 
@@ -99,8 +99,8 @@ class FullRoundDeadlineTests(unittest.TestCase):
             return mock.Mock(status_code=200, json=lambda: {'data': [{'embedding': [1.0]}]})
         token = ROUND_DEADLINE.set(time.monotonic() + 0.015)
         try:
-            with mock.patch('oak.vector.embedder.httpx.post', post), \
-                    mock.patch('oak.vector.embedder.time.sleep', wraps=time.sleep):
+            with mock.patch('darwinagent.vector.embedder.httpx.post', post), \
+                    mock.patch('darwinagent.vector.embedder.time.sleep', wraps=time.sleep):
                 with self.assertRaises(RoundDeadlineExceeded):
                     Embedder('https://unused.example', 'unused', 'recorded').embed('probe')
             self.assertEqual(len(calls), 1)
@@ -143,7 +143,7 @@ class ConversationDateTests(unittest.TestCase):
     def test_all_session_dates_follow_message_metadata(self):
         case = LocomoAdapter(Path('datasets/locomo/data/locomo10_zh.json')).generation_input('conv-26')
         from datasets.locomo.graph_rules import load_facts
-        facts, _ = load_facts(Path('datasets/locomo/snapshots/gvtest_v1/conv-26'))
+        facts, _ = load_facts(Path('tests/fixtures/locomo_snapshot/conv-26'))
         dates = _session_dates(facts, case.corpus)
         self.assertEqual(dates[1], '2023-05-08')
         for block in case.corpus:

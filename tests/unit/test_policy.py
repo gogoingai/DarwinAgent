@@ -1,6 +1,6 @@
 import unittest
-from oak.contracts import EvaluationResult
-from oak.experiments import AdoptionPolicy
+from darwinagent.contracts import EvaluationResult
+from darwinagent.experiments import AdoptionPolicy
 
 
 class AdoptionTests(unittest.TestCase):

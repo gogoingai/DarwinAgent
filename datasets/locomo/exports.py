@@ -1,6 +1,6 @@
 """Serialization bridge only; published content is never amended."""
 import json
-from oak.runtime.artifacts import atomic_json
+from darwinagent.runtime.artifacts import atomic_json
 
 
 def legacy_rows(result):

@@ -20,3 +20,9 @@ embed_cache.tmp
 # ---- 构建产物与本地参考资料 ----
 dist/
 papers/
+
+# Local packaging and test artifacts
+/build/
+.coverage
+.pytest_cache/
+htmlcov/

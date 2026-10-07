@@ -11,24 +11,24 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
 
-from oak.config import RunConfig
-from oak.agents.protocol import ModelSession, ProtocolError
-from oak.contracts import AnswerResult, CaseInput, EvaluationResult, QuestionInput, RunResult, SourceRef
-from oak.experiments.admission import AdmissionError, _samples
-from oak.experiments.admission_worker import run_isolated
-from oak.experiments.bootstrap import AssetBootstrapper
-from oak.experiments.runner import (ExperimentRunner, _retry_journal,
+from darwinagent.config import RunConfig
+from darwinagent.agents.protocol import ModelSession, ProtocolError
+from darwinagent.contracts import AnswerResult, CaseInput, EvaluationResult, QuestionInput, RunResult, SourceRef
+from darwinagent.experiments.admission import AdmissionError, _samples
+from darwinagent.experiments.admission_worker import run_isolated
+from darwinagent.experiments.bootstrap import AssetBootstrapper
+from darwinagent.experiments.runner import (ExperimentRunner, _retry_journal,
                                     _retryable_answer, _settle_reservations,
                                     _prior_failed_tool_params,
                                     stability_metrics)
-from oak.experiments.snapshots import attach_vector, load_frozen_graph
-from oak.kernel.assets import Asset, KernelAssets
-from oak.kernel.functions import FunctionRegistry
-from oak.llm.recorded import RecordedClient
-from oak.operators.data import DataCapabilities
-from oak.operators.sandbox import Limits
-from oak.runtime.artifacts import atomic_json
-from oak.runtime.artifacts import digest
+from darwinagent.experiments.snapshots import attach_vector, load_frozen_graph
+from darwinagent.kernel.assets import Asset, KernelAssets
+from darwinagent.kernel.functions import FunctionRegistry
+from darwinagent.llm.recorded import RecordedClient
+from darwinagent.operators.data import DataCapabilities
+from darwinagent.operators.sandbox import Limits
+from darwinagent.runtime.artifacts import atomic_json
+from darwinagent.runtime.artifacts import digest
 from tests.integration.test_agentic_round import (FakeEmbedder, build_snapshot,
                                                    cold_bundle, corpus, gvtest_graph)
 
@@ -106,7 +106,7 @@ class FrozenCandidateAdmissionTests(unittest.TestCase):
                          ['protocol_error','ok'])
 
     def test_stage_mixed_fault_retries_only_transient_checkpoint(self):
-        from oak.experiments import runner as runner_module
+        from darwinagent.experiments import runner as runner_module
 
         evidence=(SourceRef('m','c','1'),)
         initial=RunResult('trial','identity','version',(
@@ -180,7 +180,7 @@ class FrozenCandidateAdmissionTests(unittest.TestCase):
             self.assertEqual(journal['questions']['q1']['state'],'done')
 
     def test_stage_resume_does_not_reissue_reserved_mixed_fault(self):
-        from oak.experiments import runner as runner_module
+        from darwinagent.experiments import runner as runner_module
 
         class Client:
             def ledger_summary(self):
@@ -242,7 +242,7 @@ class FrozenCandidateAdmissionTests(unittest.TestCase):
                         {'asset_id':'f_two','status':'passed'}]})
                 raise subprocess.TimeoutExpired('worker',1)
 
-            with mock.patch('oak.experiments.admission_worker.subprocess.run',
+            with mock.patch('darwinagent.experiments.admission_worker.subprocess.run',
                             side_effect=blocks):
                 self.assertFalse(run_isolated(payload,report,1))
             saved=json.loads(report.read_text())
@@ -370,7 +370,7 @@ class FrozenCandidateAdmissionTests(unittest.TestCase):
                         {'asset_id':'f_two','status':'failed'}]})
                 return SimpleNamespace(returncode=1,stderr='AdmissionError')
 
-            with mock.patch('oak.experiments.admission_worker.subprocess.run',
+            with mock.patch('darwinagent.experiments.admission_worker.subprocess.run',
                             side_effect=refused):
                 self.assertFalse(run_isolated(payload,report,1))
             rows=json.loads(report.read_text())['scenarios']
@@ -605,7 +605,7 @@ class FrozenCandidateAdmissionTests(unittest.TestCase):
                     for row in report['scenarios']))
 
     def test_candidate_smoke_keeps_each_risk_category_when_dates_dominate(self):
-        from oak.experiments import runner as runner_module
+        from darwinagent.experiments import runner as runner_module
 
         class Client:
             async def aclose(self):
@@ -636,7 +636,7 @@ class FrozenCandidateAdmissionTests(unittest.TestCase):
         self.assertEqual(Pipeline.seen[:3],('date0','filter','traverse'))
 
     def test_candidate_smoke_recovers_transient_but_blocks_tool_failure(self):
-        from oak.experiments import runner as runner_module
+        from darwinagent.experiments import runner as runner_module
 
         @dataclass(frozen=True)
         class Case:

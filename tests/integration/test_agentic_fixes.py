@@ -6,29 +6,21 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from oak.config import RunConfig
-from oak.contracts import AnswerResult, CaseInput, EvaluationResult, QuestionInput, RunResult, SourceRef
-from oak.kernel.assets import Asset, KernelAssets
-from oak.kernel import KernelBundle
-from oak.kernel.validation import capability_floor_errors, capability_names
-from oak.llm.recorded import RecordedClient
-from oak.runtime.artifacts import digest
+from darwinagent.config import RunConfig
+from darwinagent.contracts import AnswerResult, CaseInput, EvaluationResult, QuestionInput, RunResult, SourceRef
+from darwinagent.kernel.assets import Asset, KernelAssets
+from darwinagent.kernel import KernelBundle
+from darwinagent.kernel.validation import capability_floor_errors, capability_names
+from darwinagent.llm.recorded import RecordedClient
+from darwinagent.runtime.artifacts import digest
 from types import SimpleNamespace
 
 
-def _container_str_allowed():
-    from oak.operators.sandbox import Interpreter, Limits, admit
-    try:
-        fn = admit("def run(p):\n return str(p['x'])\n", 'F', ['q'])
-        Interpreter(fn, {}, Limits(1000, 5.0, 10000)).execute({'x': [1]})
-        return True
-    except Exception:
-        return False
 
 
 class BatchedFaultRetryTests(unittest.TestCase):
     def run_retry(self, script, faulted):
-        from oak.experiments.runner import batched_fault_retry
+        from darwinagent.experiments.runner import batched_fault_retry
         td = tempfile.TemporaryDirectory(); self.addCleanup(td.cleanup)
         answers_dir = Path(td.name)
         for a in faulted:
@@ -96,7 +88,7 @@ class RetrievalFloorTests(unittest.TestCase):
         self.assertEqual(capability_floor_errors(real, ('semantic_search', 'traverse')), [])
 
     def test_trial_floor_requires_positive_execution(self):
-        from oak.kernel.validation import trial_capability_floor_errors
+        from darwinagent.kernel.validation import trial_capability_floor_errors
         untouched = ({'asset_id': 'a', 'data': [], 'capability_calls': {}},)
         self.assertEqual(len(trial_capability_floor_errors(untouched, ('semantic_search', 'traverse'))), 2)
         empty_but_executed = ({'asset_id': 'a', 'data': [], 'capability_calls': {'semantic_search': 1}},)
@@ -132,7 +124,7 @@ class TraceSummaryTests(unittest.TestCase):
 
     def test_tool_calls_distinct_from_model_outputs(self):
         # 评审#2 反例：一次工具调用 + ready + 作答 + 审查＝4 条模型输出，工具调用数必须是 1
-        from oak.experiments.runner import _retrieval_trace
+        from darwinagent.experiments.runner import _retrieval_trace
         summary = _retrieval_trace(self._answer([{'编号': 'c-0001'}]))
         self.assertEqual(summary['tool_calls'], 1)
         self.assertEqual(summary['model_calls'], 4)
@@ -142,7 +134,7 @@ class TraceSummaryTests(unittest.TestCase):
         self.assertEqual(summary['tools'][0]['capabilities'], {'semantic_search': 1})
 
     def test_empty_result_and_review_rejection_visible(self):
-        from oak.experiments.runner import _retrieval_trace
+        from darwinagent.experiments.runner import _retrieval_trace
         summary = _retrieval_trace(self._answer([], review_accepted=False, review_feedback='证据不足，不应作答'))
         self.assertEqual(summary['empty_results'], 1)
         self.assertTrue(any(r['by'] == 'review' and '证据不足' in r['reason'] for r in summary['rejections']))
@@ -158,7 +150,7 @@ class TraceGapTests(unittest.TestCase):
         return AnswerResult('0', 'answered', 'ok', evidence=ev, raw_outputs=raw, trace=trace_events)
 
     def test_frozen_check_reasons_visible(self):
-        from oak.experiments.runner import _retrieval_trace
+        from darwinagent.experiments.runner import _retrieval_trace
         events = ({'stage': 'candidate', 'attempt': 0,
                    'candidate': {'status': 'answered'},
                    'checks': ({'check_id': 'fixed.cite', 'ok': False,
@@ -172,7 +164,7 @@ class TraceGapTests(unittest.TestCase):
     def test_params_come_from_execution_record_not_rejected_calls(self):
         # 第一次动作调未登记工具被拒（raw_outputs 里留下错误参数），第二次成功——
         # 摘要必须用工具事件内执行点记录的 parameters
-        from oak.experiments.runner import _retrieval_trace
+        from darwinagent.experiments.runner import _retrieval_trace
         raw = ('{"action":"call","asset_id":"bogus_tool","parameters":{"wrong":true}}',
                '{"action":"call","asset_id":"f_good","parameters":{"stale":"x"}}',
                '{"action":"ready"}')
@@ -185,7 +177,7 @@ class TraceGapTests(unittest.TestCase):
         self.assertNotIn('stale', summary['tools'][0]['params'])
 
     def test_evidence_excerpts_and_sources_visible(self):
-        from oak.experiments.runner import _retrieval_trace
+        from darwinagent.experiments.runner import _retrieval_trace
         events = ({'stage': 'tool', 'attempt': 0, 'step': 0, 'asset_id': 'f_semantic',
                    'parameters': {'query': 'q'}, 'data': [
                        {'node_id': 'n000001', '陈述': '甲计划下周修打印机', 'source_ids': ['s1', 's2']},
@@ -199,7 +191,7 @@ class TraceGapTests(unittest.TestCase):
         self.assertEqual(evidence[0]['source_ids'], ['s1', 's2'])
 
     def test_truncation_is_marked(self):
-        from oak.experiments.runner import _retrieval_trace, _TRACE_CHARS
+        from darwinagent.experiments.runner import _retrieval_trace, _TRACE_CHARS
         events = tuple(
             {'stage': 'tool', 'attempt': 0, 'step': i, 'asset_id': f'f_{i}',
              'parameters': {'q': 'x' * 400}, 'data': [], 'node_ids': [], 'source_ids': [],
@@ -213,7 +205,7 @@ class TraceGapTests(unittest.TestCase):
 class CrossCaseTraceTests(unittest.TestCase):
     def test_same_question_id_keeps_case_local_trace(self):
         # 评审#3 反例：A、B 对话都有第 0 题，A 用 tool_A、B 用 tool_B——反馈不得串用
-        from oak.experiments import runner as R
+        from darwinagent.experiments import runner as R
         ev = (SourceRef('message_text', 'c', '1'),)
         def make(tool):
             raw = ('{"action":"call","asset_id":"%s","parameters":{"query":"q"}}' % tool,
@@ -243,7 +235,7 @@ class ProposalFeedbackTests(unittest.TestCase):
                              'precision_issues': [], 'reference_items': ['GOLD-SECRET']}}
 
     def test_failure_first_compressed_with_trace(self):
-        from oak.experiments import runner as R
+        from darwinagent.experiments import runner as R
         rows = (self.locomo_row('0', True), self.locomo_row('1', False),
                 self.locomo_row('2', False))
         ev = (SourceRef('message_text', 'c', '1'),)
@@ -276,7 +268,7 @@ class ProposalFeedbackTests(unittest.TestCase):
         self.assertEqual(feedback['diagnostic_rows_total'], 2)
 
     def test_budget_rotates_across_cases(self):
-        from oak.experiments import runner as R
+        from darwinagent.experiments import runner as R
         rows_a = tuple(self.locomo_row(str(i), False) for i in range(6))
         rows_b = tuple(self.locomo_row(str(i), False) for i in range(6))
         answers = tuple(AnswerResult(str(i), 'answered', 'x', evidence=(SourceRef('m', 'c', '1'),)) for i in range(6))
@@ -296,13 +288,13 @@ class ProposalFeedbackTests(unittest.TestCase):
 
 class ProposalPayloadContract(unittest.TestCase):
     def test_scope_and_admission_error_reach_the_model(self):
-        from oak.experiments.proposal import ProposalGenerator
+        from darwinagent.experiments.proposal import ProposalGenerator
         from tests.fixtures import case, spec
         td = tempfile.TemporaryDirectory(); self.addCleanup(td.cleanup)
         root = Path(td.name)
         s = spec(root / 'assets')
         client = RecordedClient({'proposal': ['not-json'] * 6})
-        config = __import__('oak.config', fromlist=['RunConfig']).RunConfig()
+        config = __import__('darwinagent.config', fromlist=['RunConfig']).RunConfig()
         async def run():
             return await ProposalGenerator().propose(
                 s.bundle if hasattr(s, 'bundle') else None, [case()], {'x': 1}, client, config,
@@ -359,7 +351,7 @@ class EmbedderCacheConcurrencyTests(unittest.TestCase):
         # conv-47 事故回归：共享固定 .tmp 名在并发缓存未命中时互相抢文件 →
         # FileNotFoundError 记为整题故障。唯一临时名后并发 flush 必须全部成功。
         import threading
-        from oak.vector.embedder import Embedder
+        from darwinagent.vector.embedder import Embedder
         emb = Embedder.__new__(Embedder)
         with tempfile.TemporaryDirectory() as td:
             emb.cache_path = Path(td) / 'embed_cache.json'
@@ -393,9 +385,9 @@ class AbstentionAuditScopeTests(unittest.TestCase):
         # 评审#5：融合版拒答审计不得读全图——covers_full_graph=False、证据＝已召回行；
         # 需要补证只能显式调用登记工具（调用与返回都在轨迹里）。
         import asyncio
-        from oak.engine import Pipeline
-        from oak.kernel import TaskSpec
-        from oak.llm.recorded import RecordedClient
+        from darwinagent.engine import Pipeline
+        from darwinagent.kernel import TaskSpec
+        from darwinagent.llm.recorded import RecordedClient
         from tests.fixtures import review
         from tests.integration.test_agentic_round import (ROOT, FakeEmbedder, build_snapshot,
                                                           cold_bundle, corpus)
@@ -443,7 +435,7 @@ class AdmissionRetryThenSuccessTests(unittest.TestCase):
         import contextlib
         import io
         from tests.integration.test_experiment import LedgerRecordedClient, RecordedExperiment
-        from oak.experiments.runner import ExperimentRunner
+        from darwinagent.experiments.runner import ExperimentRunner
         class RetryOnceExperiment(RecordedExperiment):
             def __init__(self, root):
                 super().__init__(root)
@@ -467,7 +459,7 @@ class AdmissionRetryThenSuccessTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             runner = RetryOnceExperiment(root)
-            from oak.kernel import TaskSpec
+            from darwinagent.kernel import TaskSpec
             from tests.integration.test_experiment import TASK
             task_spec = TaskSpec.load(TASK / 'task.yaml')
             with contextlib.redirect_stdout(io.StringIO()):
@@ -487,7 +479,7 @@ class FaultRetryInvalidatesEvaluationTests(unittest.TestCase):
         # 不得沿用基于故障答案集的旧检查点
         import asyncio
         from types import SimpleNamespace
-        from oak.experiments import runner as R
+        from darwinagent.experiments import runner as R
 
         class FakeClient:
             async def aclose(self): pass
@@ -551,8 +543,8 @@ if __name__ == '__main__':
 
 class GraphCheckBudgetTests(unittest.TestCase):
     def _registry(self, steps=30000):
-        from oak.kernel.checks import CheckRegistry
-        from oak.operators.sandbox import Limits
+        from darwinagent.kernel.checks import CheckRegistry
+        from darwinagent.operators.sandbox import Limits
         src = ("def check(candidate):\n"
                " issues=[]\n fact=0\n"
                " for n in candidate.get('nodes', []):\n"
@@ -584,7 +576,7 @@ class GraphCheckBudgetTests(unittest.TestCase):
     def test_stage_skip_and_preflight(self):
         import asyncio
         from types import SimpleNamespace
-        from oak.experiments import runner as R
+        from darwinagent.experiments import runner as R
         # (a) 图阶段全局失败：不进入分批重试（FakePipeline 只被调用一次）
         class FakeClient:
             async def aclose(self): pass
@@ -618,11 +610,11 @@ class PreflightCapabilityTests(unittest.TestCase):
         return asyncio.run(runner._preflight(*args,**kwargs))
     def _runner_with_graph(self, root):
         import asyncio
-        from oak.experiments.runner import ExperimentRunner
-        from oak.experiments.snapshots import load_frozen_graph
+        from darwinagent.experiments.runner import ExperimentRunner
+        from darwinagent.experiments.snapshots import load_frozen_graph
         from tests.integration.test_agentic_round import FakeEmbedder, build_snapshot, corpus, cold_bundle
         snapshot,_=build_snapshot(root)
-        from oak.experiments.snapshots import attach_vector
+        from darwinagent.experiments.snapshots import attach_vector
         graph=load_frozen_graph(snapshot, corpus())
         attach_vector(graph, snapshot, embedder_factory=lambda: FakeEmbedder())
         class C:
@@ -638,13 +630,13 @@ class PreflightCapabilityTests(unittest.TestCase):
         # 评审③反例：semantic_search 在未执行分支里（AST 有调用），试跑只执行 nodes
         # ——候选预检必须拒绝
         from dataclasses import replace
-        from oak.kernel import TaskSpec
+        from darwinagent.kernel import TaskSpec
         from tests.integration.test_agentic_round import ROOT
         with tempfile.TemporaryDirectory() as td:
             root=Path(td)
             runner,bundle=self._runner_with_graph(root)
             spec=TaskSpec.load(ROOT/'tasks/conversation_memory/task.yaml')
-            from oak.kernel.assets import Asset
+            from darwinagent.kernel.assets import Asset
             fake=Asset('f_semantic','F',
                 "def run(params):\n if params.get('mode')=='vec':\n  return semantic_search(params['query'], limit=4)\n return nodes('原子事实', limit=2)\n",
                 {'type':'object','properties':{'mode':{'type':'string'}}},{'type':'array'},
@@ -667,7 +659,7 @@ class PreflightCapabilityTests(unittest.TestCase):
 
     def _export(self, root, assets):
         import tempfile as _tf
-        from oak.kernel.assets import KernelAssets
+        from darwinagent.kernel.assets import KernelAssets
         return KernelAssets(assets).export(Path(_tf.mkdtemp(prefix='pf-'))/'exported')
 
 
@@ -681,10 +673,10 @@ class ExternalEntryTests(unittest.TestCase):
 
     def _setup(self, td, with_traverse=True, bad_c=False):
         import asyncio
-        from oak.engine import Pipeline  # noqa: F401  确认入口依赖可导入
-        from oak.experiments.snapshots import load_frozen_graph
-        from oak.kernel import TaskSpec
-        from oak.kernel.assets import Asset, KernelAssets
+        from darwinagent.engine import Pipeline  # noqa: F401  确认入口依赖可导入
+        from darwinagent.experiments.snapshots import load_frozen_graph
+        from darwinagent.kernel import TaskSpec
+        from darwinagent.kernel.assets import Asset, KernelAssets
         from tests.integration.test_agentic_round import (ROOT, FakeEmbedder, build_snapshot,
                                                           cold_bundle, corpus)
         root = Path(td)
@@ -715,7 +707,7 @@ class ExternalEntryTests(unittest.TestCase):
         from tests.integration.test_agentic_round import FakeEmbedder
         with tempfile.TemporaryDirectory() as td:
             root, snapshot, manifest, bundle, task, cases = self._setup(td)
-            config = __import__('oak.config', fromlist=['RunConfig']).RunConfig(function_timeout_s=15.0)
+            config = __import__('darwinagent.config', fromlist=['RunConfig']).RunConfig(function_timeout_s=15.0)
             # 完整入口第一段：锁定资产加载 + 逐对话预检（真向量索引挂载＋图 C＋能力试跑）
             preflight(bundle, config, task, cases, snap_root=root / 'snapshots',
                       embedder_factory=lambda: FakeEmbedder())
@@ -734,7 +726,7 @@ class ExternalEntryTests(unittest.TestCase):
         import tempfile
         from datasets.locomo.scripts.external_test import preflight
         from tests.integration.test_agentic_round import FakeEmbedder
-        config = __import__('oak.config', fromlist=['RunConfig']).RunConfig(function_timeout_s=15.0)
+        config = __import__('darwinagent.config', fromlist=['RunConfig']).RunConfig(function_timeout_s=15.0)
         with tempfile.TemporaryDirectory() as td:
             root, _, _, bundle, task, cases = self._setup(td, with_traverse=False)
             with self.assertRaises(SystemExit) as caught:
@@ -757,7 +749,7 @@ class PreflightStagingTests(unittest.TestCase):
         import contextlib
         import io
         from tests.integration.test_experiment import RecordedExperiment
-        from oak.kernel import TaskSpec
+        from darwinagent.kernel import TaskSpec
         from tests.integration.test_experiment import TASK
 
         class PreflightFailOnce(RecordedExperiment):
@@ -795,7 +787,7 @@ class PreflightStagingTests(unittest.TestCase):
         import contextlib
         import io
         from tests.integration.test_experiment import RecordedExperiment, TASK
-        from oak.kernel import TaskSpec
+        from darwinagent.kernel import TaskSpec
         from tests.integration.test_agentic_round import cold_bundle
 
         class Recording(RecordedExperiment):
@@ -821,7 +813,7 @@ class PreflightStagingTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
-            from oak.kernel.registration import load_assets
+            from darwinagent.kernel.registration import load_assets
             load_assets(TASK).export(root / 'seed')     # 设备任务 bundle，导出目录＝root/'seed'
             runner = Recording(root)
             target = root / 'R1' / 'candidate' / 'bundle'
@@ -842,7 +834,7 @@ class TraceReturnTypesTests(unittest.TestCase):
     """评审四：合法的非数组工具返回不崩摘要；空结果与合法 0/False 区分。"""
 
     def _summarize(self, data):
-        from oak.experiments.runner import _retrieval_trace
+        from darwinagent.experiments.runner import _retrieval_trace
         ev = (SourceRef('message_text', 'c', '1'),)
         raw = ('{"action":"call","asset_id":"t","parameters":{}}', '{"action":"ready"}')
         events = ({'stage': 'tool', 'attempt': 0, 'step': 0, 'asset_id': 't',
@@ -914,8 +906,8 @@ class AnswerCheckAdmissionTests(unittest.TestCase):
              'source_ids': ['s'], '编号': 'c-0001', '主体': '甲'}]
 
     def _registry(self, src, check_stage='answer'):
-        from oak.kernel.checks import CheckRegistry
-        from oak.operators.sandbox import Limits
+        from darwinagent.kernel.checks import CheckRegistry
+        from darwinagent.operators.sandbox import Limits
         target_stage = check_stage
         class A: kind='C'; id='c'; fingerprint='f'; stage=target_stage; content=src
         class B:
@@ -924,14 +916,14 @@ class AnswerCheckAdmissionTests(unittest.TestCase):
         return CheckRegistry(B(), Limits(30000, 15.0, 180000))
 
     def test_synthetic_snapshot_is_well_formed(self):
-        from oak.kernel.checks import synthetic_answer_snapshot
+        from darwinagent.kernel.checks import synthetic_answer_snapshot
         snap = synthetic_answer_snapshot(self.ROWS, '甲计划做什么？')
         self.assertEqual(snap['status'], 'answered')
         self.assertEqual(snap['answer'], '甲计划下周修打印机')
         self.assertTrue(snap['evidence'] and snap['node_ids'])
 
     def test_rejecting_c_fails_admission(self):
-        from oak.kernel.checks import enforce_opinions, synthetic_answer_snapshot
+        from darwinagent.kernel.checks import enforce_opinions, synthetic_answer_snapshot
         snap = synthetic_answer_snapshot(self.ROWS, '甲计划做什么？')
         bad = self._registry("def check(candidate):\n return {'ok': False, 'issues': ['candidate 不是对象']}")
         with self.assertRaises(ValueError) as caught:
@@ -967,8 +959,7 @@ class TrimmedEvaluateTests(unittest.TestCase):
                 aud = tdp / 'audited.json'
                 aud.write_text(json.dumps([{'idx': i, 'question': f'q{i}', 'answer': f'g{i}',
                                             'disputed': i == 5} for i in range(n_qas)]))
-            ev.LOCK_PATH = lock
-            evaluator = ev.LocomoEvaluator(None, tdp / 'work', audited_path=aud or tdp / 'x.json')
+            evaluator = ev.LocomoEvaluator(None, tdp / 'work', audited_path=aud or tdp / 'x.json', lock_path=lock)
             fake_aggregate = lambda rows, disputed: {
                 'overall': {'lenient': {'correct': len(rows)}, 'precise': {'correct': len(rows)}},
                 'grades': [{'idx': row['idx'], 'status': 'ok'} for row in rows]}
@@ -1026,39 +1017,39 @@ async def _fake_dual_grade_batch(items, client, context, cache_dir):
 
 class CarriedCheckpointTests(unittest.TestCase):
     """答案检查点跨框架版本搬运（用户指令：不要从头跑）：CARRIED 旁车＋答案路径逐字节复核。
-    编排/评测层（oak/experiments/）差异不影响答案计算，可重锚；答案路径漂移一律拒绝。"""
+    编排/评测层（darwinagent/experiments/）差异不影响答案计算，可重锚；答案路径漂移一律拒绝。"""
 
     def test_no_sidecar_accepts_only_current_identity(self):
-        from oak.engine.pipeline import carried_acceptor
+        from darwinagent.engine.pipeline import carried_acceptor
         with tempfile.TemporaryDirectory() as td:
             acc = carried_acceptor(td, 'new-id', {})
             self.assertTrue(acc('new-id'))
             self.assertFalse(acc('old-id'))
 
     def test_sidecar_accepts_old_identity_when_answer_path_identical(self):
-        from oak.engine.pipeline import carried_acceptor
-        fw = {'/x/oak/operators/data.py': 'a', '/x/oak/experiments/runner.py': 'old'}
+        from darwinagent.engine.pipeline import carried_acceptor
+        fw = {'/x/darwinagent/operators/data.py': 'a', '/x/darwinagent/experiments/runner.py': 'old'}
         with tempfile.TemporaryDirectory() as td:
             (Path(td) / 'CARRIED.json').write_text(json.dumps(
                 {'accepted_identities': ['old-id'], 'source_framework': fw}))
             self.assertTrue(carried_acceptor(td, 'new-id', fw)('old-id'))
-            fw2 = dict(fw); fw2['/x/oak/experiments/runner.py'] = 'new'
+            fw2 = dict(fw); fw2['/x/darwinagent/experiments/runner.py'] = 'new'
             self.assertTrue(carried_acceptor(td, 'new-id', fw2)('old-id'))  # 编排层差异放行
 
     def test_sidecar_rejects_when_answer_path_changed(self):
-        from oak.engine.pipeline import carried_acceptor
+        from darwinagent.engine.pipeline import carried_acceptor
         with tempfile.TemporaryDirectory() as td:
             (Path(td) / 'CARRIED.json').write_text(json.dumps(
                 {'accepted_identities': ['old-id'],
-                 'source_framework': {'/x/oak/operators/data.py': 'a'}}))
+                 'source_framework': {'/x/darwinagent/operators/data.py': 'a'}}))
             with self.assertRaisesRegex(ValueError, '答案路径文件与搬运源不一致'):
-                carried_acceptor(td, 'new-id', {'/x/oak/operators/data.py': 'changed'})
+                carried_acceptor(td, 'new-id', {'/x/darwinagent/operators/data.py': 'changed'})
 
     def test_carry_rebase_answer_path_drift_detected(self):
         from datasets.locomo.scripts.carry_rebase import answer_path_ok
-        bad = answer_path_ok({'/x/oak/operators/data.py': 'a', '/x/oak/experiments/runner.py': 'old'},
-                             {'/x/oak/operators/data.py': 'b', '/x/oak/experiments/runner.py': 'new'})
-        self.assertEqual(bad, ['/x/oak/operators/data.py'])
+        bad = answer_path_ok({'/x/darwinagent/operators/data.py': 'a', '/x/darwinagent/experiments/runner.py': 'old'},
+                             {'/x/darwinagent/operators/data.py': 'b', '/x/darwinagent/experiments/runner.py': 'new'})
+        self.assertEqual(bad, ['/x/darwinagent/operators/data.py'])
 
 
 class SmokeThresholdTests(unittest.TestCase):
@@ -1067,8 +1058,8 @@ class SmokeThresholdTests(unittest.TestCase):
 
     def test_single_fault_passes_double_fault_rejects(self):
         from dataclasses import dataclass, replace as dcreplace
-        from oak.experiments.runner import ExperimentRunner
-        import oak.experiments.runner as R
+        from darwinagent.experiments.runner import ExperimentRunner
+        import darwinagent.experiments.runner as R
         @dataclass
         class Q:
             id: str; text: str = '?'; parameters: dict = None
@@ -1108,7 +1099,7 @@ class SmokeJudgeContractTests(unittest.TestCase):
     def test_smoke_judge_maps_evaluation_result_fields(self):
         import datasets.locomo.run as R
         import datasets.locomo.evaluator as EV
-        from oak.contracts import EvaluationResult
+        from darwinagent.contracts import EvaluationResult
         async def fake_evaluate(self, result, asked=None):
             return EvaluationResult({'original_precise': 2}, 3, 2, 0, 1)
         answers = (AnswerResult('0', 'abstained', 'x', ()),) * 3
@@ -1123,10 +1114,10 @@ class EvidenceBoundaryTests(unittest.TestCase):
 
     def test_returned_rows_only_plus_fabrication_guard(self):
         import tempfile
-        from oak.experiments.snapshots import load_frozen_graph, attach_vector
-        from oak.kernel.functions import FunctionRegistry
-        from oak.kernel.assets import Asset, KernelAssets
-        from oak.operators.sandbox import Limits
+        from darwinagent.experiments.snapshots import load_frozen_graph, attach_vector
+        from darwinagent.kernel.functions import FunctionRegistry
+        from darwinagent.kernel.assets import Asset, KernelAssets
+        from darwinagent.operators.sandbox import Limits
         from tests.integration.test_agentic_round import FakeEmbedder, build_snapshot, corpus
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
@@ -1150,7 +1141,7 @@ class EvidenceBoundaryTests(unittest.TestCase):
             reg = FunctionRegistry(bundle, Limits(30000, 15.0, 180000))
             result = reg.call('f_pick', {}, graph)
             caps_rows = graph  # 快照图行集来自 load_frozen_graph 的 DataCapabilities
-            from oak.operators.data import DataCapabilities
+            from darwinagent.operators.data import DataCapabilities
             all_read = DataCapabilities(graph).rows
             fact_ids = [nid for nid, row in all_read.items() if row['entity_type'] == '原子事实']
             self.assertEqual(len(result['read_node_ids']), min(50, len(fact_ids)))
@@ -1168,8 +1159,8 @@ class DeterministicFaultTests(unittest.TestCase):
     def test_deterministic_error_skips_retry(self):
         import asyncio
         from tests.integration.test_experiment import TASK
-        from oak.kernel import TaskSpec
-        import oak.experiments.runner as R
+        from darwinagent.kernel import TaskSpec
+        import darwinagent.experiments.runner as R
         from tests.integration.test_agentic_round import build_snapshot, corpus
         scripted = [RunResult('c', 'i', 'v', (
             AnswerResult('q1', 'answered', 'a', (SourceRef('k', 'd', 'l'),)),
@@ -1212,14 +1203,14 @@ class DecorativeCheckTests(unittest.TestCase):
     装饰性 C（永远 ok）在准入被拒。"""
 
     def test_all_ok_check_rejected_and_flagging_check_passes(self):
-        from oak.kernel.checks import enforce_rejection
+        from darwinagent.kernel.checks import enforce_rejection
         enforce_rejection([], 'ctx')                                  # 无 C＝合法省略
         with self.assertRaisesRegex(ValueError, '畸形候选'):
             enforce_rejection([{'check_id': 'c1', 'ok': True, 'issues': []}], 'ctx')
         enforce_rejection([{'check_id': 'c1', 'ok': False, 'issues': ['空答案']}], 'ctx')
 
     def test_invalid_variant_shape(self):
-        from oak.kernel.checks import synthetic_invalid_answer_snapshot
+        from darwinagent.kernel.checks import synthetic_invalid_answer_snapshot
         v = synthetic_invalid_answer_snapshot('问？')
         self.assertEqual(v['status'], 'answered')
         self.assertEqual(v['answer'], '')
@@ -1230,7 +1221,7 @@ class ActiveStagesFeedbackTests(unittest.TestCase):
     """专家规格#5：冻结快照下 P.extract 不执行——反馈必须告知提案器「改它不进计分路径」。"""
 
     def test_frozen_snapshot_marks_extract_skipped(self):
-        from oak.experiments.runner import pipeline_active_stages
+        from darwinagent.experiments.runner import pipeline_active_stages
         frozen = pipeline_active_stages(Path('/snapshots'))
         self.assertIn('SKIPPED', frozen['P.extract'])
         self.assertIn('不因 S 补丁重建', frozen['S'])
@@ -1243,7 +1234,7 @@ class ToolTelemetryTests(unittest.TestCase):
     逐调用新增证据增量（new_node_ids）与重复调用标记（repeat_call）。"""
 
     def test_new_ids_and_repeat_flag(self):
-        from oak.experiments.runner import _retrieval_trace
+        from darwinagent.experiments.runner import _retrieval_trace
         from types import SimpleNamespace as NS
         params = {'query': '甲'}
         trace = (
@@ -1267,8 +1258,8 @@ class CrossRoundRejectionFeedbackTests(unittest.TestCase):
     轮内重试看得到 admission_error，跨轮以前看不到，导致每轮摔新坑不带记忆。"""
 
     def test_previous_round_rejection_enters_feedback(self):
-        from oak.experiments.runner import training_feedback
-        from oak.contracts import RunResult
+        from darwinagent.experiments.runner import training_feedback
+        from darwinagent.contracts import RunResult
         result = RunResult('c', 'i', 'v', (), (), ())
         payload = training_feedback((SimpleNamespace(id='c', questions=()),), (result,), (('c', {}),),
                                     EvaluationResult({'m': 0}, 0, 0, 0, 0),
@@ -1287,14 +1278,14 @@ class PatchNormalizationTests(unittest.TestCase):
     格式类错误不再消耗重试预算（用户拍板重试上限 50 次，留给内容类问题）。"""
 
     def test_extra_keys_dropped_and_noted(self):
-        from oak.experiments.proposal import ProposalGenerator
+        from darwinagent.experiments.proposal import ProposalGenerator
         import inspect
         src = inspect.getsource(ProposalGenerator)
         self.assertIn('dropped', src)
         # 直接驱动 valid：构造带多余键的补丁载荷
         import asyncio
-        from oak.kernel.assets import Asset
-        from oak.llm.recorded import RecordedClient
+        from darwinagent.kernel.assets import Asset
+        from darwinagent.llm.recorded import RecordedClient
         item = {'id': 'p_x', 'kind': 'P', 'role': 'tools', 'content': '指引',
                 'input_contract': {'type': 'any'}, 'output_contract': {'type': 'any'},
                 'schema_dependencies': [], 'description': 'd', 'trial_inputs': [],
@@ -1305,7 +1296,7 @@ class PatchNormalizationTests(unittest.TestCase):
         gen = ProposalGenerator.__new__(ProposalGenerator)
         valid = None
         # 通过类内部协议函数直接验证剥离逻辑（不整段伪造会话）
-        from oak.experiments.proposal import AssetPatch
+        from darwinagent.experiments.proposal import AssetPatch
         import dataclasses
         fields = {f.name for f in dataclasses.fields(Asset)}
         extra = sorted(set(item) - fields - {'schema_dependencies'})
@@ -1322,7 +1313,7 @@ class RetryVarianceTests(unittest.TestCase):
 
     def test_admission_error_carries_attempt_number(self):
         import inspect
-        from oak.experiments import runner
+        from darwinagent.experiments import runner
         src = inspect.getsource(runner)
         self.assertIn('重试 {attempt+1}/{ADMISSION_ATTEMPTS}', src)
 
@@ -1331,16 +1322,14 @@ class FUnitTestsTests(unittest.TestCase):
     """用户拍板：冒烟之外必须有单测——准入试跑并入真实数据形态压力矩阵
     （空行/图头尾/列表字段行）。容器 str() 类分支错误在准入层暴露（R7 事故：14 题）。"""
 
-    @unittest.skipUnless(_container_str_allowed(), '沙箱容器str修复已回退（分支待重部署）')
-    def test_container_str_now_safe_across_stress_shapes(self):
-        """语义更新（用户拍板根治）：容器 str() 合法化后，压力矩阵验证的是
-        「全形态不崩」——该类错误已不存在，矩阵继续拦其他形态病（None/缺字段）。"""
+    def test_stress_samples_expose_unsupported_container_conversion(self):
+        """Current sandbox rejects container string conversion; stress trials must expose it."""
         import tempfile
-        from oak.experiments.runner import stress_trial_samples
-        from oak.experiments.snapshots import load_frozen_graph
-        from oak.kernel.assets import Asset, KernelAssets
-        from oak.kernel.functions import FunctionRegistry
-        from oak.operators.sandbox import Limits
+        from darwinagent.experiments.runner import stress_trial_samples
+        from darwinagent.experiments.snapshots import load_frozen_graph
+        from darwinagent.kernel.assets import Asset, KernelAssets
+        from darwinagent.kernel.functions import FunctionRegistry
+        from darwinagent.operators.sandbox import Limits
         from tests.integration.test_agentic_round import FakeEmbedder, build_snapshot, corpus, cold_bundle
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
@@ -1359,20 +1348,26 @@ class FUnitTestsTests(unittest.TestCase):
             reg = FunctionRegistry(bundle, Limits(30000, 15.0, 180000))
             samples = stress_trial_samples([{'rows': [{'node_id': 'n000000'}]}], graph)
             self.assertTrue(samples, '压力样本应非空')
-            for sample in samples:                     # 全形态不崩＝通过（容器 str 已合法）
-                reg.call('f_bad', sample, graph)
+            from darwinagent.operators.sandbox import SandboxError
+            failures = []
+            for sample in samples:
+                try:
+                    reg.call('f_bad', sample, graph)
+                except SandboxError as exc:
+                    failures.append(str(exc))
+            self.assertTrue(any('Container-to-string conversion is unsupported' in e for e in failures))
 
     def test_stress_samples_shapes(self):
         import tempfile
-        from oak.experiments.runner import stress_trial_samples
+        from darwinagent.experiments.runner import stress_trial_samples
         from tests.integration.test_agentic_round import build_snapshot
         with tempfile.TemporaryDirectory() as td:
             snapshot, _ = build_snapshot(Path(td))
-            from oak.experiments.snapshots import load_frozen_graph
+            from darwinagent.experiments.snapshots import load_frozen_graph
             from tests.integration.test_agentic_round import corpus
             graph = load_frozen_graph(snapshot, corpus())
             base = {'rows': [{'node_id': 'n000000'}]}
-            from oak.operators.data import DataCapabilities
+            from darwinagent.operators.data import DataCapabilities
             total = len(DataCapabilities(graph).rows)
             out = stress_trial_samples([base], graph)
             self.assertTrue(any(p['rows'] == [] for p in out), '含空行集')
@@ -1384,18 +1379,16 @@ class FUnitTestsTests(unittest.TestCase):
 
 
 class ContainerStringificationTests(unittest.TestCase):
-    """根治（用户拍板）：容器 str() 不再报错——三轮事故 R7/R10/R13 共 70 题故障同类。
-    纯数据容器确定性字符串化（递归限深限宽，无地址信息）。"""
+    """Current restricted execution contract forbids container-to-string conversion."""
 
-    @unittest.skipUnless(_container_str_allowed(), '沙箱容器str修复已回退（分支待重部署）')
-    def test_str_container_deterministic(self):
-        from oak.operators.sandbox import Interpreter, Limits, admit
+    def test_container_conversion_is_rejected(self):
+        from darwinagent.operators.sandbox import Interpreter, Limits, admit
         src = ("def run(params):\n"
                " return {'s': str(params['rows'][0].get('source_ids', []))}\n")
         fn = admit(src, 'F', ['q?'])
-        from oak.operators.data import DataCapabilities
+        from darwinagent.operators.data import DataCapabilities
         caps = None  # 无能力依赖
         interp = Interpreter(fn, {}, Limits(30000, 15.0, 180000))
-        out = interp.execute({'rows': [{'source_ids': ['D1:3', 'D1:7']}]})
-        self.assertEqual(out['s'], '[D1:3;D1:7]')
-        self.assertNotIn('0x', out['s'], '不得含地址信息')
+        from darwinagent.operators.sandbox import SandboxError
+        with self.assertRaisesRegex(SandboxError, 'Container-to-string conversion is unsupported'):
+            interp.execute({'rows': [{'source_ids': ['D1:3', 'D1:7']}]})

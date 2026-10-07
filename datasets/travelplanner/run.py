@@ -3,12 +3,12 @@ import argparse
 import asyncio
 from pathlib import Path
 
-from oak.config import RunConfig
-from oak.engine import Pipeline
-from oak.kernel import TaskSpec
-from oak.kernel.registration import load_assets
-from oak.llm.client import LLMClient
-from oak.llm.settings import load_connection
+from darwinagent.config import RunConfig
+from darwinagent.engine import Pipeline
+from darwinagent.kernel import TaskSpec
+from darwinagent.kernel.registration import load_assets
+from darwinagent.llm.client import LLMClient
+from darwinagent.llm.settings import load_legacy_connection as load_connection
 from .adapter import TravelPlannerAdapter
 from .evaluator import TravelPlannerEvaluator
 from .exports import write
@@ -27,7 +27,7 @@ async def main(args):
         result=await Pipeline(client,root/'generation').run(adapter.generation_input(str(args.index)),spec,RunConfig())
         write(result,root/'plans.jsonl')
         scores=await TravelPlannerEvaluator(root/'evaluation').evaluate(result)
-        from oak.runtime.artifacts import atomic_json
+        from darwinagent.runtime.artifacts import atomic_json
         atomic_json(root/'evaluation.json',scores.to_dict())
 
 

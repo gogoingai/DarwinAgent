@@ -12,12 +12,12 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from oak.config import RunConfig
-from oak.contracts import EvaluationResult
-from oak.kernel import TaskSpec
-from oak.kernel.execution import KernelRuntime
-from oak.kg.graph import load_graph
-from oak.agents.answer import AnswerAgent
+from darwinagent.config import RunConfig
+from darwinagent.contracts import EvaluationResult
+from darwinagent.kernel import TaskSpec
+from darwinagent.kernel.execution import KernelRuntime
+from darwinagent.kg.graph import load_graph
+from darwinagent.agents.answer import AnswerAgent
 
 from tests.integration.test_wiki_faults_repro import (FIXTURES, TASK_YAML,
                                                       FIXED_C, FIXED_F,
@@ -103,13 +103,13 @@ class ExternalFaultsDoNotBlockAdoption(unittest.TestCase):
                                 len(faults), 0, diag)
 
     def test_split_faults_classifies_by_error_prefix(self):
-        from oak.experiments.policy import split_faults
+        from darwinagent.experiments.policy import split_faults
         s = self._scores(5, faults=('TransportExhausted: tools: 429', 'RateLimitError: x',
                                     'ValueError: tool.params: undeclared'))
         self.assertEqual(split_faults(s), (2, 1))
 
     def test_external_fault_does_not_block_deterministic_does(self):
-        from oak.experiments.policy import AdoptionPolicy
+        from darwinagent.experiments.policy import AdoptionPolicy
         policy = AdoptionPolicy('precise', ('lenient',))
         baseline = self._scores(5)
         # 外部故障候选：primary 严格升 → 采纳，且披露 external_faults

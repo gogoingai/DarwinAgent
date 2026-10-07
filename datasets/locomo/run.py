@@ -11,13 +11,13 @@ import json
 from collections import Counter
 from pathlib import Path
 
-from oak.config import RunConfig
-from oak.engine import Pipeline
-from oak.experiments import (AdoptionPolicy, CampaignController, ExperimentRunner, ExperimentSpec, SelectionPolicy)
-from oak.experiments.spec import precheck_identity
-from oak.kernel import KernelBundle, TaskSpec
-from oak.llm.client import LLMClient
-from oak.llm.settings import load_connection
+from darwinagent.config import RunConfig
+from darwinagent.engine import Pipeline
+from darwinagent.experiments import (AdoptionPolicy, CampaignController, ExperimentRunner, ExperimentSpec, SelectionPolicy)
+from darwinagent.experiments.spec import precheck_identity
+from darwinagent.kernel import KernelBundle, TaskSpec
+from darwinagent.llm.client import LLMClient
+from darwinagent.llm.settings import load_legacy_connection as load_connection
 from .adapter import LocomoAdapter
 from .evaluator import LocomoEvaluator, AUDITED, LOCK_PATH
 from .exports import write
@@ -56,7 +56,7 @@ def arm_config(arm, vector_k=None):
 def memory_structure_sample(snapshot_dir,max_facts=30):
     """Deterministic, label-free structure sample of the frozen memory plane for cold-start
     bootstrap: node/relation inventories plus a few atomic-memory rows."""
-    from oak.kg.graph import load_graph
+    from darwinagent.kg.graph import load_graph
     manifest=json.loads((Path(snapshot_dir)/'manifest.json').read_text())
     g=load_graph(Path(snapshot_dir)/'graph.json')
     node_types=Counter(nd.get('etype') for _,nd in g.nodes(data=True))
@@ -113,7 +113,7 @@ def bootstrap_trial_graph(adapter):
     两臂共用——V0 虽不走工具循环，其 bundle 的 F 仍要在同一记忆面上通过试跑与探针。"""
     global _TRIAL_GRAPH
     if _TRIAL_GRAPH is None:
-        from oak.experiments.snapshots import attach_vector, load_frozen_graph
+        from darwinagent.experiments.snapshots import attach_vector, load_frozen_graph
         corpus=adapter.generation_input('conv-26').corpus
         graph=load_frozen_graph(SNAPSHOTS/'conv-26',corpus)
         attach_vector(graph,SNAPSHOTS/'conv-26')
@@ -273,7 +273,7 @@ async def main(args):
                                                               spec.with_bundle(KernelBundle(Path(args.assets))),config)
             write(result,root/'answers.jsonl')
             scores=await LocomoEvaluator(client,root/'evaluation').evaluate(result)
-            from oak.runtime.artifacts import atomic_json
+            from darwinagent.runtime.artifacts import atomic_json
             atomic_json(root/'evaluation.json',scores.to_dict())
 
 

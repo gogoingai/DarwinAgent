@@ -15,11 +15,11 @@ from pathlib import Path
 from unittest import mock
 
 from networkx import freeze
-from oak.config import RunConfig
-from oak.contracts import GraphResult
-from oak.kernel import KernelBundle, TaskSpec
-from oak.kernel.execution import KernelRuntime
-from oak.kernel.registration import load_assets
+from darwinagent.config import RunConfig
+from darwinagent.contracts import GraphResult
+from darwinagent.kernel import KernelBundle, TaskSpec
+from darwinagent.kernel.execution import KernelRuntime
+from darwinagent.kernel.registration import load_assets
 from tests.fixtures import TASK
 from tests.integration.test_experiment import RecordedExperiment
 from tests.integration.test_wiki_faults_repro import (FIXTURES, TASK_YAML,
@@ -28,13 +28,13 @@ from tests.integration.test_wiki_faults_repro import (FIXTURES, TASK_YAML,
                                                       candidate_bundle,
                                                       legal_candidate,
                                                       travel_case)
-from oak.kg.graph import load_graph
-from oak.agents.answer import AnswerAgent
+from darwinagent.kg.graph import load_graph
+from darwinagent.agents.answer import AnswerAgent
 
 
 class MaxRetriesDefault(unittest.TestCase):
     def test_transport_retries_now_ten(self):
-        from oak.config import Config
+        from darwinagent.config import Config
         cfg = Config(api_key='x', work_dir=Path(tempfile.mkdtemp()))
         self.assertEqual(cfg.max_retries, 10)
 
@@ -47,7 +47,7 @@ class PublishRejectEntersFeedback(unittest.TestCase):
         question = case.questions[0]
         g = load_graph(FIXTURES / 'graph.json')
         # 从工具真实可见的 Rockford 餐厅行里选节点（候选校验要求 node_ids ⊆ visible）
-        from oak.operators.data import DataCapabilities
+        from darwinagent.operators.data import DataCapabilities
         probe = GraphResult(freeze(g), {b.source.id: b for b in case.corpus})
         caps = DataCapabilities(probe)
         visible_rests = [rid for rid, r in caps.rows.items()
@@ -130,7 +130,7 @@ class ScoredRoundsAndIdentity(unittest.TestCase):
 
         class _Eval:
             async def evaluate(self, result, asked=None):
-                from oak.contracts import EvaluationResult
+                from darwinagent.contracts import EvaluationResult
                 precise = 0 if name == 'B0' else 1
                 return EvaluationResult({'precise': precise}, 1, 1, 0, 0)
         return _Eval()
@@ -144,9 +144,9 @@ class ScoredRoundsAndIdentity(unittest.TestCase):
                                         evaluator=self._lenient_evaluator,
                                         validation_plan={'case': None, 'policy': None})
             runner.validation_plan['case'] = runner.case
-            from oak.experiments.spec import SelectionPolicy
+            from darwinagent.experiments.spec import SelectionPolicy
             runner.validation_plan['policy'] = SelectionPolicy('precise', 'precise')
-            from oak.experiments.proposal import ProposalGenerator
+            from darwinagent.experiments.proposal import ProposalGenerator
             original = ProposalGenerator.propose
 
             async def stall_r1_then_fail(self, *args, **kwargs):
@@ -206,7 +206,7 @@ class SeedAssetsAnchor(unittest.TestCase):
                     return super()._client(stage)
 
             runner = SeededRun(root, seed_assets=seed_dir)
-            with mock.patch('oak.experiments.bootstrap.AssetBootstrapper',
+            with mock.patch('darwinagent.experiments.bootstrap.AssetBootstrapper',
                             side_effect=AssertionError('冷启动不应执行')):
                 summary = _run(runner, rounds=0)
             self.assertEqual(summary['status'], 'complete')

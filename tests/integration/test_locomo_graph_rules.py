@@ -11,7 +11,7 @@ from datasets.locomo.graph_rules import (
     FACT_TYPE, PROJECTION_VERSION, graph_cache_key, load_facts,
     project_candidates, rebuild_graph, vector_hit_check)
 
-SNAPSHOTS = Path('datasets/locomo/snapshots/gvtest_v1')
+SNAPSHOTS = Path('tests/fixtures/locomo_snapshot')
 
 MINIMAL_S = """\
 meta:
@@ -55,7 +55,7 @@ class FactProjectionTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.facts, cls.manifest = load_facts(SNAPSHOTS / 'conv-26')
-        cls.schema = __import__('oak.schema.model', fromlist=['Schema']).Schema \
+        cls.schema = __import__('darwinagent.schema.model', fromlist=['Schema']).Schema \
             .from_yaml(MINIMAL_S)
 
     def test_projection_is_deterministic_and_traceable(self):
@@ -126,7 +126,7 @@ class FactProjectionTests(unittest.TestCase):
 
     def test_undeclared_schema_is_rejected(self):
         """S 绑定：S 未声明投影硬前提（缺 原子事实）→ 重建被拒，不是静默降级。"""
-        from oak.schema.model import Schema
+        from darwinagent.schema.model import Schema
         poor = Schema.from_yaml(
             'meta:\n  task: conversation_memory\n'
             'entity_types:\n'
@@ -139,7 +139,7 @@ class FactProjectionTests(unittest.TestCase):
     def test_schema_shapes_the_graph(self):
         """S 即构图规则：S 少声明（无 主题/会话）→ 图真实变小（少类型/边/属性）；
         硬前提违反（原子事实主键非 编号）→ 拒绝。"""
-        from oak.schema.model import Schema
+        from darwinagent.schema.model import Schema
         smaller = Schema.from_yaml(MINIMAL_S.replace(
             '  主题:\n'
             '    primary_key: [名称]\n'
@@ -166,14 +166,14 @@ class FactProjectionTests(unittest.TestCase):
         self.assertGreater(full.number_of_edges(), slim.number_of_edges())
 
     def test_wrong_fact_primary_key_is_rejected(self):
-        from oak.schema.model import Schema
+        from darwinagent.schema.model import Schema
         bad = MINIMAL_S.replace('    primary_key: [编号]\n', '    primary_key: [陈述]\n', 1)
         bad = bad.replace('      - {name: 编号, dtype: string}\n', '', 1)
         with self.assertRaises(ValueError):
             rebuild_graph(self.facts, Schema.from_yaml(bad))
 
     def test_cache_key_binds_facts_schema_projection_only(self):
-        from oak.runtime.artifacts import digest
+        from darwinagent.runtime.artifacts import digest
         k1 = graph_cache_key(self.manifest['facts_digest'], 'schema-a')
         k2 = graph_cache_key(self.manifest['facts_digest'], 'schema-a')
         k3 = graph_cache_key(self.manifest['facts_digest'], 'schema-b')

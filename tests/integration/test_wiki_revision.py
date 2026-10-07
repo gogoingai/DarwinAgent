@@ -8,17 +8,17 @@ import unittest
 from pathlib import Path
 from dataclasses import replace
 
-from oak.config import RunConfig
-from oak.contracts import CaseInput, GraphResult, QuestionInput
-from oak.experiments.admission import AdmissionError, admit_candidate, _pressure_graph, _samples, _traversal_shape
-from oak.experiments.wiki import WikiMaintainer
-from oak.kernel.assets import Asset, KernelAssets
-from oak.kernel.functions import FunctionRegistry
+from darwinagent.config import RunConfig
+from darwinagent.contracts import CaseInput, GraphResult, QuestionInput
+from darwinagent.experiments.admission import AdmissionError, admit_candidate, _pressure_graph, _samples, _traversal_shape
+from darwinagent.experiments.wiki import WikiMaintainer
+from darwinagent.kernel.assets import Asset, KernelAssets
+from darwinagent.kernel.functions import FunctionRegistry
 from tests.integration.test_agentic_round import cold_bundle, corpus, gvtest_graph
 from tests.integration.test_wiki_optimization import WikiRecordedExperiment
 from tests.integration.test_experiment import LedgerRecordedClient
 from tests.fixtures import TASK
-from oak.kernel import TaskSpec
+from darwinagent.kernel import TaskSpec
 from datasets.locomo.run import _trimmed_train_adapter
 
 
@@ -102,7 +102,7 @@ class InterfaceAdmissionRegression(unittest.TestCase):
 
 class WikiEvidenceRegression(unittest.TestCase):
     def test_late_fault_survives_both_trace_budgets_and_is_runtime_experience(self):
-        from oak.experiments.wiki import bounded_trace, _context_facts
+        from darwinagent.experiments.wiki import bounded_trace, _context_facts
         trace=[{'stage':'tool','asset_id':'f','parameters':{'limit':i}} for i in range(9)]
         trace.append({'stage':'tool_error','asset_id':'f','parameters':{'limit':300},
                       'error_type':'SandboxError','error':'budget exhausted',
@@ -144,7 +144,7 @@ class WikiEvidenceRegression(unittest.TestCase):
             self.assertTrue(all(e['confidence']=='hypothesis' for e in wiki['entries']))
 
     def test_candidate_check_rejections_survive_compression_and_retain_check_identity(self):
-        from oak.experiments.wiki import _context_facts
+        from darwinagent.experiments.wiki import _context_facts
         trace=[{'stage':'tool','asset_id':'f'} for _ in range(10)]
         trace.append({'stage':'candidate','checks':[{'check_id':'c_shape',
             'fingerprint':'check-hash','ok':False,'issues':['answer is not an array'],'steps_used':45}]})
@@ -161,8 +161,8 @@ class WikiEvidenceRegression(unittest.TestCase):
             self.assertEqual(row['parameters'],{'days':3})
 
     def test_frozen_json_container_types_are_executable_and_documented(self):
-        from oak.operators.sandbox import Interpreter,admit
-        from oak.experiments.bootstrap import _CORE_RULES
+        from darwinagent.operators.sandbox import Interpreter,admit
+        from darwinagent.experiments.bootstrap import _CORE_RULES
         code="def check(candidate):\n rows=candidate['structured_answer']\n issues=[]\n if not isinstance(rows,(list,tuple)):\n  issues.append('not array')\n for row in rows:\n  local=dict(row)\n  if not isinstance(local,dict):\n   issues.append('not object')\n return {'ok':not issues,'issues':issues}"
         snapshot={'structured_answer':[{'days':1}]}
         self.assertTrue(Interpreter(admit(code,'C'),{}).execute(snapshot)['ok'])
@@ -173,8 +173,8 @@ class WikiEvidenceRegression(unittest.TestCase):
         self.assertNotIn('F and C MUST NOT set role or stage',_CORE_RULES)
 
     def test_failed_candidate_payload_type_is_evidence_not_a_guessed_cause(self):
-        from oak.contracts import AnswerResult,RunResult
-        from oak.experiments.runner import _wiki_training_evidence
+        from darwinagent.contracts import AnswerResult,RunResult
+        from darwinagent.experiments.runner import _wiki_training_evidence
         check={'check_id':'c_shape','ok':False,'issues':['not array']}
         answer=AnswerResult('q1','execution_error','',error='ProtocolError',trace=({
             'stage':'candidate','candidate':{'status':'answered','answer':'[{"days":1}]','node_ids':[]},
@@ -219,7 +219,7 @@ class WikiEvidenceRegression(unittest.TestCase):
 
 class BootstrapFeedbackRegression(unittest.TestCase):
     def test_unsupported_union_types_are_reported_together_before_data_execution(self):
-        from oak.kernel.validation import validate_bundle
+        from darwinagent.kernel.validation import validate_bundle
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp);seed=cold_bundle(root/'seed',with_c=False)
             f=Asset('f_bad_contract','F','def run(params):\n return []',
@@ -235,7 +235,7 @@ class BootstrapFeedbackRegression(unittest.TestCase):
             self.assertIn('not a union/list',str(caught.exception))
 
     def test_resource_feedback_contains_real_input_steps_and_matched_edges(self):
-        from oak.experiments.bootstrap import _trial_failure_feedback
+        from darwinagent.experiments.bootstrap import _trial_failure_feedback
         report={'scenarios':[{'asset_id':'f_expand','scenario_id':'high_degree_in',
             'status':'failed','required':True,'error_type':'SandboxError',
             'error':'Restricted execution budget exhausted','parameters':{'node_ids':['n000114']},
@@ -264,8 +264,8 @@ class CurrentAssetReferenceRegression(unittest.TestCase):
             'reason':'Verified current base reference','training_evidence':['6:conv-x::q1']}]}
 
     def test_reference_resolves_exact_current_fingerprint_and_saved_reply(self):
-        from oak.experiments.proposal import ProposalGenerator
-        from oak.experiments.runner import ExperimentRunner
+        from darwinagent.experiments.proposal import ProposalGenerator
+        from darwinagent.experiments.runner import ExperimentRunner
         with tempfile.TemporaryDirectory() as tmp:
             base=cold_bundle(Path(tmp)/'base',with_c=False);obj=self.payload(base)
             patch=ProposalGenerator.decode(obj,base)[0]
@@ -275,7 +275,7 @@ class CurrentAssetReferenceRegression(unittest.TestCase):
             self.assertFalse(ExperimentRunner._valid_proposal_raw(json.dumps(obj)))
 
     def test_reference_cannot_select_other_asset_or_change_kind(self):
-        from oak.experiments.proposal import ProposalGenerator
+        from darwinagent.experiments.proposal import ProposalGenerator
         with tempfile.TemporaryDirectory() as tmp:
             base=cold_bundle(Path(tmp)/'base',with_c=False);obj=self.payload(base)
             obj['patches'][0]['base_fingerprint']='current:unknown'
@@ -284,7 +284,7 @@ class CurrentAssetReferenceRegression(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,'type change'):ProposalGenerator.decode(obj,base)
 
     def test_literal_wrong_hash_is_rejected_and_legacy_literal_remains_valid(self):
-        from oak.experiments.proposal import ProposalGenerator
+        from darwinagent.experiments.proposal import ProposalGenerator
         with tempfile.TemporaryDirectory() as tmp:
             base=cold_bundle(Path(tmp)/'base',with_c=False);obj=self.payload(base)
             obj['patches'][0]['base_fingerprint']='0'*64
@@ -296,7 +296,7 @@ class CurrentAssetReferenceRegression(unittest.TestCase):
 
 class EvaluatorInterfaceRegression(unittest.TestCase):
     def test_generic_non_numeric_question_and_opt_in_subset(self):
-        from oak.experiments.runner import _evaluate_stage
+        from darwinagent.experiments.runner import _evaluate_stage
         result=object();questions=(QuestionInput('trip-A','where?'),)
         seen=[]
         class GenericEvaluator:

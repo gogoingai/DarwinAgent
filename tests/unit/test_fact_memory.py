@@ -6,15 +6,15 @@ from types import SimpleNamespace
 
 import networkx as nx
 
-from oak.agents.extraction import Segment, bisect, looks_truncated, plan_batches, ExtractionAgent
-from oak.config import RunConfig
-from oak.contracts import (AtomicFact, CorpusBlock, EntityRef, FactEvidence, FactTime, FactValue,
+from darwinagent.agents.extraction import Segment, bisect, looks_truncated, plan_batches, ExtractionAgent
+from darwinagent.config import RunConfig
+from darwinagent.contracts import (AtomicFact, CorpusBlock, EntityRef, FactEvidence, FactTime, FactValue,
                            MemoryResult, SourceRef)
-from oak.kg.assembler import GraphAssembler, anchoring_errors, anchoring_invariants, recover_facts
-from oak.kernel.validation import validate_graph
-from oak.llm.recorded import RecordedClient
-from oak.runtime.artifacts import digest
-from oak.schema.model import Schema
+from darwinagent.kg.assembler import GraphAssembler, anchoring_errors, anchoring_invariants, recover_facts
+from darwinagent.kernel.validation import validate_graph
+from darwinagent.llm.recorded import RecordedClient
+from darwinagent.runtime.artifacts import digest
+from darwinagent.schema.model import Schema
 
 SEED = Path(__file__).resolve().parents[2] / 'tasks/conversation_memory/assets/S/schema.yaml'
 
@@ -245,7 +245,7 @@ axioms: []''')
 
 class MaterializedViewTests(unittest.TestCase):
     def test_view_rebuilt_from_fact_predicates_and_traceable(self):
-        from oak.operators.data import DataCapabilities
+        from darwinagent.operators.data import DataCapabilities
         schema = travel_view_schema()
         self.assertEqual(anchoring_errors(schema), [])
         b1 = block('1', 'Houston is a city in Texas.')

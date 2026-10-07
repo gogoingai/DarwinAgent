@@ -12,9 +12,9 @@ from types import SimpleNamespace
 import httpx
 import openai
 
-from oak.config import Config
-from oak.experiments.runner import _retryable_answer
-from oak.llm.client import LLMClient, TransportExhausted
+from darwinagent.config import Config
+from darwinagent.experiments.runner import _retryable_answer
+from darwinagent.llm.client import LLMClient, TransportExhausted
 
 
 def _overloaded(code=529):

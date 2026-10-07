@@ -3,12 +3,12 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
-from oak.config import Config
-from oak.kg.graph import EntityCandidate, RelationCandidate, GraphValidationError, build_graph, node_id
-from oak.llm.client import BudgetExceeded, LLMClient
-from oak.runtime import atomic_json
-from oak.schema.model import Schema
-from oak.schema.owlcheck import check_schema
+from darwinagent.config import Config
+from darwinagent.kg.graph import EntityCandidate, RelationCandidate, GraphValidationError, build_graph, node_id
+from darwinagent.llm.client import BudgetExceeded, LLMClient
+from darwinagent.runtime import atomic_json
+from darwinagent.schema.model import Schema
+from darwinagent.schema.owlcheck import check_schema
 
 
 YAML = """entity_types:
@@ -69,7 +69,7 @@ class GraphContracts(unittest.TestCase):
 
 class RuntimeContracts(unittest.TestCase):
     def test_unverified_formal_check_is_not_pass(self):
-        with patch("oak.schema.owlcheck.hermit_checks", return_value=([], False)):
+        with patch("darwinagent.schema.owlcheck.hermit_checks", return_value=([], False)):
             findings, verified = check_schema(Schema.from_yaml(YAML))
         self.assertFalse(verified)
         self.assertTrue(any(f.check == "unverified" for f in findings))

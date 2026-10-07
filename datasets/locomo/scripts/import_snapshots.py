@@ -20,8 +20,8 @@ import shutil
 from collections import defaultdict
 from pathlib import Path
 
-from oak.kg.graph import load_graph, save_graph
-from oak.runtime.artifacts import digest
+from darwinagent.kg.graph import load_graph, save_graph
+from darwinagent.runtime.artifacts import digest
 
 from datasets.locomo.adapter import LocomoAdapter
 
@@ -58,7 +58,7 @@ def import_conv(source: Path, out_root: Path, conv: str, adapter: LocomoAdapter,
     facts = [json.loads(line) for line in (src / 'facts.jsonl').read_text().splitlines() if line.strip()]
     n_nodes = graph.number_of_nodes()
     # 出处正源是 facts.jsonl 的 sources（dia_id 列表）；图节点键经 node_view 读出（编号在 __key__）。
-    from oak.kg.graph import node_view
+    from darwinagent.kg.graph import node_view
     fact_sources = {str(f.get('fid')): [str(d) for d in (f.get('sources') or [])] for f in facts}
 
     # 1) 原子事实：出处 dia_id -> 消息级 SourceRef id

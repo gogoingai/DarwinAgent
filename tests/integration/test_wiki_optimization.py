@@ -9,16 +9,16 @@ from dataclasses import replace
 from pathlib import Path
 from unittest import mock
 
-from oak.config import RunConfig
-from oak.experiments.wiki import WikiMaintainer, safe_feedback
-from oak.experiments.runner import ExperimentRunner
-from oak.kernel import TaskSpec
-from oak.kernel.registration import load_assets
-from oak.runtime.artifacts import digest
-from oak.experiments.proposal import ProposalGenerator
-from oak.experiments.bootstrap import AssetBootstrapper, _trial_failure_feedback
-from oak.agents.protocol import ProtocolError
-from oak.kernel.revision import AssetPatch, AssetRevisionService, training_id
+from darwinagent.config import RunConfig
+from darwinagent.experiments.wiki import WikiMaintainer, safe_feedback
+from darwinagent.experiments.runner import ExperimentRunner
+from darwinagent.kernel import TaskSpec
+from darwinagent.kernel.registration import load_assets
+from darwinagent.runtime.artifacts import digest
+from darwinagent.experiments.proposal import ProposalGenerator
+from darwinagent.experiments.bootstrap import AssetBootstrapper, _trial_failure_feedback
+from darwinagent.agents.protocol import ProtocolError
+from darwinagent.kernel.revision import AssetPatch, AssetRevisionService, training_id
 from tests.fixtures import TASK, client
 from tests.integration.test_experiment import LedgerRecordedClient, RecordedExperiment
 

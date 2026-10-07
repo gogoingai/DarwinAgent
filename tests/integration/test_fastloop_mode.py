@@ -14,12 +14,12 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from oak.config import RunConfig
-from oak.experiments.proposal import ProposalGenerator
-from oak.experiments.runner import ExperimentRunner
-from oak.kernel import TaskSpec
-from oak.kernel.registration import load_assets
-from oak.contracts import EvaluationResult
+from darwinagent.config import RunConfig
+from darwinagent.experiments.proposal import ProposalGenerator
+from darwinagent.experiments.runner import ExperimentRunner
+from darwinagent.kernel import TaskSpec
+from darwinagent.kernel.registration import load_assets
+from darwinagent.contracts import EvaluationResult
 from tests.fixtures import TASK
 from tests.integration.test_experiment import (LedgerRecordedClient,
                                                RecordedExperiment, client)
@@ -118,7 +118,7 @@ class ValidationSelectionTests(unittest.TestCase):
                                         validation_plan={
                                             "case": None,  # 占位：run 前替换为 recorded case
                                             "policy": __import__(
-                                                "oak.experiments.spec", fromlist=["SelectionPolicy"]
+                                                "darwinagent.experiments.spec", fromlist=["SelectionPolicy"]
                                             ).SelectionPolicy("original_precise", "original_lenient")})
             runner.validation_plan["case"] = runner.case
             summary = _run(runner, rounds=1)
@@ -162,7 +162,7 @@ class ValidationSelectionTests(unittest.TestCase):
 
             runner = FastLoopExperiment(root, evaluator=improving, validation_plan={
                 "case": None,
-                "policy": __import__("oak.experiments.spec",
+                "policy": __import__("darwinagent.experiments.spec",
                                      fromlist=["SelectionPolicy"]).SelectionPolicy(
                                          "original_precise", "original_lenient")})
             runner.validation_plan["case"] = runner.case
@@ -201,13 +201,13 @@ class PExtractMarkingTests(unittest.TestCase):
                         self.patched = True
                         pointer = json.loads(
                             (self.root / "published/current.json").read_text())
-                        from oak.kernel import KernelBundle
+                        from darwinagent.kernel import KernelBundle
                         base = KernelBundle(self.root / "published" / pointer["path"])
                         asset = next(a for a in base.assets.assets if a.role == "extract")
                         updated = asset.to_dict()
                         updated["content"] += "\nReweight extraction emphasis."
                         from collections import deque
-                        from oak.kernel.revision import training_id
+                        from darwinagent.kernel.revision import training_id
                         replies["proposal"] = deque([
                             {"patches": [{"asset": updated,
                                           "base_fingerprint": asset.fingerprint,
@@ -231,7 +231,7 @@ class RebuildSupplyCacheTests(unittest.TestCase):
     def test_rebuild_cache_reuses_same_schema_and_rebuilds_on_change(self):
         with tempfile.TemporaryDirectory() as tmp:
             runner = FastLoopExperiment(Path(tmp), graph_builder=lambda *a: object())
-            from oak.kernel.registration import load_assets as la
+            from darwinagent.kernel.registration import load_assets as la
             bundle = la(TASK).export(Path(tmp) / "bundle")
             calls = []
 
@@ -242,10 +242,10 @@ class RebuildSupplyCacheTests(unittest.TestCase):
             runner.graph_builder = counting
             from types import SimpleNamespace
             case = SimpleNamespace(id="conv-26")
-            runner.snapshot_root = Path("datasets/locomo/snapshots/gvtest_v1")
+            runner.snapshot_root = Path("tests/fixtures/locomo_snapshot")
             fake_schema = mock.MagicMock()
             fake_schema.to_yaml.return_value = "schema-v1"
-            with mock.patch("oak.kernel.validation.validate_bundle",
+            with mock.patch("darwinagent.kernel.validation.validate_bundle",
                             return_value=fake_schema):
                 runner._rebuild_graph_cached(bundle, case)
                 runner._rebuild_graph_cached(bundle, case)

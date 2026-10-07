@@ -1,0 +1,1 @@
+Preserve device serial, maintenance date and technician from each maintenance record. Do not combine different events or add unsourced technicians. The schema is ${schema}.

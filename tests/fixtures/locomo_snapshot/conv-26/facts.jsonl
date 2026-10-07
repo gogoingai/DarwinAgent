@@ -1,0 +1,4 @@
+{"fid": "fixture-0", "subject": "卡罗琳", "statement": "嘿，梅尔！很高兴见到你！你最近怎么样？", "sources": ["D1:1"], "topics": ["日常"], "session_no": 1, "ftype": "陈述", "date_iso": "2023-05-08", "date_raw": "记录日"}
+{"fid": "fixture-1", "subject": "梅拉妮", "statement": "嘿，卡罗琳！很高兴见到你！我被孩子和工作忙得团团转。你呢？有什么新鲜事吗？", "sources": ["D1:2"], "topics": ["日常"], "session_no": 1, "ftype": "陈述", "date_iso": "2023-05-08", "date_raw": "记录日"}
+{"fid": "fixture-2", "subject": "卡罗琳", "statement": "我昨天参加了一个LGBTQ互助小组，太震撼了。", "sources": ["D1:3"], "topics": ["日常"], "session_no": 1, "ftype": "陈述", "date_iso": "2023-05-08", "date_raw": "记录日"}
+{"fid": "fixture-unsourced", "subject": "fixture", "statement": "Synthetic unsourced row", "sources": [], "topics": [], "session_no": 0}

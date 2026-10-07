@@ -4,7 +4,7 @@
 # 环境变量 CARRY_FROM=<旧根>：新根缺 B0 时自动搬运其 B0 资产/答案检查点/判分检查点
 # （用户指令：不要从头跑——答案与判分是最大头，换根不得丢）。
 ARM=$1; ROOT=$2; MAX=$3; shift 3
-cd /Users/xu/git/oak
+cd /Users/xu/git/darwinagent
 mkdir -p "$(dirname "$ROOT")"
 # precheck 与正式跑必须同一 arm config：--vector-k 若在附加参数里，须随 precheck 一并传，
 # 否则 precheck.json 记录的 config 摘要与 campaign 不符，身份门直接拒绝启动（v2 首发事故）。

@@ -1,6 +1,6 @@
 """TravelPlanner 任务配置：框架 Config 之上叠任务专属参数与产物路径。
 
-自 oak/config.py 迁出（框架/任务分割）：构建循环规模、各环节限额、tp_root、
+自 darwinagent/config.py 迁出（框架/任务分割）：构建循环规模、各环节限额、tp_root、
 语料开关、冻结策略、TP 专属 work_dir 派生路径都在这里。
 """
 from __future__ import annotations
@@ -11,7 +11,8 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from oak.config import Config, MODEL_ROLES  # noqa: F401  （MODEL_ROLES 重导出兼容旧引用）
+from darwinagent.presets import legacy_benchmark_config
+from darwinagent.config import Config, MODEL_ROLES  # noqa: F401  （MODEL_ROLES 重导出兼容旧引用）
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
@@ -62,7 +63,7 @@ class TPConfig(Config):
 
 
 def load_config() -> TPConfig:
-    cfg = TPConfig()
+    cfg = legacy_benchmark_config(TPConfig)
     load_dotenv(PROJECT_ROOT / ".env")
     cfg.api_key = os.environ.get("ZHIPU_API_KEY", "")
     if not cfg.api_key:

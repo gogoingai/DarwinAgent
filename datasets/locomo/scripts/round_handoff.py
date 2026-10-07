@@ -19,7 +19,7 @@ import sys
 import time
 from pathlib import Path
 
-REPO = Path('/Users/xu/git/oak')
+REPO = Path('/Users/xu/git/darwinagent')
 
 
 def log(msg):

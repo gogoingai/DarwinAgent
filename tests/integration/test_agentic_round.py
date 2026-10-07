@@ -8,15 +8,15 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from oak.config import RunConfig
-from oak.contracts import CaseInput, CorpusBlock, QuestionInput, SourceRef
-from oak.kernel.assets import Asset, KernelAssets
-from oak.kernel.revision import AssetPatch, AssetRevisionService
-from oak.kernel.validation import atomic_memory_errors, validate_bundle
-from oak.operators.data import DataCapabilities
-from oak.operators.dates import resolve_relative
-from oak.schema.model import Schema
-from oak.vector import LocalVectorStore
+from darwinagent.config import RunConfig
+from darwinagent.contracts import CaseInput, CorpusBlock, QuestionInput, SourceRef
+from darwinagent.kernel.assets import Asset, KernelAssets
+from darwinagent.kernel.revision import AssetPatch, AssetRevisionService
+from darwinagent.kernel.validation import atomic_memory_errors, validate_bundle
+from darwinagent.operators.data import DataCapabilities
+from darwinagent.operators.dates import resolve_relative
+from darwinagent.schema.model import Schema
+from darwinagent.vector import LocalVectorStore
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -64,14 +64,14 @@ def corpus():
 
 
 def graph_result_with_vector():
-    from oak.contracts import GraphResult
+    from darwinagent.contracts import GraphResult
     gr = GraphResult(gvtest_graph(), {b.source.id: b for b in corpus()})
     store = LocalVectorStore()
     store.upsert([{'id': 'c-0001', 'text': '甲。甲计划下周修打印机',
                    'meta': {'pool': 'facts', '主体': '甲'}, 'vector': fake_vector('甲。甲计划下周修打印机')},
                   {'id': 'c-0002', 'text': '乙。乙觉得跑步能减压',
                    'meta': {'pool': 'facts', '主体': '乙'}, 'vector': fake_vector('乙。乙觉得跑步能减压')}])
-    from oak.vector import VectorIndex
+    from darwinagent.vector import VectorIndex
     object.__setattr__(gr, 'vector', VectorIndex.attach(store, FakeEmbedder()))
     return gr
 
@@ -108,7 +108,7 @@ class SemanticSearchCapability(unittest.TestCase):
         caps = DataCapabilities(graph_result_with_vector())
         rows = caps.semantic_search('跑步', subject='甲', limit=5)
         self.assertEqual([r['编号'] for r in rows], ['c-0001'] if rows else [])
-        from oak.contracts import GraphResult
+        from darwinagent.contracts import GraphResult
         bare = GraphResult(gvtest_graph(), {})
         with self.assertRaises(ValueError):
             DataCapabilities(bare).semantic_search('任意', limit=3)
@@ -215,7 +215,7 @@ class ColdStartConstraints(unittest.TestCase):
 def build_snapshot(root, conv='conv-x'):
     """Import-path fixture: a gvtest-shaped source tree + adapter, run through the importer."""
     from datasets.locomo.scripts.import_snapshots import import_conv
-    from oak.kg.graph import save_graph
+    from darwinagent.kg.graph import save_graph
     src = root / 'source'
     gdir = src / 'runs' / conv / 'graph_test01'
     gdir.mkdir(parents=True)
@@ -243,9 +243,9 @@ def build_snapshot(root, conv='conv-x'):
 
 class SnapshotPipeline(unittest.TestCase):
     def run_pipeline(self, root, config, mode):
-        from oak.engine import Pipeline
-        from oak.kernel import TaskSpec
-        from oak.llm.recorded import RecordedClient
+        from darwinagent.engine import Pipeline
+        from darwinagent.kernel import TaskSpec
+        from darwinagent.llm.recorded import RecordedClient
         from tests.fixtures import review
         snapshot, manifest = build_snapshot(root)
         bundle = cold_bundle(root)
@@ -285,7 +285,7 @@ class SnapshotPipeline(unittest.TestCase):
             self.assertEqual(retrieval[0]['k'], 1)
 
     def test_snapshot_digest_guards_identity(self):
-        from oak.experiments.snapshots import load_frozen_graph
+        from darwinagent.experiments.snapshots import load_frozen_graph
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             snapshot, manifest = build_snapshot(root)

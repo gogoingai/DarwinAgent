@@ -11,7 +11,7 @@ PROJECT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(PROJECT))
 
 from datasets.travelplanner.pipeline.config_task import load_config                     # noqa: E402
-from oak.llm.client import LLMClient                   # noqa: E402
+from darwinagent.llm.client import LLMClient                   # noqa: E402
 
 
 def check_java() -> None:

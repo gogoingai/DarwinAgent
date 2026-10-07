@@ -13,17 +13,17 @@ import json
 import time
 from pathlib import Path
 
-from oak.agents import ExtractionAgent
-from oak.agents.protocol import ProtocolError
-from oak.config import RunConfig
-from oak.contracts import CorpusBlock, SourceRef
-from oak.kg.assembler import GraphAssembler, anchoring_errors
-from oak.llm.client import LLMClient
-from oak.llm.settings import load_connection
-from oak.schema.model import Schema
+from darwinagent.agents import ExtractionAgent
+from darwinagent.agents.protocol import ProtocolError
+from darwinagent.config import RunConfig
+from darwinagent.contracts import CorpusBlock, SourceRef
+from darwinagent.kg.assembler import GraphAssembler, anchoring_errors
+from darwinagent.llm.client import LLMClient
+from darwinagent.llm.settings import load_legacy_connection as load_connection
+from darwinagent.schema.model import Schema
 
 from datasets.locomo.adapter import LocomoAdapter
-from oak.experiments.spec import precheck_identity
+from darwinagent.experiments.spec import precheck_identity
 
 ROOT = Path(__file__).resolve().parents[3]
 SEED = ROOT / 'tasks/conversation_memory/assets/S/schema.yaml'

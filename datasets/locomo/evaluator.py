@@ -6,20 +6,21 @@ import json
 from dataclasses import replace
 from pathlib import Path
 
-from oak.contracts import EvaluationResult
-from oak.runtime.artifacts import atomic_json, verify_files
+from darwinagent.contracts import EvaluationResult
+from darwinagent.runtime.artifacts import atomic_json, verify_files
 from .pipeline.data import load_conversation
 from .pipeline.protocol import aggregate, dual_grade_batch
 from .pipeline.experiment import transcript
 
 ROOT=Path(__file__).resolve().parents[2]
-LOCK_PATH=ROOT/'datasets/locomo/runs/portable_v1/evaluation_frozen.json'
+LOCK_PATH=ROOT/'datasets/locomo/evaluation_lock.json'
 AUDITED=ROOT/'datasets/locomo/runs/experiments/conv26_dual_v4/gold_audited.json'
 
 
 class LocomoEvaluator:
-    def __init__(self,client,work_dir,dataset_path=None,audited_path=AUDITED,concurrency=4):
+    def __init__(self,client,work_dir,dataset_path=None,audited_path=AUDITED,concurrency=4,lock_path=None):
         self.client,self.work_dir=client,Path(work_dir)
+        self.lock_path=Path(lock_path) if lock_path is not None else LOCK_PATH
         self.dataset_path=Path(dataset_path or ROOT/'datasets/locomo/data/locomo10_zh.json')
         self.audited_path,self.concurrency=Path(audited_path),concurrency
 
@@ -27,7 +28,7 @@ class LocomoEvaluator:
         """asked＝本轮实际出题的 question idx 集合（允许非连续题号子集）。
         None＝按全会话完整性要求（历史行为，验证/测试/外测全量路径不变）。
         判题上下文永远是全量转写，评分原语不变。"""
-        verify_files(ROOT,json.loads(LOCK_PATH.read_text()))
+        verify_files(ROOT,json.loads(self.lock_path.read_text()))
         conv=load_conversation(self.dataset_path,result.case_id)
         en=load_conversation(ROOT/'datasets/locomo/data/locomo10.json',result.case_id)
         context=transcript(conv)+'\n【英文原句对照】\n'+transcript(en)
@@ -39,6 +40,8 @@ class LocomoEvaluator:
         # 修订 gold 只在 conv-26 存在（审计参考按会话登记）；其余会话按原始 gold 两口径评分。
         audited=None;disputed=set()
         if result.case_id=='conv-26':
+            if not self.audited_path.is_file():
+                raise FileNotFoundError(f'Audited conv-26 reference missing: {self.audited_path}; pass audited_path explicitly. Audited gold is external evidence and is never fabricated.')
             audited=json.loads(self.audited_path.read_text())
             if len(audited)!=len(conv.qas) or any(row['idx']!=q.idx or row['question']!=q.question for row,q in zip(audited,conv.qas)):
                 raise ValueError('Audited reference identity mismatch')
@@ -75,5 +78,5 @@ class LocomoEvaluator:
         gen_faults=sum(a.status=='execution_error' for a in result.answers)
         eval_faults=sum(r['status']=='evaluation_error' for report in reports.values() for r in report['grades'])
         completed=sum(all(grades_by_idx[g][idx]['status']=='ok' for g in reports) for idx in predictions)
-        verify_files(ROOT,json.loads(LOCK_PATH.read_text()))
+        verify_files(ROOT,json.loads(self.lock_path.read_text()))
         return EvaluationResult(metrics,len(predictions),completed,gen_faults,eval_faults,tuple(diagnostics))

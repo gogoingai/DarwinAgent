@@ -1,0 +1,15 @@
+assets:
+  - {id: schema, kind: S, path: assets/S/schema.yaml}
+  - id: device_lookup
+    kind: F
+    path: assets/F/lookup.py
+    schema_dependencies: [schema]
+    description: Query maintenance events by requested serial
+    input_contract: {type: object, properties: {serial: {type: string}}, required: [serial]}
+    output_contract: {type: array}
+    trial_inputs: [{serial: D-17}]
+  - {id: device_subject, kind: C, stage: answer, path: assets/C/subject.py, schema_dependencies: [schema]}
+  - {id: extraction_prompt, kind: P, role: extract, path: assets/P/extract.txt, schema_dependencies: [schema]}
+  - {id: tools_prompt, kind: P, role: tools, path: assets/P/tools.txt, schema_dependencies: [schema]}
+  - {id: answer_prompt, kind: P, role: answer, path: assets/P/answer.txt, schema_dependencies: [schema]}
+  - {id: review_prompt, kind: P, role: review, path: assets/P/review.txt, schema_dependencies: [schema]}

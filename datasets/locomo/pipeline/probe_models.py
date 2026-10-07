@@ -9,7 +9,7 @@ import json
 import time
 
 from .config import NS_PROBE, load_locomo_config
-from oak.llm.client import LLMClient
+from darwinagent.llm.client import LLMClient
 
 
 async def _probe(client: LLMClient, role: str, json_mode: bool) -> dict:

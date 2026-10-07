@@ -1,0 +1,6 @@
+entity_types:
+  Maintenance:
+    primary_key: [serial, date]
+    attributes: [{name: serial, dtype: string}, {name: date, dtype: date}, {name: technician, dtype: string}]
+relation_types: {}
+axioms: []

@@ -7,7 +7,7 @@ import io
 import json
 from pathlib import Path
 
-from oak.contracts import CaseInput, CorpusBlock, QuestionInput, SourceRef
+from darwinagent.contracts import CaseInput, CorpusBlock, QuestionInput, SourceRef
 from .pipeline.data.queries import parse_dates
 from .pipeline.data.corpus import reference_chunks
 

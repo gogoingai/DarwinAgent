@@ -1,7 +1,7 @@
 """固定事实 → 图投影规则（新模式「冻结记忆/向量、图可重建」，recheck4 方案）。
 
 从快照 facts.jsonl 的固定事实行确定性投影 EntityCandidate/RelationCandidate，经
-`oak.kg.graph.build_graph(entities, relations, schema)` 按当前 S 建图：
+`darwinagent.kg.graph.build_graph(entities, relations, schema)` 按当前 S 建图：
 - 原子事实行节点：键 编号，属性 陈述/主体/类型/日期/日期粒度/日期原文/数值/主题/出处
   ——与冻结图行词表一致（向量命中映射按 编号 回行，两侧同一索引可用）；
 - 人物（主体）＋`归属于` 边；主题（topics 展开）＋`属于主题` 边；会话＋`记录于` 边。
@@ -82,7 +82,7 @@ def project_candidates(facts, schema=None, corpus=()):
     source id 作为 chunk_id（__sources__＝真实证据块，答题/审查证据解析用）——
     与 import_snapshots 的正源映射同构；未登记出处＝ValueError。无 corpus 时
     退回 fact:<fid> 追溯标记（离线测试用，不参与证据解析）。"""
-    from oak.kg.graph import EntityCandidate, RelationCandidate
+    from darwinagent.kg.graph import EntityCandidate, RelationCandidate
 
     blocks = _corpus_blocks(corpus)
     dia_to_source = {b.source.location: b.source.id for b in blocks}
@@ -214,7 +214,7 @@ def rebuild_graph(facts, schema, corpus=()):
     """固定事实＋当前 S -> 图（S 即构图规则：声明过滤见 project_candidates；
     编号 主键与向量映射硬前提违反即拒；corpus 给定时出处落真实证据块；
     无来源派生事实 __sources__ 为空——manifest 披露数量，不虚构来源）。"""
-    from oak.kg.graph import build_graph
+    from darwinagent.kg.graph import build_graph
     entities, relations = project_candidates(facts, schema, corpus)
     g = build_graph(entities, relations, schema)
     for _, nd in g.nodes(data=True):
@@ -258,8 +258,8 @@ def rebuild_snapshot_graph(snapshot_dir, schema, corpus=(), embedder_factory=Non
     （任一事实行无向量记录＝硬失败，不静默降级）。"""
     from types import MappingProxyType
     import networkx as nx
-    from oak.contracts import GraphResult
-    from oak.experiments.snapshots import attach_vector
+    from darwinagent.contracts import GraphResult
+    from darwinagent.experiments.snapshots import attach_vector
     snapshot_dir = Path(snapshot_dir)
     facts, manifest = load_facts(snapshot_dir)
     g = rebuild_graph(facts, schema, corpus)
@@ -280,7 +280,7 @@ def rebuild_snapshot_graph(snapshot_dir, schema, corpus=(), embedder_factory=Non
 def graph_cache_key(facts_digest: str, schema_fingerprint: str) -> str:
     """图缓存键：固定事实摘要＋S/规则指纹＋投影实现版本——不含题目列表、
     不含完整资产版本（F/C/P 改动复用同图；S 变才重建）。"""
-    from oak.runtime.artifacts import digest
+    from darwinagent.runtime.artifacts import digest
     return digest({'facts': facts_digest, 'schema': schema_fingerprint,
                    'projection': PROJECTION_VERSION})
 

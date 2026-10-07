@@ -5,13 +5,13 @@ import unittest
 from dataclasses import replace
 from pathlib import Path
 
-from oak.config import RunConfig
-from oak.contracts import freeze
-from oak.kernel import Asset, KernelAssets, KernelBundle, TaskSpec
-from oak.kernel.revision import AssetPatch, AssetRevisionService, training_id
-from oak.kernel.validation import validate_bundle
-from oak.operators.sandbox import Interpreter, Limits, SandboxError, admit
-from oak.kernel.registration import load_assets
+from darwinagent.config import RunConfig
+from darwinagent.contracts import freeze
+from darwinagent.kernel import Asset, KernelAssets, KernelBundle, TaskSpec
+from darwinagent.kernel.revision import AssetPatch, AssetRevisionService, training_id
+from darwinagent.kernel.validation import validate_bundle
+from darwinagent.operators.sandbox import Interpreter, Limits, SandboxError, admit
+from darwinagent.kernel.registration import load_assets
 from tests.fixtures import ROOT, TASK
 
 
@@ -61,7 +61,7 @@ class AssetBoundary(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             b=load_assets(TASK).export(Path(td)/'bundle')
             m=json.loads((b.root/'manifest.json').read_text());m['assets'][0]['path']='../../outside.py'
-            from oak.runtime.artifacts import digest
+            from darwinagent.runtime.artifacts import digest
             m['version']=digest({k:v for k,v in m.items() if k!='version'})
             (b.root/'manifest.json').write_text(json.dumps(m))
             with self.assertRaises(ValueError): KernelBundle(b.root)
@@ -122,6 +122,6 @@ class RestrictedExecution(unittest.TestCase):
         with self.assertRaises(SandboxError): Interpreter(admit('def run(params):\n return {1,2}'),{}).execute({})
 
     def test_no_cpython_exec(self):
-        import oak.operators.sandbox as sandbox
+        import darwinagent.operators.sandbox as sandbox
         tree=ast.parse(Path(sandbox.__file__).read_text())
         self.assertFalse(any(isinstance(n,ast.Call) and isinstance(n.func,ast.Name) and n.func.id in {'exec','eval','compile'} for n in ast.walk(tree)))
