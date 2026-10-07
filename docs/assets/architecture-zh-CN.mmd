@@ -1,0 +1,19 @@
+flowchart LR
+    subgraph INPUT["输入与资产"]
+      direction TB
+      A["DatasetAdapter<br/>记录 · 问题 · 来源"] ~~~ K["KernelRuntime + S/F/C/P<br/>登记资产 · 固定权限"]
+    end
+    subgraph RUN["共同运行与独立评测"]
+      direction TB
+      P["Pipeline<br/>ExtractionAgent → 来源图<br/>→ AnswerAgent"] --> E["独立 Evaluator<br/>私有参考 → 输出评分"]
+    end
+    subgraph EXP["实验控制与持久化"]
+      direction TB
+      R["ExperimentRunner<br/>提案 · 准入 · 采纳"] --> O["持久化产物<br/>提案 · 评分 · 发布版本<br/>摘要 · 经验 Wiki"]
+      O -->|"Wiki → 下一轮提案"| R
+    end
+    INPUT -->|"CaseInput + 资产"| RUN
+    RUN -->|"EvaluationResult"| EXP
+    EXP -->|"B0 / 候选执行"| RUN
+    classDef accent fill:#173b31,color:#ffffff,stroke:#173b31;
+    class K,R,O accent;

@@ -1,0 +1,13 @@
+flowchart TB
+    subgraph MUT["TASK ASSETS · PROPOSALS MAY CHANGE"]
+        direction LR
+        S["S · Schema<br/>Types and relations"] ~~~ F["F · Functions<br/>Read-only restricted queries"] ~~~ C["C · Task checks<br/>Graph / answer opinions"] ~~~ P["P · Prompts<br/>Fixed registered role slots"]
+    end
+    MUT -->|"register + validate"| G["Candidate admission + behavioral trials"]
+    subgraph FIX["FIXED FRAMEWORK + INDEPENDENT EVALUATION"]
+        direction LR
+        R["Execution + permissions<br/>Pipeline · fixed operators"] ~~~ V["Fixed validation<br/>Types · sources · status"] ~~~ E["Independent Evaluator<br/>References + metric contract"] ~~~ A["Adoption + publication<br/>Frozen policy · atomic version"]
+    end
+    G --> FIX
+    classDef accent fill:#173b31,color:#ffffff,stroke:#173b31;
+    class R,V,E,A accent;

@@ -1,113 +1,174 @@
----
-license: mit
-language: zh
-tags:
-- long-conversation-memory
-- ontology
-- locomo
-- benchmark-reproduction
----
+<p align="center"><img src="docs/assets/hero-en.svg" alt="DarwinAgent — Evolution for the Agent Era" width="100%"></p>
 
-# oak：动态本体（OaK）复现仓库
+# DarwinAgent
 
-> OaK（arXiv:2608.22974，*Toward Effective and Reliable LLM Agents via Dynamic Ontology*）
-> 的复现与扩展：**一个框架，两个数据集基准**，外加一个只-ADD 的中文记忆基线。
-> 数据集、记忆、本体全中文（locomo 轨道）。
+**An Open Framework for Experience-Driven Recursive Self-Improvement**
 
-## 目录结构
+[English](README.md) · [简体中文](README.zh-CN.md)
 
-当前固定框架为 **0.4.0**（抽取/构图两阶段 + 事实锚定图 + 三集合 campaign）：数据集实现输入适配和独立评测，生成与迭代由 `oak` 统一执行，只优化有能力边界的 S/F/C/P 资产。活动 H、`oak_domains` 与私有生成流程已移除，发行 wheel 只包含 `oak`。
+[![Offline framework checks](https://github.com/gogoingai/DarwinAgent/actions/workflows/ci.yml/badge.svg)](https://github.com/gogoingai/DarwinAgent/actions/workflows/ci.yml)
+[![Version](https://img.shields.io/badge/version-0.1.0%20experimental-45635c)](CHANGELOG.md)
+[![Python](https://img.shields.io/badge/python-%3E%3D3.11-45635c)](pyproject.toml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-45635c)](LICENSE)
 
-```text
-oak/                         # 固定框架
-├── contracts.py             # DatasetAdapter / Evaluator 与标准输入输出
-├── config.py                # 冻结 RunConfig
-├── engine/pipeline.py       # 共同 Pipeline：身份、恢复、产物
-├── agents/                  # ExtractionAgent / AnswerAgent / 固定协议
-├── kernel/                  # 登记、Runtime、F/C、固定验证、反例、原子版本
-├── experiments/             # 通用冷启动、提案、两轮控制器、采纳策略
-├── schema/                  # 本体解析、静态与图实例公理验证
-├── kg/                      # 类型图和来源
-├── operators/               # 只读算子 + 受限 AST 解释器
-├── llm/                     # 模型通信和连接装配
-└── runtime/                 # 身份、预算、原子持久化
+DarwinAgent takes its name from Charles Darwin and the theory of evolution. **Evolution for the Agent Era** is its mission: help agents adapt through experience and retain effective capabilities. In this framework, variation comes from proposed task assets, selection comes from independent evaluation and fixed admission rules, and retention comes from versioned assets and a persistent experience Wiki that informs subsequent proposals.
 
-tasks/                       # 声明及资产，不实现执行流程
-├── conversation_memory/     # 仅 task.yaml，无历史 LoCoMo 种子
-├── travel_planning/         # task.yaml + assets/{S,F,C,P}
-└── device_maintenance/      # 第三任务声明和资产
+DarwinAgent **0.1.0 is experimental**. It implements an inspectable improvement loop around a shared graph-based agent runtime. Improvement is an outcome to measure; a candidate can be rejected. The current scope is task assets, with fixed framework execution and evaluation boundaries.
 
-datasets/
-├── locomo/                  # adapter.py / evaluator.py / exports.py / run.py
-└── travelplanner/           # 同样两个接入类；共用 Pipeline
-    # 两者保留 data/、runs/、冻结评测及原路径兼容代码
+## Why DarwinAgent
 
-examples/third_domain.py      # 两个接口 + 任务资产，在仓库外跑共同 Pipeline
-tests/{unit,integration,portability}/
-docs/                        # 架构、类图、资产能力边界和使用入口
-dist/                        # 新 wheel 仅包含 oak；旧发行物保留
-mem0/                        # 独立的只-ADD 中文记忆基线
-third_party/                 # 已允许的 TravelPlanner 环境数据
-```
+A useful answer is one run. A useful capability should survive the next run. DarwinAgent records what a candidate changed, which sources supported an answer, how it was evaluated, why it was accepted or rejected, and what experience reaches the next proposal. This makes adaptation a reproducible experiment rather than an untracked prompt edit.
 
-[架构、类图与能力边界](docs/ARCHITECTURE.md) · [接入与运行](docs/PORTABLE-USAGE.md) · [实施和验收](docs/PORTABILITY-PLAN.md)。框架实现验收与模型成绩分开记录；冷启动结果以对应运行目录产物为准，不能用离线录制响应代替真实实验。
+## The evolution loop
 
-0.4.0 通过 119 项离线检查（核心/接入/控制器/三集合 campaign 98 + 冻结评测与旅行资产 21）和仓库外 wheel 验收；抽取按消息边界分批（≤2000 字符）+ 截断二分 + 定位化错误反馈，图由原子记忆确定性装配并做 round-trip 校验。0.3.2 的真实冷启动失败记录与归因见[修复与实验记录](docs/FRAMEWORK-REPAIR-LOG.md)。下表为历史任务成绩。
+![Evolution loop](docs/assets/evolution-loop-en.svg)
 
-## 成绩（严格口径，详见各任务目录）
+1. **Run:** execute a baseline through the common `Pipeline` and score its actual outputs.
+2. **Vary:** propose bounded changes to S/F/C/P assets using training evidence and Wiki feedback.
+3. **Select:** validate contracts and capabilities, run the candidate, and apply the frozen adoption policy.
+4. **Retain:** publish accepted versions atomically; preserve rejection facts and feed experience into the next proposal.
 
-| 任务 | 指标 | 本仓库 | 论文/对照 |
-|---|---|---|---|
-| TravelPlanner | Final（官方评测器，50 题） | **78%** | 55.9% |
-| LoCoMo 中文 conv-26 | 历史 exact（旧修复 gold，199 题） | **79.9%** | 历史原始 gold 口径 73.9%；待统一复评 |
-| LoCoMo 中文 conv-26 | 历史混合 gold 宽松评分（已停用） | **89.4%** | 不作跨系统同口径比较 |
-| LoCoMo 中文 conv-44 | 严格 exact（旧版栈零调参首跑） | **68.3%** | — |
+The kernel, evaluator, permissions, and adoption rules stay outside the proposal boundary. DarwinAgent does not train model weights or rewrite its own optimizer. Its name describes the inspiration, not a claim to implement a genetic algorithm.
 
-conv-26 既有固定图的原始/审计 gold × 宽松/精准复评见[独立实验报告](datasets/locomo/runs/experiments/conv26_dual_v4/REPORT.md)。旧评分不代表本轮基线或系统上限，未验证全量十段。
+## What is implemented
 
-> 历史上限审计与旧评分记录见 `datasets/locomo/pipeline/OPTIMIZATION_LOG.md` 与 `PLAN-90.md`；
-> 它们不能证明 90% 可达或不可达。当前结论须依据统一判分与逐要素诊断。
+| Capability | v0.1.0 behavior |
+| --- | --- |
+| Shared task runtime | `ExtractionAgent` → attributed graph → `AnswerAgent`, through one `Pipeline` |
+| Bounded task assets | **S** schemas, **F** query functions, **C** task checks, **P** role prompts |
+| Experience | Wiki stores observations and accepted/rejected decisions for subsequent proposals |
+| Reproducibility | Fingerprinted bundles, frozen run identity, persistent artifacts, explicit resume |
+| Evaluation | Separate `DatasetAdapter` and `Evaluator`; metric names supplied by the task |
+| Experiment control | `ExperimentRunner`; separate `CampaignController` for train/validation/test protocols |
+| Model connection | One explicit OpenAI-compatible Chat Completions endpoint by default; optional tier overrides |
+| Entry points | Installed CLI, Python SDK, offline replay, live mode, maintenance task example |
 
-## 快速开始
+## Try the loop
+
+Install **from this source checkout**. These instructions apply to this review branch; it has not been published to PyPI or merged as a release. They do not assert that remote `main` contains this version.
 
 ```bash
-uv sync
-cp .env.example .env          # 填 ZHIPU_API_KEY（locomo 另可配 LOCOMO_FAST_* 双档）
-
-# TravelPlanner（需先准备原官方环境和评测依赖）
-uv sync --extra benchmarks
-uv run python -m datasets.travelplanner.run --split train --index 0 --output datasets/travelplanner/runs/my_framework_case
-
-# LoCoMo 中文（三集合：train=conv-26 / validation=conv-47 / test=conv-49）
-uv run python -m datasets.locomo.scripts.precheck --output datasets/locomo/runs/atomic_v1   # 真实模型预检（campaign 的启动门）
-uv run python -m datasets.locomo.run --campaign --output datasets/locomo/runs/atomic_v1     # B0 -> Rn 无限迭代（--rounds 可设上限）
-uv run python -m datasets.locomo.run --campaign --output datasets/locomo/runs/atomic_v1 --stop  # 叫停：当前轮完成后锁定候选并进入验证/测试
-
-# 框架、接入与控制器检查，及显式录制响应的第三任务示例
-uv run python -m unittest discover -s tests
-uv run python examples/third_domain.py
-
-# mem0 只-ADD 基线（自测）
-uv run python -c "from mem0.memory_core import Mem0AdditiveCore; print('ok')"
+# Run from this source checkout; Python 3.11+ and uv are required.
+uv sync --frozen
+uv run darwinagent --version
+uv run darwinagent doctor --output runs/doctor
+uv run darwinagent demo --mode replay --rounds 2 --output runs/demo-replay
 ```
 
-## 模型路由
+Expected replay: `status=complete`, first candidate accepted, second rejected for `primary_not_strictly_improved`, and `http_attempts=0`. The independent evaluator scores requested technician/date fields **0.5 → 1.0 → 1.0** in one tiny synthetic task. Replay uses scripted model responses, a seeded B0, and **P-only** proposals through the real controller and runtime. It demonstrates mechanics, not model learning or benchmark gains; it has no held-out evaluation.
 
-| 档 | 模型 | 用途 |
-|---|---|---|
-| strong | glm-5.3（智谱） | 资产初始化 / 提案 / 终答 / 语义审查 / LoCoMo 独立评分 |
-| fast | deepseek-v4-flash-fast（commandcode 网关，独立 `LOCOMO_FAST_*`） | 抽取 / 工具选择 |
+The output directory contains:
 
-真实实验提前冻结模型路由；变更路由需重新冻结工程基线并使用新目录。
+```text
+runs/demo-replay/
+├── experiment.json                           # frozen identity
+├── B0/evaluation/maintenance-demo.json         # baseline score
+├── R1/evaluation/maintenance-demo.json         # candidate score (also R2)
+├── R1/optimization/attempt-0/proposal-call.json # proposal input (also R2)
+├── optimization/wiki.json                     # durable experience
+├── published/current.json                     # accepted asset version
+└── demo-summary.json                          # controller summary
+```
 
-## HF 归档
+For live execution, configure your endpoint and use a separate output directory:
 
-- TravelPlanner：<https://huggingface.co/datasets/justis-xu/oak-travelplanner>
-- LoCoMo 中文：<https://huggingface.co/datasets/justis-xu/oak-locomo>
-（含 LLM 请求缓存，可零 API 费用复现全部轨迹；.gitignore 与本仓库刻意不同，见各 ARCHIVE.md）
+```bash
+cp .env.example .env
+# Set DARWINAGENT_API_KEY, DARWINAGENT_BASE_URL, DARWINAGENT_MODEL in .env.
+uv run darwinagent demo --mode live --rounds 2 --output runs/demo-live \
+  --max-requests 40 --timeout 1800
+```
 
-## 方法论
+The CLI reads the current directory's `.env` without overriding shell variables. Live uses the actual model, with no recorded fallback. The cap counts dispatched HTTP attempts, including retries; the timeout covers the whole run. A live baseline may already be correct, so ties are rejected. Success means the stages execute and decisions are recorded, not that the score must improve.
 
-两线复现的完整经验（TravelPlanner 14 条 + locomo 新增 4 条：别名表是攻击面/
-日期不交给 LLM/翻译数据集先测上限/终答上下文相关性排序）：
-`datasets/travelplanner/OPTIMIZATION_LOG.md` 与 `datasets/locomo/pipeline/OPTIMIZATION_LOG.md`。
+Resume an existing run only with the same frozen mode, model, configuration, and source identity:
+
+```bash
+uv run darwinagent demo --mode replay --rounds 2 --output runs/demo-replay --resume
+```
+
+Or call the demo from Python:
+
+```python
+import asyncio
+from pathlib import Path
+from darwinagent.demo import run_demo
+
+asyncio.run(run_demo(Path("runs/python-replay"), mode="replay", rounds=2))
+```
+
+[Full quickstart](docs/en/quickstart.md) · [Configuration](docs/en/configuration.md) · [Dated acceptance evidence](docs/acceptance/2026-10-07.md)
+
+## Bring your own task
+
+Implement the generation boundary and an independent evaluator, then register task assets in `task.yaml` and `assets/index.yaml`. The generation input carries records, questions, and source references; evaluator references stay in the evaluator.
+
+```python
+from darwinagent import (
+    CaseInput, CorpusBlock, QuestionInput, SourceRef, EvaluationResult,
+)
+
+class Records:
+    def generation_input(self, case_id):
+        return CaseInput(case_id,
+            (CorpusBlock(SourceRef("maintenance_record", case_id, "row-1"),
+                         "设备 D-17 于 2026-09-01 由林维护。"),),
+            (QuestionInput("q1", "谁在什么时候维护了 D-17？",
+                           {"serial": "D-17"}),))
+
+class Score:
+    async def evaluate(self, result):
+        correct = sum(a.status == "answered" and "林" in a.answer
+                      and "2026-09-01" in a.answer for a in result.answers)
+        faults = sum(a.status == "execution_error" for a in result.answers)
+        return EvaluationResult({"correct": correct}, len(result.answers),
+                                len(result.answers) - faults, faults, 0)
+```
+
+Load the actual packaged declaration and asset registry:
+
+```python
+from darwinagent import TaskSpec
+from darwinagent.demo import TASK_ROOT
+from darwinagent.kernel.registration import load_assets
+
+assets = load_assets(TASK_ROOT)  # task.yaml + assets/index.yaml + S/F/C/P files
+spec = TaskSpec.load(TASK_ROOT / "task.yaml")
+```
+
+These classes plug into the common runtime; they do not replace the agent execution flow. The [complete offline example](examples/third_domain.py) runs both interfaces with registered S/F/C/P assets:
+
+```bash
+uv run python examples/third_domain.py
+```
+
+See the [custom task guide](docs/en/custom-tasks.md) for a complete live `Pipeline` example and asset contracts. Arbitrary external agent plugins are a future extension, not a v0.1 capability.
+
+## Architecture and documentation
+
+![Architecture](docs/assets/architecture-en.svg)
+
+| Guide | English | 简体中文 |
+| --- | --- | --- |
+| Quickstart | [Read](docs/en/quickstart.md) | [阅读](docs/zh-CN/quickstart.md) |
+| Architecture | [Read](docs/en/architecture.md) | [阅读](docs/zh-CN/architecture.md) |
+| Configuration | [Read](docs/en/configuration.md) | [阅读](docs/zh-CN/configuration.md) |
+| Custom tasks | [Read](docs/en/custom-tasks.md) | [阅读](docs/zh-CN/custom-tasks.md) |
+| Experiments | [Read](docs/en/experiments.md) | [阅读](docs/zh-CN/experiments.md) |
+| Migration | [Read](docs/en/migration.md) | [阅读](docs/zh-CN/migration.md) |
+
+[Historical evidence index](docs/history/README.md) · [Editable graphics and PNG exports](docs/assets/README.md) · [Project introduction](docs/launch/introduction.en.md)
+
+## Status and direction
+
+The local Python 3.11/3.12/3.13 suites and installed-wheel acceptance are documented in the [dated report](docs/acceptance/2026-10-07.md). GitHub CI has not yet run for this branch; the badge links to the real workflow. Historical dataset scores belong to their original protocols and source revisions.
+
+Next directions are broader independent task examples, controlled held-out studies, and a carefully specified external agent integration boundary. These are research and engineering plans, not shipped capabilities or promised quality gains.
+
+## Research provenance and community
+
+The S/F kernel is inspired by [*Toward Effective and Reliable LLM Agents via Dynamic Ontology*](https://arxiv.org/abs/2608.22974) (OaK). C/P assets and the experience Wiki are engineering extensions in this project. Historical reproduction records remain separately indexed; no paper performance numbers are used as current DarwinAgent results.
+
+[Contributing](CONTRIBUTING.md) · [中文贡献指南](CONTRIBUTING.zh-CN.md) · [Changelog](CHANGELOG.md) · [Software citation](CITATION.cff)
+
+MIT © 2026 DarwinAgent contributors. See [LICENSE](LICENSE); third-party material retains its own license and provenance.

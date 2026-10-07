@@ -1,0 +1,24 @@
+flowchart TB
+    subgraph CYCLE["EXPERIENCE-DRIVEN EVOLUTION" ]
+    direction LR
+    subgraph VAR["01 · VARIATION"]
+      direction TB
+      B["B0 / current version<br/>Actual outputs + scores"] --> P["Propose asset candidate<br/>Training evidence + Wiki"]
+    end
+    subgraph SEL["02 · SELECTION"]
+      direction TB
+      V["Validate and trial<br/>Contracts · capabilities"] --> E["Independent output scores<br/>Frozen adoption policy"]
+    end
+    subgraph KEEP["03 · RETENTION"]
+      direction TB
+      D["Improved and qualified?"] -->|"yes"| A["Accept version<br/>Atomic publication"]
+      D -->|"no"| R["Reject candidate<br/>Retain current version"]
+      A --> W["Persistent experience Wiki<br/>Observations + decisions"]
+      R --> W
+    end
+    VAR --> SEL --> KEEP
+    end
+    CYCLE --> NEXT["Wiki informs next proposal<br/>Repeat with current assets"]
+    NEXT -.-> CYCLE
+    classDef accent fill:#173b31,color:#ffffff,stroke:#173b31;
+    class P,W accent;

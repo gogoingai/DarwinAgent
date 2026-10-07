@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="720" viewBox="0 0 1600 720" role="img" aria-labelledby="title desc">
+<title id="title">DarwinAgent — Agent 时代的进化</title><desc id="desc">A branching evolution motif connects variation, selection, retention, and experience. Experimental version 0.1.0.</desc>
+<rect width="1600" height="720" rx="26" fill="#f4f7f1"/>
+<path d="M0 610 Q650 450 1600 615 L1600 720 L0 720Z" fill="#e4eee4"/>
+<g font-family="Arial, Noto Sans CJK SC, Microsoft YaHei, PingFang SC, sans-serif" fill="#173b31">
+<text x="78" y="109" font-size="35" font-weight="700" letter-spacing="1">DarwinAgent</text>
+<rect x="1320" y="67" width="203" height="48" rx="24" fill="#dfe9df"/>
+<text x="1421" y="98" font-size="19" text-anchor="middle">0.1.0 · experimental</text>
+<text x="78" y="226" font-size="70" font-weight="700">Agent 时代的进化</text>
+<text x="81" y="280" font-size="31" fill="#506f62">面向 Agent 经验驱动递归自改进的开源框架</text>
+<text x="81" y="645" font-size="25" fill="#506f62">S / F / C / P 资产 · 固定运行时 · 持久经验 Wiki</text>
+</g>
+<g fill="none" stroke-linecap="round"><path d="M98 500 C280 500 270 449 438 449 S635 500 783 449 S1046 449 1211 397 S1395 397 1484 352" stroke="#2c6d53" stroke-width="8"/>
+<path d="M438 449 C518 449 565 548 650 548 M783 449 C871 449 921 547 1027 547 M1211 397 C1302 397 1369 491 1472 491" stroke="#b0b9aa" stroke-width="5"/>
+<path d="M103 507 C360 600 789 620 1152 488" stroke="#b5c6b7" stroke-width="2" stroke-dasharray="7 11"/>
+</g>
+<g fill="#f4f7f1" stroke="#2c6d53" stroke-width="6"><circle cx="98" cy="500" r="15"/><circle cx="438" cy="449" r="18"/><circle cx="783" cy="449" r="18"/><circle cx="1211" cy="397" r="18"/><circle cx="1484" cy="352" r="15"/></g>
+<g fill="#b7c0b1"><circle cx="650" cy="548" r="10"/><circle cx="1027" cy="547" r="10"/><circle cx="1472" cy="491" r="10"/></g>
+<g font-family="Arial, Noto Sans CJK SC, Microsoft YaHei, PingFang SC, sans-serif" font-size="22" font-weight="600" fill="#355d48" text-anchor="middle"><text x="198" y="423">提出变化</text><text x="522" y="379">独立筛选</text><text x="878" y="376">保留能力</text><text x="1270" y="325">积累经验</text></g>
+</svg>

@@ -1,0 +1,24 @@
+flowchart TB
+    subgraph CYCLE["经验驱动的进化循环" ]
+    direction LR
+    subgraph VAR["01 · 产生变化"]
+      direction TB
+      B["B0 / 当前版本<br/>实际输出与评分"] --> P["提出资产候选<br/>训练证据 + Wiki"]
+    end
+    subgraph SEL["02 · 独立筛选"]
+      direction TB
+      V["契约验证与试跑<br/>权限 · 行为反例"] --> E["独立输出评分<br/>固定采纳策略"]
+    end
+    subgraph KEEP["03 · 保留与积累"]
+      direction TB
+      D["严格提升且满足规则？"] -->|"是"| A["采纳版本<br/>原子发布"]
+      D -->|"否"| R["拒绝候选<br/>保留原版本"]
+      A --> W["持久化经验 Wiki<br/>观察 · 采纳 · 拒绝"]
+      R --> W
+    end
+    VAR --> SEL --> KEEP
+    end
+    CYCLE --> NEXT["Wiki 影响下一轮提案<br/>使用当前资产继续循环"]
+    NEXT -.-> CYCLE
+    classDef accent fill:#173b31,color:#ffffff,stroke:#173b31;
+    class P,W accent;

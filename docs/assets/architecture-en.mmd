@@ -1,0 +1,19 @@
+flowchart LR
+    subgraph INPUT["INPUT + ASSETS"]
+      direction TB
+      A["DatasetAdapter<br/>Records · questions · sources"] ~~~ K["KernelRuntime + S/F/C/P<br/>Fixed permissions"]
+    end
+    subgraph RUN["RUNTIME + EVALUATION"]
+      direction TB
+      P["Pipeline<br/>ExtractionAgent → source graph<br/>→ AnswerAgent"] --> E["Independent Evaluator<br/>Private references → output scores"]
+    end
+    subgraph EXP["EXPERIMENT + PERSISTENCE"]
+      direction TB
+      R["ExperimentRunner<br/>Proposals · admission<br/>Adoption decisions"] --> O["Durable artifacts<br/>Proposals · scores<br/>Published version<br/>Summary · experience Wiki"]
+      O -->|"Wiki → next proposal"| R
+    end
+    INPUT -->|"CaseInput + assets"| RUN
+    RUN -->|"EvaluationResult"| EXP
+    EXP -->|"B0 / candidate execution"| RUN
+    classDef accent fill:#173b31,color:#ffffff,stroke:#173b31;
+    class K,R,O accent;

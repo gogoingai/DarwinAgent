@@ -1,0 +1,16 @@
+cff-version: 1.2.0
+message: "If you use DarwinAgent, cite this software and record the commit and experiment protocol used."
+title: "DarwinAgent: Evolution for the Agent Era"
+type: software
+version: "0.1.0"
+authors:
+  - name: "DarwinAgent contributors"
+repository-code: "https://github.com/gogoingai/DarwinAgent"
+url: "https://github.com/gogoingai/DarwinAgent"
+license: MIT
+abstract: "An experimental open framework for experience-driven recursive self-improvement of agents, inspired by Darwinian evolution."
+keywords:
+  - recursive self-improvement
+  - agents
+  - experience learning
+  - task assets

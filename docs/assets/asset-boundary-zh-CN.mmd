@@ -1,0 +1,13 @@
+flowchart TB
+    subgraph MUT["提案可修改的任务资产"]
+        direction LR
+        S["S · 模式<br/>类型与关系"] ~~~ F["F · 查询函数<br/>只读受限执行"] ~~~ C["C · 任务检查<br/>图／回答检查意见"] ~~~ P["P · 角色提示词<br/>固定登记槽位"]
+    end
+    MUT -->|"登记并验证"| G["候选准入与行为试跑"]
+    subgraph FIX["固定框架与独立评测"]
+        direction LR
+        R["执行与权限<br/>Pipeline · 固定算子"] ~~~ V["固定验证<br/>类型 · 来源 · 状态"] ~~~ E["独立 Evaluator<br/>参考与评分契约"] ~~~ A["采纳与发布<br/>冻结策略 · 原子版本"]
+    end
+    G --> FIX
+    classDef accent fill:#173b31,color:#ffffff,stroke:#173b31;
+    class R,V,E,A accent;
