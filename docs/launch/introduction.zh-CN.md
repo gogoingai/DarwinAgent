@@ -48,7 +48,7 @@ uv run darwinagent demo --mode replay --rounds 2 --output runs/demo-replay
 
 真实模式使用相同任务与独立评测器，不回退到脚本响应。模型可能在基线就答对，因此保留基线、拒绝两轮同分候选，也可能是正确结果。请求上限包含重试，超时覆盖整个演示。
 
-当前源码版本尚未发布到 PyPI，本文也不表示远端主分支已包含 0.1.0。具体安装、真实模式配置和 Python 接入方式见[中文 README](../../README.zh-CN.md)与[快速开始](../zh-CN/quickstart.md)。[带日期的验收记录](../acceptance/2026-10-07.md)区分本地回归、离线回放和真实模型烟雾验收。
+实验性的 0.1.0 源码已合入项目仓库的 `main` 分支，尚未发布到 PyPI。具体安装、真实模式配置和 Python 接入方式见[中文 README](../../README.zh-CN.md)与[快速开始](../zh-CN/quickstart.md)。[带日期的验收记录](../acceptance/2026-10-07.md)区分本地回归、离线回放和真实模型烟雾验收。
 
 DarwinAgent 希望把 Agent 的适应过程变成有边界、有证据、可积累的实验。后续方向包括更多独立任务、受控留出集研究，以及明确的外部 Agent 接入接口。欢迎通过[项目仓库](https://github.com/gogoingai/DarwinAgent)了解实现，提交可复现的问题与任务示例。
 

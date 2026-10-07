@@ -2,7 +2,7 @@
 
 [English](../en/quickstart.md) · [简体中文](../zh-CN/quickstart.md) · [README](../../README.zh-CN.md)
 
-从当前源码检出目录运行，需要 Python 3.11+ 和 uv。此审查分支未发布到 PyPI；不要把远端主分支当作已验证的 0.1.0 安装来源。
+从当前源码检出目录运行，需要 Python 3.11+ 和 uv。实验性的 0.1.0 源码已合入 `main`，尚未发布到 PyPI。
 
 ```bash
 uv sync --frozen

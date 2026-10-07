@@ -45,7 +45,7 @@ The kernel, evaluator, permissions, and adoption rules stay outside the proposal
 
 ## Try the loop
 
-Install **from this source checkout**. These instructions apply to this review branch; it has not been published to PyPI or merged as a release. They do not assert that remote `main` contains this version.
+Install **from this source checkout**. DarwinAgent 0.1.0 is available on `main` as an experimental source version; it has not been published to PyPI or as a GitHub Release.
 
 ```bash
 # Run from this source checkout; Python 3.11+ and uv are required.
@@ -161,7 +161,7 @@ See the [custom task guide](docs/en/custom-tasks.md) for a complete live `Pipeli
 
 ## Status and direction
 
-The local Python 3.11/3.12/3.13 suites and installed-wheel acceptance are documented in the [dated report](docs/acceptance/2026-10-07.md). GitHub CI has not yet run for this branch; the badge links to the real workflow. Historical dataset scores belong to their original protocols and source revisions.
+The local Python 3.11/3.12/3.13 suites and installed-wheel acceptance are documented in the [dated report](docs/acceptance/2026-10-07.md). The workflow badge shows the latest GitHub CI status. Historical dataset scores belong to their original protocols and source revisions.
 
 Next directions are broader independent task examples, controlled held-out studies, and a carefully specified external agent integration boundary. These are research and engineering plans, not shipped capabilities or promised quality gains.
 

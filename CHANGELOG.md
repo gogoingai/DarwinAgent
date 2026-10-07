@@ -2,7 +2,7 @@
 
 ## 0.1.0 — experimental source version (2026-10-07)
 
-This version has not been published to PyPI or released from the review branch.
+This experimental source version is available on `main`. It has not been published to PyPI or as a GitHub Release.
 
 - Introduced the independent `darwinagent` distribution/import namespace, Python 3.11+ support, and packaged maintenance task resources.
 - Added installed `doctor` and `demo` CLI commands, replay/live modes, bounded HTTP attempts/time, and matching-identity resume.

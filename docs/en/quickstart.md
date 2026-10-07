@@ -2,7 +2,7 @@
 
 [English](../en/quickstart.md) · [简体中文](../zh-CN/quickstart.md) · [README](../../README.md)
 
-Run from this source checkout with Python 3.11+ and uv. This review branch has not been published to PyPI; remote main is not a verified 0.1.0 installation source.
+Run from this source checkout with Python 3.11+ and uv. The experimental 0.1.0 source is available on `main`; it has not been published to PyPI.
 
 ```bash
 uv sync --frozen

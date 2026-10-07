@@ -65,13 +65,23 @@ class FullRoundDeadlineTests(unittest.TestCase):
     def test_wiki_overrun_does_not_publish_completed_score(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
+            runner = FastLoopExperiment(root, round_deadline_s=30)
             original = WikiMaintainer.record
-            async def slow(self, stage, kind, *args, **kwargs):
+            reached_wiki = []
+            async def expire_at_wiki(maintainer, stage, kind, *args, **kwargs):
                 if stage == 'R1' and kind == 'decision' and kwargs.get('infer'):
-                    await asyncio.sleep(0.6)
-                return await original(self, stage, kind, *args, **kwargs)
-            with mock.patch.object(WikiMaintainer, 'record', slow):
-                summary = _run(FastLoopExperiment(root, round_deadline_s=0.3), rounds=1)
+                    scored = json.loads((root / 'R1/stage.json').read_text())
+                    self.assertEqual(scored['status'], 'complete')
+                    self.assertEqual(scored['scores']['completed'], scored['scores']['total'])
+                    reached_wiki.append(stage)
+                    # Inject expiration only after formal scoring. Timer cancellation
+                    # is exercised separately by the proposal/formal-score probes.
+                    runner._round_deadline = time.monotonic() - 1
+                    raise RoundDeadlineExceeded('Injected Wiki-phase deadline exceeded')
+                return await original(maintainer, stage, kind, *args, **kwargs)
+            with mock.patch.object(WikiMaintainer, 'record', expire_at_wiki):
+                summary = _run(runner, rounds=1)
+            self.assertEqual(reached_wiki, ['R1'])
             self.verify_timeout(root, summary)
             self.assertTrue((root / 'R1/stage.json').exists())
 

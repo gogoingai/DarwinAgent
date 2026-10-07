@@ -48,7 +48,7 @@ Replay uses scripted model responses, a seeded baseline, and P-only proposals th
 
 Live mode uses the same task and independent evaluator without a scripted fallback. A model may answer the baseline correctly, so retaining it and rejecting two tied candidates can be the right result. Request limits count retries and the timeout covers the whole demo.
 
-This source version has not been published to PyPI, and this introduction does not assert that remote main contains 0.1.0. See the [README](../../README.md) and [quickstart](../en/quickstart.md) for installation, live configuration, and SDK integration. The [dated acceptance record](../acceptance/2026-10-07.md) separates local regression, replay, and real-model smoke evidence.
+The experimental 0.1.0 source is available on the repository's `main` branch and has not been published to PyPI. See the [README](../../README.md) and [quickstart](../en/quickstart.md) for installation, live configuration, and SDK integration. The [dated acceptance record](../acceptance/2026-10-07.md) separates local regression, replay, and real-model smoke evidence.
 
 DarwinAgent aims to make agent adaptation a bounded experiment with evidence that accumulates. Next directions include more independent tasks, controlled held-out studies, and a defined external agent integration boundary. Visit the [repository](https://github.com/gogoingai/DarwinAgent) to inspect the implementation or contribute reproducible issues and task examples.
 
