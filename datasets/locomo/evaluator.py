@@ -13,7 +13,7 @@ from .pipeline.protocol import aggregate, dual_grade_batch
 from .pipeline.experiment import transcript
 
 ROOT=Path(__file__).resolve().parents[2]
-LOCK_PATH=ROOT/'datasets/locomo/evaluation_lock.json'
+LOCK_PATH=ROOT/'datasets/locomo/evaluation_lock.governance-20261007.json'
 AUDITED=ROOT/'datasets/locomo/runs/experiments/conv26_dual_v4/gold_audited.json'
 
 
