@@ -26,7 +26,7 @@ class RiskSmokeTests(unittest.TestCase):
     _preflight_sync = staticmethod(preflight_sync)
 
     def test_candidate_smoke_keeps_each_risk_category_when_dates_dominate(self):
-        from darwinagent.experiments import runner as runner_module
+        from darwinagent.experiments import stages as runner_module
 
         class Client:
             async def aclose(self):
@@ -72,7 +72,7 @@ class RiskSmokeTests(unittest.TestCase):
         self.assertEqual(Pipeline.seen[:3], ("date0", "filter", "traverse"))
 
     def test_candidate_smoke_recovers_transient_but_blocks_tool_failure(self):
-        from darwinagent.experiments import runner as runner_module
+        from darwinagent.experiments import stages as runner_module
 
         @dataclass(frozen=True)
         class Case:

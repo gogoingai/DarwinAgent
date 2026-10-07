@@ -34,7 +34,7 @@ class RecoveryTests(unittest.TestCase):
     _preflight_sync = staticmethod(preflight_sync)
 
     def test_stage_mixed_fault_retries_only_transient_checkpoint(self):
-        from darwinagent.experiments import runner as runner_module
+        from darwinagent.experiments import stages as runner_module
 
         evidence = (SourceRef("m", "c", "1"),)
         initial = RunResult(
@@ -138,7 +138,7 @@ class RecoveryTests(unittest.TestCase):
             self.assertEqual(journal["questions"]["q1"]["state"], "done")
 
     def test_stage_resume_does_not_reissue_reserved_mixed_fault(self):
-        from darwinagent.experiments import runner as runner_module
+        from darwinagent.experiments import stages as runner_module
 
         class Client:
             def ledger_summary(self):

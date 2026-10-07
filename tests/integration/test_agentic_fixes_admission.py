@@ -17,6 +17,7 @@ from darwinagent.contracts import (
     RunResult,
     SourceRef,
 )
+from darwinagent.experiments.runner import ExperimentRunner
 from darwinagent.kernel.assets import Asset, KernelAssets
 from darwinagent.llm.recorded import RecordedClient
 
@@ -190,7 +191,7 @@ class GraphCheckBudgetTests(unittest.TestCase):
         import asyncio
         from types import SimpleNamespace
 
-        from darwinagent.experiments import runner as R
+        from darwinagent.experiments import stages as R
 
         # (a) 图阶段全局失败：不进入分批重试（FakePipeline 只被调用一次）
         class FakeClient:
@@ -224,7 +225,7 @@ class GraphCheckBudgetTests(unittest.TestCase):
             questions = (QuestionInput("q1", "?"), QuestionInput("q2", "?"))
 
         with tempfile.TemporaryDirectory() as td:
-            runner = R.ExperimentRunner(
+            runner = ExperimentRunner(
                 type("Adapter", (), {"generation_input": staticmethod(lambda i: C())})(),
                 lambda c, p: type("E", (), {"evaluate": None})(),
                 None,
@@ -344,7 +345,7 @@ class SmokeThresholdTests(unittest.TestCase):
     def test_single_fault_passes_double_fault_rejects(self):
         from dataclasses import dataclass
 
-        import darwinagent.experiments.runner as R
+        import darwinagent.experiments.stages as R
         from darwinagent.experiments.runner import ExperimentRunner
 
         @dataclass

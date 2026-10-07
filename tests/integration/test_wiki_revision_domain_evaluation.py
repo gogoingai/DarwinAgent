@@ -8,7 +8,7 @@ from darwinagent.contracts import QuestionInput
 
 class EvaluatorInterfaceRegression(unittest.TestCase):
     def test_generic_non_numeric_question_and_opt_in_subset(self):
-        from darwinagent.experiments.runner import _evaluate_stage
+        from darwinagent.experiments.stages import _evaluate_stage
 
         result = object()
         questions = (QuestionInput("trip-A", "where?"),)

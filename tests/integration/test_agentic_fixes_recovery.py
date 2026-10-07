@@ -16,6 +16,7 @@ from darwinagent.contracts import (
     RunResult,
     SourceRef,
 )
+from darwinagent.experiments.runner import ExperimentRunner
 from darwinagent.runtime.artifacts import digest
 
 
@@ -98,7 +99,7 @@ class FaultRetryInvalidatesEvaluationTests(unittest.TestCase):
         import asyncio
         from types import SimpleNamespace
 
-        from darwinagent.experiments import runner as R
+        from darwinagent.experiments import stages as R
 
         class FakeClient:
             async def aclose(self):
@@ -168,7 +169,7 @@ class FaultRetryInvalidatesEvaluationTests(unittest.TestCase):
             (root / "B0" / "evaluation" / "c.json").write_text(
                 json.dumps({"run_identity": "i", "asset_version": "v", "scores": stale.to_dict()})
             )
-            runner = R.ExperimentRunner(
+            runner = ExperimentRunner(
                 type("Adapter", (), {"generation_input": staticmethod(lambda ident: C())})(),
                 lambda client, path: FakeEvaluator(client, path),
                 None,
@@ -197,7 +198,7 @@ class DeterministicFaultTests(unittest.TestCase):
     def test_deterministic_error_skips_retry(self):
         import asyncio
 
-        import darwinagent.experiments.runner as R
+        import darwinagent.experiments.stages as R
 
         scripted = [
             RunResult(
@@ -247,7 +248,7 @@ class DeterministicFaultTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
-            runner = R.ExperimentRunner(
+            runner = ExperimentRunner(
                 type("Adapter", (), {"generation_input": staticmethod(lambda i: C())})(),
                 lambda c, p: FakeEvaluator(c, p),
                 None,

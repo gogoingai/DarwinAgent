@@ -9,11 +9,9 @@ from pathlib import Path
 from darwinagent.contracts import plain
 from darwinagent.kernel.revision import training_id
 
-from .wiki import bounded_trace
-
-FEEDBACK_BUDGET_CHARS = 35000
-_DIAG_ROW_CHARS = 2200
-_TRACE_CHARS = 600
+from .constants import _DIAG_ROW_CHARS, _TRACE_CHARS
+from .constants import FEEDBACK_BUDGET_CHARS as FEEDBACK_BUDGET_CHARS
+from .wiki_evidence import bounded_trace
 
 
 def _clip(value, limit):
