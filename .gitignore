@@ -6,63 +6,17 @@ third_party/
 *.egg-info/
 .DS_Store
 .jdk/
-
-# ---- 运行产物：只入库轻量、可复现、有证据价值的 ----
-runs/cache/
-runs/cost_ledger.jsonl
-runs/logs/
-
-# 重产物不入库（图/轨迹/逐题目录，单题 graph.json 可达 9MB）：
-runs/inference/q*/
-runs/inference.round*.bak/
-runs/anchor/
-runs/anchor.*/
-runs/build/round_*/
-
-# 第五轮各版本快照（大体积，不入库；HF 有全量）
-runs/inference*.bak/
-runs/anchor.r*/
 .env.bak*
 
-# ---- 目录重组后（2026-09-29）：任务产物随任务目录 ----
-datasets/travelplanner/runs/
-datasets/locomo/runs/cache/
-datasets/locomo/runs/logs/
-datasets/locomo/runs/cost_ledger.jsonl
-
-# Versioned LoCoMo experiments: keep reports, exclude request caches and runtime logs
-datasets/locomo/runs/experiments/*/runtime/
-datasets/locomo/runs/experiments/*/connectivity/
-datasets/locomo/runs/experiments/*/verdict_cache/
-datasets/locomo/runs/experiments/*/blind_verdict_cache/
-datasets/locomo/runs/experiments/*/evaluation_snapshots/
-datasets/locomo/runs/experiments/*/evaluations/
-datasets/locomo/runs/dual_reports/*/*/runtime/
-datasets/locomo/runs/dual_reports/*/*/cache/
-
-# 收口迭代（2026-10-02）：报告与审计入库；逐轮快照是代码副本（git 历史可代）、
-# 带完整轨迹的逐轮 answers.jsonl 不入库（判分 delta 已浓缩进 patch-impact.md）
-datasets/locomo/runs/closeout/snapshots/
-datasets/locomo/runs/conv-44/closeout-r*/answers.jsonl
-
-# ---- iter_v2/portable_v1 实验产物:可重建的重原料不入库(LLM 响应缓存/图快照) ----
-# 记录类产物(answers/report/failures/system_side/契约/决策/frozen_code)全部入库
-datasets/locomo/runs/**/cache/
-datasets/locomo/runs/**/graph_*/
-
-# ---- 框架冷启动实验(2026-10-03):逐题完整生成轨迹不入库 ----
-# 单题 result.json 可达 90M+(含全量推理轨迹);结论已浓缩进 acceptance/summary/decision
-datasets/locomo/runs/**/generation/
-datasets/locomo/runs/**/frozen_code/
-datasets/locomo/runs/**/*.console.log
+# ---- 框架净化（2026-10-07，操作者拍板）：仓库只保留框架代码/文档/任务适配与基准数据 ----
+# 一切实验运行产物与快照种子不入库（磁盘保留＋HF 归档承载）
+datasets/*/runs/
+datasets/locomo/snapshots/
+datasets/loomo_runs_typo_check/
+runs/
+embed_cache.json
+embed_cache.tmp
 
 # ---- 构建产物与本地参考资料 ----
 dist/
 papers/
-datasets/locomo/runs/agentic_v1/
-
-# 实验根大产物不入库（磁盘保留＋HF 归档）：大文件走 HF，不进 git
-datasets/locomo/runs/agentic_v*/
-# 快照向量缓存＝运行时产物（不版本化；HF/磁盘归档承载）
-embed_cache.json
-embed_cache.tmp
