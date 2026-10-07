@@ -1,0 +1,253 @@
+{
+  "date": "2026-10-07",
+  "model": "glm-5.3-flash",
+  "concurrency": 1,
+  "designed_cases": 12,
+  "complete_cases": 11,
+  "partial_cases": 1,
+  "designed_questions": 28,
+  "completed_questions": 27,
+  "passed_completed_questions": 27,
+  "missing": [
+    {
+      "case_id": "one-past-page",
+      "question_id": "q2"
+    }
+  ],
+  "http_attempts": 144,
+  "http_outcome_unknown": 1,
+  "active_seconds": 2195.79,
+  "wiki_sessions_completed": 3,
+  "status": "pending_unknown_request",
+  "published_to_main": false,
+  "previous_main_commit": "1760eadb614fc9c843c23f63d07762c7fda6339d",
+  "branch_state": {
+    "name": "main",
+    "adopted": null,
+    "working": "5f9f309348f355306217188b54786511270a0647df716283a6eda90f588938d7",
+    "revision": 0,
+    "parent": null
+  },
+  "core": {
+    "tests": 517,
+    "passed": 510,
+    "skipped": 7,
+    "result": "pass"
+  },
+  "locomo": {
+    "tests": 18,
+    "result": "pass"
+  },
+  "travelplanner": {
+    "tests": 11,
+    "result": "pass"
+  },
+  "ruff_check": "pass",
+  "ruff_format_check": "pass",
+  "diff_check": "pass",
+  "unknown_request": {
+    "id": "b27562fae4ee439a93cae9a67d4c8b97",
+    "case_id": "one-past-page",
+    "question_id": "q2",
+    "state": "unknown",
+    "new_attempt_authorized": false
+  },
+  "case_results": [
+    {
+      "case_id": "shuffled-dates",
+      "expected": 3,
+      "completed": 3,
+      "passed": 3
+    },
+    {
+      "case_id": "serial-prefix",
+      "expected": 3,
+      "completed": 3,
+      "passed": 3
+    },
+    {
+      "case_id": "same-date-subjects",
+      "expected": 2,
+      "completed": 2,
+      "passed": 2
+    },
+    {
+      "case_id": "exact-page-20",
+      "expected": 2,
+      "completed": 2,
+      "passed": 2
+    },
+    {
+      "case_id": "one-past-page",
+      "expected": 2,
+      "completed": 1,
+      "passed": 1
+    },
+    {
+      "case_id": "filtered-tail",
+      "expected": 2,
+      "completed": 2,
+      "passed": 2
+    },
+    {
+      "case_id": "interleaved-devices",
+      "expected": 2,
+      "completed": 2,
+      "passed": 2
+    },
+    {
+      "case_id": "technician-change",
+      "expected": 3,
+      "completed": 3,
+      "passed": 3
+    },
+    {
+      "case_id": "year-boundary",
+      "expected": 3,
+      "completed": 3,
+      "passed": 3
+    },
+    {
+      "case_id": "leap-day",
+      "expected": 2,
+      "completed": 2,
+      "passed": 2
+    },
+    {
+      "case_id": "empty-match",
+      "expected": 2,
+      "completed": 2,
+      "passed": 2
+    },
+    {
+      "case_id": "out-of-range-recovery",
+      "expected": 2,
+      "completed": 2,
+      "passed": 2
+    }
+  ],
+  "wiki_sessions": [
+    {
+      "case_id": "one-past-page",
+      "status": "complete",
+      "exchanges": 2,
+      "terminal_action": "submit_patch",
+      "candidate": {
+        "version": "ac27598ae261f6e1fdbde74d051126d619bd7287f034bc7f4f95f5a7f74e7f98",
+        "admission": "pass"
+      }
+    },
+    {
+      "case_id": "filtered-tail",
+      "status": "complete",
+      "exchanges": 1,
+      "terminal_action": "no_change",
+      "candidate": null
+    },
+    {
+      "case_id": "technician-change",
+      "status": "complete",
+      "exchanges": 1,
+      "terminal_action": "no_change",
+      "candidate": null
+    }
+  ],
+  "wiki_jobs": 3,
+  "model_receipts": {
+    "total_calls": 143,
+    "cache_hits": 0,
+    "prompt_tokens": 244562,
+    "completion_tokens": 107245,
+    "by_model": {
+      "glm-5.3-flash": {
+        "calls": 143
+      }
+    }
+  },
+  "candidate_boundary": {
+    "mode": "offline_kernel_no_http",
+    "candidate": "ac27598ae261f6e1fdbde74d051126d619bd7287f034bc7f4f95f5a7f74e7f98",
+    "rows": [
+      {
+        "records": 21,
+        "returned": 21,
+        "complete": true,
+        "observation": {
+          "steps_used": 9,
+          "step_budget": 30000,
+          "elapsed_ms": 0.2,
+          "read_operations": 1,
+          "capability_calls": {
+            "nodes": 1
+          },
+          "traverse_observations": [],
+          "traverse_directions": [],
+          "result_bytes": 3287
+        }
+      },
+      {
+        "records": 5000,
+        "returned": 5000,
+        "complete": true,
+        "observation": {
+          "steps_used": 9,
+          "step_budget": 30000,
+          "elapsed_ms": 28.3,
+          "read_operations": 1,
+          "capability_calls": {
+            "nodes": 1
+          },
+          "traverse_observations": [],
+          "traverse_directions": [],
+          "result_bytes": 793890
+        }
+      },
+      {
+        "records": 5001,
+        "returned": 5000,
+        "complete": false,
+        "observation": {
+          "steps_used": 9,
+          "step_budget": 30000,
+          "elapsed_ms": 43.6,
+          "read_operations": 1,
+          "capability_calls": {
+            "nodes": 1
+          },
+          "traverse_observations": [],
+          "traverse_directions": [],
+          "result_bytes": 793890
+        }
+      }
+    ],
+    "adopted": false
+  },
+  "migration": {
+    "export": "complete",
+    "import": "complete",
+    "native_objects": 551,
+    "progress_files": 1120,
+    "isolated": 0,
+    "verification": {
+      "pinned_wiki_cursor": "pass",
+      "boundary_refutation": "pass",
+      "new_http_attempts": 0,
+      "completed_answers_read": 27,
+      "answer_checksums": "pass",
+      "graph_and_question_versions": "pass",
+      "continued_questions": 27,
+      "new_model_calls": 0,
+      "unknown_question_selected": false,
+      "proposal_sessions_reused": 3,
+      "proposal_reuse_model_calls": 0
+    },
+    "credential_scan": "pass"
+  },
+  "scope_notes": [
+    "Prepared Chinese sources and graphs; no extraction or embedding calls.",
+    "Separate field evaluation; original five-question fixture_exact=0/5 remains unchanged.",
+    "5001-node candidate boundary is an offline KernelRuntime check, not an additional real-model case.",
+    "Candidate admission passed but full-size boundary failed; candidate not adopted.",
+    "143 receipts plus one unknown outcome; unknown consumption not inferred."
+  ]
+}

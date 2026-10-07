@@ -27,58 +27,62 @@ from darwinagent.runtime.steps import StepJournal, UnknownRequest
 from darwinagent.runtime.workspace import Workspace
 
 
-def fixtures(root):
-    definitions = [
-        (
-            "subject-date",
-            [("D-31", "2026-01-02", "林"), ("D-32", "2026-03-09", "赵")],
-            [
-                (
-                    "q1",
-                    "D-32由谁在何时维护？只返回technician和date字段。",
-                    "D-32",
-                    {"technician": "赵", "date": "2026-03-09"},
-                ),
-                (
-                    "q2",
-                    "D-31由谁在何时维护？只返回technician和date字段。",
-                    "D-31",
-                    {"technician": "林", "date": "2026-01-02"},
-                ),
-            ],
-        ),
-        (
-            "historical-refusal",
-            [("D-51", "2026-07-02", "王"), ("D-51", "2026-07-03", "李")],
-            [
-                (
-                    "q1",
-                    "D-51在2026-07-03由谁维护？只返回该事件technician和date。",
-                    "D-51",
-                    {"technician": "李", "date": "2026-07-03"},
-                ),
-                ("q2", "D-59由谁在何时维护？如无记录，应abstained。", "D-59", None),
-            ],
-        ),
-        (
-            "paging-tail",
-            [("D-71", str(date(2026, 1, 1) + timedelta(days=i)), "陈") for i in range(75)],
-            [
-                (
-                    "q1",
-                    "D-71共有多少条记录？必须用f_page_facts，limit=25，从offset=0逐页读取到结束，只返回count字段。",
-                    "D-71",
-                    {"count": 75},
-                ),
-                (
-                    "q2",
-                    "D-71最后一条记录的技术员和日期？使用f_page_facts逐页核对，只返回technician和date。",
-                    "D-71",
-                    {"technician": "陈", "date": "2026-03-16"},
-                ),
-            ],
-        ),
-    ]
+def fixtures(root, definitions=None):
+    definitions = (
+        definitions
+        if definitions is not None
+        else [
+            (
+                "subject-date",
+                [("D-31", "2026-01-02", "林"), ("D-32", "2026-03-09", "赵")],
+                [
+                    (
+                        "q1",
+                        "D-32由谁在何时维护？只返回technician和date字段。",
+                        "D-32",
+                        {"technician": "赵", "date": "2026-03-09"},
+                    ),
+                    (
+                        "q2",
+                        "D-31由谁在何时维护？只返回technician和date字段。",
+                        "D-31",
+                        {"technician": "林", "date": "2026-01-02"},
+                    ),
+                ],
+            ),
+            (
+                "historical-refusal",
+                [("D-51", "2026-07-02", "王"), ("D-51", "2026-07-03", "李")],
+                [
+                    (
+                        "q1",
+                        "D-51在2026-07-03由谁维护？只返回该事件technician和date。",
+                        "D-51",
+                        {"technician": "李", "date": "2026-07-03"},
+                    ),
+                    ("q2", "D-59由谁在何时维护？如无记录，应abstained。", "D-59", None),
+                ],
+            ),
+            (
+                "paging-tail",
+                [("D-71", str(date(2026, 1, 1) + timedelta(days=i)), "陈") for i in range(75)],
+                [
+                    (
+                        "q1",
+                        "D-71共有多少条记录？必须用f_page_facts，limit=25，从offset=0逐页读取到结束，只返回count字段。",
+                        "D-71",
+                        {"count": 75},
+                    ),
+                    (
+                        "q2",
+                        "D-71最后一条记录的技术员和日期？使用f_page_facts逐页核对，只返回technician和date。",
+                        "D-71",
+                        {"technician": "陈", "date": "2026-03-16"},
+                    ),
+                ],
+            ),
+        ]
+    )
     output = []
     for case_id, records, questions in definitions:
         folder = root / case_id
@@ -143,6 +147,7 @@ def fixtures(root):
                     "technician": {"type": "string"},
                     "date": {"type": "string"},
                     "count": {"type": "integer"},
+                    "technicians": {"type": "array", "items": {"type": "string"}},
                 },
             },
         )
@@ -165,7 +170,17 @@ def evaluate(result, expected):
             passed = (
                 answer.status == "answered"
                 and isinstance(value, dict)
-                and all(value.get(k) == v for k, v in reference.items())
+                and all(
+                    (
+                        isinstance(value.get(k), list)
+                        and all(isinstance(item, str) for item in value[k])
+                        and len(value[k]) == len(v)
+                        and sorted(value[k]) == sorted(v)
+                    )
+                    if isinstance(v, list)
+                    else type(value.get(k)) is type(v) and value.get(k) == v
+                    for k, v in reference.items()
+                )
             )
         rows.append(
             {
@@ -181,13 +196,14 @@ def evaluate(result, expected):
     return {"total": len(expected), "passed": sum(r["passed"] for r in rows), "rows": rows}
 
 
-async def live(root, model, active_seconds=1200, max_requests=70):
+async def live(root, model, active_seconds=1200, max_requests=70, *, definitions=None):
     if not model.strip():
         raise ValueError("Explicit user-selected model required")
-    cases = fixtures(root)
+    cases = fixtures(root, definitions)
     cfg = Config.from_env(work_dir=root / "transport")
     cfg.model_strong = cfg.model_middle = cfg.model_fast = model
     cfg.max_concurrency = cfg.fast_max_concurrency = 1
+    cfg.request_timeout_s = 240
     cfg.max_http_requests = max_requests
     cfg.request_budget_path = root / "http-attempts.json"
     cfg.validate_model()
@@ -250,9 +266,16 @@ async def live(root, model, active_seconds=1200, max_requests=70):
                             StepJournal.respond = original
                         if not injected:
                             raise AssertionError("Receipt interruption fixture did not execute")
-                    result = await pipeline.run(
-                        case, task, run_config, execution=ExecutionSelection()
-                    )
+                    try:
+                        result = await pipeline.run(
+                            case, task, run_config, execution=ExecutionSelection()
+                        )
+                    except UnknownRequest as exc:
+                        report.setdefault("unresolved", []).append(
+                            {"case_id": case.id, "error": str(exc)}
+                        )
+                        atomic_json(root / "extended-report.json", report)
+                        continue
                     evaluation = evaluate(result, expected)
                     start = client.http_attempts()
                     await pipeline.run(
@@ -267,7 +290,10 @@ async def live(root, model, active_seconds=1200, max_requests=70):
                             "Completed answers were regenerated after control change"
                         )
                     if index == 0:
-                        workspace.create_branch("manual-fork", parent="main")
+                        try:
+                            workspace.branch("manual-fork")
+                        except KeyError:
+                            workspace.create_branch("manual-fork", parent="main")
                         await pipeline.run(
                             case,
                             task,
@@ -309,7 +335,9 @@ async def live(root, model, active_seconds=1200, max_requests=70):
                         flush=True,
                     )
                 report["status"] = (
-                    "complete"
+                    "pending"
+                    if report.get("unresolved")
+                    else "complete"
                     if all(
                         c["evaluation"]["passed"] == c["evaluation"]["total"]
                         for c in report["cases"]
