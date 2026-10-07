@@ -8,8 +8,9 @@ from pathlib import Path
 
 
 def digest(value) -> str:
-    return hashlib.sha256(json.dumps(value, ensure_ascii=False, sort_keys=True,
-                                     separators=(",", ":")).encode()).hexdigest()
+    return hashlib.sha256(
+        json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
 
 
 def atomic_json(path: Path, value) -> None:
@@ -29,8 +30,11 @@ def atomic_json(path: Path, value) -> None:
 
 
 def verify_files(root: Path, expected: dict[str, str]) -> None:
-    changed = [name for name, fp in expected.items()
-               if not (root / name).is_file()
-               or hashlib.sha256((root / name).read_bytes()).hexdigest() != fp]
+    changed = [
+        name
+        for name, fp in expected.items()
+        if not (root / name).is_file()
+        or hashlib.sha256((root / name).read_bytes()).hexdigest() != fp
+    ]
     if changed:
         raise ValueError(f"Frozen files changed: {changed}")

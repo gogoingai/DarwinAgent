@@ -7,6 +7,7 @@
 - verified_fix 绑定具体复现回放行，不能只凭同资产通过准入。
 夹具复用 tests/fixtures/travel_faults（归档 2026-10-05 Travel 事故证据）。
 """
+
 import asyncio
 import json
 import tempfile
@@ -15,95 +16,153 @@ from pathlib import Path
 
 from darwinagent.config import RunConfig
 from darwinagent.experiments.admission import AdmissionError, admit_candidate
-from darwinagent.experiments.runner import (_check_snapshot_expectation,
-                                    _prior_failed_check_snapshots,
-                                    promote_verified_check_replay)
+from darwinagent.experiments.runner import (
+    _check_snapshot_expectation,
+    _prior_failed_check_snapshots,
+    promote_verified_check_replay,
+)
 from darwinagent.experiments.wiki import _lessons
 from darwinagent.kernel import KernelBundle, TaskSpec
 from darwinagent.kernel.validation import capability_names
 from darwinagent.runtime.artifacts import digest
 
-from tests.integration.test_wiki_faults_repro import (COMPLETE_C, FIXED_F, FIXTURES,
-                                                      TASK_YAML, base_bundle,
-                                                      candidate_bundle,
-                                                      legal_candidate, travel_case,
-                                                      travel_graph)
+from tests.integration.test_wiki_faults_repro import (
+    COMPLETE_C,
+    FIXED_F,
+    FIXTURES,
+    TASK_YAML,
+    base_bundle,
+    candidate_bundle,
+    legal_candidate,
+    travel_case,
+    travel_graph,
+)
 
 TRAVEL_CONTRACT = TaskSpec.load(TASK_YAML).answer_contract
 
 
-def write_checkpoint(root, stage, case_id, question_id, events, status='execution_error'):
-    path = root / stage / 'generation' / case_id / 'answers' / f'{digest(question_id)}.json'
+def write_checkpoint(root, stage, case_id, question_id, events, status="execution_error"):
+    path = root / stage / "generation" / case_id / "answers" / f"{digest(question_id)}.json"
     path.parent.mkdir(parents=True, exist_ok=True)
-    result = {'question_id': question_id, 'status': status, 'trace': events}
-    path.write_text(json.dumps({'identity': 'test', 'digest': digest(result),
-                                'result': result}, ensure_ascii=False))
+    result = {"question_id": question_id, "status": status, "trace": events}
+    path.write_text(
+        json.dumps(
+            {"identity": "test", "digest": digest(result), "result": result}, ensure_ascii=False
+        )
+    )
     return path
 
 
-def candidate_event(snapshot, check_id='c_answer_shape', issues=('answer is not an array',)):
-    return {'stage': 'candidate', 'attempt': 0, 'candidate': {
-                'status': snapshot['status'], 'answer': snapshot['answer'],
-                'node_ids': snapshot['node_ids']},
-            'checks': [{'check_id': check_id, 'ok': False, 'issues': list(issues)}],
-            'check_snapshot': snapshot}
+def candidate_event(snapshot, check_id="c_answer_shape", issues=("answer is not an array",)):
+    return {
+        "stage": "candidate",
+        "attempt": 0,
+        "candidate": {
+            "status": snapshot["status"],
+            "answer": snapshot["answer"],
+            "node_ids": snapshot["node_ids"],
+        },
+        "checks": [{"check_id": check_id, "ok": False, "issues": list(issues)}],
+        "check_snapshot": snapshot,
+    }
 
 
 def legal_snapshot():
     candidate = legal_candidate()
-    return {'stage': 'answer', 'question': 'plan the trip', 'parameters': {},
-            'status': 'answered', 'answer': candidate['answer'],
-            'node_ids': candidate['node_ids'], 'evidence': [], 'visible_evidence': [],
-            'structured_answer': json.loads(candidate['answer'])}
+    return {
+        "stage": "answer",
+        "question": "plan the trip",
+        "parameters": {},
+        "status": "answered",
+        "answer": candidate["answer"],
+        "node_ids": candidate["node_ids"],
+        "evidence": [],
+        "visible_evidence": [],
+        "structured_answer": json.loads(candidate["answer"]),
+    }
 
 
 class CheckSnapshotClassificationTests(unittest.TestCase):
     def test_machine_decidable_expectations(self):
         legal = legal_snapshot()
-        malformed = {**legal, 'answer': 'not a JSON array', 'structured_answer': None}
-        violating = {**legal, 'structured_answer': ['not an object'],
-                     'answer': '["not an object"]'}
-        abstained = {**legal, 'status': 'abstained', 'answer': '无法回答',
-                     'structured_answer': None, 'node_ids': []}
-        empty = {**legal, 'answer': '', 'structured_answer': None, 'node_ids': []}
-        self.assertEqual(_check_snapshot_expectation(legal, TRAVEL_CONTRACT)[0], 'informational')
-        self.assertEqual(_check_snapshot_expectation(malformed, TRAVEL_CONTRACT)[0], 'must_reject')
-        self.assertEqual(_check_snapshot_expectation(violating, TRAVEL_CONTRACT)[0], 'must_reject')
-        self.assertEqual(_check_snapshot_expectation(abstained, TRAVEL_CONTRACT)[0], 'informational')
-        self.assertEqual(_check_snapshot_expectation(empty, TRAVEL_CONTRACT)[0], 'must_reject')
+        malformed = {**legal, "answer": "not a JSON array", "structured_answer": None}
+        violating = {**legal, "structured_answer": ["not an object"], "answer": '["not an object"]'}
+        abstained = {
+            **legal,
+            "status": "abstained",
+            "answer": "无法回答",
+            "structured_answer": None,
+            "node_ids": [],
+        }
+        empty = {**legal, "answer": "", "structured_answer": None, "node_ids": []}
+        self.assertEqual(_check_snapshot_expectation(legal, TRAVEL_CONTRACT)[0], "informational")
+        self.assertEqual(_check_snapshot_expectation(malformed, TRAVEL_CONTRACT)[0], "must_reject")
+        self.assertEqual(_check_snapshot_expectation(violating, TRAVEL_CONTRACT)[0], "must_reject")
+        self.assertEqual(
+            _check_snapshot_expectation(abstained, TRAVEL_CONTRACT)[0], "informational"
+        )
+        self.assertEqual(_check_snapshot_expectation(empty, TRAVEL_CONTRACT)[0], "must_reject")
 
     def test_scanner_reads_checkpoints_and_dedups(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            write_checkpoint(root, 'B0', 'train:0', '0', [candidate_event(legal_snapshot())])
-            write_checkpoint(root, 'R1', 'train:0', '0', [candidate_event(legal_snapshot())])
-            write_checkpoint(root, 'R2', 'train:0', '0', [{
-                'stage': 'candidate', 'candidate': {'status': 'answered', 'answer': 'x',
-                                                    'node_ids': []},
-                'checks': [{'check_id': 'c_answer_shape', 'ok': False, 'issues': ['old style']}]}])
+            write_checkpoint(root, "B0", "train:0", "0", [candidate_event(legal_snapshot())])
+            write_checkpoint(root, "R1", "train:0", "0", [candidate_event(legal_snapshot())])
+            write_checkpoint(
+                root,
+                "R2",
+                "train:0",
+                "0",
+                [
+                    {
+                        "stage": "candidate",
+                        "candidate": {"status": "answered", "answer": "x", "node_ids": []},
+                        "checks": [
+                            {"check_id": "c_answer_shape", "ok": False, "issues": ["old style"]}
+                        ],
+                    }
+                ],
+            )
             rows = _prior_failed_check_snapshots(root, TRAVEL_CONTRACT)
             self.assertEqual(len(rows), 1, rows)
-            self.assertEqual(rows[0]['case_id'], 'train:0')
-            self.assertEqual(rows[0]['expectation'], 'informational')
-            self.assertEqual(rows[0]['check_ids'], ['c_answer_shape'])
+            self.assertEqual(rows[0]["case_id"], "train:0")
+            self.assertEqual(rows[0]["expectation"], "informational")
+            self.assertEqual(rows[0]["check_ids"], ["c_answer_shape"])
 
     def test_promotion_binds_verified_rows_idempotently(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            write_checkpoint(root, 'B0', 'train:0', '0', [candidate_event(legal_snapshot())])
+            write_checkpoint(root, "B0", "train:0", "0", [candidate_event(legal_snapshot())])
             snapshot_digest = digest(legal_snapshot())
-            promote_verified_check_replay(root, [{
-                'snapshot_digest': snapshot_digest, 'check_ids': ['c_answer_shape'],
-                'verified_by': 'travel probe 2026-10-05',
-                'provenance': {'old_fingerprint': '039af3c0', 'new_fingerprint': '12bd5517',
-                               'malformed_rejected': True}}])
-            promote_verified_check_replay(root, [{
-                'snapshot_digest': snapshot_digest, 'check_ids': ['c_answer_shape'],
-                'verified_by': 'again'}])
+            promote_verified_check_replay(
+                root,
+                [
+                    {
+                        "snapshot_digest": snapshot_digest,
+                        "check_ids": ["c_answer_shape"],
+                        "verified_by": "travel probe 2026-10-05",
+                        "provenance": {
+                            "old_fingerprint": "039af3c0",
+                            "new_fingerprint": "12bd5517",
+                            "malformed_rejected": True,
+                        },
+                    }
+                ],
+            )
+            promote_verified_check_replay(
+                root,
+                [
+                    {
+                        "snapshot_digest": snapshot_digest,
+                        "check_ids": ["c_answer_shape"],
+                        "verified_by": "again",
+                    }
+                ],
+            )
             rows = _prior_failed_check_snapshots(root, TRAVEL_CONTRACT)
-            self.assertEqual(rows[0]['expectation'], 'verified_must_pass')
-            store = json.loads((root / 'optimization' / 'check-replay-verified.json').read_text())
-            self.assertEqual(len(store['rows']), 1)
+            self.assertEqual(rows[0]["expectation"], "verified_must_pass")
+            store = json.loads((root / "optimization" / "check-replay-verified.json").read_text())
+            self.assertEqual(len(store["rows"]), 1)
 
 
 class CheckReplayAdmissionTests(unittest.TestCase):
@@ -114,58 +173,79 @@ class CheckReplayAdmissionTests(unittest.TestCase):
 
     def test_must_reject_row_gates_and_passes_correct_c(self):
         root = self._rows_root()
-        malformed = {**legal_snapshot(), 'answer': 'not a JSON array', 'structured_answer': None}
-        write_checkpoint(root, 'B0', 'train:0', '0', [candidate_event(malformed)])
+        malformed = {**legal_snapshot(), "answer": "not a JSON array", "structured_answer": None}
+        write_checkpoint(root, "B0", "train:0", "0", [candidate_event(malformed)])
         rows = _prior_failed_check_snapshots(root, TRAVEL_CONTRACT)
-        self.assertEqual(rows[0]['expectation'], 'must_reject')
+        self.assertEqual(rows[0]["expectation"], "must_reject")
         case = travel_case()
-        bundle = self._patched({'c_answer_shape': COMPLETE_C, 'f_flight_pair': None})
+        bundle = self._patched({"c_answer_shape": COMPLETE_C, "f_flight_pair": None})
         report = self._admit_with_rows(bundle, case, rows)
-        reject_rows = [s for s in report['scenarios'] if s.get('scenario_id') == 'check_replay_reject']
-        self.assertEqual([s['status'] for s in reject_rows], ['passed'], reject_rows)
+        reject_rows = [
+            s for s in report["scenarios"] if s.get("scenario_id") == "check_replay_reject"
+        ]
+        self.assertEqual([s["status"] for s in reject_rows], ["passed"], reject_rows)
 
     def test_verified_row_blocks_misjudging_c_and_passes_fixed_c(self):
         root = self._rows_root()
-        write_checkpoint(root, 'B0', 'train:0', '0', [candidate_event(legal_snapshot())])
-        promote_verified_check_replay(root, [{
-            'snapshot_digest': digest(legal_snapshot()), 'check_ids': ['c_answer_shape'],
-            'verified_by': 'probe', 'provenance': {'malformed_rejected': True}}])
+        write_checkpoint(root, "B0", "train:0", "0", [candidate_event(legal_snapshot())])
+        promote_verified_check_replay(
+            root,
+            [
+                {
+                    "snapshot_digest": digest(legal_snapshot()),
+                    "check_ids": ["c_answer_shape"],
+                    "verified_by": "probe",
+                    "provenance": {"malformed_rejected": True},
+                }
+            ],
+        )
         rows = _prior_failed_check_snapshots(root, TRAVEL_CONTRACT)
         case = travel_case()
-        old_c = (FIXTURES / 'b0_assets/assets/C/c_answer_shape.py').read_text()
-        misjudging = self._patched({'c_answer_shape': old_c, 'f_flight_pair': None})
+        old_c = (FIXTURES / "b0_assets/assets/C/c_answer_shape.py").read_text()
+        misjudging = self._patched({"c_answer_shape": old_c, "f_flight_pair": None})
         report = self._admit_with_rows(misjudging, case, rows)
-        self.assertEqual(report['verdict'], 'failed')
-        blocked = [s for s in report['scenarios']
-                   if s.get('scenario_id') == 'check_replay_verified' and s.get('required', True)]
-        self.assertTrue(blocked and all(s['status'] == 'failed' for s in blocked), blocked)
+        self.assertEqual(report["verdict"], "failed")
+        blocked = [
+            s
+            for s in report["scenarios"]
+            if s.get("scenario_id") == "check_replay_verified" and s.get("required", True)
+        ]
+        self.assertTrue(blocked and all(s["status"] == "failed" for s in blocked), blocked)
 
-        fixed = self._patched({'c_answer_shape': COMPLETE_C, 'f_flight_pair': None})
+        fixed = self._patched({"c_answer_shape": COMPLETE_C, "f_flight_pair": None})
         report = self._admit_with_rows(fixed, case, rows)
-        verified = [s for s in report['scenarios']
-                    if s.get('scenario_id') == 'check_replay_verified' and s.get('required', True)]
-        self.assertTrue(verified and all(s['status'] == 'passed' for s in verified), verified)
-        self.assertEqual(report['verdict'], 'passed')
+        verified = [
+            s
+            for s in report["scenarios"]
+            if s.get("scenario_id") == "check_replay_verified" and s.get("required", True)
+        ]
+        self.assertTrue(verified and all(s["status"] == "passed" for s in verified), verified)
+        self.assertEqual(report["verdict"], "passed")
 
     def test_informational_rows_record_but_do_not_gate(self):
         root = self._rows_root()
-        write_checkpoint(root, 'B0', 'train:0', '0', [candidate_event(legal_snapshot())])
+        write_checkpoint(root, "B0", "train:0", "0", [candidate_event(legal_snapshot())])
         rows = _prior_failed_check_snapshots(root, TRAVEL_CONTRACT)
-        self.assertEqual(rows[0]['expectation'], 'informational')
+        self.assertEqual(rows[0]["expectation"], "informational")
         case = travel_case()
         # 语义上从严的 C（合法快照仍拒——电池之外的历史快照不强制放行）
-        strict = self._patched({'c_answer_shape': COMPLETE_C.replace(
-            "return {'ok': True, 'issues': []}\n",
-            "return {'ok': True, 'issues': []}\n"), 'f_flight_pair': None})
+        strict = self._patched(
+            {
+                "c_answer_shape": COMPLETE_C.replace(
+                    "return {'ok': True, 'issues': []}\n", "return {'ok': True, 'issues': []}\n"
+                ),
+                "f_flight_pair": None,
+            }
+        )
         report = self._admit_with_rows(strict, case, rows)
-        info = [s for s in report['scenarios'] if s.get('scenario_id') == 'check_replay_info']
+        info = [s for s in report["scenarios"] if s.get("scenario_id") == "check_replay_info"]
         self.assertTrue(info)
-        self.assertTrue(all(not s.get('required', True) for s in info))
-        self.assertEqual(report['verdict'], 'passed')
+        self.assertTrue(all(not s.get("required", True) for s in info))
+        self.assertEqual(report["verdict"], "passed")
 
     def _patched(self, replacements):
         active = {k: v for k, v in replacements.items() if v is not None}
-        active.setdefault('f_flight_pair', FIXED_F)
+        active.setdefault("f_flight_pair", FIXED_F)
         holder = tempfile.TemporaryDirectory()
         self.addCleanup(holder.cleanup)
         return candidate_bundle(base_bundle(), active, holder.name)
@@ -173,12 +253,18 @@ class CheckReplayAdmissionTests(unittest.TestCase):
     def _admit_with_rows(self, bundle, case, rows):
         spec = TaskSpec.load(TASK_YAML, bundle)
         with tempfile.TemporaryDirectory() as tmp:
-            report_path = Path(tmp) / 'admission.json'
+            report_path = Path(tmp) / "admission.json"
             try:
-                admit_candidate(bundle, [case], {case.id: travel_graph(case)},
-                                RunConfig(), capability_names(spec.retrieval_floor),
-                                report_path, answer_contract=spec.answer_contract,
-                                replay_checks=rows)
+                admit_candidate(
+                    bundle,
+                    [case],
+                    {case.id: travel_graph(case)},
+                    RunConfig(),
+                    capability_names(spec.retrieval_floor),
+                    report_path,
+                    answer_contract=spec.answer_contract,
+                    replay_checks=rows,
+                )
                 return json.loads(report_path.read_text())
             except AdmissionError as exc:
                 return exc.report
@@ -187,38 +273,90 @@ class CheckReplayAdmissionTests(unittest.TestCase):
 class VerifiedFixBindingTests(unittest.TestCase):
     def test_lesson_verification_binds_reproduced_checks(self):
         entries = [
-            {'id': 'a' * 64, 'stage': 'R1', 'kind': 'attempt', 'category': 'runtime',
-             'scope': 'admission', 'training_ids': [], 'fact_status': 'recorded',
-             'confidence': 'hypothesis', 'pending_attribution': False,
-             'facts': {'status': 'failed', 'admission': {'scenarios': [
-                 {'asset_id': 'c_answer_shape', 'scenario_id': 'check_replay_verified',
-                  'status': 'failed', 'required': True,
-                  'error_type': 'CandidateCheckRejected',
-                  'error': 'answer is not an array'}]}}},
-            {'id': 'b' * 64, 'stage': 'R2', 'kind': 'attempt', 'category': 'strategy',
-             'scope': 'admission', 'training_ids': [], 'fact_status': 'recorded',
-             'confidence': 'hypothesis', 'pending_attribution': False,
-             'facts': {'status': 'passed', 'asset_changes': [
-                 {'asset_id': 'c_answer_shape',
-                  'after': {'id': 'c_answer_shape', 'kind': 'C', 'content': 'def check(c):\n    return {"ok": True, "issues": []}\n',
-                            'input_contract': {'type': 'any'}, 'output_contract': {'type': 'any'},
-                            'trial_inputs': [], 'fingerprint': 'f' * 64}}],
-                 'verification': {'verdict': 'passed', 'scenarios': [
-                     {'scenario_id': 'check_replay_verified', 'status': 'passed',
-                      'required': True, 'asset_id': 'c_answer_shape',
-                      'input_ref': 'train:0:0:abcd', 'expectation': 'verified_must_pass'},
-                     {'scenario_id': 'check_replay_reject', 'status': 'passed',
-                      'required': True, 'asset_id': None,
-                      'check_ids': ['c_answer_shape'], 'input_ref': 'train:0:0:ffff',
-                      'expectation': 'must_reject'}]}}},
+            {
+                "id": "a" * 64,
+                "stage": "R1",
+                "kind": "attempt",
+                "category": "runtime",
+                "scope": "admission",
+                "training_ids": [],
+                "fact_status": "recorded",
+                "confidence": "hypothesis",
+                "pending_attribution": False,
+                "facts": {
+                    "status": "failed",
+                    "admission": {
+                        "scenarios": [
+                            {
+                                "asset_id": "c_answer_shape",
+                                "scenario_id": "check_replay_verified",
+                                "status": "failed",
+                                "required": True,
+                                "error_type": "CandidateCheckRejected",
+                                "error": "answer is not an array",
+                            }
+                        ]
+                    },
+                },
+            },
+            {
+                "id": "b" * 64,
+                "stage": "R2",
+                "kind": "attempt",
+                "category": "strategy",
+                "scope": "admission",
+                "training_ids": [],
+                "fact_status": "recorded",
+                "confidence": "hypothesis",
+                "pending_attribution": False,
+                "facts": {
+                    "status": "passed",
+                    "asset_changes": [
+                        {
+                            "asset_id": "c_answer_shape",
+                            "after": {
+                                "id": "c_answer_shape",
+                                "kind": "C",
+                                "content": 'def check(c):\n    return {"ok": True, "issues": []}\n',
+                                "input_contract": {"type": "any"},
+                                "output_contract": {"type": "any"},
+                                "trial_inputs": [],
+                                "fingerprint": "f" * 64,
+                            },
+                        }
+                    ],
+                    "verification": {
+                        "verdict": "passed",
+                        "scenarios": [
+                            {
+                                "scenario_id": "check_replay_verified",
+                                "status": "passed",
+                                "required": True,
+                                "asset_id": "c_answer_shape",
+                                "input_ref": "train:0:0:abcd",
+                                "expectation": "verified_must_pass",
+                            },
+                            {
+                                "scenario_id": "check_replay_reject",
+                                "status": "passed",
+                                "required": True,
+                                "asset_id": None,
+                                "check_ids": ["c_answer_shape"],
+                                "input_ref": "train:0:0:ffff",
+                                "expectation": "must_reject",
+                            },
+                        ],
+                    },
+                },
+            },
         ]
         lessons = _lessons(entries)
-        verified = [l for l in lessons if l.get('status') == 'admission_verified']
+        verified = [l for l in lessons if l.get("status") == "admission_verified"]
         self.assertEqual(len(verified), 1, lessons)
-        reproduced = verified[0]['verified_fix'].get('reproduced_checks')
-        self.assertTrue(reproduced, verified[0]['verified_fix'])
-        self.assertTrue(all(p['scenario_id'].startswith('check_replay') for p in reproduced))
-        self.assertTrue(all('c_answer_shape' in p['check_ids'] for p in reproduced))
+        reproduced = verified[0]["verified_fix"].get("reproduced_checks")
+        self.assertTrue(reproduced, verified[0]["verified_fix"])
+        self.assertTrue(all(p["scenario_id"].startswith("check_replay") for p in reproduced))
+        self.assertTrue(all("c_answer_shape" in p["check_ids"] for p in reproduced))
 
 
 class AnswerSnapshotPersistenceTests(unittest.TestCase):
@@ -234,6 +372,7 @@ class AnswerSnapshotPersistenceTests(unittest.TestCase):
         class StubClient:
             """tools: 先真调一次 f_city_rows（真图执行），再 ready；answer: 从载荷
             visible_evidence 取 node_ids 回合法归档候选——C 误杀路径的真实形态。"""
+
             def __init__(self):
                 self.tool_turn = 0
 
@@ -241,18 +380,30 @@ class AnswerSnapshotPersistenceTests(unittest.TestCase):
                 if role == RunConfig().tools_role:
                     self.tool_turn += 1
                     if self.tool_turn == 1:
-                        content = json.dumps({'action': 'call', 'asset_id': 'f_city_rows',
-                                              'parameters': {'table': 'restaurants',
-                                                             'city': 'Rockford', 'limit': 5}})
+                        content = json.dumps(
+                            {
+                                "action": "call",
+                                "asset_id": "f_city_rows",
+                                "parameters": {
+                                    "table": "restaurants",
+                                    "city": "Rockford",
+                                    "limit": 5,
+                                },
+                            }
+                        )
                     else:
-                        content = json.dumps({'action': 'ready'})
+                        content = json.dumps({"action": "ready"})
                 else:
-                    payload = json.loads(messages[-1]['content'])
-                    ids = [r['node_id'] for r in payload.get('visible_evidence', ())][:5]
-                    content = json.dumps({'status': candidate['status'],
-                                          'answer': candidate['answer'],
-                                          'node_ids': ids})
-                return type('Reply', (), {'content': content})()
+                    payload = json.loads(messages[-1]["content"])
+                    ids = [r["node_id"] for r in payload.get("visible_evidence", ())][:5]
+                    content = json.dumps(
+                        {
+                            "status": candidate["status"],
+                            "answer": candidate["answer"],
+                            "node_ids": ids,
+                        }
+                    )
+                return type("Reply", (), {"content": content})()
 
             async def aclose(self):
                 pass
@@ -260,23 +411,24 @@ class AnswerSnapshotPersistenceTests(unittest.TestCase):
         spec = TaskSpec.load(TASK_YAML, base_bundle())
         config = RunConfig(protocol_attempts=1, answer_attempts=2)
         from darwinagent.kernel.execution import KernelRuntime
+
         runtime = KernelRuntime(base_bundle(), config)
-        agent = AnswerAgent(runtime, StubClient(), config, spec, 'repro')
+        agent = AnswerAgent(runtime, StubClient(), config, spec, "repro")
         result = asyncio.run(agent.answer(question, travel_graph(case)))
-        events = [e for e in result.trace if e.get('stage') == 'candidate']
+        events = [e for e in result.trace if e.get("stage") == "candidate"]
         self.assertTrue(events)
-        self.assertTrue(all('check_snapshot' in e for e in events))
-        snap = events[0]['check_snapshot']
-        self.assertIsInstance(snap['structured_answer'], (list, tuple))  # plain() 的 JSON 形态
-        self.assertEqual(_check_snapshot_expectation(snap, TRAVEL_CONTRACT)[0], 'informational')
+        self.assertTrue(all("check_snapshot" in e for e in events))
+        snap = events[0]["check_snapshot"]
+        self.assertIsInstance(snap["structured_answer"], (list, tuple))  # plain() 的 JSON 形态
+        self.assertEqual(_check_snapshot_expectation(snap, TRAVEL_CONTRACT)[0], "informational")
 
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            write_checkpoint(root, 'B0', case.id, question.id, list(result.to_dict()['trace']))
+            write_checkpoint(root, "B0", case.id, question.id, list(result.to_dict()["trace"]))
             rows = _prior_failed_check_snapshots(root, TRAVEL_CONTRACT)
             self.assertEqual(len(rows), 1)
-            self.assertEqual(rows[0]['expectation'], 'informational')
-            self.assertEqual(rows[0]['issues'], ['answer is not an array'])
+            self.assertEqual(rows[0]["expectation"], "informational")
+            self.assertEqual(rows[0]["issues"], ["answer is not an array"])
 
 
 class ArchivedAttributionTests(unittest.TestCase):
@@ -286,30 +438,43 @@ class ArchivedAttributionTests(unittest.TestCase):
     def test_all_archived_travel_attributions_fit_budget(self):
         from darwinagent.experiments.wiki import WikiMaintainer
         from tests.integration.test_experiment import LedgerRecordedClient
-        root = Path('datasets/travelplanner/runs/wiki_gap_repair_20261005_loop3/train')
+
+        root = Path("datasets/travelplanner/runs/wiki_gap_repair_20261005_loop3/train")
         if not root.exists():
-            self.skipTest('归档证据目录不在本检出（运行产物不进版本库）；'
-                          '在产生该证据的运行侧本测试为强制项')
-        events = [json.loads(p.read_text())
-                  for p in sorted((root / 'optimization/events').glob('*.json'))]
-        targets = [e for e in events if e['kind'] in ('formal', 'decision')]
+            self.skipTest(
+                "归档证据目录不在本检出（运行产物不进版本库）；在产生该证据的运行侧本测试为强制项"
+            )
+        events = [
+            json.loads(p.read_text()) for p in sorted((root / "optimization/events").glob("*.json"))
+        ]
+        targets = [e for e in events if e["kind"] in ("formal", "decision")]
         self.assertGreaterEqual(len(targets), 4)
         for event in targets:
-            reply = [{'cause': 'offline probe attribution', 'action': 'review bounded facts',
-                      'training_ids': event['training_ids']}]
-            client = LedgerRecordedClient({'wiki_maintainer': reply})
+            reply = [
+                {
+                    "cause": "offline probe attribution",
+                    "action": "review bounded facts",
+                    "training_ids": event["training_ids"],
+                }
+            ]
+            client = LedgerRecordedClient({"wiki_maintainer": reply})
             with tempfile.TemporaryDirectory() as tmp:
-                maintainer = WikiMaintainer(tmp, 'offline-attribution', lambda _: client,
-                                            RunConfig(protocol_attempts=1), limit=10)
+                maintainer = WikiMaintainer(
+                    tmp,
+                    "offline-attribution",
+                    lambda _: client,
+                    RunConfig(protocol_attempts=1),
+                    limit=10,
+                )
                 asyncio.run(maintainer._attribute(event))
-                request = Path(tmp) / 'optimization' / 'maintenance' / f"{event['id']}.request.json"
-                self.assertTrue(request.exists(), event['id'])
+                request = Path(tmp) / "optimization" / "maintenance" / f"{event['id']}.request.json"
+                self.assertTrue(request.exists(), event["id"])
                 payload = json.loads(request.read_text())
                 self.assertLessEqual(
-                    len(json.dumps(payload, ensure_ascii=False, default=str)), 35000,
-                    event['id'])
-                out = Path(tmp) / 'optimization' / 'maintenance' / f"{event['id']}.json"
-                self.assertTrue(out.exists(), event['id'])
+                    len(json.dumps(payload, ensure_ascii=False, default=str)), 35000, event["id"]
+                )
+                out = Path(tmp) / "optimization" / "maintenance" / f"{event['id']}.json"
+                self.assertTrue(out.exists(), event["id"])
 
 
 class VerifiedFixBindingRefTests(unittest.TestCase):
@@ -317,67 +482,131 @@ class VerifiedFixBindingRefTests(unittest.TestCase):
 
     @staticmethod
     def _lesson_entry(pattern_scenario, error_type, input_ref):
-        return {'id': 'a' * 64, 'stage': 'R1', 'kind': 'attempt', 'category': 'runtime',
-                'scope': 'admission', 'training_ids': [], 'fact_status': 'recorded',
-                'confidence': 'hypothesis', 'pending_attribution': False,
-                'facts': {'status': 'failed', 'admission': {'scenarios': [
-                    {'asset_id': 'f_tool', 'scenario_id': pattern_scenario,
-                     'status': 'failed', 'required': True, 'input_ref': input_ref,
-                     'error_type': error_type, 'error': 'boom'}]}}}
+        return {
+            "id": "a" * 64,
+            "stage": "R1",
+            "kind": "attempt",
+            "category": "runtime",
+            "scope": "admission",
+            "training_ids": [],
+            "fact_status": "recorded",
+            "confidence": "hypothesis",
+            "pending_attribution": False,
+            "facts": {
+                "status": "failed",
+                "admission": {
+                    "scenarios": [
+                        {
+                            "asset_id": "f_tool",
+                            "scenario_id": pattern_scenario,
+                            "status": "failed",
+                            "required": True,
+                            "input_ref": input_ref,
+                            "error_type": error_type,
+                            "error": "boom",
+                        }
+                    ]
+                },
+            },
+        }
 
     @staticmethod
     def _passed_entry(rows):
-        return {'id': 'b' * 64, 'stage': 'R2', 'kind': 'attempt', 'category': 'strategy',
-                'scope': 'admission', 'training_ids': [], 'fact_status': 'recorded',
-                'confidence': 'hypothesis', 'pending_attribution': False,
-                'facts': {'status': 'passed', 'asset_changes': [
-                    {'asset_id': 'f_tool',
-                     'after': {'id': 'f_tool', 'kind': 'F', 'content': 'def run(p):\n    return {"rows": [], "truncated": False}\n',
-                               'input_contract': {'type': 'any'},
-                               'output_contract': {'type': 'any'},
-                               'trial_inputs': [{'x': 1}], 'fingerprint': 'f' * 64}}],
-                    'verification': {'verdict': 'passed', 'scenarios': rows}}}
+        return {
+            "id": "b" * 64,
+            "stage": "R2",
+            "kind": "attempt",
+            "category": "strategy",
+            "scope": "admission",
+            "training_ids": [],
+            "fact_status": "recorded",
+            "confidence": "hypothesis",
+            "pending_attribution": False,
+            "facts": {
+                "status": "passed",
+                "asset_changes": [
+                    {
+                        "asset_id": "f_tool",
+                        "after": {
+                            "id": "f_tool",
+                            "kind": "F",
+                            "content": 'def run(p):\n    return {"rows": [], "truncated": False}\n',
+                            "input_contract": {"type": "any"},
+                            "output_contract": {"type": "any"},
+                            "trial_inputs": [{"x": 1}],
+                            "fingerprint": "f" * 64,
+                        },
+                    }
+                ],
+                "verification": {"verdict": "passed", "scenarios": rows},
+            },
+        }
 
     def test_same_scenario_different_ref_does_not_verify(self):
         from darwinagent.experiments.wiki import _lessons
+
         entries = [
-            self._lesson_entry('replay', 'SandboxError', 'conv-26:replay:aaaa1111aaaa1111'),
-            self._passed_entry([{'asset_id': 'f_tool', 'scenario_id': 'replay',
-                                 'status': 'passed', 'required': True,
-                                 'input_ref': 'conv-26:replay:bbbb2222bbbb2222'}]),
+            self._lesson_entry("replay", "SandboxError", "conv-26:replay:aaaa1111aaaa1111"),
+            self._passed_entry(
+                [
+                    {
+                        "asset_id": "f_tool",
+                        "scenario_id": "replay",
+                        "status": "passed",
+                        "required": True,
+                        "input_ref": "conv-26:replay:bbbb2222bbbb2222",
+                    }
+                ]
+            ),
         ]
         lessons = _lessons(entries)
-        self.assertFalse([l for l in lessons if l.get('status') == 'admission_verified'],
-                         lessons)
+        self.assertFalse([l for l in lessons if l.get("status") == "admission_verified"], lessons)
 
     def test_same_ref_does_verify_replay_lesson(self):
         from darwinagent.experiments.wiki import _lessons
+
         entries = [
-            self._lesson_entry('replay', 'SandboxError', 'conv-26:replay:aaaa1111aaaa1111'),
-            self._passed_entry([{'asset_id': 'f_tool', 'scenario_id': 'replay',
-                                 'status': 'passed', 'required': True,
-                                 'input_ref': 'conv-26:replay:aaaa1111aaaa1111'}]),
+            self._lesson_entry("replay", "SandboxError", "conv-26:replay:aaaa1111aaaa1111"),
+            self._passed_entry(
+                [
+                    {
+                        "asset_id": "f_tool",
+                        "scenario_id": "replay",
+                        "status": "passed",
+                        "required": True,
+                        "input_ref": "conv-26:replay:aaaa1111aaaa1111",
+                    }
+                ]
+            ),
         ]
         lessons = _lessons(entries)
-        self.assertTrue([l for l in lessons if l.get('status') == 'admission_verified'],
-                        lessons)
+        self.assertTrue([l for l in lessons if l.get("status") == "admission_verified"], lessons)
 
     def test_structure_row_pass_does_not_verify(self):
         from darwinagent.experiments.wiki import _lessons
+
         entries = [
-            self._lesson_entry('answer_0', 'CandidateCheckRejected', 'conv-26:answer_0'),
-            self._passed_entry([{'asset_id': 'c_shape', 'scenario_id': 'answer_0',
-                                 'status': 'passed', 'required': True,
-                                 'expectation': 'structure', 'ok': False,
-                                 'input_ref': 'conv-26:answer_0'}]),
+            self._lesson_entry("answer_0", "CandidateCheckRejected", "conv-26:answer_0"),
+            self._passed_entry(
+                [
+                    {
+                        "asset_id": "c_shape",
+                        "scenario_id": "answer_0",
+                        "status": "passed",
+                        "required": True,
+                        "expectation": "structure",
+                        "ok": False,
+                        "input_ref": "conv-26:answer_0",
+                    }
+                ]
+            ),
         ]
         # answer_0 lesson belongs to c_shape; make asset match
-        entries[1]['facts']['asset_changes'][0]['asset_id'] = 'c_shape'
-        entries[1]['facts']['asset_changes'][0]['after']['id'] = 'c_shape'
-        entries[1]['facts']['asset_changes'][0]['after']['kind'] = 'C'
+        entries[1]["facts"]["asset_changes"][0]["asset_id"] = "c_shape"
+        entries[1]["facts"]["asset_changes"][0]["after"]["id"] = "c_shape"
+        entries[1]["facts"]["asset_changes"][0]["after"]["kind"] = "C"
         lessons = _lessons(entries)
-        self.assertFalse([l for l in lessons if l.get('status') == 'admission_verified'],
-                         lessons)
+        self.assertFalse([l for l in lessons if l.get("status") == "admission_verified"], lessons)
 
 
 class ThirdReviewFixTests(unittest.TestCase):
@@ -387,48 +616,55 @@ class ThirdReviewFixTests(unittest.TestCase):
         """正例自洽（三次复查 P1）：参数一致＋非转移日三餐规则的语义 C 过电池；
         同一 C 对「旧行程＋不匹配参数」判拒——夹具不会被错装。"""
         from tests.integration.test_wiki_faults_repro import FIXED_F
+
         params_c = (
-            'def check(candidate):\n'
+            "def check(candidate):\n"
             '    if candidate.get("status") == "abstained":\n'
             '        return {"ok": True, "issues": []}\n'
             '    ans = candidate.get("structured_answer")\n'
-            '    if not isinstance(ans, (list, tuple)):\n'
+            "    if not isinstance(ans, (list, tuple)):\n"
             '        return {"ok": False, "issues": ["answer is not an array"]}\n'
             '    p = candidate.get("parameters") or {}\n'
             '    org = p.get("org", "")\n'
             '    dest = p.get("dest", "")\n'
-            '    issues = []\n'
+            "    issues = []\n"
             '    if p.get("days") and len(ans) != p.get("days"):\n'
             '        issues.append("trip length must equal days param")\n'
-            '    for i, d in enumerate(ans):\n'
-            '        if not isinstance(d, dict):\n'
-            '            d = dict(d)\n'
+            "    for i, d in enumerate(ans):\n"
+            "        if not isinstance(d, dict):\n"
+            "            d = dict(d)\n"
             '        if d.get("days") != i + 1:\n'
             '            issues.append("days must be 1..N")\n'
-            '    if ans:\n'
+            "    if ans:\n"
             '        c0 = str(dict(ans[0]).get("current_city") or "")\n'
             '        cs0 = [x.strip() for x in c0.replace("from ", "").split(" to ")] if c0 else []\n'
-            '        if not cs0 or cs0[0] != org:\n'
+            "        if not cs0 or cs0[0] != org:\n"
             '            issues.append("first day must start at org")\n'
-            '    if ans:\n'
+            "    if ans:\n"
             '        cn = str(dict(ans[-1]).get("current_city") or "")\n'
             '        csn = [x.strip() for x in cn.replace("from ", "").split(" to ")] if cn else []\n'
-            '        if not csn or csn[-1] != org:\n'
+            "        if not csn or csn[-1] != org:\n"
             '            issues.append("last day must close the trip at org")\n'
-            '    for i, d in enumerate(ans):\n'
-            '        if not isinstance(d, dict):\n'
-            '            d = dict(d)\n'
+            "    for i, d in enumerate(ans):\n"
+            "        if not isinstance(d, dict):\n"
+            "            d = dict(d)\n"
             '        if i > 0 and not (d.get("lunch") or d.get("dinner")):\n'
             '            issues.append("non-transfer day needs a meal")\n'
-            '    return {"ok": not issues, "issues": issues}\n')
+            '    return {"ok": not issues, "issues": issues}\n'
+        )
         from tests.integration.test_wiki_faults_repro import TravelFaultReproductionTests as T
+
         holder = tempfile.TemporaryDirectory()
         self.addCleanup(holder.cleanup)
-        bundle = candidate_bundle(base_bundle(), {'c_answer_shape': params_c,
-                                                  'f_flight_pair': FIXED_F}, holder.name)
+        bundle = candidate_bundle(
+            base_bundle(), {"c_answer_shape": params_c, "f_flight_pair": FIXED_F}, holder.name
+        )
         report = T._admit(T(), bundle)
-        failed = [s for s in report['scenarios']
-                  if s.get('status') == 'failed' and s.get('required', True)]
+        failed = [
+            s
+            for s in report["scenarios"]
+            if s.get("status") == "failed" and s.get("required", True)
+        ]
         self.assertEqual(failed, [], failed)
 
         # 旧行程（3 天 Rockford）＋夹具参数（2 天 Rockford→Springfield）＝语义错配，
@@ -437,116 +673,250 @@ class ThirdReviewFixTests(unittest.TestCase):
         fixture = spec.answer_examples[0]
         graph = travel_graph(travel_case())
         from darwinagent.kernel.checks import counterexample_snapshot
+
         snapshot = counterexample_snapshot(
-            {**fixture, 'candidate': {'status': 'answered',
-                                      'answer': json.dumps(json.loads(
-                                          legal_candidate()['answer']), ensure_ascii=False),
-                                      'node_ids': [next(iter(
-                                          __import__('darwinagent.kernel.functions',
-                                                     fromlist=['DataCapabilities'])
-                                          .DataCapabilities(graph).rows))]}},
-            [{'node_id': next(iter(
-                __import__('darwinagent.kernel.functions', fromlist=['DataCapabilities'])
-                .DataCapabilities(graph).rows))}],
-            fixture['question'], fixture['parameters'])
+            {
+                **fixture,
+                "candidate": {
+                    "status": "answered",
+                    "answer": json.dumps(
+                        json.loads(legal_candidate()["answer"]), ensure_ascii=False
+                    ),
+                    "node_ids": [
+                        next(
+                            iter(
+                                __import__(
+                                    "darwinagent.kernel.functions", fromlist=["DataCapabilities"]
+                                )
+                                .DataCapabilities(graph)
+                                .rows
+                            )
+                        )
+                    ],
+                },
+            },
+            [
+                {
+                    "node_id": next(
+                        iter(
+                            __import__(
+                                "darwinagent.kernel.functions", fromlist=["DataCapabilities"]
+                            )
+                            .DataCapabilities(graph)
+                            .rows
+                        )
+                    )
+                }
+            ],
+            fixture["question"],
+            fixture["parameters"],
+        )
         from darwinagent.kernel.execution import KernelRuntime
+
         runtime = KernelRuntime(bundle, RunConfig())
         _, opinions = runtime.check_candidate(
-            type('Q', (), {'text': fixture['question'],
-                           'parameters': fixture['parameters'],
-                           'id': 'x'})(), snapshot, graph, set(snapshot['node_ids']))
-        self.assertFalse(next(o for o in opinions if o['check_id'] == 'c_answer_shape')['ok'])
+            type(
+                "Q",
+                (),
+                {"text": fixture["question"], "parameters": fixture["parameters"], "id": "x"},
+            )(),
+            snapshot,
+            graph,
+            set(snapshot["node_ids"]),
+        )
+        self.assertFalse(next(o for o in opinions if o["check_id"] == "c_answer_shape")["ok"])
 
     def test_stress_input_mismatch_does_not_verify(self):
         """三次复查 P2：数据相关场景（stress/base）绑定原输入 digest——
         A→B 失败、只证 A→C 成功不得标已修复。"""
         from darwinagent.experiments.wiki import _lessons
+
         def failed(scenario, ref):
-            return {'id': 'a' * 64, 'stage': 'R1', 'kind': 'attempt', 'category': 'runtime',
-                    'scope': 'admission', 'training_ids': [], 'fact_status': 'recorded',
-                    'confidence': 'hypothesis', 'pending_attribution': False,
-                    'facts': {'status': 'failed', 'admission': {'scenarios': [
-                        {'asset_id': 'f_rel', 'scenario_id': scenario, 'status': 'failed',
-                         'required': True, 'input_ref': ref, 'error_type': 'SandboxError',
-                         'error': 'budget'}]}}}
+            return {
+                "id": "a" * 64,
+                "stage": "R1",
+                "kind": "attempt",
+                "category": "runtime",
+                "scope": "admission",
+                "training_ids": [],
+                "fact_status": "recorded",
+                "confidence": "hypothesis",
+                "pending_attribution": False,
+                "facts": {
+                    "status": "failed",
+                    "admission": {
+                        "scenarios": [
+                            {
+                                "asset_id": "f_rel",
+                                "scenario_id": scenario,
+                                "status": "failed",
+                                "required": True,
+                                "input_ref": ref,
+                                "error_type": "SandboxError",
+                                "error": "budget",
+                            }
+                        ]
+                    },
+                },
+            }
+
         def passed(rows):
-            return {'id': 'b' * 64, 'stage': 'R2', 'kind': 'attempt', 'category': 'strategy',
-                    'scope': 'admission', 'training_ids': [], 'fact_status': 'recorded',
-                    'confidence': 'hypothesis', 'pending_attribution': False,
-                    'facts': {'status': 'passed', 'asset_changes': [
-                        {'asset_id': 'f_rel',
-                         'after': {'id': 'f_rel', 'kind': 'F',
-                                   'content': 'def run(p):\n    return {"rows": [], "truncated": False}\n',
-                                   'input_contract': {'type': 'any'},
-                                   'output_contract': {'type': 'any'},
-                                   'trial_inputs': [{'a': 1}], 'fingerprint': 'f' * 64}}],
-                        'verification': {'verdict': 'passed', 'scenarios': rows}}}
-        origin_digest = 'aaaa1111aaaa1111'
+            return {
+                "id": "b" * 64,
+                "stage": "R2",
+                "kind": "attempt",
+                "category": "strategy",
+                "scope": "admission",
+                "training_ids": [],
+                "fact_status": "recorded",
+                "confidence": "hypothesis",
+                "pending_attribution": False,
+                "facts": {
+                    "status": "passed",
+                    "asset_changes": [
+                        {
+                            "asset_id": "f_rel",
+                            "after": {
+                                "id": "f_rel",
+                                "kind": "F",
+                                "content": 'def run(p):\n    return {"rows": [], "truncated": False}\n',
+                                "input_contract": {"type": "any"},
+                                "output_contract": {"type": "any"},
+                                "trial_inputs": [{"a": 1}],
+                                "fingerprint": "f" * 64,
+                            },
+                        }
+                    ],
+                    "verification": {"verdict": "passed", "scenarios": rows},
+                },
+            }
+
+        origin_digest = "aaaa1111aaaa1111"
         # 不同参数成功（stress 场景另一 digest）→ 不验证
-        lessons = _lessons([failed('stress', f'conv-26:stress:{origin_digest}'),
-                            passed([{'asset_id': 'f_rel', 'scenario_id': 'stress',
-                                     'status': 'passed', 'required': True,
-                                     'input_ref': 'conv-26:stress:cccc3333cccc3333'}])])
-        self.assertFalse([l for l in lessons if l.get('status') == 'admission_verified'])
+        lessons = _lessons(
+            [
+                failed("stress", f"conv-26:stress:{origin_digest}"),
+                passed(
+                    [
+                        {
+                            "asset_id": "f_rel",
+                            "scenario_id": "stress",
+                            "status": "passed",
+                            "required": True,
+                            "input_ref": "conv-26:stress:cccc3333cccc3333",
+                        }
+                    ]
+                ),
+            ]
+        )
+        self.assertFalse([l for l in lessons if l.get("status") == "admission_verified"])
         # 原参数在 base 场景成功（跨场景同 digest）→ 四次复查「绑定场景」后不再
         # 验证（翻转三审断言：stress 失败只能由 stress 族通过行验证；见
         # FourthReviewBindingTests.test_same_case_cross_scenario_same_params_does_not_verify）
-        lessons = _lessons([failed('stress', f'conv-26:stress:{origin_digest}'),
-                            passed([{'asset_id': 'f_rel', 'scenario_id': 'base',
-                                     'status': 'passed', 'required': True,
-                                     'input_ref': f'conv-26:base:{origin_digest}'}])])
-        self.assertFalse([l for l in lessons if l.get('status') == 'admission_verified'])
+        lessons = _lessons(
+            [
+                failed("stress", f"conv-26:stress:{origin_digest}"),
+                passed(
+                    [
+                        {
+                            "asset_id": "f_rel",
+                            "scenario_id": "base",
+                            "status": "passed",
+                            "required": True,
+                            "input_ref": f"conv-26:base:{origin_digest}",
+                        }
+                    ]
+                ),
+            ]
+        )
+        self.assertFalse([l for l in lessons if l.get("status") == "admission_verified"])
 
     def test_loop6_failure_summary_keeps_rejection_reason(self):
         """三次复查 P1：真实 loop6 R1 attempt 的 C 拒绝理由（issues）必须在维护
         请求的场景行里保留——维护器要能读到反复拒绝的原因。"""
         from darwinagent.experiments.wiki import WikiMaintainer
         from tests.integration.test_experiment import LedgerRecordedClient
-        root = Path('datasets/travelplanner/runs/wiki_gap_repair_20261005_loop6/train/optimization/events')
+
+        root = Path(
+            "datasets/travelplanner/runs/wiki_gap_repair_20261005_loop6/train/optimization/events"
+        )
         if not root.exists():
-            self.skipTest('归档证据目录不在本检出（运行产物不进版本库）；'
-                          '在产生该证据的运行侧本测试为强制项')
-        source = next(p for p in sorted(root.glob('025aa34a*.json')))
+            self.skipTest(
+                "归档证据目录不在本检出（运行产物不进版本库）；在产生该证据的运行侧本测试为强制项"
+            )
+        source = next(p for p in sorted(root.glob("025aa34a*.json")))
         event = json.loads(source.read_text())
-        reply = [{'cause': 'offline', 'action': 'ok', 'training_ids': event['training_ids']}]
+        reply = [{"cause": "offline", "action": "ok", "training_ids": event["training_ids"]}]
         with tempfile.TemporaryDirectory() as tmp:
-            m = WikiMaintainer(tmp, 'offline3', lambda _: LedgerRecordedClient(
-                {'wiki_maintainer': reply}), RunConfig(protocol_attempts=1), limit=10)
+            m = WikiMaintainer(
+                tmp,
+                "offline3",
+                lambda _: LedgerRecordedClient({"wiki_maintainer": reply}),
+                RunConfig(protocol_attempts=1),
+                limit=10,
+            )
             asyncio.run(m._attribute(event))
-            request = json.loads((Path(tmp) / 'optimization' / 'maintenance'
-                                  / f"{event['id']}.request.json").read_text())
-            rows = ((request['event']['facts'].get('admission') or {}).get('scenarios')
-                    or request['event']['facts'].get('scenarios') or [])
+            request = json.loads(
+                (
+                    Path(tmp) / "optimization" / "maintenance" / f"{event['id']}.request.json"
+                ).read_text()
+            )
+            rows = (
+                (request["event"]["facts"].get("admission") or {}).get("scenarios")
+                or request["event"]["facts"].get("scenarios")
+                or []
+            )
             self.assertTrue(rows)
-            rejected = [r for r in rows if 'structured_answer' in str(r.get('issues', ''))]
+            rejected = [r for r in rows if "structured_answer" in str(r.get("issues", ""))]
             self.assertTrue(rejected, rows)
 
     def test_tight_budget_keeps_nested_failure_facts(self):
         """5000 字符级预算下，candidate 事件的 checks[].check_id/ok/issues/步数、
         candidate_summary.json_type、observation 预算事实仍然保留。"""
         from darwinagent.experiments.wiki import _compress_training_evidence
-        facts = {'training_examples': [{
-            'question_id': '0', 'parameters': {'org': 'A'},
-            'generated_answer': 'x' * 4000, 'source_text': [{'text': 'y' * 2000}],
-            'trace': [
-                {'stage': 'candidate', 'attempt': 0,
-                 'candidate': {'status': 'answered'},
-                 'checks': [{'check_id': 'c_answer_structure', 'ok': False,
-                             'issues': ['structured_answer is missing or not parseable JSON'],
-                             'steps_used': 45, 'step_budget': 30000}],
-                 'candidate_summary': {'json_type': 'list', 'answer': 'z' * 900},
-                 'observation': {'steps_used': 45, 'step_budget': 30000}}]}]}
+
+        facts = {
+            "training_examples": [
+                {
+                    "question_id": "0",
+                    "parameters": {"org": "A"},
+                    "generated_answer": "x" * 4000,
+                    "source_text": [{"text": "y" * 2000}],
+                    "trace": [
+                        {
+                            "stage": "candidate",
+                            "attempt": 0,
+                            "candidate": {"status": "answered"},
+                            "checks": [
+                                {
+                                    "check_id": "c_answer_structure",
+                                    "ok": False,
+                                    "issues": [
+                                        "structured_answer is missing or not parseable JSON"
+                                    ],
+                                    "steps_used": 45,
+                                    "step_budget": 30000,
+                                }
+                            ],
+                            "candidate_summary": {"json_type": "list", "answer": "z" * 900},
+                            "observation": {"steps_used": 45, "step_budget": 30000},
+                        }
+                    ],
+                }
+            ]
+        }
         _compress_training_evidence(facts, budget=1200)
         import json as _json
+
         self.assertLessEqual(len(_json.dumps(facts, ensure_ascii=False)), 1400)
-        event = facts['training_examples'][0]['trace'][0]
-        check = event['checks'][0]
-        self.assertEqual(check['check_id'], 'c_answer_structure')
-        self.assertIs(check['ok'], False)
-        self.assertEqual(check['issues'], ['structured_answer is missing or not parseable JSON'])
-        self.assertEqual(check['steps_used'], 45)
-        self.assertEqual(event['candidate_summary']['json_type'], 'list')
-        self.assertEqual(event['observation']['steps_used'], 45)
+        event = facts["training_examples"][0]["trace"][0]
+        check = event["checks"][0]
+        self.assertEqual(check["check_id"], "c_answer_structure")
+        self.assertIs(check["ok"], False)
+        self.assertEqual(check["issues"], ["structured_answer is missing or not parseable JSON"])
+        self.assertEqual(check["steps_used"], 45)
+        self.assertEqual(event["candidate_summary"]["json_type"], "list")
+        self.assertEqual(event["observation"]["steps_used"], 45)
 
 
 class FourthReviewBindingTests(unittest.TestCase):
@@ -555,116 +925,214 @@ class FourthReviewBindingTests(unittest.TestCase):
     （case-old 失败、case-new 同参数通过仍产 admission_verified）。"""
 
     @staticmethod
-    def _failed(ref, graph_digests=None, scenario='stress', asset='f_flight_pair'):
-        admission = {'scenarios': [
-            {'asset_id': asset, 'scenario_id': scenario, 'status': 'failed',
-             'required': True, 'input_ref': ref, 'error_type': 'ValueError',
-             'error': 'tool.result.outbound: expected object'}]}
+    def _failed(ref, graph_digests=None, scenario="stress", asset="f_flight_pair"):
+        admission = {
+            "scenarios": [
+                {
+                    "asset_id": asset,
+                    "scenario_id": scenario,
+                    "status": "failed",
+                    "required": True,
+                    "input_ref": ref,
+                    "error_type": "ValueError",
+                    "error": "tool.result.outbound: expected object",
+                }
+            ]
+        }
         if graph_digests is not None:
-            admission['graph_digests'] = graph_digests
-        return {'id': 'a' * 64, 'stage': 'R1', 'kind': 'attempt', 'category': 'runtime',
-                'scope': 'admission', 'training_ids': [], 'fact_status': 'recorded',
-                'confidence': 'hypothesis', 'pending_attribution': False,
-                'facts': {'status': 'failed', 'admission': admission}}
+            admission["graph_digests"] = graph_digests
+        return {
+            "id": "a" * 64,
+            "stage": "R1",
+            "kind": "attempt",
+            "category": "runtime",
+            "scope": "admission",
+            "training_ids": [],
+            "fact_status": "recorded",
+            "confidence": "hypothesis",
+            "pending_attribution": False,
+            "facts": {"status": "failed", "admission": admission},
+        }
 
     @staticmethod
-    def _passed(rows, graph_digests=None, asset_id='f_flight_pair', kind='F'):
-        verification = {'verdict': 'passed', 'scenarios': rows}
+    def _passed(rows, graph_digests=None, asset_id="f_flight_pair", kind="F"):
+        verification = {"verdict": "passed", "scenarios": rows}
         if graph_digests is not None:
-            verification['graph_digests'] = graph_digests
-        return {'id': 'b' * 64, 'stage': 'R2', 'kind': 'attempt', 'category': 'strategy',
-                'scope': 'admission', 'training_ids': [], 'fact_status': 'recorded',
-                'confidence': 'hypothesis', 'pending_attribution': False,
-                'facts': {'status': 'passed', 'asset_changes': [
-                    {'asset_id': asset_id,
-                     'after': {'id': asset_id, 'kind': kind,
-                               'content': 'def run(p):\n    return {"rows": [], "truncated": False}\n',
-                               'input_contract': {'type': 'any'},
-                               'output_contract': {'type': 'any'},
-                               'trial_inputs': [{'org': 'A', 'dest': 'B'}],
-                               'fingerprint': 'e' * 64}}],
-                    'verification': verification}}
+            verification["graph_digests"] = graph_digests
+        return {
+            "id": "b" * 64,
+            "stage": "R2",
+            "kind": "attempt",
+            "category": "strategy",
+            "scope": "admission",
+            "training_ids": [],
+            "fact_status": "recorded",
+            "confidence": "hypothesis",
+            "pending_attribution": False,
+            "facts": {
+                "status": "passed",
+                "asset_changes": [
+                    {
+                        "asset_id": asset_id,
+                        "after": {
+                            "id": asset_id,
+                            "kind": kind,
+                            "content": 'def run(p):\n    return {"rows": [], "truncated": False}\n',
+                            "input_contract": {"type": "any"},
+                            "output_contract": {"type": "any"},
+                            "trial_inputs": [{"org": "A", "dest": "B"}],
+                            "fingerprint": "e" * 64,
+                        },
+                    }
+                ],
+                "verification": verification,
+            },
+        }
 
-    DIGEST = '3320bdd2d325b999efdc40189b4d0306caa9e69f59deedfdf14f8cad34c6fb1d'
+    DIGEST = "3320bdd2d325b999efdc40189b4d0306caa9e69f59deedfdf14f8cad34c6fb1d"
 
     def test_cross_case_same_params_does_not_verify(self):
         """反例本体（现状红）：case-old 的 stress 失败不得被 case-new 的同参数
         通过行验证——base/stress 参数来自资产级 trial_inputs，跨 case 必然同
         digest，旧逻辑只看 digest 子串。"""
         from darwinagent.experiments.wiki import _lessons
-        lessons = _lessons([
-            self._failed(f'case-old:stress:0:{self.DIGEST}'),
-            self._passed([{'asset_id': 'f_flight_pair', 'scenario_id': 'stress',
-                           'status': 'passed', 'required': True,
-                           'input_ref': f'case-new:stress:0:{self.DIGEST}'}])])
-        self.assertFalse([l for l in lessons if l.get('status') == 'admission_verified'],
-                         lessons)
+
+        lessons = _lessons(
+            [
+                self._failed(f"case-old:stress:0:{self.DIGEST}"),
+                self._passed(
+                    [
+                        {
+                            "asset_id": "f_flight_pair",
+                            "scenario_id": "stress",
+                            "status": "passed",
+                            "required": True,
+                            "input_ref": f"case-new:stress:0:{self.DIGEST}",
+                        }
+                    ]
+                ),
+            ]
+        )
+        self.assertFalse([l for l in lessons if l.get("status") == "admission_verified"], lessons)
 
     def test_same_case_cross_scenario_same_params_does_not_verify(self):
         """场景绑定：同 case 同 digest 但不同场景族（stress 失败、base 通过）
         不得验证——场景是绑定要素之一（四审）。"""
         from darwinagent.experiments.wiki import _lessons
-        lessons = _lessons([
-            self._failed(f'conv-26:stress:0:{self.DIGEST}'),
-            self._passed([{'asset_id': 'f_flight_pair', 'scenario_id': 'base',
-                           'status': 'passed', 'required': True,
-                           'input_ref': f'conv-26:base:0:{self.DIGEST}'}])])
-        self.assertFalse([l for l in lessons if l.get('status') == 'admission_verified'],
-                         lessons)
+
+        lessons = _lessons(
+            [
+                self._failed(f"conv-26:stress:0:{self.DIGEST}"),
+                self._passed(
+                    [
+                        {
+                            "asset_id": "f_flight_pair",
+                            "scenario_id": "base",
+                            "status": "passed",
+                            "required": True,
+                            "input_ref": f"conv-26:base:0:{self.DIGEST}",
+                        }
+                    ]
+                ),
+            ]
+        )
+        self.assertFalse([l for l in lessons if l.get("status") == "admission_verified"], lessons)
 
     def test_graph_digest_mismatch_does_not_verify(self):
         """数据图身份：同 case 同场景同 digest，但验证运行的数据图与失败时不同
         （可重建图场景）→ 旧故障不能算已修复。"""
         from darwinagent.experiments.wiki import _lessons
-        g1, g2 = 'a' * 63 + '1', 'a' * 63 + '2'
-        lessons = _lessons([
-            self._failed(f'conv-26:stress:0:{self.DIGEST}',
-                         graph_digests={'conv-26': g1}),
-            self._passed([{'asset_id': 'f_flight_pair', 'scenario_id': 'stress',
-                           'status': 'passed', 'required': True,
-                           'input_ref': f'conv-26:stress:0:{self.DIGEST}'}],
-                          graph_digests={'conv-26': g2})])
-        self.assertFalse([l for l in lessons if l.get('status') == 'admission_verified'],
-                         lessons)
+
+        g1, g2 = "a" * 63 + "1", "a" * 63 + "2"
+        lessons = _lessons(
+            [
+                self._failed(f"conv-26:stress:0:{self.DIGEST}", graph_digests={"conv-26": g1}),
+                self._passed(
+                    [
+                        {
+                            "asset_id": "f_flight_pair",
+                            "scenario_id": "stress",
+                            "status": "passed",
+                            "required": True,
+                            "input_ref": f"conv-26:stress:0:{self.DIGEST}",
+                        }
+                    ],
+                    graph_digests={"conv-26": g2},
+                ),
+            ]
+        )
+        self.assertFalse([l for l in lessons if l.get("status") == "admission_verified"], lessons)
         # 图一致时仍验证（既有用例不回退）
-        lessons = _lessons([
-            self._failed(f'conv-26:stress:0:{self.DIGEST}',
-                         graph_digests={'conv-26': g1}),
-            self._passed([{'asset_id': 'f_flight_pair', 'scenario_id': 'stress',
-                           'status': 'passed', 'required': True,
-                           'input_ref': f'conv-26:stress:0:{self.DIGEST}'}],
-                          graph_digests={'conv-26': g1})])
-        self.assertTrue([l for l in lessons if l.get('status') == 'admission_verified'],
-                        lessons)
+        lessons = _lessons(
+            [
+                self._failed(f"conv-26:stress:0:{self.DIGEST}", graph_digests={"conv-26": g1}),
+                self._passed(
+                    [
+                        {
+                            "asset_id": "f_flight_pair",
+                            "scenario_id": "stress",
+                            "status": "passed",
+                            "required": True,
+                            "input_ref": f"conv-26:stress:0:{self.DIGEST}",
+                        }
+                    ],
+                    graph_digests={"conv-26": g1},
+                ),
+            ]
+        )
+        self.assertTrue([l for l in lessons if l.get("status") == "admission_verified"], lessons)
 
     def test_same_case_same_scenario_same_digest_verifies(self):
         """守门（既有行为不回退）：同 case＋同场景族＋同 digest＋同图 → 验证成立。"""
         from darwinagent.experiments.wiki import _lessons
-        lessons = _lessons([
-            self._failed(f'conv-26:stress:0:{self.DIGEST}'),
-            self._passed([{'asset_id': 'f_flight_pair', 'scenario_id': 'stress',
-                           'status': 'passed', 'required': True,
-                           'input_ref': f'conv-26:stress:0:{self.DIGEST}'}])])
-        self.assertTrue([l for l in lessons if l.get('status') == 'admission_verified'],
-                        lessons)
+
+        lessons = _lessons(
+            [
+                self._failed(f"conv-26:stress:0:{self.DIGEST}"),
+                self._passed(
+                    [
+                        {
+                            "asset_id": "f_flight_pair",
+                            "scenario_id": "stress",
+                            "status": "passed",
+                            "required": True,
+                            "input_ref": f"conv-26:stress:0:{self.DIGEST}",
+                        }
+                    ]
+                ),
+            ]
+        )
+        self.assertTrue([l for l in lessons if l.get("status") == "admission_verified"], lessons)
 
     def test_real_check_replay_ref_shape_verifies(self):
         """真实 check_replay ref 形态（case:question_id:<12hex>，第二段是题号而非
         场景名）：同 case＋同题号＋同快照 digest 的通过行必须验证——场景比对用
         ref 段对 ref 段，不得与行 scenario_id 标签比对（否则真实回放验证被误拒）。"""
         from darwinagent.experiments.wiki import _lessons
+
         d12 = self.DIGEST[:12]
-        lessons = _lessons([
-            self._failed(f'conv-26:5:{d12}', scenario='check_replay_verified',
-                         asset='c_answer_shape'),
-            self._passed([{'asset_id': 'c_answer_shape',
-                           'scenario_id': 'check_replay_verified',
-                           'status': 'passed', 'required': True,
-                           'input_ref': f'conv-26:5:{d12}'}],
-                         asset_id='c_answer_shape', kind='C')])
-        self.assertTrue([l for l in lessons if l.get('status') == 'admission_verified'],
-                        lessons)
+        lessons = _lessons(
+            [
+                self._failed(
+                    f"conv-26:5:{d12}", scenario="check_replay_verified", asset="c_answer_shape"
+                ),
+                self._passed(
+                    [
+                        {
+                            "asset_id": "c_answer_shape",
+                            "scenario_id": "check_replay_verified",
+                            "status": "passed",
+                            "required": True,
+                            "input_ref": f"conv-26:5:{d12}",
+                        }
+                    ],
+                    asset_id="c_answer_shape",
+                    kind="C",
+                ),
+            ]
+        )
+        self.assertTrue([l for l in lessons if l.get("status") == "admission_verified"], lessons)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

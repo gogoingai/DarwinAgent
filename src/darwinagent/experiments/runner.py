@@ -4,6 +4,7 @@ Multi-case training: every case of the split runs fully on the same candidate bu
 round; scores aggregate by the frozen sum rule. Feedback for proposals is dataset-generic:
 diagnostic rows travel as the evaluator produced them (opt-out flag `passed: true`),
 bounded by a size budget, and only training feedback ever reaches a proposal."""
+
 from __future__ import annotations
 
 import asyncio
@@ -34,19 +35,39 @@ from .proposal import ProposalGenerator
 from .spec import aggregate_scores
 from .wiki import WikiMaintainer, safe_feedback, safe_scores, asset_evidence, bounded_trace
 
-from .feedback import _clip, _diagnostic_failure, _compact_diagnostic, _retrieval_trace, pipeline_active_stages, training_feedback as _training_feedback, question_identity, _wiki_training_evidence, _per_case_feedback_facts
+from .feedback import (
+    _clip,
+    _diagnostic_failure,
+    _compact_diagnostic,
+    _retrieval_trace,
+    pipeline_active_stages,
+    training_feedback as _training_feedback,
+    question_identity,
+    _wiki_training_evidence,
+    _per_case_feedback_facts,
+)
 from .trials import stress_trial_samples
-from .recovery import batched_fault_retry, _retryable_answer, _retry_journal, _settle_reservations, _failed_tool_params, _prior_failed_tool_params, _check_snapshot_expectation, _prior_failed_check_snapshots, promote_verified_check_replay
+from .recovery import (
+    batched_fault_retry,
+    _retryable_answer,
+    _retry_journal,
+    _settle_reservations,
+    _failed_tool_params,
+    _prior_failed_tool_params,
+    _check_snapshot_expectation,
+    _prior_failed_check_snapshots,
+    promote_verified_check_replay,
+)
 from .statistics import stability_metrics
 
 FEEDBACK_BUDGET_CHARS = 35000
-_DIAG_ROW_CHARS = 2200        # 未识别结构的诊断行截断上限（locomo 判分行会被结构化压缩）
-_TRACE_CHARS = 600            # 单题检索轨迹序列化上限
+_DIAG_ROW_CHARS = 2200  # 未识别结构的诊断行截断上限（locomo 判分行会被结构化压缩）
+_TRACE_CHARS = 600  # 单题检索轨迹序列化上限
 
 
 async def _evaluate_stage(evaluator, result, questions):
     """Subset-aware evaluators opt in; the generic evaluator needs only RunResult."""
-    if 'asked' in inspect.signature(evaluator.evaluate).parameters:
+    if "asked" in inspect.signature(evaluator.evaluate).parameters:
         return await evaluator.evaluate(result, asked=tuple(q.id for q in questions))
     return await evaluator.evaluate(result)
 
@@ -55,7 +76,7 @@ def training_feedback(*args, **kwargs):
     return _training_feedback(*args, **kwargs, budget=FEEDBACK_BUDGET_CHARS)
 
 
-ADMISSION_ATTEMPTS=50
+ADMISSION_ATTEMPTS = 50
 
 
 class WikiAdmissionExhausted(ValueError):
@@ -63,343 +84,548 @@ class WikiAdmissionExhausted(ValueError):
 
 
 class ExperimentRunner:
-    def __init__(self,adapter,evaluator_factory,connection_config,run_config,policy,work_dir,
-                 frozen_files=(),client_factory=None,bootstrap_context=None,snapshot_root=None,
-                 bootstrap_trial_graph=None,smoke_judge=None,optimization_mode='legacy',
-                 wiki_call_limit=30,dynamic_trial=False,graph_builder=None,
-                 proposal_attempts=None,round_deadline_s=None,validation_plan=None,
-                 seed_assets=None):
-        if optimization_mode not in ('legacy','wiki'):
-            raise ValueError('Unknown optimization mode')
+    def __init__(
+        self,
+        adapter,
+        evaluator_factory,
+        connection_config,
+        run_config,
+        policy,
+        work_dir,
+        frozen_files=(),
+        client_factory=None,
+        bootstrap_context=None,
+        snapshot_root=None,
+        bootstrap_trial_graph=None,
+        smoke_judge=None,
+        optimization_mode="legacy",
+        wiki_call_limit=30,
+        dynamic_trial=False,
+        graph_builder=None,
+        proposal_attempts=None,
+        round_deadline_s=None,
+        validation_plan=None,
+        seed_assets=None,
+    ):
+        if optimization_mode not in ("legacy", "wiki"):
+            raise ValueError("Unknown optimization mode")
         if type(wiki_call_limit) is not int or wiki_call_limit < 1:
-            raise ValueError('Wiki call limit must be positive')
+            raise ValueError("Wiki call limit must be positive")
         if dynamic_trial and (snapshot_root is not None or bootstrap_trial_graph is not None):
-            raise ValueError('dynamic_trial is the no-snapshot dynamic-graph admission mode')
+            raise ValueError("dynamic_trial is the no-snapshot dynamic-graph admission mode")
         if graph_builder is not None and snapshot_root is None:
-            raise ValueError('graph_builder requires snapshot_root (frozen memory/vector)')
-        if proposal_attempts is not None and (type(proposal_attempts) is not int
-                                              or proposal_attempts < 1):
-            raise ValueError('proposal_attempts must be a positive int')
-        if round_deadline_s is not None and (type(round_deadline_s) not in (int,float)
-                                             or round_deadline_s <= 0):
-            raise ValueError('round_deadline_s must be positive seconds')
-        self.adapter,self.evaluator_factory=adapter,evaluator_factory
-        self.connection_config,self.config,self.policy=connection_config,run_config,policy
-        self.root=Path(work_dir)
-        self.frozen=snapshot_files([Path(__file__).resolve().parents[1],*frozen_files])
-        self.revisions=AssetRevisionService()
-        self._injected_client=client_factory
+            raise ValueError("graph_builder requires snapshot_root (frozen memory/vector)")
+        if proposal_attempts is not None and (
+            type(proposal_attempts) is not int or proposal_attempts < 1
+        ):
+            raise ValueError("proposal_attempts must be a positive int")
+        if round_deadline_s is not None and (
+            type(round_deadline_s) not in (int, float) or round_deadline_s <= 0
+        ):
+            raise ValueError("round_deadline_s must be positive seconds")
+        self.adapter, self.evaluator_factory = adapter, evaluator_factory
+        self.connection_config, self.config, self.policy = connection_config, run_config, policy
+        self.root = Path(work_dir)
+        self.frozen = snapshot_files([Path(__file__).resolve().parents[1], *frozen_files])
+        self.revisions = AssetRevisionService()
+        self._injected_client = client_factory
         # bootstrap_context: 冻结快照结构样本（无标签），随冷启动 bootstrap 载荷进提示词。
-        self.bootstrap_context=bootstrap_context
+        self.bootstrap_context = bootstrap_context
         # snapshot_root: 每对话冻结记忆快照目录（<case_id>/ 子目录）；注入时臂间共享同一记忆面。
-        self.snapshot_root=Path(snapshot_root) if snapshot_root is not None else None
+        self.snapshot_root = Path(snapshot_root) if snapshot_root is not None else None
         # bootstrap_trial_graph: 冷启动 bootstrap 反馈环内的真图试跑（冻结快照图）。
-        self.bootstrap_trial_graph=bootstrap_trial_graph
+        self.bootstrap_trial_graph = bootstrap_trial_graph
         # dynamic_trial: 动态图任务（无冻结快照、无共享试验图）的真图准入模式——
         # 候选必须在同题真图上过完整准入电池（2026-10-05 Travel 空值契约/冻结容器
         # 事故：坏候选漏过准入在正式计分才炸）。任务装配层按任务形态选择注入。
-        self.dynamic_trial=dynamic_trial
+        self.dynamic_trial = dynamic_trial
         # smoke_judge: 任务层注入的子集判题器（冻结判题原语；框架不依赖任务模块）。
-        self.smoke_judge=smoke_judge
-        self._fault_retried=set()
-        self.optimization_mode=optimization_mode
-        self.wiki_call_limit=wiki_call_limit
+        self.smoke_judge = smoke_judge
+        self._fault_retried = set()
+        self.optimization_mode = optimization_mode
+        self.wiki_call_limit = wiki_call_limit
         # 新模式（recheck4「冻结记忆/向量、图可重建」）：graph_builder 注入时，
         # 记忆/向量仍取快照，正式/冒烟/准入的图全部按当前 S 从固定事实重建；
         # proposal_attempts/round_deadline_s 是新模式轮预算（旧模式默认 50/无时限，
         # 行为不变）；validation_plan 把同对话验证题接入选版（聚合指标进决策与
         # Wiki，逐题 gold/答案/诊断不进提案器）。
-        self.graph_builder=graph_builder
+        self.graph_builder = graph_builder
         # seed-assets（缺口③）：给定锁定 bundle 目录时跳过冷启动、直接以其为 B0
         # （准入/冒烟/评分不豁免）；进声明 identity。
-        self.seed_assets=Path(seed_assets) if seed_assets is not None else None
-        self.proposal_attempts=proposal_attempts or ADMISSION_ATTEMPTS
-        self.round_deadline_s=round_deadline_s
-        self.validation_plan=validation_plan
-        self._round_deadline=None
-        self._rebuild_cache={}
+        self.seed_assets = Path(seed_assets) if seed_assets is not None else None
+        self.proposal_attempts = proposal_attempts or ADMISSION_ATTEMPTS
+        self.round_deadline_s = round_deadline_s
+        self.validation_plan = validation_plan
+        self._round_deadline = None
+        self._rebuild_cache = {}
         if graph_builder is not None and dynamic_trial:
-            raise ValueError('graph_builder and dynamic_trial are exclusive graph modes')
+            raise ValueError("graph_builder and dynamic_trial are exclusive graph modes")
 
     def _wiki_report_valid(self, report, candidate, *, smoke=False):
-        if (report.get('verdict')!='passed' or
-                report.get('candidate_version')!=candidate.version or
-                report.get('config_digest')!=digest(self.config.to_dict()) or
-                report.get('asset_fingerprints')!={a.id:a.fingerprint
-                                                    for a in candidate.assets.assets}):
+        if (
+            report.get("verdict") != "passed"
+            or report.get("candidate_version") != candidate.version
+            or report.get("config_digest") != digest(self.config.to_dict())
+            or report.get("asset_fingerprints")
+            != {a.id: a.fingerprint for a in candidate.assets.assets}
+        ):
             return False
         if self.snapshot_root is not None:
             from .snapshots import snapshot_digest
-            if any(snapshot_digest(self.snapshot_root/case_id)!=saved
-                   for case_id,saved in report.get('snapshot_digests',{}).items()):
+
+            if any(
+                snapshot_digest(self.snapshot_root / case_id) != saved
+                for case_id, saved in report.get("snapshot_digests", {}).items()
+            ):
                 return False
-            if not report.get('snapshot_digests'):
+            if not report.get("snapshot_digests"):
                 return False
         elif self.dynamic_trial:
             # 动态图模式的报告必须绑定真图（graph_digests 由 admit_candidate 按
             # 排序行 digest 写入）；无图绑定的报告不得作为有效准入证据复用。
-            if not report.get('graph_digests'):
+            if not report.get("graph_digests"):
                 return False
-        return not smoke or report.get('smoke',{}).get('status')=='passed'
+        return not smoke or report.get("smoke", {}).get("status") == "passed"
 
-    async def _wiki_bootstrap_trials(self,wiki):
-        for report_file in sorted((self.root/'B0'/'bootstrap-trials').glob('*.json')):
-            report=json.loads(report_file.read_text())
-            await wiki.record('B0','bootstrap_trial',report,source=str(report_file),
-                              scope='trial')
+    async def _wiki_bootstrap_trials(self, wiki):
+        for report_file in sorted((self.root / "B0" / "bootstrap-trials").glob("*.json")):
+            report = json.loads(report_file.read_text())
+            await wiki.record(
+                "B0", "bootstrap_trial", report, source=str(report_file), scope="trial"
+            )
 
     async def _wiki_attempt(self, wiki, stage, name, cases, spec, adopted, results, scope):
         """Resume at the first uncompleted attempt; never reuse an uncertain model call."""
         from darwinagent.agents.protocol import parse_json
-        required_caps=capability_names(getattr(spec,'retrieval_floor',{}) or {})
-        questions=[{'training_id':tid,'text':q.text}
-                   for case in cases for tid,q in zip(question_identity(case),case.questions)]
-        training_ids=[tid for case in cases for tid in question_identity(case)]
-        forbidden=[q.text for case in cases for q in case.questions]
-        candidate_path=stage/'candidate'/'bundle'
-        goal_path=stage/'optimization'/'goal.json'
+
+        required_caps = capability_names(getattr(spec, "retrieval_floor", {}) or {})
+        questions = [
+            {"training_id": tid, "text": q.text}
+            for case in cases
+            for tid, q in zip(question_identity(case), case.questions)
+        ]
+        training_ids = [tid for case in cases for tid in question_identity(case)]
+        forbidden = [q.text for case in cases for q in case.questions]
+        candidate_path = stage / "candidate" / "bundle"
+        goal_path = stage / "optimization" / "goal.json"
         if not goal_path.exists():
-            entries=wiki._wiki()['entries']
-            origin=next((e for e in reversed(entries) if e.get('attribution') and
-                         e['kind'] in ('formal','decision')),None)
-            atomic_json(goal_path,{'base_version':adopted.version,'stage':name,
-                'direction':origin['attribution']['action'] if origin else
-                    '根据训练证据修复未解决问题，可联合调整 S/F/C/P；不降低验收门槛。',
-                'evidence_ids':[origin['id']] if origin else []})
-        goal=json.loads(goal_path.read_text())
+            entries = wiki._wiki()["entries"]
+            origin = next(
+                (
+                    e
+                    for e in reversed(entries)
+                    if e.get("attribution") and e["kind"] in ("formal", "decision")
+                ),
+                None,
+            )
+            atomic_json(
+                goal_path,
+                {
+                    "base_version": adopted.version,
+                    "stage": name,
+                    "direction": origin["attribution"]["action"]
+                    if origin
+                    else "根据训练证据修复未解决问题，可联合调整 S/F/C/P；不降低验收门槛。",
+                    "evidence_ids": [origin["id"]] if origin else [],
+                },
+            )
+        goal = json.loads(goal_path.read_text())
         for attempt in range(self.proposal_attempts):
             # 轮预算（新模式，recheck4）：deadline 自 round 起不随 attempt 重置；
             # 到点终止在途工作并持久化状态，由上层记 round_timeout（超时轮
             # 不计正式轮）。旧模式 round_deadline_s=None，检查为零成本短路。
-            if self._round_deadline is not None and time.monotonic()>self._round_deadline:
-                record_dir=stage/'optimization'/f'attempt-{attempt}'
-                atomic_json(record_dir/'status.json',{'state':'deadline',
-                    'attempt':attempt,'base_version':adopted.version,
-                    'error':f'round deadline exceeded ({self.round_deadline_s}s)',
-                    'deadline_elapsed_s':round(time.monotonic()-(self._round_deadline
-                                            -self.round_deadline_s),1)})
+            if self._round_deadline is not None and time.monotonic() > self._round_deadline:
+                record_dir = stage / "optimization" / f"attempt-{attempt}"
+                atomic_json(
+                    record_dir / "status.json",
+                    {
+                        "state": "deadline",
+                        "attempt": attempt,
+                        "base_version": adopted.version,
+                        "error": f"round deadline exceeded ({self.round_deadline_s}s)",
+                        "deadline_elapsed_s": round(
+                            time.monotonic() - (self._round_deadline - self.round_deadline_s), 1
+                        ),
+                    },
+                )
                 raise RoundDeadlineExceeded(
-                    f'Round deadline ({self.round_deadline_s}s) exceeded at attempt {attempt}')
-            record_dir=stage/'optimization'/f'attempt-{attempt}'
-            record_path=record_dir/'status.json'
-            proposal_path=record_dir/'proposal-call.json'
-            staged_path=stage/f'.candidate-attempt-{attempt}'
-            record=json.loads(record_path.read_text()) if record_path.exists() else None
-            if record and record['state'] in ('failed','uncertain'):
+                    f"Round deadline ({self.round_deadline_s}s) exceeded at attempt {attempt}"
+                )
+            record_dir = stage / "optimization" / f"attempt-{attempt}"
+            record_path = record_dir / "status.json"
+            proposal_path = record_dir / "proposal-call.json"
+            staged_path = stage / f".candidate-attempt-{attempt}"
+            record = json.loads(record_path.read_text()) if record_path.exists() else None
+            if record and record["state"] in ("failed", "uncertain"):
                 continue
-            if record and record['state']=='passed' and candidate_path.joinpath('manifest.json').exists():
-                await wiki.record(name,'attempt',{'status':'passed','attempt':attempt,
-                    'candidate_version':record['candidate_version'],'base_version':adopted.version,
-                    'asset_kinds':record.get('asset_kinds',[])},
-                    category='strategy',scope='smoke' if self.snapshot_root else 'admission',
-                    source=str(record_path))
+            if (
+                record
+                and record["state"] == "passed"
+                and candidate_path.joinpath("manifest.json").exists()
+            ):
+                await wiki.record(
+                    name,
+                    "attempt",
+                    {
+                        "status": "passed",
+                        "attempt": attempt,
+                        "candidate_version": record["candidate_version"],
+                        "base_version": adopted.version,
+                        "asset_kinds": record.get("asset_kinds", []),
+                    },
+                    category="strategy",
+                    scope="smoke" if self.snapshot_root else "admission",
+                    source=str(record_path),
+                )
                 return KernelBundle(candidate_path)
             if not record:
-                context=wiki.context()
-                context['objective']=goal
-                record={'state':'reserved','attempt':attempt,'base_version':adopted.version,
-                        'wiki_version':context['version'],'wiki_context':context,
-                        'target':str(staged_path)}
-                atomic_json(record_path,record)
-            elif record['base_version']!=adopted.version:
-                raise ValueError('Wiki attempt baseline identity mismatch')
-            if record['state']=='passed':
-                raise ValueError('Published Wiki candidate is missing; refusing replay')
+                context = wiki.context()
+                context["objective"] = goal
+                record = {
+                    "state": "reserved",
+                    "attempt": attempt,
+                    "base_version": adopted.version,
+                    "wiki_version": context["version"],
+                    "wiki_context": context,
+                    "target": str(staged_path),
+                }
+                atomic_json(record_path, record)
+            elif record["base_version"] != adopted.version:
+                raise ValueError("Wiki attempt baseline identity mismatch")
+            if record["state"] == "passed":
+                raise ValueError("Published Wiki candidate is missing; refusing replay")
             try:
-                if (staged_path/'bundle'/'manifest.json').exists():
-                    patches=()
+                if (staged_path / "bundle" / "manifest.json").exists():
+                    patches = ()
                 elif proposal_path.exists():
-                    saved=json.loads(proposal_path.read_text())
-                    if saved['input']['base_version']!=adopted.version or (
-                            saved['input'].get('wiki',{}).get('version')!=record['wiki_version']):
-                        raise ValueError('Saved proposal identity mismatch')
-                    patches=next((ProposalGenerator.decode(parse_json(raw),adopted)
-                                  for raw in reversed(saved['raw_outputs'])
-                                  if raw and self._valid_proposal_raw(raw,adopted)),None)
+                    saved = json.loads(proposal_path.read_text())
+                    if saved["input"]["base_version"] != adopted.version or (
+                        saved["input"].get("wiki", {}).get("version") != record["wiki_version"]
+                    ):
+                        raise ValueError("Saved proposal identity mismatch")
+                    patches = next(
+                        (
+                            ProposalGenerator.decode(parse_json(raw), adopted)
+                            for raw in reversed(saved["raw_outputs"])
+                            if raw and self._valid_proposal_raw(raw, adopted)
+                        ),
+                        None,
+                    )
                     if patches is None:
-                        record.update(state='uncertain',error='No validated saved proposal')
-                        atomic_json(record_path,record)
+                        record.update(state="uncertain", error="No validated saved proposal")
+                        atomic_json(record_path, record)
                         continue
                 else:
-                    if record_path.exists() and record.get('request_started'):
-                        record.update(state='uncertain',error='Proposal reply not persisted')
-                        atomic_json(record_path,record)
+                    if record_path.exists() and record.get("request_started"):
+                        record.update(state="uncertain", error="Proposal reply not persisted")
+                        atomic_json(record_path, record)
                         continue
-                    client=self._client(name)
+                    client = self._client(name)
                     try:
-                        record['request_started']=True
-                        atomic_json(record_path,record)
-                        patches=await ProposalGenerator().propose(
-                            adopted,cases,None,client,self.config,proposal_path,questions,
-                            allowed_kinds=tuple(scope or ()),wiki_context=record['wiki_context'])
+                        record["request_started"] = True
+                        atomic_json(record_path, record)
+                        patches = await ProposalGenerator().propose(
+                            adopted,
+                            cases,
+                            None,
+                            client,
+                            self.config,
+                            proposal_path,
+                            questions,
+                            allowed_kinds=tuple(scope or ()),
+                            wiki_context=record["wiki_context"],
+                        )
                     finally:
                         await client.aclose()
                 if patches:
-                    atomic_json(record_dir/'patches.json',
-                                {'patches':[p.to_dict() for p in patches]})
-                patch_file=record_dir/'patches.json'
-                patch_evidence=json.loads(patch_file.read_text()) if patch_file.exists() else {}
-                if not (staged_path/'bundle'/'manifest.json').exists():
-                    self.revisions.propose(adopted,patches,staged_path,training_ids,forbidden,
-                                           allowed_kinds=tuple(scope or ()),
-                                           required_capabilities=required_caps)
-                staged=KernelBundle(staged_path/'bundle')
-                report_path=staged_path/'admission.json'
-                saved_admission=(json.loads((record_dir/'admission.json').read_text())
-                                 if (record_dir/'admission.json').exists() else {})
+                    atomic_json(
+                        record_dir / "patches.json", {"patches": [p.to_dict() for p in patches]}
+                    )
+                patch_file = record_dir / "patches.json"
+                patch_evidence = json.loads(patch_file.read_text()) if patch_file.exists() else {}
+                if not (staged_path / "bundle" / "manifest.json").exists():
+                    self.revisions.propose(
+                        adopted,
+                        patches,
+                        staged_path,
+                        training_ids,
+                        forbidden,
+                        allowed_kinds=tuple(scope or ()),
+                        required_capabilities=required_caps,
+                    )
+                staged = KernelBundle(staged_path / "bundle")
+                report_path = staged_path / "admission.json"
+                saved_admission = (
+                    json.loads((record_dir / "admission.json").read_text())
+                    if (record_dir / "admission.json").exists()
+                    else {}
+                )
                 try:
-                    if not self._wiki_report_valid(saved_admission,staged):
-                        await self._preflight(staged,spec,cases[0].questions[0],cases,
-                                        _failed_tool_params(results))
+                    if not self._wiki_report_valid(saved_admission, staged):
+                        await self._preflight(
+                            staged, spec, cases[0].questions[0], cases, _failed_tool_params(results)
+                        )
                 finally:
                     if report_path.exists():
-                        atomic_json(record_dir/'admission.json',json.loads(report_path.read_text()))
+                        atomic_json(
+                            record_dir / "admission.json", json.loads(report_path.read_text())
+                        )
                 if self.snapshot_root is not None or self.dynamic_trial:
-                    prior=(json.loads((record_dir/'smoke.json').read_text())
-                           if (record_dir/'smoke.json').exists() else {})
-                    if prior.get('status')=='passed' and self._wiki_report_valid(
-                            json.loads((record_dir/'admission.json').read_text()),staged):
-                        smoke_error=None
+                    prior = (
+                        json.loads((record_dir / "smoke.json").read_text())
+                        if (record_dir / "smoke.json").exists()
+                        else {}
+                    )
+                    if prior.get("status") == "passed" and self._wiki_report_valid(
+                        json.loads((record_dir / "admission.json").read_text()), staged
+                    ):
+                        smoke_error = None
                     else:
                         # 冒烟是单次尝试最长段：开跑前再查一次 deadline（不重置）。
-                        if self._round_deadline is not None \
-                                and time.monotonic()>self._round_deadline:
+                        if (
+                            self._round_deadline is not None
+                            and time.monotonic() > self._round_deadline
+                        ):
                             raise RoundDeadlineExceeded(
-                                f'Round deadline ({self.round_deadline_s}s) exceeded '
-                                f'before smoke at attempt {attempt}')
-                        smoke_started=time.monotonic()
-                        smoke_error=await self._smoke_gate(cases,spec.with_bundle(staged),candidate=True)
-                        smoke={'status':'failed' if smoke_error else 'passed','error':smoke_error,
-                               'elapsed_s':round(time.monotonic()-smoke_started,3)}
-                        atomic_json(record_dir/'smoke.json',smoke)
-                        self._record_smoke(staged,smoke_error,smoke['elapsed_s'])
+                                f"Round deadline ({self.round_deadline_s}s) exceeded "
+                                f"before smoke at attempt {attempt}"
+                            )
+                        smoke_started = time.monotonic()
+                        smoke_error = await self._smoke_gate(
+                            cases, spec.with_bundle(staged), candidate=True
+                        )
+                        smoke = {
+                            "status": "failed" if smoke_error else "passed",
+                            "error": smoke_error,
+                            "elapsed_s": round(time.monotonic() - smoke_started, 3),
+                        }
+                        atomic_json(record_dir / "smoke.json", smoke)
+                        self._record_smoke(staged, smoke_error, smoke["elapsed_s"])
                     if smoke_error:
                         raise ValueError(smoke_error)
-                candidate_path.parent.mkdir(parents=True,exist_ok=True)
-                os.replace(staged_path,candidate_path.parent)
-                record.update(state='passed',candidate_version=staged.version,
-                              candidate_path=str(candidate_path),
-                              asset_kinds=sorted({p.asset.kind for p in patches}) if patches else [])
-                atomic_json(record_path,record)
-                await wiki.record(name,'attempt',{'status':'passed','attempt':attempt,
-                    'candidate_version':staged.version,'base_version':adopted.version,
-                    'asset_kinds':record['asset_kinds'],
-                    **asset_evidence(adopted,staged),
-                    'verification':json.loads((record_dir/'admission.json').read_text())
-                        if (record_dir/'admission.json').exists() else None,
-                    'smoke':json.loads((record_dir/'smoke.json').read_text())
-                        if (record_dir/'smoke.json').exists() else None},
-                    category='strategy',scope='smoke' if self.snapshot_root else 'admission',
-                    source=str(record_path))
+                candidate_path.parent.mkdir(parents=True, exist_ok=True)
+                os.replace(staged_path, candidate_path.parent)
+                record.update(
+                    state="passed",
+                    candidate_version=staged.version,
+                    candidate_path=str(candidate_path),
+                    asset_kinds=sorted({p.asset.kind for p in patches}) if patches else [],
+                )
+                atomic_json(record_path, record)
+                await wiki.record(
+                    name,
+                    "attempt",
+                    {
+                        "status": "passed",
+                        "attempt": attempt,
+                        "candidate_version": staged.version,
+                        "base_version": adopted.version,
+                        "asset_kinds": record["asset_kinds"],
+                        **asset_evidence(adopted, staged),
+                        "verification": json.loads((record_dir / "admission.json").read_text())
+                        if (record_dir / "admission.json").exists()
+                        else None,
+                        "smoke": json.loads((record_dir / "smoke.json").read_text())
+                        if (record_dir / "smoke.json").exists()
+                        else None,
+                    },
+                    category="strategy",
+                    scope="smoke" if self.snapshot_root else "admission",
+                    source=str(record_path),
+                )
                 return KernelBundle(candidate_path)
-            except (ValueError,ProtocolError) as exc:
-                if record.get('state')=='passed':
+            except (ValueError, ProtocolError) as exc:
+                if record.get("state") == "passed":
                     raise
-                record.update(state='failed',error=f'{type(exc).__name__}: {exc}')
-                atomic_json(record_path,record)
-                facts={'status':'failed','attempt':attempt,'error':record['error'],
-                    'admission':json.loads((record_dir/'admission.json').read_text())
-                        if (record_dir/'admission.json').exists() else None,
-                    'smoke':json.loads((record_dir/'smoke.json').read_text())
-                        if (record_dir/'smoke.json').exists() else None,
-                    'patches':json.loads((record_dir/'patches.json').read_text()).get('patches',[])
-                        if (record_dir/'patches.json').exists() else [],
-                    'base_version':adopted.version,'objective':goal}
-                await wiki.record(name,'attempt',facts,category='runtime',scope='trial',
-                    training_ids=training_ids,source=str(record_path),infer=wiki.new_failure(facts))
-        raise WikiAdmissionExhausted(f'All {self.proposal_attempts} Wiki admission attempts failed')
+                record.update(state="failed", error=f"{type(exc).__name__}: {exc}")
+                atomic_json(record_path, record)
+                facts = {
+                    "status": "failed",
+                    "attempt": attempt,
+                    "error": record["error"],
+                    "admission": json.loads((record_dir / "admission.json").read_text())
+                    if (record_dir / "admission.json").exists()
+                    else None,
+                    "smoke": json.loads((record_dir / "smoke.json").read_text())
+                    if (record_dir / "smoke.json").exists()
+                    else None,
+                    "patches": json.loads((record_dir / "patches.json").read_text()).get(
+                        "patches", []
+                    )
+                    if (record_dir / "patches.json").exists()
+                    else [],
+                    "base_version": adopted.version,
+                    "objective": goal,
+                }
+                await wiki.record(
+                    name,
+                    "attempt",
+                    facts,
+                    category="runtime",
+                    scope="trial",
+                    training_ids=training_ids,
+                    source=str(record_path),
+                    infer=wiki.new_failure(facts),
+                )
+        raise WikiAdmissionExhausted(f"All {self.proposal_attempts} Wiki admission attempts failed")
 
     @staticmethod
-    def _valid_proposal_raw(raw,base=None):
+    def _valid_proposal_raw(raw, base=None):
         try:
             from darwinagent.agents.protocol import parse_json
-            ProposalGenerator.decode(parse_json(raw),base)
+
+            ProposalGenerator.decode(parse_json(raw), base)
             return True
-        except (ValueError,TypeError,KeyError):
+        except (ValueError, TypeError, KeyError):
             return False
 
     @staticmethod
     def _wiki_decision_facts(decision):
-        facts={k:decision.get(k) for k in ('accepted','status','reasons',
-                                            'base_version','candidate_version')}
-        if decision.get('baseline') is not None:
-            facts['baseline']=safe_scores(decision['baseline'])
-        if decision.get('candidate') is not None:
-            facts['candidate']=safe_scores(decision['candidate'])
+        facts = {
+            k: decision.get(k)
+            for k in ("accepted", "status", "reasons", "base_version", "candidate_version")
+        }
+        if decision.get("baseline") is not None:
+            facts["baseline"] = safe_scores(decision["baseline"])
+        if decision.get("candidate") is not None:
+            facts["candidate"] = safe_scores(decision["candidate"])
         return facts
 
-    async def _wiki_formal_from_disk(self,wiki,name,cases,scores):
-        if any(e['stage']==name and e['kind']=='formal' for e in wiki._wiki()['entries']):
+    async def _wiki_formal_from_disk(self, wiki, name, cases, scores):
+        if any(e["stage"] == name and e["kind"] == "formal" for e in wiki._wiki()["entries"]):
             return
-        results=[]
+        results = []
         for case in cases:
-            path=self.root/name/'generation'/case.id/'result.json'
-            saved=json.loads(path.read_text())
-            saved['answers']=tuple(AnswerResult.from_dict(row) for row in saved['answers'])
+            path = self.root / name / "generation" / case.id / "result.json"
+            saved = json.loads(path.read_text())
+            saved["answers"] = tuple(AnswerResult.from_dict(row) for row in saved["answers"])
             results.append(RunResult(**saved))
-        raw=training_feedback(cases,results,_per_case_feedback_facts(self.root,name,cases),
-                              EvaluationResult(**scores),
-                              active_stages=pipeline_active_stages(self.snapshot_root))
-        candidate=KernelBundle(self.root/name/'candidate'/'bundle')
-        await wiki.record(name,'formal',{**safe_feedback(raw),**asset_evidence(candidate),
-            **_wiki_training_evidence(cases,results,diagnostics=
-                _per_case_feedback_facts(self.root,name,cases))},category='strategy',
-                          scope='formal',training_ids=[
-                              tid for case in cases for tid in question_identity(case)],
-                          source=str(self.root/name/'stage.json'))
+        raw = training_feedback(
+            cases,
+            results,
+            _per_case_feedback_facts(self.root, name, cases),
+            EvaluationResult(**scores),
+            active_stages=pipeline_active_stages(self.snapshot_root),
+        )
+        candidate = KernelBundle(self.root / name / "candidate" / "bundle")
+        await wiki.record(
+            name,
+            "formal",
+            {
+                **safe_feedback(raw),
+                **asset_evidence(candidate),
+                **_wiki_training_evidence(
+                    cases, results, diagnostics=_per_case_feedback_facts(self.root, name, cases)
+                ),
+            },
+            category="strategy",
+            scope="formal",
+            training_ids=[tid for case in cases for tid in question_identity(case)],
+            source=str(self.root / name / "stage.json"),
+        )
 
-    async def _legacy_candidate(self,stage,name,cases,spec,adopted,results,baseline,
-                                evidence,scope,decision_path,decisions,n):
+    async def _legacy_candidate(
+        self,
+        stage,
+        name,
+        cases,
+        spec,
+        adopted,
+        results,
+        baseline,
+        evidence,
+        scope,
+        decision_path,
+        decisions,
+        n,
+    ):
         """Keep the old proposal and error-feedback path unchanged for legacy runs."""
-        client=self._client(name)
-        prev_decision=self.root/f'R{n-1}'/'decision.json'
-        previous_round=None
-        if n>0 and prev_decision.exists():
-            pd=json.loads(prev_decision.read_text())
-            previous_round={'round':f'R{n-1}','status':pd.get('status'),
-                            'accepted':pd.get('accepted'),'reasons':(pd.get('reasons') or [])[:6]}
-        feedback=training_feedback(cases,results,_per_case_feedback_facts(self.root,evidence,cases),
-                                   baseline,active_stages=pipeline_active_stages(self.snapshot_root),
-                                   previous_round=previous_round)
-        questions=[{'training_id':tid,'text':q.text}
-                   for case in cases for tid,q in zip(question_identity(case),case.questions)]
-        required_caps=capability_names(getattr(spec,'retrieval_floor',{}) or {})
+        client = self._client(name)
+        prev_decision = self.root / f"R{n - 1}" / "decision.json"
+        previous_round = None
+        if n > 0 and prev_decision.exists():
+            pd = json.loads(prev_decision.read_text())
+            previous_round = {
+                "round": f"R{n - 1}",
+                "status": pd.get("status"),
+                "accepted": pd.get("accepted"),
+                "reasons": (pd.get("reasons") or [])[:6],
+            }
+        feedback = training_feedback(
+            cases,
+            results,
+            _per_case_feedback_facts(self.root, evidence, cases),
+            baseline,
+            active_stages=pipeline_active_stages(self.snapshot_root),
+            previous_round=previous_round,
+        )
+        questions = [
+            {"training_id": tid, "text": q.text}
+            for case in cases
+            for tid, q in zip(question_identity(case), case.questions)
+        ]
+        required_caps = capability_names(getattr(spec, "retrieval_floor", {}) or {})
         try:
-            admission_error=None
+            admission_error = None
             for attempt in range(ADMISSION_ATTEMPTS):
-                attempt_path=stage/f'.candidate-attempt-{attempt}'
-                if attempt_path.exists(): shutil.rmtree(attempt_path)
+                attempt_path = stage / f".candidate-attempt-{attempt}"
+                if attempt_path.exists():
+                    shutil.rmtree(attempt_path)
                 try:
-                    patches=await ProposalGenerator().propose(
-                        adopted,cases,feedback,client,self.config,stage/'proposal-call.json',
-                        questions,allowed_kinds=tuple(scope or ()),
-                        admission_error=admission_error)
-                    training_ids=[tid for case in cases for tid in question_identity(case)]
-                    forbidden=[q.text for case in cases for q in case.questions]
-                    self.revisions.propose(adopted,patches,attempt_path,training_ids,forbidden,
-                                           allowed_kinds=tuple(scope or ()),
-                                           required_capabilities=required_caps)
-                    staged=KernelBundle(attempt_path/'bundle')
-                    await self._preflight(staged,spec,cases[0].questions[0],cases,
-                                    _failed_tool_params(results))
+                    patches = await ProposalGenerator().propose(
+                        adopted,
+                        cases,
+                        feedback,
+                        client,
+                        self.config,
+                        stage / "proposal-call.json",
+                        questions,
+                        allowed_kinds=tuple(scope or ()),
+                        admission_error=admission_error,
+                    )
+                    training_ids = [tid for case in cases for tid in question_identity(case)]
+                    forbidden = [q.text for case in cases for q in case.questions]
+                    self.revisions.propose(
+                        adopted,
+                        patches,
+                        attempt_path,
+                        training_ids,
+                        forbidden,
+                        allowed_kinds=tuple(scope or ()),
+                        required_capabilities=required_caps,
+                    )
+                    staged = KernelBundle(attempt_path / "bundle")
+                    await self._preflight(
+                        staged, spec, cases[0].questions[0], cases, _failed_tool_params(results)
+                    )
                     if self.snapshot_root is not None or self.dynamic_trial:
-                        smoke_started=time.monotonic()
-                        round_smoke=await self._smoke_gate(cases,spec.with_bundle(staged),candidate=True)
-                        self._record_smoke(staged,round_smoke,time.monotonic()-smoke_started)
-                        if round_smoke: raise ValueError(round_smoke)
-                    candidate_path=stage/'candidate'/'bundle'
-                    candidate_path.parent.mkdir(parents=True,exist_ok=True)
-                    os.replace(attempt_path,candidate_path.parent)
+                        smoke_started = time.monotonic()
+                        round_smoke = await self._smoke_gate(
+                            cases, spec.with_bundle(staged), candidate=True
+                        )
+                        self._record_smoke(staged, round_smoke, time.monotonic() - smoke_started)
+                        if round_smoke:
+                            raise ValueError(round_smoke)
+                    candidate_path = stage / "candidate" / "bundle"
+                    candidate_path.parent.mkdir(parents=True, exist_ok=True)
+                    os.replace(attempt_path, candidate_path.parent)
                     return KernelBundle(candidate_path)
-                except (ValueError,ProtocolError) as exc:
-                    admission_error=f'[重试 {attempt+1}/{ADMISSION_ATTEMPTS}] {type(exc).__name__}: {exc}'
+                except (ValueError, ProtocolError) as exc:
+                    admission_error = (
+                        f"[重试 {attempt + 1}/{ADMISSION_ATTEMPTS}] {type(exc).__name__}: {exc}"
+                    )
             raise ValueError(admission_error)
         except Exception as exc:
-            decision={'accepted':False,'status':'validation_failed',
-                      'reasons':[f'{type(exc).__name__}: {exc}'],
-                      'base_version':adopted.version,'candidate':None}
-            atomic_json(decision_path,decision);decisions.append(decision)
-            print(json.dumps({'stage':name,**decision},ensure_ascii=False),flush=True)
+            decision = {
+                "accepted": False,
+                "status": "validation_failed",
+                "reasons": [f"{type(exc).__name__}: {exc}"],
+                "base_version": adopted.version,
+                "candidate": None,
+            }
+            atomic_json(decision_path, decision)
+            decisions.append(decision)
+            print(json.dumps({"stage": name, **decision}, ensure_ascii=False), flush=True)
             return None
         finally:
             await client.aclose()
@@ -408,71 +634,102 @@ class ExperimentRunner:
         """Stage-level execution faults from the on-disk stage records. A candidate rejected
         after complete scoring is a normal outcome; a stage that could not finish scoring is
         a fault and must surface in the run status."""
-        health={}
-        for path in sorted(self.root.glob('*/stage.json')):
-            row=json.loads(path.read_text());scores=row.get('scores',{})
-            faults={'status':row.get('status'),'completed':scores.get('completed'),
-                    'total':scores.get('total'),'generation_faults':scores.get('generation_faults'),
-                    'evaluation_faults':scores.get('evaluation_faults')}
-            if (row.get('status')!='complete' or faults['completed']!=faults['total']
-                    or faults['generation_faults'] or faults['evaluation_faults']):
-                health[path.parent.name]=faults
+        health = {}
+        for path in sorted(self.root.glob("*/stage.json")):
+            row = json.loads(path.read_text())
+            scores = row.get("scores", {})
+            faults = {
+                "status": row.get("status"),
+                "completed": scores.get("completed"),
+                "total": scores.get("total"),
+                "generation_faults": scores.get("generation_faults"),
+                "evaluation_faults": scores.get("evaluation_faults"),
+            }
+            if (
+                row.get("status") != "complete"
+                or faults["completed"] != faults["total"]
+                or faults["generation_faults"]
+                or faults["evaluation_faults"]
+            ):
+                health[path.parent.name] = faults
         return health
 
-    async def _preflight(self,candidate,spec,sample_question=None,cases=None,replay_inputs=()):
+    async def _preflight(self, candidate, spec, sample_question=None, cases=None, replay_inputs=()):
         """An identity-bound candidate report, including actual frozen trial inputs."""
         from types import SimpleNamespace
         from .admission import admit_candidate
-        if self.snapshot_root is None and self.bootstrap_trial_graph is None \
-                and not self.dynamic_trial:
+
+        if (
+            self.snapshot_root is None
+            and self.bootstrap_trial_graph is None
+            and not self.dynamic_trial
+        ):
             # Legacy dynamic-graph runs execute their actual-data trials in Pipeline.run.
             return None
         if cases is None:
-            cases=(SimpleNamespace(id='trial',questions=() if sample_question is None
-                                    else (sample_question,)),)
-        replay_inputs=tuple(replay_inputs)+tuple(_prior_failed_tool_params(self.root))
-        replay_checks=tuple(_prior_failed_check_snapshots(self.root,
-            getattr(spec,'answer_contract',None)))
-        report_path=Path(candidate.root).parent/'admission.json'
-        required=capability_names(getattr(spec,'retrieval_floor',{}) or {})
+            cases = (
+                SimpleNamespace(
+                    id="trial", questions=() if sample_question is None else (sample_question,)
+                ),
+            )
+        replay_inputs = tuple(replay_inputs) + tuple(_prior_failed_tool_params(self.root))
+        replay_checks = tuple(
+            _prior_failed_check_snapshots(self.root, getattr(spec, "answer_contract", None))
+        )
+        report_path = Path(candidate.root).parent / "admission.json"
+        required = capability_names(getattr(spec, "retrieval_floor", {}) or {})
         if self.snapshot_root is not None and self.graph_builder is None:
             from .admission_worker import run_isolated
             from .snapshots import snapshot_digest
+
             try:
-                snapshot_digests={
-                    c.id:snapshot_digest(self.snapshot_root/c.id) for c in cases}
-            except (OSError,ValueError) as exc:
+                snapshot_digests = {c.id: snapshot_digest(self.snapshot_root / c.id) for c in cases}
+            except (OSError, ValueError) as exc:
                 from .admission import AdmissionError
-                report={'schema_version':1,'candidate_version':candidate.version,
-                        'asset_fingerprints':{
-                            a.id:a.fingerprint for a in candidate.assets.assets},
-                        'config_digest':digest(self.config.to_dict()),
-                        'scenarios':[{'asset_id':'bundle','scenario_id':'training_graph',
-                            'status':'incomplete','required':True,'error':str(exc)}],
-                        'verdict':'failed'}
-                atomic_json(report_path,report)
-                raise AdmissionError(report_path,report) from exc
-            request={'bundle_path':str(candidate.root),'bundle_version':candidate.version,
-                     'snapshot_root':str(self.snapshot_root),
-                     'snapshot_digests':snapshot_digests,
-                     'asset_fingerprints':{
-                         a.id:a.fingerprint for a in candidate.assets.assets},
-                     'cases':[c.to_dict() for c in cases],
-                     'config':self.config.to_dict(),'required_caps':sorted(required),
-                     'report_path':str(report_path),
-                     'replay_inputs':plain(replay_inputs),
-                     'replay_checks':plain(replay_checks),
-                     'answer_counterexamples':plain(getattr(spec,'answer_counterexamples',()) or ()),
-                     'answer_examples':plain(getattr(spec,'answer_examples',()) or ())}
-            request_path=report_path.with_name('admission-input.json')
-            atomic_json(request_path,request)
-            if not run_isolated(request_path,report_path,bounded_timeout(180)):
+
+                report = {
+                    "schema_version": 1,
+                    "candidate_version": candidate.version,
+                    "asset_fingerprints": {a.id: a.fingerprint for a in candidate.assets.assets},
+                    "config_digest": digest(self.config.to_dict()),
+                    "scenarios": [
+                        {
+                            "asset_id": "bundle",
+                            "scenario_id": "training_graph",
+                            "status": "incomplete",
+                            "required": True,
+                            "error": str(exc),
+                        }
+                    ],
+                    "verdict": "failed",
+                }
+                atomic_json(report_path, report)
+                raise AdmissionError(report_path, report) from exc
+            request = {
+                "bundle_path": str(candidate.root),
+                "bundle_version": candidate.version,
+                "snapshot_root": str(self.snapshot_root),
+                "snapshot_digests": snapshot_digests,
+                "asset_fingerprints": {a.id: a.fingerprint for a in candidate.assets.assets},
+                "cases": [c.to_dict() for c in cases],
+                "config": self.config.to_dict(),
+                "required_caps": sorted(required),
+                "report_path": str(report_path),
+                "replay_inputs": plain(replay_inputs),
+                "replay_checks": plain(replay_checks),
+                "answer_counterexamples": plain(getattr(spec, "answer_counterexamples", ()) or ()),
+                "answer_examples": plain(getattr(spec, "answer_examples", ()) or ()),
+            }
+            request_path = report_path.with_name("admission-input.json")
+            atomic_json(request_path, request)
+            if not run_isolated(request_path, report_path, bounded_timeout(180)):
                 from .admission import AdmissionError
-                raise AdmissionError(report_path,json.loads(report_path.read_text()))
+
+                raise AdmissionError(report_path, json.loads(report_path.read_text()))
             return json.loads(report_path.read_text())
-        graphs={}
+        graphs = {}
         if self.dynamic_trial:
-            graphs=await self._dynamic_trial_graphs(candidate,cases)
+            graphs = await self._dynamic_trial_graphs(candidate, cases)
         elif self.graph_builder is not None and self.snapshot_root is not None:
             # 新模式：准入电池在「按当前 S 重建的图」上跑（与正式答题同一派生规则），
             # 不再用快照冻结图过检——准入面=作答面。逐候选 S 指纹键控缓存。
@@ -480,31 +737,47 @@ class ExperimentRunner:
             # AdmissionError——不放宽、不崩溃（B0/候选轮一致）。
             try:
                 for case in cases:
-                    graphs[case.id]=self._rebuild_graph_cached(candidate,case)
+                    graphs[case.id] = self._rebuild_graph_cached(candidate, case)
             except Exception as exc:
                 from .admission import AdmissionError
-                report={'schema_version':1,'candidate_version':candidate.version,
-                        'asset_fingerprints':{
-                            a.id:a.fingerprint for a in candidate.assets.assets},
-                        'config_digest':digest(self.config.to_dict()),
-                        'scenarios':[{'asset_id':'bundle','scenario_id':'training_graph',
-                            'status':'incomplete','required':True,
-                            'error':f'graph rebuild failed: {type(exc).__name__}: '
-                                    f'{str(exc)[:400]}'}],
-                        'verdict':'failed'}
-                atomic_json(report_path,report)
-                raise AdmissionError(report_path,report) from exc
+
+                report = {
+                    "schema_version": 1,
+                    "candidate_version": candidate.version,
+                    "asset_fingerprints": {a.id: a.fingerprint for a in candidate.assets.assets},
+                    "config_digest": digest(self.config.to_dict()),
+                    "scenarios": [
+                        {
+                            "asset_id": "bundle",
+                            "scenario_id": "training_graph",
+                            "status": "incomplete",
+                            "required": True,
+                            "error": f"graph rebuild failed: {type(exc).__name__}: "
+                            f"{str(exc)[:400]}",
+                        }
+                    ],
+                    "verdict": "failed",
+                }
+                atomic_json(report_path, report)
+                raise AdmissionError(report_path, report) from exc
         else:
             for case in cases:
-                graphs[case.id]=self.bootstrap_trial_graph
-        return admit_candidate(candidate,cases,graphs,self.config,
-            required,report_path,replay_inputs=replay_inputs,
-            answer_contract=getattr(spec,'answer_contract',None),
+                graphs[case.id] = self.bootstrap_trial_graph
+        return admit_candidate(
+            candidate,
+            cases,
+            graphs,
+            self.config,
+            required,
+            report_path,
+            replay_inputs=replay_inputs,
+            answer_contract=getattr(spec, "answer_contract", None),
             replay_checks=replay_checks,
-            answer_counterexamples=getattr(spec,'answer_counterexamples',()) or (),
-            answer_examples=getattr(spec,'answer_examples',()) or ())
+            answer_counterexamples=getattr(spec, "answer_counterexamples", ()) or (),
+            answer_examples=getattr(spec, "answer_examples", ()) or (),
+        )
 
-    def _rebuild_graph_cached(self,bundle,case):
+    def _rebuild_graph_cached(self, bundle, case):
         """重建图供给（准入/试跑共用）：键＝固定事实摘要＋S 规则指纹＋builder 源码
         摘要（投影实现版本）——F/C/P 改动复用同图，S 变才重建。core 不 import
         任务侧模块：builder 身份用源码摘要（与 Pipeline 身份同口径）。"""
@@ -512,248 +785,372 @@ class ExperimentRunner:
         from .snapshots import snapshot_manifest
         from ..kernel.validation import validate_bundle
         from darwinagent.runtime.artifacts import digest as _digest
-        manifest=snapshot_manifest(self.snapshot_root/case.id)
-        schema=validate_bundle(bundle)
+
+        manifest = snapshot_manifest(self.snapshot_root / case.id)
+        schema = validate_bundle(bundle)
         try:
-            builder_src=inspect.getsource(self.graph_builder)
-        except (OSError,TypeError):
-            builder_src=repr(self.graph_builder)
-        key=(case.id,manifest.get('facts_digest',''),_digest(schema.to_yaml()),
-             _digest(builder_src))
+            builder_src = inspect.getsource(self.graph_builder)
+        except (OSError, TypeError):
+            builder_src = repr(self.graph_builder)
+        key = (
+            case.id,
+            manifest.get("facts_digest", ""),
+            _digest(schema.to_yaml()),
+            _digest(builder_src),
+        )
         if key not in self._rebuild_cache:
-            self._rebuild_cache[key]=self.graph_builder(
-                self.snapshot_root/case.id,schema,
-                getattr(case,'corpus',()),None)
+            self._rebuild_cache[key] = self.graph_builder(
+                self.snapshot_root / case.id, schema, getattr(case, "corpus", ()), None
+            )
         return self._rebuild_cache[key]
 
-    async def _rebuild_trial_supply(self,bundle,cases):
+    async def _rebuild_trial_supply(self, bundle, cases):
         """新模式冷启动试跑图供给：草案 bundle 也在「按当前 S 重建的图」上试跑
         （与正式/准入同派生规则），异常处理复用 bootstrap 的 ValueError 反馈路径。"""
-        return {case.id:self._rebuild_graph_cached(bundle,case) for case in cases}
+        return {case.id: self._rebuild_graph_cached(bundle, case) for case in cases}
 
-    async def _dynamic_trial_graphs(self,bundle,cases):
+    async def _dynamic_trial_graphs(self, bundle, cases):
         """动态图任务的真图供给：候选补丁未触碰 S/P.extract 时复用已采纳 stage 的
         同题真图（stage 资产版本==候选基线版本＋graph.complete.json digest 校验），
         触碰时必须用候选资产重抽——旧图证明不了新候选安全（拿旧图过检=身份失配）。
         重抽结果键控缓存，bootstrap 纠错与 resume 复用同一份确定性产物。"""
         from collections.abc import Mapping
-        origin=getattr(bundle.assets,'origin',None)
-        origin=origin if isinstance(origin,Mapping) else {}
-        rebuild=any((p.get('asset') or {}).get('kind')=='S'
-                    or ((p.get('asset') or {}).get('kind')=='P'
-                        and (p.get('asset') or {}).get('role')=='extract')
-                    for p in origin.get('patches',()))
-        graphs={}
+
+        origin = getattr(bundle.assets, "origin", None)
+        origin = origin if isinstance(origin, Mapping) else {}
+        rebuild = any(
+            (p.get("asset") or {}).get("kind") == "S"
+            or (
+                (p.get("asset") or {}).get("kind") == "P"
+                and (p.get("asset") or {}).get("role") == "extract"
+            )
+            for p in origin.get("patches", ())
+        )
+        graphs = {}
         for case in cases:
-            graph=None
+            graph = None
             if not rebuild:
-                graph=self._adopted_stage_graph(case,origin.get('base_version'))
+                graph = self._adopted_stage_graph(case, origin.get("base_version"))
             if graph is None:
-                graph=await self._extract_trial_graph(bundle,case)
-            graphs[case.id]=graph
+                graph = await self._extract_trial_graph(bundle, case)
+            graphs[case.id] = graph
         return graphs
 
-    def _adopted_stage_graph(self,case,base_version):
+    def _adopted_stage_graph(self, case, base_version):
         """最近已采纳 stage 的同题真图；无基线版本/stage 缺图/digest 不符 → None（走重抽）。"""
         import re as _re
         from types import MappingProxyType as _MP
         import networkx as nx
         from darwinagent.kg.graph import load_graph
+
         if not base_version:
             return None
+
         def stage_key(path):
-            name=path.parent.name
-            if name=='B0': return (0,0)
-            m=_re.fullmatch(r'R(\d+)',name)
-            return (1,int(m.group(1))) if m else (2,0)
-        stages=[]
-        for path in self.root.glob('*/stage.json'):
+            name = path.parent.name
+            if name == "B0":
+                return (0, 0)
+            m = _re.fullmatch(r"R(\d+)", name)
+            return (1, int(m.group(1))) if m else (2, 0)
+
+        stages = []
+        for path in self.root.glob("*/stage.json"):
             try:
-                row=json.loads(path.read_text())
-            except (OSError,ValueError):
+                row = json.loads(path.read_text())
+            except (OSError, ValueError):
                 continue
-            if row.get('asset_version')==base_version:
+            if row.get("asset_version") == base_version:
                 stages.append(path)
-        for path in sorted(stages,key=stage_key):
-            generation=path.parent/'generation'/case.id
-            graph_path=generation/'graph.json'
-            complete=generation/'graph.complete.json'
+        for path in sorted(stages, key=stage_key):
+            generation = path.parent / "generation" / case.id
+            graph_path = generation / "graph.json"
+            complete = generation / "graph.complete.json"
             if not (graph_path.exists() and complete.exists()):
                 continue
             try:
-                payload=json.loads(graph_path.read_text())
-                if digest(payload)!=json.loads(complete.read_text()).get('digest'):
+                payload = json.loads(graph_path.read_text())
+                if digest(payload) != json.loads(complete.read_text()).get("digest"):
                     continue
-                return GraphResult(nx.freeze(load_graph(graph_path)),
-                                   _MP({b.source.id:b for b in case.corpus}))
-            except (OSError,ValueError):
+                return GraphResult(
+                    nx.freeze(load_graph(graph_path)), _MP({b.source.id: b for b in case.corpus})
+                )
+            except (OSError, ValueError):
                 continue
         return None
 
-    async def _extract_trial_graph(self,bundle,case):
+    async def _extract_trial_graph(self, bundle, case):
         """用候选资产真抽一次试验图；键=(case, S 指纹, P.extract 指纹, config, 传输身份)
         ——不含候选整体版本，未触碰抽取面的后续候选共享缓存。"""
         import networkx as nx
         from types import MappingProxyType as _MP
         from darwinagent.agents import ExtractionAgent
         from darwinagent.kernel.execution import KernelRuntime
-        from darwinagent.kg.graph import load_graph,save_graph
-        schema=next(a.fingerprint for a in bundle.assets.assets if a.kind=='S')
-        extract=next((a.fingerprint for a in bundle.assets.assets
-                      if a.kind=='P' and a.role=='extract'),None)
-        transport=transport_identity(type('Connection',(),{'cfg':self.connection_config})())
-        key=digest({'case':case.to_dict(),'schema':schema,'extract':extract,
-                    'config':digest(self.config.to_dict()),'transport':transport})
-        cache=self.root/'trial-graphs'/key
-        graph_path=cache/'graph.json'
-        if graph_path.exists() and (cache/'graph.complete.json').exists():
+        from darwinagent.kg.graph import load_graph, save_graph
+
+        schema = next(a.fingerprint for a in bundle.assets.assets if a.kind == "S")
+        extract = next(
+            (a.fingerprint for a in bundle.assets.assets if a.kind == "P" and a.role == "extract"),
+            None,
+        )
+        transport = transport_identity(type("Connection", (), {"cfg": self.connection_config})())
+        key = digest(
+            {
+                "case": case.to_dict(),
+                "schema": schema,
+                "extract": extract,
+                "config": digest(self.config.to_dict()),
+                "transport": transport,
+            }
+        )
+        cache = self.root / "trial-graphs" / key
+        graph_path = cache / "graph.json"
+        if graph_path.exists() and (cache / "graph.complete.json").exists():
             try:
-                payload=json.loads(graph_path.read_text())
-                if digest(payload)==json.loads((cache/'graph.complete.json').read_text()).get('digest'):
-                    return GraphResult(nx.freeze(load_graph(graph_path)),
-                                       _MP({b.source.id:b for b in case.corpus}))
-            except (OSError,ValueError):
+                payload = json.loads(graph_path.read_text())
+                if digest(payload) == json.loads((cache / "graph.complete.json").read_text()).get(
+                    "digest"
+                ):
+                    return GraphResult(
+                        nx.freeze(load_graph(graph_path)),
+                        _MP({b.source.id: b for b in case.corpus}),
+                    )
+            except (OSError, ValueError):
                 pass
-        client=self._client('trial-graph')
+        client = self._client("trial-graph")
         try:
-            runtime=KernelRuntime(bundle,self.config,tuple(q.text for q in case.questions))
-            graph=await ExtractionAgent(runtime,client,self.config,key[:16]).extract_entities(case.corpus)
+            runtime = KernelRuntime(bundle, self.config, tuple(q.text for q in case.questions))
+            graph = await ExtractionAgent(runtime, client, self.config, key[:16]).extract_entities(
+                case.corpus
+            )
         finally:
             await client.aclose()
-        cache.mkdir(parents=True,exist_ok=True)
-        save_graph(graph.graph,graph_path)
-        payload=json.loads(graph_path.read_text())
-        atomic_json(cache/'graph.complete.json',{'digest':digest(payload),'case':case.id,
-                    'bundle_version':bundle.version,'schema':schema,'extract':extract})
+        cache.mkdir(parents=True, exist_ok=True)
+        save_graph(graph.graph, graph_path)
+        payload = json.loads(graph_path.read_text())
+        atomic_json(
+            cache / "graph.complete.json",
+            {
+                "digest": digest(payload),
+                "case": case.id,
+                "bundle_version": bundle.version,
+                "schema": schema,
+                "extract": extract,
+            },
+        )
         return graph
 
-    def _client(self,stage):
+    def _client(self, stage):
         if self._injected_client is not None:
             return self._injected_client(stage)
-        cfg=copy.deepcopy(self.connection_config)
-        cfg.work_dir=self.root/stage/'runtime'
+        cfg = copy.deepcopy(self.connection_config)
+        cfg.work_dir = self.root / stage / "runtime"
         return LLMClient(cfg)
 
     def verify(self):
         assert_files(self.frozen)
 
     @staticmethod
-    def _record_smoke(bundle,error,elapsed_s=0):
-        path=Path(bundle.root).parent/'admission.json'
+    def _record_smoke(bundle, error, elapsed_s=0):
+        path = Path(bundle.root).parent / "admission.json"
         if not path.exists():
             return
-        report=json.loads(path.read_text())
-        report['smoke']={'status':'failed' if error else 'passed',
-                         'error':error,'elapsed_s':round(elapsed_s,3)}
+        report = json.loads(path.read_text())
+        report["smoke"] = {
+            "status": "failed" if error else "passed",
+            "error": error,
+            "elapsed_s": round(elapsed_s, 3),
+        }
         if error:
-            report['verdict']='failed'
-        atomic_json(path,report)
+            report["verdict"] = "failed"
+        atomic_json(path, report)
 
-    async def _stage(self,name,cases,spec):
+    async def _stage(self, name, cases, spec):
         """Run every case of the split on the same bundle; aggregate by the frozen sum rule.
 
         Faulted questions get ONE bounded retry pass: their checkpoints are removed and the
         pipeline reruns (healthy answers checkpoint-reuse at zero cost). A question that
         fails twice is a real fault and stays; the retry is recorded in the stage summary."""
-        self.verify();started=time.time();stage=self.root/name
-        client=self._client(name)
+        self.verify()
+        started = time.time()
+        stage = self.root / name
+        client = self._client(name)
         try:
-            results=[];scores=[];identities=[];retries={}
+            results = []
+            scores = []
+            identities = []
+            retries = {}
             for case in cases:
-                pipeline=Pipeline(client,stage/'generation',
-                                  frozen_snapshot=None if self.snapshot_root is None else self.snapshot_root/case.id,
-                                  graph_builder=self.graph_builder)
-                result=await pipeline.run(case,spec,self.config)
-                journal_path=stage/'fault-retry'/f'{case.id}.json'
-                _settle_reservations(journal_path,result,client.ledger_summary())
-                faulted=[a for a in result.answers if a.status=='execution_error']
-                graph_failure=[d for d in (result.graph_diagnostics or ())
-                               if isinstance(d,Mapping) and d.get('status')=='execution_error']
+                pipeline = Pipeline(
+                    client,
+                    stage / "generation",
+                    frozen_snapshot=None
+                    if self.snapshot_root is None
+                    else self.snapshot_root / case.id,
+                    graph_builder=self.graph_builder,
+                )
+                result = await pipeline.run(case, spec, self.config)
+                journal_path = stage / "fault-retry" / f"{case.id}.json"
+                _settle_reservations(journal_path, result, client.ledger_summary())
+                faulted = [a for a in result.answers if a.status == "execution_error"]
+                graph_failure = [
+                    d
+                    for d in (result.graph_diagnostics or ())
+                    if isinstance(d, Mapping) and d.get("status") == "execution_error"
+                ]
                 if faulted and graph_failure:
                     # 图阶段全局确定性失败（评审①）：删答案检查点救不回图阶段产物，
                     # 分批等待重试毫无意义——如实记录，不重试。
-                    retries[case.id]={'questions':len(faulted),'recovered':0,
-                                      'still_faulted':sorted(a.question_id for a in faulted),
-                                      'skipped_retry':'graph_stage_failure',
-                                      'graph_error':str(graph_failure[0].get('error'))[:200]}
-                    print(json.dumps({'stage':name,'case':case.id,'fault_retry':retries[case.id]},ensure_ascii=False),flush=True)
+                    retries[case.id] = {
+                        "questions": len(faulted),
+                        "recovered": 0,
+                        "still_faulted": sorted(a.question_id for a in faulted),
+                        "skipped_retry": "graph_stage_failure",
+                        "graph_error": str(graph_failure[0].get("error"))[:200],
+                    }
+                    print(
+                        json.dumps(
+                            {"stage": name, "case": case.id, "fault_retry": retries[case.id]},
+                            ensure_ascii=False,
+                        ),
+                        flush=True,
+                    )
                 elif faulted and not any(_retryable_answer(a) for a in faulted):
                     # 确定性工具错误（评审：接口/参数错误重试不会变好）：不整题重检索，
                     # 如实入统计与反馈，由资产修订解决（scope F）。
-                    retries[case.id]={'questions':len(faulted),'recovered':0,
-                                      'still_faulted':sorted(a.question_id for a in faulted),
-                                      'skipped_retry':'deterministic_tool_error',
-                                      'sample_errors':[str(a.error)[:150] for a in faulted[:3]]}
-                    print(json.dumps({'stage':name,'case':case.id,'fault_retry':retries[case.id]},ensure_ascii=False),flush=True)
+                    retries[case.id] = {
+                        "questions": len(faulted),
+                        "recovered": 0,
+                        "still_faulted": sorted(a.question_id for a in faulted),
+                        "skipped_retry": "deterministic_tool_error",
+                        "sample_errors": [str(a.error)[:150] for a in faulted[:3]],
+                    }
+                    print(
+                        json.dumps(
+                            {"stage": name, "case": case.id, "fault_retry": retries[case.id]},
+                            ensure_ascii=False,
+                        ),
+                        flush=True,
+                    )
                 elif faulted:
-                    journal=_retry_journal(journal_path,result.identity)
-                    eligible=[]
+                    journal = _retry_journal(journal_path, result.identity)
+                    eligible = []
                     for answer in faulted:
                         if not _retryable_answer(answer):
                             continue
-                        previous=journal['questions'].get(answer.question_id)
+                        previous = journal["questions"].get(answer.question_id)
                         if previous is not None:
                             continue
-                        journal['questions'][answer.question_id]={
-                            'state':'reserved','attempts':1,
-                            'initial_digest':digest(answer.to_dict()),
-                            'initial_error_type':str(answer.error).split(':',1)[0],
-                            'consumed_before':client.ledger_summary()}
+                        journal["questions"][answer.question_id] = {
+                            "state": "reserved",
+                            "attempts": 1,
+                            "initial_digest": digest(answer.to_dict()),
+                            "initial_error_type": str(answer.error).split(":", 1)[0],
+                            "consumed_before": client.ledger_summary(),
+                        }
                         eligible.append(answer)
-                        atomic_json(journal_path,journal)
+                        atomic_json(journal_path, journal)
                     if not eligible:
-                        retries[case.id]={'questions':len(faulted),'recovered':0,
-                                          'still_faulted':sorted(a.question_id for a in faulted),
-                                          'skipped_retry':'already_reserved_or_deterministic'}
+                        retries[case.id] = {
+                            "questions": len(faulted),
+                            "recovered": 0,
+                            "still_faulted": sorted(a.question_id for a in faulted),
+                            "skipped_retry": "already_reserved_or_deterministic",
+                        }
                     else:
-                    # 先歇再重试：EmptyCompletion 类故障多为瞬时突发，隔窗后分批小跑；
-                    # 统计口径见 batched_fault_retry（末份答案集重算，不做批次并集）。
-                        retry_started=time.monotonic()
-                        result,still_faulted=await batched_fault_retry(
-                            pipeline,case,spec,self.config,
-                            stage/'generation'/case.id/'answers',eligible)
-                        latest={a.question_id:a for a in result.answers}
+                        # 先歇再重试：EmptyCompletion 类故障多为瞬时突发，隔窗后分批小跑；
+                        # 统计口径见 batched_fault_retry（末份答案集重算，不做批次并集）。
+                        retry_started = time.monotonic()
+                        result, still_faulted = await batched_fault_retry(
+                            pipeline,
+                            case,
+                            spec,
+                            self.config,
+                            stage / "generation" / case.id / "answers",
+                            eligible,
+                        )
+                        latest = {a.question_id: a for a in result.answers}
                         for answer in eligible:
-                            journal['questions'][answer.question_id].update(
-                                state='done',consumed_after=client.ledger_summary(),
-                                final_error_type=str(latest[answer.question_id].error).split(':',1)[0]
-                                if latest[answer.question_id].status=='execution_error' else None)
-                        atomic_json(journal_path,journal)
-                        retries[case.id]={'questions':len(faulted),
-                                          'retried':len(eligible),
-                                          'recovered':sum(a.question_id not in still_faulted for a in eligible),
-                                          'still_faulted':still_faulted,
-                                          'elapsed_s':round(time.monotonic()-retry_started,3),
-                                          'skipped_deterministic':len(faulted)-len(eligible)}
-                    print(json.dumps({'stage':name,'case':case.id,'fault_retry':retries[case.id]},ensure_ascii=False),flush=True)
-                scores_path=stage/'evaluation'/f'{case.id}.json'
+                            journal["questions"][answer.question_id].update(
+                                state="done",
+                                consumed_after=client.ledger_summary(),
+                                final_error_type=str(latest[answer.question_id].error).split(
+                                    ":", 1
+                                )[0]
+                                if latest[answer.question_id].status == "execution_error"
+                                else None,
+                            )
+                        atomic_json(journal_path, journal)
+                        retries[case.id] = {
+                            "questions": len(faulted),
+                            "retried": len(eligible),
+                            "recovered": sum(a.question_id not in still_faulted for a in eligible),
+                            "still_faulted": still_faulted,
+                            "elapsed_s": round(time.monotonic() - retry_started, 3),
+                            "skipped_deterministic": len(faulted) - len(eligible),
+                        }
+                    print(
+                        json.dumps(
+                            {"stage": name, "case": case.id, "fault_retry": retries[case.id]},
+                            ensure_ascii=False,
+                        ),
+                        flush=True,
+                    )
+                scores_path = stage / "evaluation" / f"{case.id}.json"
                 if case.id in retries:
-                    scores_path.unlink(missing_ok=True)  # 重试跑过＝答案集可能已变：旧评测检查点一律作废重评
+                    scores_path.unlink(
+                        missing_ok=True
+                    )  # 重试跑过＝答案集可能已变：旧评测检查点一律作废重评
                 if scores_path.exists():
-                    saved=json.loads(scores_path.read_text())
-                    if saved['run_identity']!=result.identity or saved['asset_version']!=spec.bundle.version:
-                        raise ValueError('Evaluation checkpoint identity mismatch')
-                    case_scores=EvaluationResult(**saved['scores'])
+                    saved = json.loads(scores_path.read_text())
+                    if (
+                        saved["run_identity"] != result.identity
+                        or saved["asset_version"] != spec.bundle.version
+                    ):
+                        raise ValueError("Evaluation checkpoint identity mismatch")
+                    case_scores = EvaluationResult(**saved["scores"])
                 else:
-                    evaluator=self.evaluator_factory(client,stage/'evaluation'/case.id)
+                    evaluator = self.evaluator_factory(client, stage / "evaluation" / case.id)
                     # 完整性按本轮实际出题集核对（训练集瘦身后是前缀子集；全量时等价旧检查）
-                    case_scores=await _evaluate_stage(evaluator,result,case.questions)
-                    atomic_json(scores_path,{'run_identity':result.identity,'asset_version':spec.bundle.version,
-                                             'scores':case_scores.to_dict()})
-                results.append(result);scores.append(case_scores);identities.append(result.identity)
-            aggregated=aggregate_scores(scores)
+                    case_scores = await _evaluate_stage(evaluator, result, case.questions)
+                    atomic_json(
+                        scores_path,
+                        {
+                            "run_identity": result.identity,
+                            "asset_version": spec.bundle.version,
+                            "scores": case_scores.to_dict(),
+                        },
+                    )
+                results.append(result)
+                scores.append(case_scores)
+                identities.append(result.identity)
+            aggregated = aggregate_scores(scores)
             self.verify()
-            summary={'stage':name,'cases':[c.id for c in cases],
-                     'status':'complete' if aggregated.completed==aggregated.total and not aggregated.evaluation_faults else 'failed',
-                     'run_identities':identities,'asset_version':spec.bundle.version,'scores':aggregated.to_dict(),
-                     'fault_retries':retries,
-                     'calls':client.ledger_summary(),'elapsed_s':round(time.time()-started,2)}
-            atomic_json(stage/'stage.json',summary)
-            print(json.dumps({k:summary[k] for k in ('stage','status','asset_version','elapsed_s')},ensure_ascii=False),flush=True)
-            return results,aggregated
-        finally: await client.aclose()
+            summary = {
+                "stage": name,
+                "cases": [c.id for c in cases],
+                "status": "complete"
+                if aggregated.completed == aggregated.total and not aggregated.evaluation_faults
+                else "failed",
+                "run_identities": identities,
+                "asset_version": spec.bundle.version,
+                "scores": aggregated.to_dict(),
+                "fault_retries": retries,
+                "calls": client.ledger_summary(),
+                "elapsed_s": round(time.time() - started, 2),
+            }
+            atomic_json(stage / "stage.json", summary)
+            print(
+                json.dumps(
+                    {k: summary[k] for k in ("stage", "status", "asset_version", "elapsed_s")},
+                    ensure_ascii=False,
+                ),
+                flush=True,
+            )
+            return results, aggregated
+        finally:
+            await client.aclose()
 
-    async def _smoke_gate(self,cases,spec,questions_per_case=6,candidate=False):
+    async def _smoke_gate(self, cases, spec, questions_per_case=6, candidate=False):
         """B0 全量提交前的冒烟门（用户拍板：先保证能答对，再启动跑；v10 追加：6 题对 2）：
         每训练对话抽前 6 题走完整真实管线＋冻结判题（临时目录、真模型、~5 分钟）。
         过门条件＝执行错误 <2/3、判题完整、至少 2/6 precise 答对；不满足分钟级中止换根
@@ -762,455 +1159,759 @@ class ExperimentRunner:
         只有系统性破绽（≥2/3）才在此拦下。"""
         import dataclasses as _dc
         import tempfile
-        client=self._client('B0-smoke')
+
+        client = self._client("B0-smoke")
         try:
             for case in cases:
-                questions=case.questions
+                questions = case.questions
                 if candidate:
-                    risk=('时间|日期|哪天|何时|上周|昨天',
-                          '过滤|全部|哪些|多少|类型|主题',
-                          '关系|相关|属于|关联|遍历')
+                    risk = (
+                        "时间|日期|哪天|何时|上周|昨天",
+                        "过滤|全部|哪些|多少|类型|主题",
+                        "关系|相关|属于|关联|遍历",
+                    )
                     import re
-                    selected=[]
+
+                    selected = []
                     for pattern in risk:
-                        first=next((q for q in questions if q not in selected
-                                    and re.search(pattern,q.text)),None)
+                        first = next(
+                            (
+                                q
+                                for q in questions
+                                if q not in selected and re.search(pattern, q.text)
+                            ),
+                            None,
+                        )
                         if first is not None:
                             selected.append(first)
                     selected.extend(q for q in questions if q not in selected)
-                    questions=tuple(selected)
-                sampled=_dc.replace(case,questions=tuple(questions[:questions_per_case]))
+                    questions = tuple(selected)
+                sampled = _dc.replace(case, questions=tuple(questions[:questions_per_case]))
                 with tempfile.TemporaryDirectory() as td:
-                    pipeline=Pipeline(client,Path(td),
-                                      frozen_snapshot=None if self.snapshot_root is None else self.snapshot_root/case.id,
-                                      graph_builder=self.graph_builder)
-                    result=await pipeline.run(sampled,spec,self.config)
-                    faults=[a for a in result.answers if a.status=='execution_error']
-                    recoverable=[a for a in faults if _retryable_answer(a)]
-                    if candidate and recoverable and len(recoverable)==len(faults):
-                        result,_=await batched_fault_retry(
-                            pipeline,sampled,spec,self.config,
-                            Path(td)/case.id/'answers',recoverable)
-                faults=[a for a in result.answers if a.status=='execution_error']
+                    pipeline = Pipeline(
+                        client,
+                        Path(td),
+                        frozen_snapshot=None
+                        if self.snapshot_root is None
+                        else self.snapshot_root / case.id,
+                        graph_builder=self.graph_builder,
+                    )
+                    result = await pipeline.run(sampled, spec, self.config)
+                    faults = [a for a in result.answers if a.status == "execution_error"]
+                    recoverable = [a for a in faults if _retryable_answer(a)]
+                    if candidate and recoverable and len(recoverable) == len(faults):
+                        result, _ = await batched_fault_retry(
+                            pipeline,
+                            sampled,
+                            spec,
+                            self.config,
+                            Path(td) / case.id / "answers",
+                            recoverable,
+                        )
+                faults = [a for a in result.answers if a.status == "execution_error"]
                 if candidate and faults:
-                    return (f'候选冒烟执行故障 {len(faults)}/{len(result.answers)}: '
-                            + str(faults[0].error)[:200])
-                if len(faults)*3>=len(result.answers)*2:
-                    return f'冒烟执行错误达 {len(faults)}/{len(result.answers)}（≥2/3，系统性破绽）: '+str(faults[0].error)[:200]
-                if not any(a.status in ('answered','abstained') for a in result.answers):
-                    return '冒烟题无任何有效作答'
+                    return (
+                        f"候选冒烟执行故障 {len(faults)}/{len(result.answers)}: "
+                        + str(faults[0].error)[:200]
+                    )
+                if len(faults) * 3 >= len(result.answers) * 2:
+                    return (
+                        f"冒烟执行错误达 {len(faults)}/{len(result.answers)}（≥2/3，系统性破绽）: "
+                        + str(faults[0].error)[:200]
+                    )
+                if not any(a.status in ("answered", "abstained") for a in result.answers):
+                    return "冒烟题无任何有效作答"
                 # 冒烟判题（任务层注入的冻结判题原语，训练集金标对机械门合法可见）：
                 # 保证能答对，至少 1/3 precise。无注入时退化为「存在有效作答」检查。
                 if self.smoke_judge is not None:
-                    verdict=await self.smoke_judge(client,case,result.answers)
-                    if verdict['completed']<verdict['total']:
-                        return f'冒烟判题未完成: {verdict}'
-                    if verdict['precise']<2:
-                        return f"冒烟 {verdict['total']} 题对 {verdict['precise']}（需≥2）——质量门拒绝"
-                elif not any(a.status in ('answered','abstained') for a in result.answers):
-                    return '冒烟题无任何有效作答'
+                    verdict = await self.smoke_judge(client, case, result.answers)
+                    if verdict["completed"] < verdict["total"]:
+                        return f"冒烟判题未完成: {verdict}"
+                    if verdict["precise"] < 2:
+                        return (
+                            f"冒烟 {verdict['total']} 题对 {verdict['precise']}（需≥2）——质量门拒绝"
+                        )
+                elif not any(a.status in ("answered", "abstained") for a in result.answers):
+                    return "冒烟题无任何有效作答"
             return None
-        finally: await client.aclose()
+        finally:
+            await client.aclose()
 
-    async def run(self,case_ids,spec,rounds=2,resume=False,stop_file=None,b0_gate=None,stage_gate=None,
-                  scope=()):
+    async def run(
+        self,
+        case_ids,
+        spec,
+        rounds=2,
+        resume=False,
+        stop_file=None,
+        b0_gate=None,
+        stage_gate=None,
+        scope=(),
+    ):
         """case_ids: one conversation id or a tuple; every case runs fully each round on the
         same candidate bundle. rounds=None iterates until stop_file appears. scope limits
         which asset kinds a round may patch (P first; F/S open by attribution later)."""
-        if isinstance(case_ids,str): case_ids=(case_ids,)
+        if isinstance(case_ids, str):
+            case_ids = (case_ids,)
         if not case_ids:
-            raise ValueError('Training split needs at least one case')
-        if rounds is not None and (type(rounds) is not int or rounds<0):
-            raise ValueError('Rounds must be a nonnegative integer or None for unbounded iteration')
-        self.verify();cases=[self.adapter.generation_input(c) for c in case_ids]
-        self.root.mkdir(parents=True,exist_ok=True)
-        declaration={'cases':list(case_ids),'case_fingerprint':digest([c.to_dict() for c in cases]),
-                     'aggregation':'sum',
-                     'task':spec.declaration(),'config':self.config.to_dict(),
-                     'connection':transport_identity(type('Connection',(),{'cfg':self.connection_config})()),
-                     'policy':asdict(self.policy),'frozen_files':self.frozen,
-                     'seed_assets':[str(self.seed_assets)] if getattr(self,'seed_assets',None) else [],
-                     'scope':list(scope or ()),
-                     'source_layers':sorted({b.source.kind for case in cases for b in case.corpus}),
-                     'snapshots':({c.id:(self.snapshot_root/c.id/'manifest.json').read_text()
-                                   for c in cases} if self.snapshot_root is not None else {}),
-                     'dynamic_trial':self.dynamic_trial}
-        if self.optimization_mode=='wiki':
-            declaration['optimization']={'mode':'wiki','maintenance_call_limit':self.wiki_call_limit}
-        if self.round_deadline_s is not None or self.proposal_attempts!=ADMISSION_ATTEMPTS:
-            declaration['round_controls']={'deadline_s':self.round_deadline_s,
-                                           'proposal_attempts':self.proposal_attempts}
+            raise ValueError("Training split needs at least one case")
+        if rounds is not None and (type(rounds) is not int or rounds < 0):
+            raise ValueError("Rounds must be a nonnegative integer or None for unbounded iteration")
+        self.verify()
+        cases = [self.adapter.generation_input(c) for c in case_ids]
+        self.root.mkdir(parents=True, exist_ok=True)
+        declaration = {
+            "cases": list(case_ids),
+            "case_fingerprint": digest([c.to_dict() for c in cases]),
+            "aggregation": "sum",
+            "task": spec.declaration(),
+            "config": self.config.to_dict(),
+            "connection": transport_identity(
+                type("Connection", (), {"cfg": self.connection_config})()
+            ),
+            "policy": asdict(self.policy),
+            "frozen_files": self.frozen,
+            "seed_assets": [str(self.seed_assets)] if getattr(self, "seed_assets", None) else [],
+            "scope": list(scope or ()),
+            "source_layers": sorted({b.source.kind for case in cases for b in case.corpus}),
+            "snapshots": (
+                {c.id: (self.snapshot_root / c.id / "manifest.json").read_text() for c in cases}
+                if self.snapshot_root is not None
+                else {}
+            ),
+            "dynamic_trial": self.dynamic_trial,
+        }
+        if self.optimization_mode == "wiki":
+            declaration["optimization"] = {
+                "mode": "wiki",
+                "maintenance_call_limit": self.wiki_call_limit,
+            }
+        if self.round_deadline_s is not None or self.proposal_attempts != ADMISSION_ATTEMPTS:
+            declaration["round_controls"] = {
+                "deadline_s": self.round_deadline_s,
+                "proposal_attempts": self.proposal_attempts,
+            }
         if self.graph_builder is not None:
-            declaration['graph_mode']='frozen-memory-rebuilt-graph'
+            declaration["graph_mode"] = "frozen-memory-rebuilt-graph"
         if self.validation_plan is not None:
-            declaration['validation']={'case_fingerprint':digest(self.validation_plan['case'].to_dict()),
-                                       'policy':asdict(self.validation_plan['policy'])}
-        declaration=json.loads(json.dumps(declaration,ensure_ascii=False))
-        experiment_path=self.root/'experiment.json'
+            declaration["validation"] = {
+                "case_fingerprint": digest(self.validation_plan["case"].to_dict()),
+                "policy": asdict(self.validation_plan["policy"]),
+            }
+        declaration = json.loads(json.dumps(declaration, ensure_ascii=False))
+        experiment_path = self.root / "experiment.json"
         if experiment_path.exists():
-            recorded=json.loads(experiment_path.read_text())
+            recorded = json.loads(experiment_path.read_text())
             # 兼容旧声明：rounds 已移出身份（2026-10-06 缺口①修复——轮数是预算
             # 上限不是数据身份）；旧运行的 wiki/检查点身份仍按冻结纪律校验。
-            recorded.pop('rounds',None)
-            if not resume or recorded!=declaration:
-                raise ValueError('Existing experiment requires explicit resume with exactly the same identity')
-            if 'rounds' in json.loads(experiment_path.read_text()):
+            recorded.pop("rounds", None)
+            if not resume or recorded != declaration:
+                raise ValueError(
+                    "Existing experiment requires explicit resume with exactly the same identity"
+                )
+            if "rounds" in json.loads(experiment_path.read_text()):
                 # 旧格式迁移：校验通过后落盘新形态，旧键不再残留
-                atomic_json(experiment_path,declaration)
-        else: atomic_json(experiment_path,declaration)
-        wiki=(WikiMaintainer(self.root,digest(declaration),self._client,self.config,self.wiki_call_limit)
-              if self.optimization_mode=='wiki' else None)
+                atomic_json(experiment_path, declaration)
+        else:
+            atomic_json(experiment_path, declaration)
+        wiki = (
+            WikiMaintainer(
+                self.root, digest(declaration), self._client, self.config, self.wiki_call_limit
+            )
+            if self.optimization_mode == "wiki"
+            else None
+        )
         if wiki is not None:
             wiki.reconcile()
         try:
-            bundle_path=self.root/'B0'/'assets'
-            if (bundle_path/'manifest.json').exists(): bundle=KernelBundle(bundle_path)
-            elif getattr(self,'seed_assets',None) is not None:
+            bundle_path = self.root / "B0" / "assets"
+            if (bundle_path / "manifest.json").exists():
+                bundle = KernelBundle(bundle_path)
+            elif getattr(self, "seed_assets", None) is not None:
                 # seed-assets 入口（缺口③修复，2026-10-06）：从锁定 bundle 直接锚定
                 # B0（跳过冷启动引导），准入/冒烟/评分门槛原样作用——种子资产不豁免
                 # 任何检查；Wiki 仍从零开始（跨运行经验不导入）。
                 import shutil
-                seed=Path(self.seed_assets)
-                seeded=KernelBundle(seed)  # 构造即校验 manifest/资产
-                bundle_path.parent.mkdir(parents=True,exist_ok=True)
-                shutil.copytree(seed,bundle_path)
-                bundle=KernelBundle(bundle_path)
-                atomic_json(self.root/'B0'/'seed.json',{'source':str(seed),
-                    'version':seeded.version})
+
+                seed = Path(self.seed_assets)
+                seeded = KernelBundle(seed)  # 构造即校验 manifest/资产
+                bundle_path.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copytree(seed, bundle_path)
+                bundle = KernelBundle(bundle_path)
+                atomic_json(
+                    self.root / "B0" / "seed.json", {"source": str(seed), "version": seeded.version}
+                )
             else:
-                client=self._client('B0')
+                client = self._client("B0")
+
                 def trial_record(report):
-                    path=self.root/'B0'/'bootstrap-trials'/f"{digest(report)}.json"
-                    atomic_json(path,report)
+                    path = self.root / "B0" / "bootstrap-trials" / f"{digest(report)}.json"
+                    atomic_json(path, report)
+
                 try:
-                    bundle=await AssetBootstrapper().initialize(
-                        cases,spec,client,self.config,bundle_path,
+                    bundle = await AssetBootstrapper().initialize(
+                        cases,
+                        spec,
+                        client,
+                        self.config,
+                        bundle_path,
                         structure_sample=self.bootstrap_context,
                         trial_graph=self.bootstrap_trial_graph,
                         snapshot_root=self.snapshot_root,
                         trial_record=trial_record if wiki else None,
-                        trial_supply=(self._dynamic_trial_graphs if self.dynamic_trial
-                                      else (self._rebuild_trial_supply
-                                            if self.graph_builder is not None
-                                            and self.snapshot_root is not None else None)))
+                        trial_supply=(
+                            self._dynamic_trial_graphs
+                            if self.dynamic_trial
+                            else (
+                                self._rebuild_trial_supply
+                                if self.graph_builder is not None and self.snapshot_root is not None
+                                else None
+                            )
+                        ),
+                    )
                 except Exception as exc:
                     if wiki is not None:
                         await self._wiki_bootstrap_trials(wiki)
-                        call_path=self.root/'B0'/'bootstrap-call.json'
-                        saved=json.loads(call_path.read_text()) if call_path.exists() else {}
-                        await wiki.record('B0','bootstrap_failure',{
-                            'error':f'{type(exc).__name__}: {exc}'[:1500],
-                            'protocol_events':[
-                                {k:e.get(k) for k in ('attempt','status','error')}
-                                for e in saved.get('events',())]},
-                            scope='trial',source=str(call_path),infer=True)
+                        call_path = self.root / "B0" / "bootstrap-call.json"
+                        saved = json.loads(call_path.read_text()) if call_path.exists() else {}
+                        await wiki.record(
+                            "B0",
+                            "bootstrap_failure",
+                            {
+                                "error": f"{type(exc).__name__}: {exc}"[:1500],
+                                "protocol_events": [
+                                    {k: e.get(k) for k in ("attempt", "status", "error")}
+                                    for e in saved.get("events", ())
+                                ],
+                            },
+                            scope="trial",
+                            source=str(call_path),
+                            infer=True,
+                        )
                     raise
                 finally:
                     await client.aclose()
             if wiki is not None:
                 await self._wiki_bootstrap_trials(wiki)
-            if self.snapshot_root is not None or self.bootstrap_trial_graph is not None \
-                    or self.dynamic_trial:
-                b0_report=self.root/'B0'/'admission.json'
-                b0_snapshot=self.root/'B0'/'optimization'/'admission.json'
-                prior=(json.loads(b0_snapshot.read_text()) if b0_snapshot.exists() else {})
+            if (
+                self.snapshot_root is not None
+                or self.bootstrap_trial_graph is not None
+                or self.dynamic_trial
+            ):
+                b0_report = self.root / "B0" / "admission.json"
+                b0_snapshot = self.root / "B0" / "optimization" / "admission.json"
+                prior = json.loads(b0_snapshot.read_text()) if b0_snapshot.exists() else {}
                 try:
-                    if not (wiki is not None and self._wiki_report_valid(prior,bundle)):
-                        await self._preflight(bundle,spec,cases[0].questions[0],cases)
+                    if not (wiki is not None and self._wiki_report_valid(prior, bundle)):
+                        await self._preflight(bundle, spec, cases[0].questions[0], cases)
                 finally:
                     if wiki is not None and b0_report.exists():
-                        if not b0_snapshot.exists() or not self._wiki_report_valid(prior,bundle):
-                            fresh=json.loads(b0_report.read_text())
-                            fresh.pop('smoke',None)
-                            atomic_json(b0_snapshot,fresh)
-                        await wiki.record('B0','admission',json.loads(b0_snapshot.read_text()),
-                                          source=str(b0_snapshot),scope='admission')
-            if stage_gate is not None: stage_gate('B0')
+                        if not b0_snapshot.exists() or not self._wiki_report_valid(prior, bundle):
+                            fresh = json.loads(b0_report.read_text())
+                            fresh.pop("smoke", None)
+                            atomic_json(b0_snapshot, fresh)
+                        await wiki.record(
+                            "B0",
+                            "admission",
+                            json.loads(b0_snapshot.read_text()),
+                            source=str(b0_snapshot),
+                            scope="admission",
+                        )
+            if stage_gate is not None:
+                stage_gate("B0")
             if self.snapshot_root is not None or self.dynamic_trial:
-                recorded=(json.loads((self.root/'B0'/'admission.json').read_text())
-                          if (self.root/'B0'/'admission.json').exists() else {})
-                if wiki is not None and self._wiki_report_valid(recorded,bundle,smoke=True):
-                    smoke_error=None
+                recorded = (
+                    json.loads((self.root / "B0" / "admission.json").read_text())
+                    if (self.root / "B0" / "admission.json").exists()
+                    else {}
+                )
+                if wiki is not None and self._wiki_report_valid(recorded, bundle, smoke=True):
+                    smoke_error = None
                 else:
-                    smoke_started=time.monotonic()
-                    smoke_error=await self._smoke_gate(cases,spec.with_bundle(bundle))
-                    self._record_smoke(bundle,smoke_error,time.monotonic()-smoke_started)
+                    smoke_started = time.monotonic()
+                    smoke_error = await self._smoke_gate(cases, spec.with_bundle(bundle))
+                    self._record_smoke(bundle, smoke_error, time.monotonic() - smoke_started)
                 if wiki is not None:
-                    report=json.loads((self.root/'B0'/'admission.json').read_text())
-                    await wiki.record('B0','smoke',report.get('smoke',{}),
-                                      source=str(self.root/'B0'/'admission.json'),scope='smoke')
+                    report = json.loads((self.root / "B0" / "admission.json").read_text())
+                    await wiki.record(
+                        "B0",
+                        "smoke",
+                        report.get("smoke", {}),
+                        source=str(self.root / "B0" / "admission.json"),
+                        scope="smoke",
+                    )
                 if smoke_error:
-                    summary={'status':'blocked_b0','reason':'smoke gate: 3 题全灭（确定性缺陷）',
-                             'smoke_error':smoke_error,'rounds':[],'adopted_version':None}
-                    atomic_json(self.root/'summary.json',summary)
-                    raise ValueError('冒烟门拒绝（全量提交前 3 题全灭）: '+smoke_error)
-            results,baseline=await self._stage('B0',cases,spec.with_bundle(bundle))
+                    summary = {
+                        "status": "blocked_b0",
+                        "reason": "smoke gate: 3 题全灭（确定性缺陷）",
+                        "smoke_error": smoke_error,
+                        "rounds": [],
+                        "adopted_version": None,
+                    }
+                    atomic_json(self.root / "summary.json", summary)
+                    raise ValueError("冒烟门拒绝（全量提交前 3 题全灭）: " + smoke_error)
+            results, baseline = await self._stage("B0", cases, spec.with_bundle(bundle))
             if wiki is not None:
-                raw=training_feedback(cases,results,_per_case_feedback_facts(self.root,'B0',cases),
-                                      baseline,active_stages=pipeline_active_stages(self.snapshot_root))
-                await wiki.record('B0','formal',{**safe_feedback(raw),**asset_evidence(bundle),
-                                  **_wiki_training_evidence(cases,results,diagnostics=
-                                      _per_case_feedback_facts(self.root,'B0',cases))},category='strategy',
-                                  scope='formal',training_ids=[
-                                      tid for case in cases for tid in question_identity(case)],
-                                  source=str(self.root/'B0'/'stage.json'),infer=True)
+                raw = training_feedback(
+                    cases,
+                    results,
+                    _per_case_feedback_facts(self.root, "B0", cases),
+                    baseline,
+                    active_stages=pipeline_active_stages(self.snapshot_root),
+                )
+                await wiki.record(
+                    "B0",
+                    "formal",
+                    {
+                        **safe_feedback(raw),
+                        **asset_evidence(bundle),
+                        **_wiki_training_evidence(
+                            cases,
+                            results,
+                            diagnostics=_per_case_feedback_facts(self.root, "B0", cases),
+                        ),
+                    },
+                    category="strategy",
+                    scope="formal",
+                    training_ids=[tid for case in cases for tid in question_identity(case)],
+                    source=str(self.root / "B0" / "stage.json"),
+                    infer=True,
+                )
             if b0_gate is not None and not b0_gate(baseline):
-                summary={'status':'blocked_b0','reason':'baseline gate rejected the B0 evaluation',
-                         'baseline':baseline.to_dict(),'rounds':[],'adopted_version':None}
-                atomic_json(self.root/'summary.json',summary)
-                print(json.dumps({'stage':'B0','status':'blocked_b0'},ensure_ascii=False),flush=True)
+                summary = {
+                    "status": "blocked_b0",
+                    "reason": "baseline gate rejected the B0 evaluation",
+                    "baseline": baseline.to_dict(),
+                    "rounds": [],
+                    "adopted_version": None,
+                }
+                atomic_json(self.root / "summary.json", summary)
+                print(
+                    json.dumps({"stage": "B0", "status": "blocked_b0"}, ensure_ascii=False),
+                    flush=True,
+                )
                 return summary
-            adopted=self.revisions.publish(bundle,self.root/'published',{'accepted':True,'reasons':['initial_validated_baseline']})
+            adopted = self.revisions.publish(
+                bundle,
+                self.root / "published",
+                {"accepted": True, "reasons": ["initial_validated_baseline"]},
+            )
             # 新模式验证基线（recheck4）：B0 对固定验证题建基线；候选轮的验证只回
             # 聚合选版指标进决策与 Wiki（逐题 gold/答案/诊断不进提案器）。
-            val_case=None;val_baseline=None;val_history={}
+            val_case = None
+            val_baseline = None
+            val_history = {}
             if self.validation_plan is not None:
-                val_case=self.validation_plan['case']
-                _,val_baseline=await self._stage('B0-val',(val_case,),spec.with_bundle(bundle))
-                val_history['B0']=val_baseline.to_dict()
-                atomic_json(self.root/'validation.json',val_history)
+                val_case = self.validation_plan["case"]
+                _, val_baseline = await self._stage("B0-val", (val_case,), spec.with_bundle(bundle))
+                val_history["B0"] = val_baseline.to_dict()
+                atomic_json(self.root / "validation.json", val_history)
             # The stage whose evaluation currently backs `baseline`/`results`: proposals must
             # read diagnostics from THERE, never from the round being proposed (it has not
             # run yet). A rejected candidate leaves it unchanged.
-            evidence='B0'
-            decisions=[];stopped=False
-            n=0
+            evidence = "B0"
+            decisions = []
+            stopped = False
+            n = 0
             while True:
                 # Recorded decisions are always restored first — a STOP signal (or a rounds
                 # cap) must never truncate history that already happened.
-                next_decision=self.root/f'R{n+1}'/'decision.json'
+                next_decision = self.root / f"R{n + 1}" / "decision.json"
                 if next_decision.exists():
-                    n+=1
-                    self.verify();name=f'R{n}';stage=self.root/name
-                    decision=json.loads(next_decision.read_text());decisions.append(decision)
-                    if self.validation_plan is not None and decision.get('validation'):
-                        val_history[name]=decision['validation']
-                        atomic_json(self.root/'validation.json',val_history)
+                    n += 1
+                    self.verify()
+                    name = f"R{n}"
+                    stage = self.root / name
+                    decision = json.loads(next_decision.read_text())
+                    decisions.append(decision)
+                    if self.validation_plan is not None and decision.get("validation"):
+                        val_history[name] = decision["validation"]
+                        atomic_json(self.root / "validation.json", val_history)
                     if wiki is not None:
-                        if decision.get('candidate') is not None:
+                        if decision.get("candidate") is not None:
                             await self._wiki_formal_from_disk(
-                                wiki,name,cases,decision['candidate'])
-                        formal_entry=next((e for e in reversed(wiki._wiki()['entries'])
-                            if e['stage']==name and e['kind']=='formal'),None)
-                        await wiki.record(name,'decision',{**self._wiki_decision_facts(decision),
-                            **(formal_entry['facts'] if formal_entry else {})},
-                                          training_ids=[tid for case in cases for tid in question_identity(case)],
-                                          category='runtime' if decision.get('status') in ('validation_failed','round_timeout')
-                                          else 'strategy',
-                                          scope='admission' if decision.get('status') in ('validation_failed','round_timeout')
-                                          else 'formal',
-                                          source=str(next_decision),
-                                          infer=decision.get('status') not in ('validation_failed','round_timeout'))
-                    if decision['accepted']:
-                        adopted=KernelBundle(stage/'candidate'/'bundle')
-                        baseline=EvaluationResult(**decision['candidate'])
+                                wiki, name, cases, decision["candidate"]
+                            )
+                        formal_entry = next(
+                            (
+                                e
+                                for e in reversed(wiki._wiki()["entries"])
+                                if e["stage"] == name and e["kind"] == "formal"
+                            ),
+                            None,
+                        )
+                        await wiki.record(
+                            name,
+                            "decision",
+                            {
+                                **self._wiki_decision_facts(decision),
+                                **(formal_entry["facts"] if formal_entry else {}),
+                            },
+                            training_ids=[tid for case in cases for tid in question_identity(case)],
+                            category="runtime"
+                            if decision.get("status") in ("validation_failed", "round_timeout")
+                            else "strategy",
+                            scope="admission"
+                            if decision.get("status") in ("validation_failed", "round_timeout")
+                            else "formal",
+                            source=str(next_decision),
+                            infer=decision.get("status")
+                            not in ("validation_failed", "round_timeout"),
+                        )
+                    if decision["accepted"]:
+                        adopted = KernelBundle(stage / "candidate" / "bundle")
+                        baseline = EvaluationResult(**decision["candidate"])
                         if self.validation_plan is not None:
-                            if not decision.get('validation'):
-                                raise ValueError('Accepted round is missing validation scores')
-                            val_baseline=EvaluationResult(**decision['validation'])
-                        evidence=name  # 恢复同样以最后采纳版本的评测为准
+                            if not decision.get("validation"):
+                                raise ValueError("Accepted round is missing validation scores")
+                            val_baseline = EvaluationResult(**decision["validation"])
+                        evidence = name  # 恢复同样以最后采纳版本的评测为准
                         # The publish pointer must follow the restored adoption (B0 was
                         # re-published above during resume), atomically and idempotently.
-                        self.revisions.publish(adopted,self.root/'published',decision)
+                        self.revisions.publish(adopted, self.root / "published", decision)
                         # Needed as feedback for the next round even when restored.
-                        if stage_gate is not None: stage_gate(name)
-                        results,_=await self._stage(name,cases,spec.with_bundle(adopted))
+                        if stage_gate is not None:
+                            stage_gate(name)
+                        results, _ = await self._stage(name, cases, spec.with_bundle(adopted))
                     continue
-                if stop_file is not None and Path(stop_file).exists(): stopped=True; break
+                if stop_file is not None and Path(stop_file).exists():
+                    stopped = True
+                    break
                 # 轮数口径（缺口①修复，2026-10-06）：rounds＝**完整计分轮**上限——
                 # 超时/准入耗尽/服务中断的迭代如实记录但不占轮数，循环继续到凑满；
                 # 2×迭代上限兜底防死循环。旧模式（无验证计划）维持迭代数口径不变。
                 if rounds is not None:
-                    if self.validation_plan is None and n>=rounds: break
+                    if self.validation_plan is None and n >= rounds:
+                        break
                     if self.validation_plan is not None:
-                        scored=sum(1 for d in decisions
-                                   if (d.get('candidate') or {}).get('metrics'))
-                        if scored>=rounds or n>=rounds*2: break
-                n+=1
-                self.verify();name=f'R{n}';stage=self.root/name
-                round_started=time.time()
-                budget_path=stage/'round-budget.json'
-                remaining=None
+                        scored = sum(
+                            1 for d in decisions if (d.get("candidate") or {}).get("metrics")
+                        )
+                        if scored >= rounds or n >= rounds * 2:
+                            break
+                n += 1
+                self.verify()
+                name = f"R{n}"
+                stage = self.root / name
+                round_started = time.time()
+                budget_path = stage / "round-budget.json"
+                remaining = None
                 if self.round_deadline_s is not None:
                     if budget_path.exists():
-                        budget=json.loads(budget_path.read_text())
-                        if budget['limit_s']!=self.round_deadline_s:
-                            raise ValueError('Resumed round budget changed')
+                        budget = json.loads(budget_path.read_text())
+                        if budget["limit_s"] != self.round_deadline_s:
+                            raise ValueError("Resumed round budget changed")
                     else:
-                        budget={'limit_s':self.round_deadline_s,'started_at':round_started,
-                                'deadline_at':round_started+self.round_deadline_s}
-                        atomic_json(budget_path,budget)
-                    round_started=budget['started_at']
-                    remaining=min(self.round_deadline_s,budget['deadline_at']-time.time())
-                self._round_deadline=(time.monotonic()+max(0,remaining)
-                                      if remaining is not None else None)
-                previous_validation=val_baseline
-                decision_count=len(decisions)
-                deadline_token=ROUND_DEADLINE.set(self._round_deadline)
+                        budget = {
+                            "limit_s": self.round_deadline_s,
+                            "started_at": round_started,
+                            "deadline_at": round_started + self.round_deadline_s,
+                        }
+                        atomic_json(budget_path, budget)
+                    round_started = budget["started_at"]
+                    remaining = min(self.round_deadline_s, budget["deadline_at"] - time.time())
+                self._round_deadline = (
+                    time.monotonic() + max(0, remaining) if remaining is not None else None
+                )
+                previous_validation = val_baseline
+                decision_count = len(decisions)
+                deadline_token = ROUND_DEADLINE.set(self._round_deadline)
                 try:
-                    if remaining is not None and remaining<=0:
-                        raise TimeoutError('Resumed round budget exhausted')
-                    async with asyncio.timeout(remaining) if remaining is not None else nullcontext():
-                        decision_path=stage/'decision.json'
-                        candidate_path=stage/'candidate'/'bundle'
-                        if (candidate_path/'manifest.json').exists():
-                            candidate=KernelBundle(candidate_path)
+                    if remaining is not None and remaining <= 0:
+                        raise TimeoutError("Resumed round budget exhausted")
+                    async with (
+                        asyncio.timeout(remaining) if remaining is not None else nullcontext()
+                    ):
+                        decision_path = stage / "decision.json"
+                        candidate_path = stage / "candidate" / "bundle"
+                        if (candidate_path / "manifest.json").exists():
+                            candidate = KernelBundle(candidate_path)
                             # 恢复已有候选同样过预检＋冒烟（评审三）：不能仅凭 manifest 存在就跳过验证
-                            recorded=self.root/name/'candidate'/'admission.json'
-                            saved=json.loads(recorded.read_text()) if recorded.exists() else {}
-                            if not (wiki is not None and self._wiki_report_valid(saved,candidate)):
-                                await self._preflight(candidate,spec,cases[0].questions[0],cases,
-                                                _failed_tool_params(results))
+                            recorded = self.root / name / "candidate" / "admission.json"
+                            saved = json.loads(recorded.read_text()) if recorded.exists() else {}
+                            if not (wiki is not None and self._wiki_report_valid(saved, candidate)):
+                                await self._preflight(
+                                    candidate,
+                                    spec,
+                                    cases[0].questions[0],
+                                    cases,
+                                    _failed_tool_params(results),
+                                )
                             if (self.snapshot_root is not None or self.dynamic_trial) and not (
-                                    wiki is not None and self._wiki_report_valid(saved,candidate,smoke=True)):
-                                smoke_started=time.monotonic()
-                                resume_smoke=await self._smoke_gate(cases,spec.with_bundle(candidate),candidate=True)
-                                self._record_smoke(candidate,resume_smoke,
-                                                   time.monotonic()-smoke_started)
-                                if resume_smoke: raise ValueError('恢复候选冒烟失败: '+resume_smoke)
+                                wiki is not None
+                                and self._wiki_report_valid(saved, candidate, smoke=True)
+                            ):
+                                smoke_started = time.monotonic()
+                                resume_smoke = await self._smoke_gate(
+                                    cases, spec.with_bundle(candidate), candidate=True
+                                )
+                                self._record_smoke(
+                                    candidate, resume_smoke, time.monotonic() - smoke_started
+                                )
+                                if resume_smoke:
+                                    raise ValueError("恢复候选冒烟失败: " + resume_smoke)
                         else:
                             if wiki is not None:
                                 try:
-                                    candidate=await self._wiki_attempt(
-                                        wiki,stage,name,cases,spec,adopted,results,scope)
+                                    candidate = await self._wiki_attempt(
+                                        wiki, stage, name, cases, spec, adopted, results, scope
+                                    )
                                 except WikiAdmissionExhausted as exc:
-                                    decision={'accepted':False,'status':'validation_failed',
-                                              'reasons':[f'{type(exc).__name__}: {exc}'],
-                                              'base_version':adopted.version,'candidate':None}
-                                    atomic_json(decision_path,decision);decisions.append(decision)
-                                    await wiki.record(name,'decision',self._wiki_decision_facts(decision),
-                                                      category='runtime',scope='admission',
-                                                      source=str(decision_path))
+                                    decision = {
+                                        "accepted": False,
+                                        "status": "validation_failed",
+                                        "reasons": [f"{type(exc).__name__}: {exc}"],
+                                        "base_version": adopted.version,
+                                        "candidate": None,
+                                    }
+                                    atomic_json(decision_path, decision)
+                                    decisions.append(decision)
+                                    await wiki.record(
+                                        name,
+                                        "decision",
+                                        self._wiki_decision_facts(decision),
+                                        category="runtime",
+                                        scope="admission",
+                                        source=str(decision_path),
+                                    )
                                     continue
                             else:
-                                candidate=await self._legacy_candidate(
-                                    stage,name,cases,spec,adopted,results,baseline,evidence,scope,
-                                    decision_path,decisions,n)
-                                if candidate is None: continue
-                        if stage_gate is not None: stage_gate(name)
-                        candidate_results,candidate_scores=await self._stage(name,cases,spec.with_bundle(candidate))
-                        decision={**self.policy.decide(baseline,candidate_scores),'base_version':adopted.version,'candidate_version':candidate.version}
+                                candidate = await self._legacy_candidate(
+                                    stage,
+                                    name,
+                                    cases,
+                                    spec,
+                                    adopted,
+                                    results,
+                                    baseline,
+                                    evidence,
+                                    scope,
+                                    decision_path,
+                                    decisions,
+                                    n,
+                                )
+                                if candidate is None:
+                                    continue
+                        if stage_gate is not None:
+                            stage_gate(name)
+                        candidate_results, candidate_scores = await self._stage(
+                            name, cases, spec.with_bundle(candidate)
+                        )
+                        decision = {
+                            **self.policy.decide(baseline, candidate_scores),
+                            "base_version": adopted.version,
+                            "candidate_version": candidate.version,
+                        }
                         # 新模式：P.extract 此模式不执行——其补丁不得报告为已生效优化。
                         if self.graph_builder is not None:
-                            origin=getattr(candidate.assets,'origin',None)
-                            origin=origin if isinstance(origin,Mapping) else {}
-                            px=[p for p in origin.get('patches',())
-                                if (p.get('asset') or {}).get('kind')=='P'
-                                and (p.get('asset') or {}).get('role')=='extract']
+                            origin = getattr(candidate.assets, "origin", None)
+                            origin = origin if isinstance(origin, Mapping) else {}
+                            px = [
+                                p
+                                for p in origin.get("patches", ())
+                                if (p.get("asset") or {}).get("kind") == "P"
+                                and (p.get("asset") or {}).get("role") == "extract"
+                            ]
                             if px:
-                                decision['p_extract_not_effective']=len(px)
+                                decision["p_extract_not_effective"] = len(px)
                         # 新模式验证选版（防退化）：训练主判通过后，候选在固定验证题上聚合
                         # 指标须无故障、primary 严格升＋floor 不降（与 SelectionPolicy 同谓词，
                         # 逐候选判定）；验证退化即拒绝（训练小集收益只是继续迭代的信号）。
-                        if self.validation_plan is not None and decision['accepted']:
-                            _,val_scores=await self._stage(f'{name}-val',(val_case,),
-                                                           spec.with_bundle(candidate))
-                            policy=self.validation_plan['policy']
+                        if self.validation_plan is not None and decision["accepted"]:
+                            _, val_scores = await self._stage(
+                                f"{name}-val", (val_case,), spec.with_bundle(candidate)
+                            )
+                            policy = self.validation_plan["policy"]
                             from .policy import split_faults
-                            ext_val,det_val=split_faults(val_scores)
-                            v_failures=[]
+
+                            ext_val, det_val = split_faults(val_scores)
+                            v_failures = []
                             # 外部故障不拦（操作者指令 2026-10-07）：传输/限流族留分母、
                             # 入决策披露；确定性生成故障、非故障性缺题与评测故障照拦。
-                            if val_scores.total!=val_baseline.total \
-                                    or val_scores.completed!=val_scores.total-ext_val \
-                                    or det_val:
-                                v_failures.append('incomplete_evaluation')
+                            if (
+                                val_scores.total != val_baseline.total
+                                or val_scores.completed != val_scores.total - ext_val
+                                or det_val
+                            ):
+                                v_failures.append("incomplete_evaluation")
                             if val_scores.evaluation_faults:
-                                v_failures.append('evaluation_fault')
-                            if set(val_scores.metrics)!=set(val_baseline.metrics):
-                                v_failures.append('metric_contract_changed')
+                                v_failures.append("evaluation_fault")
+                            if set(val_scores.metrics) != set(val_baseline.metrics):
+                                v_failures.append("metric_contract_changed")
                             if not v_failures:
-                                if val_scores.metrics.get(policy.primary,-1) \
-                                        <= val_baseline.metrics.get(policy.primary,-1):
-                                    v_failures.append('primary_not_strictly_improved')
-                                if val_scores.metrics.get(policy.floor,-1) \
-                                        < val_baseline.metrics.get(policy.floor,-1):
-                                    v_failures.append('metric_decreased:'+policy.floor)
+                                if val_scores.metrics.get(
+                                    policy.primary, -1
+                                ) <= val_baseline.metrics.get(policy.primary, -1):
+                                    v_failures.append("primary_not_strictly_improved")
+                                if val_scores.metrics.get(
+                                    policy.floor, -1
+                                ) < val_baseline.metrics.get(policy.floor, -1):
+                                    v_failures.append("metric_decreased:" + policy.floor)
                             # 外部故障披露放 decision 顶层：validation 字典必须保持
                             # EvaluationResult 形状（resume 处 EvaluationResult(**d) 重建）。
-                            decision['validation']={'metrics':plain(dict(val_scores.metrics)),
-                                'total':val_scores.total,'completed':val_scores.completed,
-                                'generation_faults':val_scores.generation_faults,
-                                'evaluation_faults':val_scores.evaluation_faults}
+                            decision["validation"] = {
+                                "metrics": plain(dict(val_scores.metrics)),
+                                "total": val_scores.total,
+                                "completed": val_scores.completed,
+                                "generation_faults": val_scores.generation_faults,
+                                "evaluation_faults": val_scores.evaluation_faults,
+                            }
                             if ext_val:
-                                decision['validation_external_faults']=ext_val
-                            val_history[name]=val_scores.to_dict()
-                            atomic_json(self.root/'validation.json',val_history)
+                                decision["validation_external_faults"] = ext_val
+                            val_history[name] = val_scores.to_dict()
+                            atomic_json(self.root / "validation.json", val_history)
                             if v_failures:
-                                decision['accepted']=False
-                                decision['reasons']=[*decision['reasons'],
-                                                     *(f'validation_{r}' for r in v_failures)]
+                                decision["accepted"] = False
+                                decision["reasons"] = [
+                                    *decision["reasons"],
+                                    *(f"validation_{r}" for r in v_failures),
+                                ]
                             else:
-                                val_baseline=val_scores
-                        decision['round_elapsed_s']=round(time.time()-round_started,1)
+                                val_baseline = val_scores
+                        decision["round_elapsed_s"] = round(time.time() - round_started, 1)
                         # 保持旧循环的落盘顺序：Wiki 中断后可从正式决策补写经验。
                         # 有整轮预算时推迟决策落盘，防 Wiki 超时留下可采纳记录。
                         if self.round_deadline_s is None:
-                            atomic_json(decision_path,decision);decisions.append(decision)
+                            atomic_json(decision_path, decision)
+                            decisions.append(decision)
                         if wiki is not None:
-                            raw=training_feedback(cases,candidate_results,
-                                _per_case_feedback_facts(self.root,name,cases),candidate_scores,
-                                active_stages=pipeline_active_stages(self.snapshot_root))
-                            formal_facts={**safe_feedback(raw),**asset_evidence(adopted,candidate),
-                                **_wiki_training_evidence(cases,candidate_results,results,
-                                    _per_case_feedback_facts(self.root,name,cases))}
-                            if decision.get('validation'):
-                                formal_facts['validation']=decision['validation']  # 聚合指标
-                            if decision.get('p_extract_not_effective'):
-                                formal_facts['p_extract_not_effective']=decision['p_extract_not_effective']
-                            await wiki.record(name,'formal',formal_facts,category='strategy',
-                                scope='formal',training_ids=[
-                                    tid for case in cases for tid in question_identity(case)],
-                                source=str(stage/'stage.json'))
-                            await wiki.record(name,'decision',{**self._wiki_decision_facts(decision),
-                                **formal_facts},training_ids=[tid for case in cases for tid in question_identity(case)],
-                                category='strategy',scope='formal',source=str(decision_path),infer=True)
-                        if self._round_deadline is not None and time.monotonic()>=self._round_deadline:
-                            raise TimeoutError('Round deadline exceeded before publication')
-                        decision['round_elapsed_s']=round(time.time()-round_started,1)
+                            raw = training_feedback(
+                                cases,
+                                candidate_results,
+                                _per_case_feedback_facts(self.root, name, cases),
+                                candidate_scores,
+                                active_stages=pipeline_active_stages(self.snapshot_root),
+                            )
+                            formal_facts = {
+                                **safe_feedback(raw),
+                                **asset_evidence(adopted, candidate),
+                                **_wiki_training_evidence(
+                                    cases,
+                                    candidate_results,
+                                    results,
+                                    _per_case_feedback_facts(self.root, name, cases),
+                                ),
+                            }
+                            if decision.get("validation"):
+                                formal_facts["validation"] = decision["validation"]  # 聚合指标
+                            if decision.get("p_extract_not_effective"):
+                                formal_facts["p_extract_not_effective"] = decision[
+                                    "p_extract_not_effective"
+                                ]
+                            await wiki.record(
+                                name,
+                                "formal",
+                                formal_facts,
+                                category="strategy",
+                                scope="formal",
+                                training_ids=[
+                                    tid for case in cases for tid in question_identity(case)
+                                ],
+                                source=str(stage / "stage.json"),
+                            )
+                            await wiki.record(
+                                name,
+                                "decision",
+                                {**self._wiki_decision_facts(decision), **formal_facts},
+                                training_ids=[
+                                    tid for case in cases for tid in question_identity(case)
+                                ],
+                                category="strategy",
+                                scope="formal",
+                                source=str(decision_path),
+                                infer=True,
+                            )
+                        if (
+                            self._round_deadline is not None
+                            and time.monotonic() >= self._round_deadline
+                        ):
+                            raise TimeoutError("Round deadline exceeded before publication")
+                        decision["round_elapsed_s"] = round(time.time() - round_started, 1)
                         if self.round_deadline_s is not None:
-                            atomic_json(decision_path,decision);decisions.append(decision)
-                        if decision['accepted']:
-                            adopted=self.revisions.publish(candidate,self.root/'published',decision)
-                            baseline=candidate_scores;results=candidate_results
-                            evidence=name  # 后续提案的诊断跟随新采纳版本
-                        print(json.dumps({'stage':name,'accepted':decision['accepted'],'reasons':decision['reasons']},ensure_ascii=False),flush=True)
+                            atomic_json(decision_path, decision)
+                            decisions.append(decision)
+                        if decision["accepted"]:
+                            adopted = self.revisions.publish(
+                                candidate, self.root / "published", decision
+                            )
+                            baseline = candidate_scores
+                            results = candidate_results
+                            evidence = name  # 后续提案的诊断跟随新采纳版本
+                        print(
+                            json.dumps(
+                                {
+                                    "stage": name,
+                                    "accepted": decision["accepted"],
+                                    "reasons": decision["reasons"],
+                                },
+                                ensure_ascii=False,
+                            ),
+                            flush=True,
+                        )
                 except TimeoutError:
-                    if self._round_deadline is None or time.monotonic()<self._round_deadline:
+                    if self._round_deadline is None or time.monotonic() < self._round_deadline:
                         raise
                     del decisions[decision_count:]
-                    val_baseline=previous_validation
-                    decision={'accepted':False,'status':'round_timeout',
-                              'reasons':[f'Round deadline ({self.round_deadline_s}s) exceeded'],
-                              'base_version':adopted.version,'candidate':None,
-                              'round_elapsed_s':round(time.time()-round_started,1)}
-                    atomic_json(stage/'timeout.json',decision)
-                    atomic_json(stage/'decision.json',decision);decisions.append(decision)
+                    val_baseline = previous_validation
+                    decision = {
+                        "accepted": False,
+                        "status": "round_timeout",
+                        "reasons": [f"Round deadline ({self.round_deadline_s}s) exceeded"],
+                        "base_version": adopted.version,
+                        "candidate": None,
+                        "round_elapsed_s": round(time.time() - round_started, 1),
+                    }
+                    atomic_json(stage / "timeout.json", decision)
+                    atomic_json(stage / "decision.json", decision)
+                    decisions.append(decision)
                     if wiki is not None:
-                        await wiki.record(name,'decision',self._wiki_decision_facts(decision),
-                                          category='runtime',scope='admission',
-                                          source=str(stage/'decision.json'),infer=False)
-                    print(json.dumps({'stage':name,'status':'round_timeout'},ensure_ascii=False),flush=True)
+                        await wiki.record(
+                            name,
+                            "decision",
+                            self._wiki_decision_facts(decision),
+                            category="runtime",
+                            scope="admission",
+                            source=str(stage / "decision.json"),
+                            infer=False,
+                        )
+                    print(
+                        json.dumps({"stage": name, "status": "round_timeout"}, ensure_ascii=False),
+                        flush=True,
+                    )
                 finally:
                     ROUND_DEADLINE.reset(deadline_token)
-                    self._round_deadline=None
+                    self._round_deadline = None
             self.verify()
             # 汇总训练阶段执行/评测故障：正常评分后的拒绝可完成，评分未完成必须报失败
-            unhealthy=self._stage_health()
-            summary={'status':'complete' if not unhealthy and all(d.get('status') not in ('validation_failed','round_timeout') for d in decisions) else 'failed',
-                     'unhealthy_stages':unhealthy,
-                     'stopped_by_operator':stopped,'rounds':decisions,'adopted_version':adopted.version,
-                     'adopted_scores':baseline.to_dict(),
-                     'stability':stability_metrics(self.root)}
+            unhealthy = self._stage_health()
+            summary = {
+                "status": "complete"
+                if not unhealthy
+                and all(
+                    d.get("status") not in ("validation_failed", "round_timeout") for d in decisions
+                )
+                else "failed",
+                "unhealthy_stages": unhealthy,
+                "stopped_by_operator": stopped,
+                "rounds": decisions,
+                "adopted_version": adopted.version,
+                "adopted_scores": baseline.to_dict(),
+                "stability": stability_metrics(self.root),
+            }
             if self.round_deadline_s is not None:
-                summary['completed_rounds']=sum(
-                    d.get('candidate') is not None
-                    and d.get('status') not in ('validation_failed','round_timeout')
-                    and d['candidate'].get('completed')==d['candidate'].get('total')
-                    and not d['candidate'].get('generation_faults')
-                    and not d['candidate'].get('evaluation_faults') for d in decisions)
-            atomic_json(self.root/'summary.json',summary)
+                summary["completed_rounds"] = sum(
+                    d.get("candidate") is not None
+                    and d.get("status") not in ("validation_failed", "round_timeout")
+                    and d["candidate"].get("completed") == d["candidate"].get("total")
+                    and not d["candidate"].get("generation_faults")
+                    and not d["candidate"].get("evaluation_faults")
+                    for d in decisions
+                )
+            atomic_json(self.root / "summary.json", summary)
             return summary
         except Exception as exc:
-            atomic_json(self.root/'failure.json',{'status':'failed','error':f'{type(exc).__name__}: {exc}'})
+            atomic_json(
+                self.root / "failure.json",
+                {"status": "failed", "error": f"{type(exc).__name__}: {exc}"},
+            )
             raise

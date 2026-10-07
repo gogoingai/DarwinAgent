@@ -8,6 +8,7 @@ output.json: {"per_query": [{"commonsense": {...}|null, "hard": {...}|null}...]}
 
 约束模块 import 时自行 os.chdir 与加载数据库——因此必须在本目录下启动。
 """
+
 import json
 import os
 import sys
@@ -19,6 +20,7 @@ def _ensure_gradio_stub() -> None:
     （2026-10-05 loop3 B0 评测故障：ModuleNotFoundError gradio。）"""
     import importlib.util
     import types
+
     if importlib.util.find_spec("gradio") is not None:
         return
     stub = types.ModuleType("gradio")
@@ -59,16 +61,28 @@ def main() -> None:
         except Exception as e:
             cs, hc = None, None
             hard_not_run = "error"
-            per_query.append({"commonsense": None, "hard": None, "error": f"{type(e).__name__}: {e}",
-                              "hard_not_run_reason": hard_not_run})
+            per_query.append(
+                {
+                    "commonsense": None,
+                    "hard": None,
+                    "error": f"{type(e).__name__}: {e}",
+                    "hard_not_run_reason": hard_not_run,
+                }
+            )
             continue
-        per_query.append({
-            "commonsense": {k: list(v) if isinstance(v, (tuple, list)) else v
-                            for k, v in cs.items()} if cs else None,
-            "hard": {k: list(v) if isinstance(v, (tuple, list)) else v
-                     for k, v in hc.items()} if hc else None,
-            "hard_not_run_reason": hard_not_run,
-        })
+        per_query.append(
+            {
+                "commonsense": {
+                    k: list(v) if isinstance(v, (tuple, list)) else v for k, v in cs.items()
+                }
+                if cs
+                else None,
+                "hard": {k: list(v) if isinstance(v, (tuple, list)) else v for k, v in hc.items()}
+                if hc
+                else None,
+                "hard_not_run_reason": hard_not_run,
+            }
+        )
     with open(out_path, "w") as f:
         json.dump({"per_query": per_query}, f, ensure_ascii=False)
 

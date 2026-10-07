@@ -3,6 +3,7 @@
 自 darwinagent/config.py 迁出（框架/任务分割）：构建循环规模、各环节限额、tp_root、
 语料开关、冻结策略、TP 专属 work_dir 派生路径都在这里。
 """
+
 from __future__ import annotations
 
 import os
@@ -76,14 +77,21 @@ def load_config() -> TPConfig:
         if not cfg.fast_api_key:
             raise RuntimeError(
                 "FAST_API_BASE 指向外部网关时必须在 .env 设置该网关的 FAST_API_KEY"
-                "（出于安全不回落使用智谱 key）")
+                "（出于安全不回落使用智谱 key）"
+            )
     else:
         cfg.fast_api_key = cfg.api_key
     # JDK（HermiT 依赖）：.env 提供 JAVA_HOME 时注入 PATH，所有子进程继承
     jh = os.environ.get("JAVA_HOME", "")
     if jh and Path(jh).exists():
         os.environ["PATH"] = f"{jh}/bin:" + os.environ.get("PATH", "")
-    for d in (cfg.work_dir, cfg.cache_dir, cfg.data_dir, cfg.build_dir,
-              cfg.final_dir, cfg.inference_dir):
+    for d in (
+        cfg.work_dir,
+        cfg.cache_dir,
+        cfg.data_dir,
+        cfg.build_dir,
+        cfg.final_dir,
+        cfg.inference_dir,
+    ):
         d.mkdir(parents=True, exist_ok=True)
     return cfg

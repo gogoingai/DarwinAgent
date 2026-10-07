@@ -1,6 +1,7 @@
 """图构建与合并：键签名（类型+主键）折叠 → 边端点重连 → 去重。
 
 EntityCandidate/RelationCandidate 是建图输入契约（框架层）；具体抽取在各任务模块。"""
+
 from __future__ import annotations
 
 import json
@@ -41,13 +42,13 @@ class GraphValidationError(ValueError):
 
 def node_id(etype: str, key: dict) -> str:
     # Structured boundaries prevent delimiter collisions. Values remain typed.
-    payload = [[str(k), v]
-               for k, v in sorted(key.items())]
+    payload = [[str(k), v] for k, v in sorted(key.items())]
     return f"{etype}::" + json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
 
 
 def _typed(value, dtype):
     import math
+
     if value is None:
         return None
     if dtype == "string":
@@ -73,6 +74,7 @@ def _typed(value, dtype):
         raise GraphValidationError("Expected bool")
     if dtype == "date":
         from datetime import date
+
         return date.fromisoformat(str(value)).isoformat()
     raise GraphValidationError(f"Unknown dtype: {dtype}")
 
@@ -126,8 +128,11 @@ def build_graph(entities, relations, schema, *, on_invalid="raise") -> nx.MultiD
             if current in seen:
                 continue
             seen.add(current)
-            pending.extend(ax.params["sup"] for ax in schema.axioms
-                           if ax.kind == "subclass" and ax.params.get("sub") == current)
+            pending.extend(
+                ax.params["sup"]
+                for ax in schema.axioms
+                if ax.kind == "subclass" and ax.params.get("sub") == current
+            )
         return False
 
     for e in entities:
@@ -135,8 +140,14 @@ def build_graph(entities, relations, schema, *, on_invalid="raise") -> nx.MultiD
             key, props = normalize(e.etype, e.key, e.properties)
             nid = node_id(e.etype, key)
             if nid not in g:
-                g.add_node(nid, etype=e.etype, __key__=json.dumps(key, ensure_ascii=False),
-                           __merged__=0, __sources__=[], **props)
+                g.add_node(
+                    nid,
+                    etype=e.etype,
+                    __key__=json.dumps(key, ensure_ascii=False),
+                    __merged__=0,
+                    __sources__=[],
+                    **props,
+                )
             cur = g.nodes[nid]
             for k, v in props.items():
                 if cur.get(k) in (None, "") and v not in (None, ""):
@@ -158,13 +169,21 @@ def build_graph(entities, relations, schema, *, on_invalid="raise") -> nx.MultiD
                 raise GraphValidationError(f"Domain/range mismatch for {r.relation}")
             head_id, tail_id = node_id(r.head[0], hk), node_id(r.tail[0], tk)
             if spec.functional and head_id in g:
-                if any(ed.get("relation") == r.relation and tgt != tail_id
-                       for _, tgt, ed in g.out_edges(head_id, data=True)):
+                if any(
+                    ed.get("relation") == r.relation and tgt != tail_id
+                    for _, tgt, ed in g.out_edges(head_id, data=True)
+                ):
                     raise GraphValidationError(f"Functional relation conflict: {r.relation}")
             for nid, etype, key in ((head_id, r.head[0], hk), (tail_id, r.tail[0], tk)):
                 if nid not in g:
-                    g.add_node(nid, etype=etype, __key__=json.dumps(key, ensure_ascii=False),
-                               __merged__=0, __sources__=[], __incomplete__=True)
+                    g.add_node(
+                        nid,
+                        etype=etype,
+                        __key__=json.dumps(key, ensure_ascii=False),
+                        __merged__=0,
+                        __sources__=[],
+                        __incomplete__=True,
+                    )
             if not g.has_edge(head_id, tail_id, key=r.relation):
                 g.add_edge(head_id, tail_id, key=r.relation, relation=r.relation)
         except (ValueError, TypeError, KeyError, IndexError) as exc:
@@ -197,7 +216,9 @@ def derive_relations(g: nx.MultiDiGraph, schema) -> nx.MultiDiGraph:
             continue
         rng = schema.entity(rel.range)
         if len(rng.primary_key) != 1:
-            raise GraphValidationError("Attribute-derived endpoints need an explicit single primary key")
+            raise GraphValidationError(
+                "Attribute-derived endpoints need an explicit single primary key"
+            )
         pk_field = rng.primary_key[0]
         dtype = next(a.dtype for a in rng.attributes if a.name == pk_field)
         attr = rel.derive.get("attr")
@@ -222,13 +243,19 @@ def derive_relations(g: nx.MultiDiGraph, schema) -> nx.MultiDiGraph:
                     continue
                 key_value = _typed(val, dtype)
                 tid = node_id(rel.range, {pk_field: key_value})
-                if rel.functional and any(ed.get("relation") == rel.name and tgt != tid
-                                          for _, tgt, ed in g.out_edges(nid, data=True)):
+                if rel.functional and any(
+                    ed.get("relation") == rel.name and tgt != tid
+                    for _, tgt, ed in g.out_edges(nid, data=True)
+                ):
                     raise GraphValidationError(f"Functional derived relation conflict: {rel.name}")
                 if not g.has_node(tid):
-                    g.add_node(tid, etype=rel.range,
-                               __key__=json.dumps({pk_field: key_value}, ensure_ascii=False),
-                               __incomplete__=True, **{pk_field: key_value})
+                    g.add_node(
+                        tid,
+                        etype=rel.range,
+                        __key__=json.dumps({pk_field: key_value}, ensure_ascii=False),
+                        __incomplete__=True,
+                        **{pk_field: key_value},
+                    )
                 if not g.has_edge(nid, tid, key=rel.name):
                     g.add_edge(nid, tid, key=rel.name, relation=rel.name, derived=True)
     return g
@@ -243,8 +270,12 @@ def graph_stats(g: nx.MultiDiGraph) -> dict:
     for _, _, ed in g.edges(data=True):
         r = ed.get("relation", "?")
         by_rel[r] = by_rel.get(r, 0) + 1
-    return {"n_nodes": g.number_of_nodes(), "n_edges": g.number_of_edges(),
-            "by_type": by_type, "by_relation": by_rel}
+    return {
+        "n_nodes": g.number_of_nodes(),
+        "n_edges": g.number_of_edges(),
+        "by_type": by_type,
+        "by_relation": by_rel,
+    }
 
 
 def graph_samples(g: nx.MultiDiGraph, per_type: int = 5) -> dict:
@@ -252,11 +283,13 @@ def graph_samples(g: nx.MultiDiGraph, per_type: int = 5) -> dict:
     for nid, nd in g.nodes(data=True):
         t = nd.get("etype", "?")
         if len(out.setdefault(t, [])) < per_type:
-            out[t].append({
-                "id": nid,
-                # node_view：主键也可见（此前 judge 以为 schema 缺字段，实为主键未物化）
-                "props": {k: v for k, v in node_view(nd).items() if v not in (None, "")},
-            })
+            out[t].append(
+                {
+                    "id": nid,
+                    # node_view：主键也可见（此前 judge 以为 schema 缺字段，实为主键未物化）
+                    "props": {k: v for k, v in node_view(nd).items() if v not in (None, "")},
+                }
+            )
     return out
 
 

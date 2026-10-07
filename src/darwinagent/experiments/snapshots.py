@@ -11,6 +11,7 @@ Integrity is by digest, the same discipline as the corpus: a snapshot never re-d
 arms differ only in assets. Validation at load time is fingerprint-based; admission-time
 quality gates (F trials against the real graph, counterexample probes, task graph C) run in
 the pipeline, not here."""
+
 from __future__ import annotations
 
 import json
@@ -18,36 +19,44 @@ from pathlib import Path
 
 
 def snapshot_manifest(snapshot_dir) -> dict:
-    path = Path(snapshot_dir) / 'manifest.json'
+    path = Path(snapshot_dir) / "manifest.json"
     if not path.exists():
-        raise ValueError(f'快照缺 manifest：{path}')
+        raise ValueError(f"快照缺 manifest：{path}")
     return json.loads(path.read_text())
 
 
 def snapshot_digest(snapshot_dir) -> str:
     manifest = snapshot_manifest(snapshot_dir)
-    for key in ('graph_digest', 'facts_digest', 'vector_digest'):
+    for key in ("graph_digest", "facts_digest", "vector_digest"):
         if not manifest.get(key):
-            raise ValueError(f'快照 manifest 缺 {key}：{snapshot_dir}')
-    return manifest['snapshot_digest']
+            raise ValueError(f"快照 manifest 缺 {key}：{snapshot_dir}")
+    return manifest["snapshot_digest"]
 
 
 def attach_vector(graph_result, snapshot_dir, embedder_factory=None):
     """Attach the frozen vector index to a GraphResult (in place) for semantic_search."""
     from darwinagent.vector import LocalVectorStore, VectorIndex
+
     snapshot_dir = Path(snapshot_dir)
     manifest = snapshot_manifest(snapshot_dir)
-    store = LocalVectorStore.load(snapshot_dir / 'vector' / 'index.jsonl')
-    if len(store) != manifest.get('n_vector_records', len(store)):
-        raise ValueError('向量索引与快照 manifest 记录数不符')
+    store = LocalVectorStore.load(snapshot_dir / "vector" / "index.jsonl")
+    if len(store) != manifest.get("n_vector_records", len(store)):
+        raise ValueError("向量索引与快照 manifest 记录数不符")
     if embedder_factory is None:
+
         def embedder_factory():
             from darwinagent.vector import load_embedder
-            return load_embedder(cache_path=snapshot_dir / 'vector' / 'embed_cache.json')
+
+            return load_embedder(cache_path=snapshot_dir / "vector" / "embed_cache.json")
+
     # GraphResult is frozen; the vector handle is attached through the dataclass back door.
-    object.__setattr__(graph_result, 'vector',
-                       VectorIndex.attach(store, embedder_factory(),
-                                          id_field=manifest.get('memory_id_field', '编号')))
+    object.__setattr__(
+        graph_result,
+        "vector",
+        VectorIndex.attach(
+            store, embedder_factory(), id_field=manifest.get("memory_id_field", "编号")
+        ),
+    )
     return graph_result
 
 
@@ -65,16 +74,18 @@ def load_frozen_graph(snapshot_dir, corpus):
 
     snapshot_dir = Path(snapshot_dir)
     manifest = snapshot_manifest(snapshot_dir)
-    payload = json.loads((snapshot_dir / 'graph.json').read_text())
-    if digest(payload) != manifest['graph_digest']:
-        raise ValueError('快照图指纹不符（graph.json 与 manifest 不一致）')
-    graph = GraphResult(nx.freeze(load_graph(snapshot_dir / 'graph.json')),
-                        MappingProxyType({b.source.id: b for b in corpus}),
-                        diagnostics=(manifest,),
-                        vector=None)
+    payload = json.loads((snapshot_dir / "graph.json").read_text())
+    if digest(payload) != manifest["graph_digest"]:
+        raise ValueError("快照图指纹不符（graph.json 与 manifest 不一致）")
+    graph = GraphResult(
+        nx.freeze(load_graph(snapshot_dir / "graph.json")),
+        MappingProxyType({b.source.id: b for b in corpus}),
+        diagnostics=(manifest,),
+        vector=None,
+    )
     known_sources = set(graph.sources)
     for _nid, nd in graph.graph.nodes(data=True):
         # 空来源（无来源派生事实）允许并在 manifest 披露；未知来源一律拒绝。
-        if set(nd.get('__sources__', [])) - known_sources:
-            raise ValueError('快照图节点含未登记来源（导入改写不完整）')
+        if set(nd.get("__sources__", [])) - known_sources:
+            raise ValueError("快照图节点含未登记来源（导入改写不完整）")
     return graph

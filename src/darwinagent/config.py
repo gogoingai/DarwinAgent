@@ -1,4 +1,5 @@
 """Task-independent model connections, execution limits, and artifact paths."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -9,23 +10,27 @@ PACKAGE_ROOT = Path(__file__).resolve().parent
 # Framework roles; application-specific roles are injected by adapters.
 MODEL_ROLES: dict[str, str] = {
     # Generic environment configuration gives every tier the same model.
-    "extraction": "middle", "tools": "middle", "answer": "strong", "review": "strong",
-    "bootstrap": "strong", "proposal": "strong",
+    "extraction": "middle",
+    "tools": "middle",
+    "answer": "strong",
+    "review": "strong",
+    "bootstrap": "strong",
+    "proposal": "strong",
     "wiki_maintainer": "strong",
-    "schema": "strong",      # P1 需求分析 / P2 模式草拟
-    "func_gen": "strong",    # P4 函数生成（含能力规划）
-    "judicator": "strong",   # P6 评判器
-    "kg": "fast",            # P3 建图抽取
-    "react": "fast",         # P5 ReAct 执行
-    "slots": "fast",         # extract_runtime_slots 槽位提取
-    "plan_repair": "fast",   # 计划格式修复 / salvage
-
+    "schema": "strong",  # P1 需求分析 / P2 模式草拟
+    "func_gen": "strong",  # P4 函数生成（含能力规划）
+    "judicator": "strong",  # P6 评判器
+    "kg": "fast",  # P3 建图抽取
+    "react": "fast",  # P5 ReAct 执行
+    "slots": "fast",  # extract_runtime_slots 槽位提取
+    "plan_repair": "fast",  # 计划格式修复 / salvage
 }
 
 
 @dataclass(frozen=True)
 class RunConfig:
     """Engineering policy, frozen before a baseline; never an optimization asset."""
+
     concurrency: int = 4
     extraction_batch_chars: int = 400
     extraction_bisect_depth: int = 2
@@ -52,18 +57,34 @@ class RunConfig:
     proposal_role: str = "proposal"
 
     def __post_init__(self):
-        for key in ("concurrency", "extraction_batch_chars", "extraction_bisect_depth", "extraction_max_tokens",
-                    "protocol_attempts", "answer_attempts",
-                    "tool_steps", "calls_per_question", "max_tokens", "function_steps", "result_bytes", "vector_k"):
+        for key in (
+            "concurrency",
+            "extraction_batch_chars",
+            "extraction_bisect_depth",
+            "extraction_max_tokens",
+            "protocol_attempts",
+            "answer_attempts",
+            "tool_steps",
+            "calls_per_question",
+            "max_tokens",
+            "function_steps",
+            "result_bytes",
+            "vector_k",
+        ):
             if type(getattr(self, key)) is not int or getattr(self, key) <= 0:
                 raise ValueError(f"{key} must be a positive integer")
         if self.retrieval_mode not in ("agentic", "vector_once"):
             raise ValueError("retrieval_mode must be 'agentic' or 'vector_once'")
-        if self.function_timeout_s <= 0 or not 0 <= self.temperature <= 2 or not 0 <= self.extraction_temperature <= 2:
+        if (
+            self.function_timeout_s <= 0
+            or not 0 <= self.temperature <= 2
+            or not 0 <= self.extraction_temperature <= 2
+        ):
             raise ValueError("Invalid execution limits")
 
     def to_dict(self):
         from dataclasses import asdict
+
         return asdict(self)
 
 
@@ -92,10 +113,12 @@ class Config:
     work_dir: Path = field(default_factory=lambda: Path.cwd() / "runs")
 
     # Legacy default limits; applications register explicit namespace scopes.
-    limits: dict = field(default_factory=lambda: {
-        "build_round_calls": 600,      # 单轮 LLM 调用上限
-        "inference_calls_per_q": 60,   # 单测试题上限
-    })
+    limits: dict = field(
+        default_factory=lambda: {
+            "build_round_calls": 600,  # 单轮 LLM 调用上限
+            "inference_calls_per_q": 60,  # 单测试题上限
+        }
+    )
 
     role_tiers: dict[str, str] = field(default_factory=lambda: dict(MODEL_ROLES))
     namespace_limits: dict[str, int] = field(default_factory=dict)
@@ -113,14 +136,20 @@ class Config:
     @classmethod
     def from_env(cls, *, work_dir=None):
         import os
+
         model = os.environ.get("DARWINAGENT_MODEL", "")
-        return cls(api_base_url=os.environ.get("DARWINAGENT_BASE_URL", ""),
-                   api_key=os.environ.get("DARWINAGENT_API_KEY", ""),
-                   model_strong=model, model_middle=model, model_fast=model,
-                   work_dir=Path(work_dir) if work_dir is not None else Path.cwd()/"runs")
+        return cls(
+            api_base_url=os.environ.get("DARWINAGENT_BASE_URL", ""),
+            api_key=os.environ.get("DARWINAGENT_API_KEY", ""),
+            model_strong=model,
+            model_middle=model,
+            model_fast=model,
+            work_dir=Path(work_dir) if work_dir is not None else Path.cwd() / "runs",
+        )
 
     def validate_model(self):
         from urllib.parse import urlparse
+
         url = urlparse(self.api_base_url)
         if url.scheme not in ("http", "https") or not url.netloc:
             raise ValueError("Set DARWINAGENT_BASE_URL to your OpenAI-compatible API base URL")
@@ -139,8 +168,10 @@ class Config:
         tier = self.tier_for(role)
         if tier is None:
             raise ValueError(f"unknown LLM role: {role}")
-        if tier == "strong": return self.model_strong
-        if tier == "middle": return self.model_middle or self.model_strong
+        if tier == "strong":
+            return self.model_strong
+        if tier == "middle":
+            return self.model_middle or self.model_strong
         return self.model_fast or self.model_strong
 
     # ---- 框架派生路径 ----

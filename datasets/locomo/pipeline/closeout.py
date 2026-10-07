@@ -9,6 +9,7 @@
 用法：
   uv run python -m datasets.locomo.pipeline.closeout conv-44 full
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -21,7 +22,7 @@ from .data import load_conversation
 from darwinagent.llm.client import LLMClient
 
 CLOSEOUT_DIR_NAME = "closeout"
-THRESHOLD_PER_100 = 6.0          # 北极星：评测外 ≤ 6 题 / 100 题
+THRESHOLD_PER_100 = 6.0  # 北极星：评测外 ≤ 6 题 / 100 题
 
 # 冻结的归因判定提示词（诊断用，不参与任何优化）
 ATTR_SYSTEM = "你是评测归因审计员，只输出合法 JSON。你的判定用于工程收口，必须保守。"
@@ -81,24 +82,34 @@ async def classify_one(client: LLMClient, conv, f: dict, ns: str) -> dict:
     """单题归因：确定性规则优先，模糊交 LLM（冻结提示词）。"""
     # 确定性：执行故障一定是系统侧
     if f.get("attribution", "").startswith("执行故障"):
-        return {"idx": f["idx"], "category": f.get("category"),
-                "verdict": "评测外", "kind": "execution",
-                "evidence": f.get("attribution", "")}
+        return {
+            "idx": f["idx"],
+            "category": f.get("category"),
+            "verdict": "评测外",
+            "kind": "execution",
+            "evidence": f.get("attribution", ""),
+        }
     dia_ids = f.get("evidence") or []
     if isinstance(dia_ids, str):
         dia_ids = [dia_ids]
     prompt = ATTR_TEMPLATE.format(
-        question=f.get("question", ""), gold=f.get("gold", ""),
+        question=f.get("question", ""),
+        gold=f.get("gold", ""),
         pred=(f.get("pred") or "")[:600],
         judge_reason=(f.get("judge_reason") or "")[:400],
         attribution=f.get("attribution", ""),
         transcript=_transcript_slice(conv, dia_ids),
     )
     r = await client.chat(
-        role="locomo_judge", temperature=0.0, max_tokens=1024, json_mode=True,
-        namespace=ns, messages=[{"role": "system", "content": ATTR_SYSTEM},
-                                {"role": "user", "content": prompt}])
+        role="locomo_judge",
+        temperature=0.0,
+        max_tokens=1024,
+        json_mode=True,
+        namespace=ns,
+        messages=[{"role": "system", "content": ATTR_SYSTEM}, {"role": "user", "content": prompt}],
+    )
     import re
+
     try:
         m = re.search(r"\{.*\}", r.content, re.S)
         o = json.loads(m.group(0)) if m else {}
@@ -111,27 +122,36 @@ async def classify_one(client: LLMClient, conv, f: dict, ns: str) -> dict:
         mk = re.search(r'"kind"\s*:\s*"([^"]+)"', c)
         me = re.search(r'"evidence"\s*:\s*"([^"]*)"', c)
         if mv and mk and mv.group(1) in ("评测内", "评测外") and mk.group(1):
-            o = {"verdict": mv.group(1), "kind": mk.group(1),
-                 "evidence": me.group(1) if me else ""}
+            o = {"verdict": mv.group(1), "kind": mk.group(1), "evidence": me.group(1) if me else ""}
         else:
             o = {}
     verdict = o.get("verdict")
     kind = o.get("kind", "")
     if verdict not in ("评测内", "评测外") or not kind:
         # 解析失败 → 保守算评测外
-        return {"idx": f["idx"], "category": f.get("category"),
-                "verdict": "评测外", "kind": "phrasing_or_reasoning",
-                "evidence": "归因解析失败，保守计系统侧: " + (r.content or "")[:120]}
-    return {"idx": f["idx"], "category": f.get("category"),
-            "verdict": verdict, "kind": kind,
-            "evidence": (o.get("evidence") or "")[:240]}
+        return {
+            "idx": f["idx"],
+            "category": f.get("category"),
+            "verdict": "评测外",
+            "kind": "phrasing_or_reasoning",
+            "evidence": "归因解析失败，保守计系统侧: " + (r.content or "")[:120],
+        }
+    return {
+        "idx": f["idx"],
+        "category": f.get("category"),
+        "verdict": verdict,
+        "kind": kind,
+        "evidence": (o.get("evidence") or "")[:240],
+    }
 
 
 async def run(conv_id: str, tag: str) -> dict:
     lc = load_locomo_config()
     conv = load_conversation(lc.dataset_path, conv_id)
     out_dir = lc.runs_dir / conv_id / tag
-    failures = [json.loads(l) for l in (out_dir / "failures.jsonl").read_text().splitlines() if l.strip()]
+    failures = [
+        json.loads(l) for l in (out_dir / "failures.jsonl").read_text().splitlines() if l.strip()
+    ]
     report = json.loads((out_dir / "report.json").read_text())
     client = LLMClient(lc.cfg)
     ns = f"{conv_id.replace('-', '')[:4]}_closeout_attr"
@@ -147,7 +167,10 @@ async def run(conv_id: str, tag: str) -> dict:
     n = report.get("n", 0)
     threshold = round(THRESHOLD_PER_100 * n / 100)
     out = {
-        "conv": conv_id, "tag": tag, "n": n, "exact": report.get("exact"),
+        "conv": conv_id,
+        "tag": tag,
+        "n": n,
+        "exact": report.get("exact"),
         "system_side_count": len(system_side),
         "threshold": threshold,
         "met": len(system_side) <= threshold,
@@ -159,16 +182,34 @@ async def run(conv_id: str, tag: str) -> dict:
     dest = lc.runs_dir / CLOSEOUT_DIR_NAME
     dest.mkdir(parents=True, exist_ok=True)
     (dest / f"closeout_{conv_id}_{tag}.json").write_text(
-        json.dumps(out, ensure_ascii=False, indent=2))
-    print(json.dumps({k: out[k] for k in
-                      ("conv", "tag", "n", "exact", "system_side_count",
-                       "threshold", "met", "system_side_by_kind", "eval_side_by_kind")},
-                     ensure_ascii=False, indent=2))
+        json.dumps(out, ensure_ascii=False, indent=2)
+    )
+    print(
+        json.dumps(
+            {
+                k: out[k]
+                for k in (
+                    "conv",
+                    "tag",
+                    "n",
+                    "exact",
+                    "system_side_count",
+                    "threshold",
+                    "met",
+                    "system_side_by_kind",
+                    "eval_side_by_kind",
+                )
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+    )
     return out
 
 
 def _count_by(items: list[dict]) -> dict:
     from collections import Counter
+
     return dict(Counter(i["kind"] for i in items))
 
 

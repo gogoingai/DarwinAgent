@@ -5,6 +5,7 @@ P.extract 补丁标注未生效、验证聚合选版（退化即拒、聚合落�
 重建图供给缓存（同 S 复用、S 变重建）。真实模型短验由
 docs/diagnostics/wiki-fastloop-20261005/ 驱动脚本承担。
 """
+
 import asyncio
 import contextlib
 import io
@@ -21,8 +22,7 @@ from darwinagent.kernel import TaskSpec
 from darwinagent.kernel.registration import load_assets
 from darwinagent.contracts import EvaluationResult
 from tests.fixtures import TASK
-from tests.integration.test_experiment import (LedgerRecordedClient,
-                                               RecordedExperiment, client)
+from tests.integration.test_experiment import LedgerRecordedClient, RecordedExperiment, client
 from tests.integration.test_wiki_optimization import WikiRecordedExperiment
 
 
@@ -41,9 +41,14 @@ class FastLoopExperiment(WikiRecordedExperiment):
 
 def _run(runner, rounds=1):
     with contextlib.redirect_stdout(io.StringIO()):
-        return asyncio.run(runner.run(
-            runner.case.id, TaskSpec.load(TASK / "task.yaml"), rounds=rounds,
-            scope=("S", "F", "C", "P")))
+        return asyncio.run(
+            runner.run(
+                runner.case.id,
+                TaskSpec.load(TASK / "task.yaml"),
+                rounds=rounds,
+                scope=("S", "F", "C", "P"),
+            )
+        )
 
 
 class RoundBudgetTests(unittest.TestCase):
@@ -63,8 +68,9 @@ class RoundBudgetTests(unittest.TestCase):
             decision = summary["rounds"][0]
             self.assertFalse(decision["accepted"])
             self.assertEqual(decision["status"], "round_timeout")
-            self.assertTrue(any("Round deadline" in r for r in decision["reasons"]),
-                            decision["reasons"])
+            self.assertTrue(
+                any("Round deadline" in r for r in decision["reasons"]), decision["reasons"]
+            )
             self.assertTrue((root / "R1/timeout.json").exists())
             self.assertFalse((root / "R1/stage.json").exists())
             self.assertEqual(summary["completed_rounds"], 0)
@@ -105,28 +111,34 @@ class ValidationSelectionTests(unittest.TestCase):
                     base = name == "B0-val"
                     precise = 2 if base else 1
                     return EvaluationResult(
-                        {"original_precise": precise, "original_lenient": precise},
-                        2, 2, 0, 0)
-                return EvaluationResult(
-                    {"precise": 0 if name == "B0" else 1}, 1, 1, 0, 0)
+                        {"original_precise": precise, "original_lenient": precise}, 2, 2, 0, 0
+                    )
+                return EvaluationResult({"precise": 0 if name == "B0" else 1}, 1, 1, 0, 0)
+
         return _Eval()
 
     def test_validation_regression_rejects_and_aggregates_persisted(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            runner = FastLoopExperiment(root, evaluator=self._stub_evaluator,
-                                        validation_plan={
-                                            "case": None,  # 占位：run 前替换为 recorded case
-                                            "policy": __import__(
-                                                "darwinagent.experiments.spec", fromlist=["SelectionPolicy"]
-                                            ).SelectionPolicy("original_precise", "original_lenient")})
+            runner = FastLoopExperiment(
+                root,
+                evaluator=self._stub_evaluator,
+                validation_plan={
+                    "case": None,  # 占位：run 前替换为 recorded case
+                    "policy": __import__(
+                        "darwinagent.experiments.spec", fromlist=["SelectionPolicy"]
+                    ).SelectionPolicy("original_precise", "original_lenient"),
+                },
+            )
             runner.validation_plan["case"] = runner.case
             summary = _run(runner, rounds=1)
             decision = summary["rounds"][0]
             # 训练主判本应接受（B0 precise 0 → R1 precise 1），验证退化（2→1）翻转拒绝
             self.assertFalse(decision["accepted"], decision)
-            self.assertTrue(any(str(r).startswith("validation_") for r in decision["reasons"]),
-                            decision["reasons"])
+            self.assertTrue(
+                any(str(r).startswith("validation_") for r in decision["reasons"]),
+                decision["reasons"],
+            )
             self.assertEqual(decision["validation"]["metrics"]["original_precise"], 1)
             history = json.loads((root / "validation.json").read_text())
             self.assertIn("B0", history)
@@ -134,8 +146,9 @@ class ValidationSelectionTests(unittest.TestCase):
             self.assertEqual(history["B0"]["metrics"]["original_precise"], 2)
             # 聚合进 wiki formal（无逐题诊断）
             wiki = json.loads((root / "optimization/wiki.json").read_text())
-            formal = next(e for e in wiki["entries"]
-                          if e["stage"] == "R1" and e["kind"] == "formal")
+            formal = next(
+                e for e in wiki["entries"] if e["stage"] == "R1" and e["kind"] == "formal"
+            )
             self.assertIn("validation", formal["facts"])
             self.assertEqual(formal["facts"]["validation"]["metrics"]["original_precise"], 1)
 
@@ -155,34 +168,53 @@ class ValidationSelectionTests(unittest.TestCase):
                             precise = 1 if name == "B0-val" else 2
                             return EvaluationResult(
                                 {"original_precise": precise, "original_lenient": precise},
-                                2, 2, 0, 0)
+                                2,
+                                2,
+                                0,
+                                0,
+                            )
                         return EvaluationResult(
-                            {"precise": 0 if name == "B0" else int(name[1:])}, 2, 2, 0, 0)
+                            {"precise": 0 if name == "B0" else int(name[1:])}, 2, 2, 0, 0
+                        )
+
                 return _Eval()
 
-            runner = FastLoopExperiment(root, evaluator=improving, validation_plan={
-                "case": None,
-                "policy": __import__("darwinagent.experiments.spec",
-                                     fromlist=["SelectionPolicy"]).SelectionPolicy(
-                                         "original_precise", "original_lenient")})
+            runner = FastLoopExperiment(
+                root,
+                evaluator=improving,
+                validation_plan={
+                    "case": None,
+                    "policy": __import__(
+                        "darwinagent.experiments.spec", fromlist=["SelectionPolicy"]
+                    ).SelectionPolicy("original_precise", "original_lenient"),
+                },
+            )
             runner.validation_plan["case"] = runner.case
             summary = _run(runner, rounds=2)
             self.assertTrue(summary["rounds"][0]["accepted"], summary["rounds"][0])
             self.assertFalse(summary["rounds"][1]["accepted"])
             # Simulate interruption between the R2 score and terminal decision.
             # R2 must still compare with adopted R1 validation, not B0.
-            (root / 'R2/decision.json').unlink()
-            restored = FastLoopExperiment(root, evaluator=improving,
-                                         validation_plan=runner.validation_plan)
+            (root / "R2/decision.json").unlink()
+            restored = FastLoopExperiment(
+                root, evaluator=improving, validation_plan=runner.validation_plan
+            )
             with contextlib.redirect_stdout(io.StringIO()):
-                resumed = asyncio.run(restored.run(
-                    restored.case.id, TaskSpec.load(TASK / "task.yaml"),
-                    rounds=2, resume=True, scope=("S", "F", "C", "P")))
-            self.assertFalse(resumed['rounds'][1]['accepted'])
-            self.assertIn('validation_primary_not_strictly_improved',
-                          resumed['rounds'][1]['reasons'])
+                resumed = asyncio.run(
+                    restored.run(
+                        restored.case.id,
+                        TaskSpec.load(TASK / "task.yaml"),
+                        rounds=2,
+                        resume=True,
+                        scope=("S", "F", "C", "P"),
+                    )
+                )
+            self.assertFalse(resumed["rounds"][1]["accepted"])
+            self.assertIn(
+                "validation_primary_not_strictly_improved", resumed["rounds"][1]["reasons"]
+            )
             history = json.loads((root / "validation.json").read_text())
-            self.assertEqual(history['R1']['metrics']['original_precise'], 2)
+            self.assertEqual(history["R1"]["metrics"]["original_precise"], 2)
 
 
 class PExtractMarkingTests(unittest.TestCase):
@@ -196,25 +228,39 @@ class PExtractMarkingTests(unittest.TestCase):
                 def _client(self, stage):
                     transport = super()._client(stage)
                     replies = getattr(transport, "replies", None)
-                    if (stage.startswith("R") and replies and "proposal" in replies
-                            and not self.patched):
+                    if (
+                        stage.startswith("R")
+                        and replies
+                        and "proposal" in replies
+                        and not self.patched
+                    ):
                         self.patched = True
-                        pointer = json.loads(
-                            (self.root / "published/current.json").read_text())
+                        pointer = json.loads((self.root / "published/current.json").read_text())
                         from darwinagent.kernel import KernelBundle
+
                         base = KernelBundle(self.root / "published" / pointer["path"])
                         asset = next(a for a in base.assets.assets if a.role == "extract")
                         updated = asset.to_dict()
                         updated["content"] += "\nReweight extraction emphasis."
                         from collections import deque
                         from darwinagent.kernel.revision import training_id
-                        replies["proposal"] = deque([
-                            {"patches": [{"asset": updated,
-                                          "base_fingerprint": asset.fingerprint,
-                                          "reason": "extract emphasis",
-                                          "training_evidence": [
-                                              training_id(self.case.id,
-                                                          self.case.questions[0].id)]}]}])
+
+                        replies["proposal"] = deque(
+                            [
+                                {
+                                    "patches": [
+                                        {
+                                            "asset": updated,
+                                            "base_fingerprint": asset.fingerprint,
+                                            "reason": "extract emphasis",
+                                            "training_evidence": [
+                                                training_id(self.case.id, self.case.questions[0].id)
+                                            ],
+                                        }
+                                    ]
+                                }
+                            ]
+                        )
                     return transport
 
             runner = ExtractPatcher(root, graph_builder=object())
@@ -222,8 +268,9 @@ class PExtractMarkingTests(unittest.TestCase):
             decision = summary["rounds"][0]
             self.assertIn("p_extract_not_effective", decision, decision)
             wiki = json.loads((root / "optimization/wiki.json").read_text())
-            formal = next(e for e in wiki["entries"]
-                          if e["stage"] == "R1" and e["kind"] == "formal")
+            formal = next(
+                e for e in wiki["entries"] if e["stage"] == "R1" and e["kind"] == "formal"
+            )
             self.assertIn("p_extract_not_effective", formal["facts"])
 
 
@@ -232,6 +279,7 @@ class RebuildSupplyCacheTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             runner = FastLoopExperiment(Path(tmp), graph_builder=lambda *a: object())
             from darwinagent.kernel.registration import load_assets as la
+
             bundle = la(TASK).export(Path(tmp) / "bundle")
             calls = []
 
@@ -241,12 +289,14 @@ class RebuildSupplyCacheTests(unittest.TestCase):
 
             runner.graph_builder = counting
             from types import SimpleNamespace
+
             case = SimpleNamespace(id="conv-26")
             runner.snapshot_root = Path("tests/fixtures/locomo_snapshot")
             fake_schema = mock.MagicMock()
             fake_schema.to_yaml.return_value = "schema-v1"
-            with mock.patch("darwinagent.kernel.validation.validate_bundle",
-                            return_value=fake_schema):
+            with mock.patch(
+                "darwinagent.kernel.validation.validate_bundle", return_value=fake_schema
+            ):
                 runner._rebuild_graph_cached(bundle, case)
                 runner._rebuild_graph_cached(bundle, case)
                 self.assertEqual(len(calls), 1)  # 同 S → 复用

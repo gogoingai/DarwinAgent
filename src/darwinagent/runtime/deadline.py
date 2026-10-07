@@ -1,8 +1,9 @@
 """A round's absolute deadline, shared by async tasks and synchronous primitives."""
+
 from contextvars import ContextVar
 import time
 
-ROUND_DEADLINE = ContextVar('oak_round_deadline', default=None)
+ROUND_DEADLINE = ContextVar("oak_round_deadline", default=None)
 
 
 class RoundDeadlineExceeded(TimeoutError):
@@ -15,7 +16,7 @@ def remaining_seconds():
         return None
     remaining = deadline - time.monotonic()
     if remaining <= 0:
-        raise RoundDeadlineExceeded('Round deadline exceeded')
+        raise RoundDeadlineExceeded("Round deadline exceeded")
     return remaining
 
 

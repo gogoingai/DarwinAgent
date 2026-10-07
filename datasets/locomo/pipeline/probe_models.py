@@ -2,6 +2,7 @@
 
 用法：uv run python -m locomo.probe_models
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -16,21 +17,32 @@ async def _probe(client: LLMClient, role: str, json_mode: bool) -> dict:
     t0 = time.time()
     try:
         r = await client.chat(
-            role=role, use_cache=False, namespace=NS_PROBE, json_mode=json_mode,
-            temperature=0.0, max_tokens=512,
+            role=role,
+            use_cache=False,
+            namespace=NS_PROBE,
+            json_mode=json_mode,
+            temperature=0.0,
+            max_tokens=512,
             messages=[
                 {"role": "system", "content": "你是连通性探测助手。"},
-                {"role": "user", "content": (
-                    '回复 JSON：{"ok": true, "model": "你的模型名"}'
-                    if json_mode else "请原样回复：PONG")},
+                {
+                    "role": "user",
+                    "content": (
+                        '回复 JSON：{"ok": true, "model": "你的模型名"}'
+                        if json_mode
+                        else "请原样回复：PONG"
+                    ),
+                },
             ],
         )
-        return {"ok": bool(r.content.strip()), "model": r.model,
-                "latency_s": round(time.time() - t0, 1),
-                "reply": r.content.strip()[:120]}
+        return {
+            "ok": bool(r.content.strip()),
+            "model": r.model,
+            "latency_s": round(time.time() - t0, 1),
+            "reply": r.content.strip()[:120],
+        }
     except Exception as e:  # noqa: BLE001
-        return {"ok": False, "error": repr(e)[:300],
-                "latency_s": round(time.time() - t0, 1)}
+        return {"ok": False, "error": repr(e)[:300], "latency_s": round(time.time() - t0, 1)}
 
 
 async def main() -> None:
@@ -43,7 +55,9 @@ async def main() -> None:
     fast_json = await _probe(client, "locomo_extract", json_mode=True)
     result = {
         "ts": time.time(),
-        "strong": strong, "fast_plain": fast_plain, "fast_json": fast_json,
+        "strong": strong,
+        "fast_plain": fast_plain,
+        "fast_json": fast_json,
         "fast_ok": fast_plain.get("ok") and fast_json.get("ok"),
         "fast_model": lc.cfg.model_fast,
         "fallback_model": "glm-5.3-flash",

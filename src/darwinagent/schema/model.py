@@ -18,6 +18,7 @@
     - {kind: cardinality, relation: r, class: A, min: 1, max: 1}
     - {kind: key_functional, entity: A, key: [k1, k2]}
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -69,7 +70,7 @@ class EntityType:
 @dataclass
 class RelationType:
     name: str
-    domain: list[str]           # 允许 list（union）
+    domain: list[str]  # 允许 list（union）
     range: str
     functional: bool = False
     inverse_of: str | None = None
@@ -162,14 +163,21 @@ class Schema:
                 pk = [pk]
             pk = [str(k).strip() for k in pk]
             if not pk:
-                raise SchemaParseError(f"实体 {name!r} 缺 primary_key（论文硬规定：每个类型必须有主键）")
+                raise SchemaParseError(
+                    f"实体 {name!r} 缺 primary_key（论文硬规定：每个类型必须有主键）"
+                )
             attrs_raw = body.get("attributes") or []
             attrs = [Attribute.from_dict(a) for a in attrs_raw]
             aliases = {str(k): str(v) for k, v in (body.get("attribute_aliases") or {}).items()}
-            entities.append(EntityType(
-                name=str(name), primary_key=pk, attributes=attrs,
-                description=str(body.get("description", "")), attribute_aliases=aliases,
-            ))
+            entities.append(
+                EntityType(
+                    name=str(name),
+                    primary_key=pk,
+                    attributes=attrs,
+                    description=str(body.get("description", "")),
+                    attribute_aliases=aliases,
+                )
+            )
 
         relations: list[RelationType] = []
         for name, body in rels_raw.items():
@@ -180,17 +188,22 @@ class Schema:
             rng = str(body.get("range", "")).strip()
             if not dom or not rng:
                 raise SchemaParseError(f"关系 {name!r} 必须声明 domain 与 range（论文硬规定）")
-            relations.append(RelationType(
-                name=str(name), domain=[str(d).strip() for d in dom], range=rng,
-                functional=bool(body.get("functional", False)),
-                inverse_of=body.get("inverse_of"),
-                description=str(body.get("description", "")),
-                derive=body.get("derive") if isinstance(body.get("derive"), dict) else None,
-            ))
+            relations.append(
+                RelationType(
+                    name=str(name),
+                    domain=[str(d).strip() for d in dom],
+                    range=rng,
+                    functional=bool(body.get("functional", False)),
+                    inverse_of=body.get("inverse_of"),
+                    description=str(body.get("description", "")),
+                    derive=body.get("derive") if isinstance(body.get("derive"), dict) else None,
+                )
+            )
 
         axioms = [Axiom.from_dict(a) for a in axs_raw]
-        return cls(meta=data.get("meta") or {}, entities=entities,
-                   relations=relations, axioms=axioms)
+        return cls(
+            meta=data.get("meta") or {}, entities=entities, relations=relations, axioms=axioms
+        )
 
     # ---------- 校验 ----------
     def entity(self, name: str) -> EntityType | None:
@@ -263,9 +276,14 @@ class Schema:
             pk = ", ".join(e.primary_key)
             lines.append(f"- {e.name} (primary key: {pk})")
             if with_attrs and e.attributes:
-                lines.append(f"    attrs: " + "; ".join(f"{a.name}:{a.dtype}" for a in e.attributes))
+                lines.append(
+                    f"    attrs: " + "; ".join(f"{a.name}:{a.dtype}" for a in e.attributes)
+                )
             if e.attribute_aliases:
-                lines.append(f"    aliases: " + "; ".join(f"{k}->{v}" for k, v in e.attribute_aliases.items()))
+                lines.append(
+                    f"    aliases: "
+                    + "; ".join(f"{k}->{v}" for k, v in e.attribute_aliases.items())
+                )
         lines.append("RELATION TYPES:")
         for r in self.relations:
             dom = "|".join(r.domain)

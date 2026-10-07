@@ -6,6 +6,7 @@
   C4 全局一致性、C5 不可满足类 —— HermiT（sync_reasoner_hermit + probe individual）
 发现矛盾后：贪心删公理重推理，定位最小冲突集，渲染带反例的反馈。
 """
+
 from __future__ import annotations
 
 import multiprocessing as mp
@@ -20,7 +21,7 @@ PINPOINT_MAX_RUNS = 30
 
 @dataclass
 class OWLFinding:
-    check: str                 # disjointness | restriction | property | global | unsatisfiable | structure
+    check: str  # disjointness | restriction | property | global | unsatisfiable | structure
     entity: str | None
     message: str
     culprits: list[str] = field(default_factory=list)
@@ -41,8 +42,11 @@ def static_checks(schema: Schema) -> list[OWLFinding]:
     names = {e.name for e in schema.entities}
 
     # Subclass cycles express equivalence; they alone are not contradictions.
-    sub = {(ax.params.get("sub"), ax.params.get("sup")) for ax in schema.axioms
-           if ax.kind == "subclass"}
+    sub = {
+        (ax.params.get("sub"), ax.params.get("sup"))
+        for ax in schema.axioms
+        if ax.kind == "subclass"
+    }
 
     # disjoint 与 subclass 冲突：sub 有两个不相交的父类
     disjoint_sets: list[set[str]] = []
@@ -65,12 +69,15 @@ def static_checks(schema: Schema) -> list[OWLFinding]:
         for ds in disjoint_sets:
             hit = ps & ds
             if len(hit) >= 2:
-                findings.append(OWLFinding(
-                    "disjointness", s,
-                    f"{s} 的继承闭包 {{{', '.join(sorted(hit))}}} 被声明为互斥，{s} 不可能有实例。",
-                    culprits=[f"subclass: {s} <- {p}" for p in sorted(hit)] +
-                             [f"disjoint: {sorted(ds)}"],
-                ))
+                findings.append(
+                    OWLFinding(
+                        "disjointness",
+                        s,
+                        f"{s} 的继承闭包 {{{', '.join(sorted(hit))}}} 被声明为互斥，{s} 不可能有实例。",
+                        culprits=[f"subclass: {s} <- {p}" for p in sorted(hit)]
+                        + [f"disjoint: {sorted(ds)}"],
+                    )
+                )
 
     # 属性级：同一关系两次声明 domain 公理指向互斥类
     dom_ax: dict[str, list[str]] = {}
@@ -81,12 +88,15 @@ def static_checks(schema: Schema) -> list[OWLFinding]:
         for ds in disjoint_sets:
             hit = set(clss) & ds
             if len(hit) >= 2:
-                findings.append(OWLFinding(
-                    "property", rel,
-                    f"关系 {rel} 的 domain 公理同时指向互斥类 {sorted(hit)}。",
-                    culprits=[f"domain: {rel} -> {c}" for c in sorted(hit)] +
-                             [f"disjoint: {sorted(ds)}"],
-                ))
+                findings.append(
+                    OWLFinding(
+                        "property",
+                        rel,
+                        f"关系 {rel} 的 domain 公理同时指向互斥类 {sorted(hit)}。",
+                        culprits=[f"domain: {rel} -> {c}" for c in sorted(hit)]
+                        + [f"disjoint: {sorted(ds)}"],
+                    )
+                )
 
     # functional 关系 range 到多值实体的提示级别问题（信息性，不阻断）
     return findings
@@ -106,10 +116,14 @@ def _build_owl(schema: Schema):
         dprops: dict[str, owl.DataProperty] = {}
         for e in schema.entities:
             for a in e.attributes:
-                pyrange = {"string": str, "int": int, "float": float,
-                           "date": str, "bool": bool}[a.dtype]
-                p = type(f"{e.name}__{a.name}", (owl.DataProperty,),
-                         {"domain": [cls[e.name]], "range": [pyrange]})
+                pyrange = {"string": str, "int": int, "float": float, "date": str, "bool": bool}[
+                    a.dtype
+                ]
+                p = type(
+                    f"{e.name}__{a.name}",
+                    (owl.DataProperty,),
+                    {"domain": [cls[e.name]], "range": [pyrange]},
+                )
                 if a.name in e.primary_key and len(e.primary_key) == 1:
                     p.is_a.append(owl.FunctionalProperty)
                 dprops[f"{e.name}.{a.name}"] = p
@@ -159,7 +173,9 @@ def _build_owl(schema: Schema):
                     # 非 functional 属性必须赋列表（owlready2 语义）
                     attr = next(a for a in e.attributes if a.name == k)
                     value = {"int": 1, "float": 1.0, "bool": True}.get(attr.dtype, "x")
-                    setattr(ind, p.python_name, value if owl.FunctionalProperty in p.is_a else [value])
+                    setattr(
+                        ind, p.python_name, value if owl.FunctionalProperty in p.is_a else [value]
+                    )
             probes[e.name] = ind
     return world, onto, cls, oprops, dprops
 
@@ -171,6 +187,7 @@ def python_attr(name: str) -> str:
 
 def _hermit_consistent(world) -> bool:
     import owlready2 as owl
+
     try:
         owl.sync_reasoner_hermit(world, infer_property_values=True)
         return len(list(world.inconsistent_classes())) == 0
@@ -182,6 +199,7 @@ def _owl_worker(schema_yaml: str, q: "mp.Queue") -> None:
     """在子进程内跑完整 HermiT 检查 + pinpoint。"""
     try:
         import owlready2 as owl
+
         schema = Schema.from_yaml(schema_yaml)
         world, onto, cls, oprops, dprops = _build_owl(schema)
 
@@ -203,28 +221,35 @@ def _owl_worker(schema_yaml: str, q: "mp.Queue") -> None:
                 trial = [a for a in culprits if a != cand]
                 runs += 1
                 try:
-                    trial_schema = _schema_minus(schema, [a for a in schema.axioms
-                                                         if f"{a.kind}: {a.params}" == cand])
+                    trial_schema = _schema_minus(
+                        schema, [a for a in schema.axioms if f"{a.kind}: {a.params}" == cand]
+                    )
                     w2, *_ = _build_owl(trial_schema)
                     if _hermit_consistent(w2):
                         culprits = trial  # 删掉它就一致 → 它在冲突集中；继续收缩
                 except Exception:
                     continue
-            findings.append({
-                "check": "global", "entity": None,
-                "message": "模式全局不一致：HermiT 判定存在逻辑矛盾（probe individual 推导冲突）。",
-                "culprits": culprits,
-            })
+            findings.append(
+                {
+                    "check": "global",
+                    "entity": None,
+                    "message": "模式全局不一致：HermiT 判定存在逻辑矛盾（probe individual 推导冲突）。",
+                    "culprits": culprits,
+                }
+            )
         else:
             # 逐类查不可满足
             for e in schema.entities:
                 try:
                     if cls[e.name] in list(world.inconsistent_classes()):
-                        findings.append({
-                            "check": "unsatisfiable", "entity": e.name,
-                            "message": f"类 {e.name} 不可满足：合并公理后不可能拥有实例。",
-                            "culprits": [],
-                        })
+                        findings.append(
+                            {
+                                "check": "unsatisfiable",
+                                "entity": e.name,
+                                "message": f"类 {e.name} 不可满足：合并公理后不可能拥有实例。",
+                                "culprits": [],
+                            }
+                        )
                 except Exception:
                     pass
         q.put({"ok": True, "findings": findings, "consistent": consistent})
@@ -237,11 +262,14 @@ def _owl_worker(schema_yaml: str, q: "mp.Queue") -> None:
 
 def _schema_minus(schema: Schema, drop_axioms: list) -> Schema:
     from dataclasses import replace
+
     drop_ids = {id(a) for a in drop_axioms}
     return replace(schema, axioms=[a for a in schema.axioms if id(a) not in drop_ids])
 
 
-def hermit_checks(schema: Schema, timeout_s: int = OWL_CHECK_TIMEOUT_S) -> tuple[list[OWLFinding], bool]:
+def hermit_checks(
+    schema: Schema, timeout_s: int = OWL_CHECK_TIMEOUT_S
+) -> tuple[list[OWLFinding], bool]:
     """子进程跑 HermiT；超时强杀返回（findings 空 + hermit_ok=False 不阻断）。"""
     q: mp.Queue = mp.Queue()
     p = mp.Process(target=_owl_worker, args=(schema.to_yaml(), q), daemon=True)
@@ -250,33 +278,42 @@ def hermit_checks(schema: Schema, timeout_s: int = OWL_CHECK_TIMEOUT_S) -> tuple
     if p.is_alive():
         p.terminate()
         p.join(3)
-        return [], False       # 超时：视为"未验证"，不阻塞（记录告警由调用方做）
+        return [], False  # 超时：视为"未验证"，不阻塞（记录告警由调用方做）
     try:
         res = q.get_nowait()
     except _queue.Empty:
         return [], False
     if not res.get("ok"):
         return [], False
-    findings = [OWLFinding(f["check"], f["entity"], f["message"], f.get("culprits", []))
-                for f in res["findings"]]
+    findings = [
+        OWLFinding(f["check"], f["entity"], f["message"], f.get("culprits", []))
+        for f in res["findings"]
+    ]
     return findings, True
 
 
-def check_schema(schema: Schema, timeout_s: int = OWL_CHECK_TIMEOUT_S, *,
-                 require_hermit: bool = True) -> tuple[list[OWLFinding], bool]:
+def check_schema(
+    schema: Schema, timeout_s: int = OWL_CHECK_TIMEOUT_S, *, require_hermit: bool = True
+) -> tuple[list[OWLFinding], bool]:
     """完整验证入口：静态 + HermiT。返回 (findings, hermit_ok)。"""
     findings = [OWLFinding("structure", None, e) for e in schema.validate()]
     findings.extend(static_checks(schema))
     hermit_findings, ok = hermit_checks(schema, timeout_s)
     findings.extend(hermit_findings)
     if require_hermit and not ok:
-        findings.append(OWLFinding("unverified", None, "HermiT unavailable, failed, or timed out; schema not verified"))
+        findings.append(
+            OWLFinding(
+                "unverified", None, "HermiT unavailable, failed, or timed out; schema not verified"
+            )
+        )
     return findings, ok
 
 
 def findings_to_feedback(findings: list[OWLFinding], attempt: int) -> str:
-    lines = [f"Your draft schema (attempt {attempt}) FAILED formal validation. "
-             f"Issues found by the reasoner:"]
+    lines = [
+        f"Your draft schema (attempt {attempt}) FAILED formal validation. "
+        f"Issues found by the reasoner:"
+    ]
     for f in findings:
         lines.append(f.render())
     lines.append(

@@ -1,5 +1,7 @@
 """Historical evaluation record only. Generation uses darwinagent.agents.AnswerAgent."""
+
 from dataclasses import dataclass, field
+
 
 @dataclass
 class QAOutput:

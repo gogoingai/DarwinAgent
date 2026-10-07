@@ -9,29 +9,51 @@ from darwinagent.config import RunConfig
 from darwinagent.kernel.assets import KernelAssets
 from darwinagent.kernel.execution import KernelRuntime
 from darwinagent.agents.protocol import ProtocolError
-from tests.fixtures import spec,case,client
+from tests.fixtures import spec, case, client
 
 
 class GraphAxiomAcceptance(unittest.TestCase):
     def test_cardinality_instance_constraint_is_mandatory_and_keeps_raw(self):
         with tempfile.TemporaryDirectory() as td:
-            root=Path(td);s=spec(root/'assets')
-            assets=[replace(a,content=a.content.replace('relation_types: {}','relation_types:\n  next: {domain: Maintenance, range: Maintenance}').replace('axioms: []','axioms:\n  - {kind: cardinality, relation: next, class: Maintenance, min: 1}')) if a.kind=='S' else a for a in s.bundle.assets.assets]
-            runtime=KernelRuntime(KernelAssets(tuple(assets)).export(root/'axioms'),RunConfig())
+            root = Path(td)
+            s = spec(root / "assets")
+            assets = [
+                replace(
+                    a,
+                    content=a.content.replace(
+                        "relation_types: {}",
+                        "relation_types:\n  next: {domain: Maintenance, range: Maintenance}",
+                    ).replace(
+                        "axioms: []",
+                        "axioms:\n  - {kind: cardinality, relation: next, class: Maintenance, min: 1}",
+                    ),
+                )
+                if a.kind == "S"
+                else a
+                for a in s.bundle.assets.assets
+            ]
+            runtime = KernelRuntime(
+                KernelAssets(tuple(assets)).export(root / "axioms"), RunConfig()
+            )
             with self.assertRaises(ProtocolError) as caught:
-                asyncio.run(ExtractionAgent(runtime,client(case()),RunConfig(),'test').extract_entities(case().corpus))
-            self.assertIn('Cardinality',str(caught.exception))
+                asyncio.run(
+                    ExtractionAgent(runtime, client(case()), RunConfig(), "test").extract_entities(
+                        case().corpus
+                    )
+                )
+            self.assertIn("Cardinality", str(caught.exception))
             self.assertTrue(caught.exception.raw_outputs)
 
     def test_static_disjoint_subclasses_rejected(self):
         from darwinagent.schema.model import Schema
         from darwinagent.schema.owlcheck import static_checks
-        schema=Schema.from_yaml('''entity_types:
+
+        schema = Schema.from_yaml("""entity_types:
   A: {primary_key: [id], attributes: [{name: id, dtype: string}]}
   B: {primary_key: [id], attributes: [{name: id, dtype: string}]}
 relation_types: {}
 axioms:
   - {kind: subclass, sub: A, sup: B}
   - {kind: disjoint, classes: [A,B]}
-''')
+""")
         self.assertTrue(static_checks(schema))

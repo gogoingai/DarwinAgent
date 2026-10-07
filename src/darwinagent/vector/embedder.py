@@ -1,5 +1,6 @@
 """嵌入客户端：OpenAI 兼容 /embeddings，磁盘缓存（键含 base_url|model|text，端点或模型
 变了自动失效）。同步实现——沙箱内 F 与索引构建共用；异步路径请用 asyncio.to_thread。"""
+
 from __future__ import annotations
 
 import hashlib
@@ -17,8 +18,8 @@ class Embedder:
     base_url: str
     api_key: str
     model: str
-    dim: int = 0                                   # 0 = 首次响应后回填
-    cache_path: Path | None = None                 # None = 不落盘
+    dim: int = 0  # 0 = 首次响应后回填
+    cache_path: Path | None = None  # None = 不落盘
     _cache: dict = field(default_factory=dict, repr=False)
 
     def __post_init__(self) -> None:
@@ -27,7 +28,7 @@ class Embedder:
             if self.cache_path.exists():
                 try:
                     self._cache = json.loads(self.cache_path.read_text())
-                except Exception:                  # noqa: BLE001
+                except Exception:  # noqa: BLE001
                     self._cache = {}
 
     # ---------------------------------------------------------------- 基础
@@ -54,7 +55,7 @@ class Embedder:
                 if not self.dim and vecs:
                     self.dim = len(vecs[0])
                 return vecs
-            except Exception as e:                 # noqa: BLE001
+            except Exception as e:  # noqa: BLE001
                 remaining_seconds()
                 last_err = e
                 time.sleep(bounded_timeout(1.5 * (attempt + 1)))
@@ -85,7 +86,7 @@ class Embedder:
                 keyed.append((k, None))
                 todo.append(i)
         for j in range(0, len(todo), batch):
-            idxs = todo[j:j + batch]
+            idxs = todo[j : j + batch]
             vecs = self._request([texts[i] for i in idxs])
             for i, v in zip(idxs, vecs):
                 keyed[i] = (keyed[i][0], v)
@@ -101,8 +102,10 @@ class Embedder:
         # 并发写者各用唯一临时名，再原子改名——共享固定 .tmp 名会在并发缓存未命中时
         # 互相抢文件（conv-47 外测 17 题 FileNotFoundError 事故，2026-10-04）。
         import os, threading
+
         tmp = self.cache_path.with_name(
-            f"{self.cache_path.name}.{os.getpid()}.{threading.get_ident()}.tmp")
+            f"{self.cache_path.name}.{os.getpid()}.{threading.get_ident()}.tmp"
+        )
         tmp.write_text(json.dumps(self._cache, ensure_ascii=False))
         tmp.replace(self.cache_path)
 
@@ -111,10 +114,13 @@ def load_embedder(env=None, cache_path: Path | None = None) -> Embedder:
     """Embedder from EMBEDDING_* environment variables (the caller is responsible for
     loading .env, e.g. via darwinagent.llm.settings.load_connection)."""
     import os
+
     env = env if env is not None else os.environ
-    base, key, model = (env.get('EMBEDDING_BASE_URL', '').strip(),
-                        env.get('EMBEDDING_API_KEY', '').strip(),
-                        env.get('EMBEDDING_MODEL', '').strip())
+    base, key, model = (
+        env.get("EMBEDDING_BASE_URL", "").strip(),
+        env.get("EMBEDDING_API_KEY", "").strip(),
+        env.get("EMBEDDING_MODEL", "").strip(),
+    )
     if not (base and key and model):
-        raise RuntimeError('EMBEDDING_BASE_URL/EMBEDDING_API_KEY/EMBEDDING_MODEL 未配置')
+        raise RuntimeError("EMBEDDING_BASE_URL/EMBEDDING_API_KEY/EMBEDDING_MODEL 未配置")
     return Embedder(base_url=base, api_key=key, model=model, cache_path=cache_path)

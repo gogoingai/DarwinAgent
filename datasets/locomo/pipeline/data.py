@@ -12,6 +12,7 @@
 类别映射（对题目实测验证，非网上流传版本）：
   1=多跳  2=时间  3=开放域推理  4=单跳  5=对抗（不可回答，带陷阱答案）
 """
+
 from __future__ import annotations
 
 import json
@@ -22,23 +23,23 @@ from pathlib import Path
 from .dates import parse_cn_date, parse_session_datetime
 
 CATEGORY_MAP = {1: "多跳", 2: "时间", 3: "开放域", 4: "单跳", 5: "对抗"}
-TOPIC_CATEGORIES = {1, 2, 3, 4}          # J 口径（可回答题）
+TOPIC_CATEGORIES = {1, 2, 3, 4}  # J 口径（可回答题）
 
 
 @dataclass
 class Turn:
     speaker: str
-    dia_id: str                          # 如 "D2:3"
+    dia_id: str  # 如 "D2:3"
     text: str
-    image_caption: str = ""             # 仅评测/审计读取，不进入建图输入
-    image_query: str = ""               # 搜图意图，不是发生事实
+    image_caption: str = ""  # 仅评测/审计读取，不进入建图输入
+    image_query: str = ""  # 搜图意图，不是发生事实
 
 
 @dataclass
 class Session:
     no: int
     date_iso: date | None
-    date_raw: str                        # 原文（英文）日期串
+    date_raw: str  # 原文（英文）日期串
     turns: list[Turn] = field(default_factory=list)
 
 
@@ -47,9 +48,9 @@ class QA:
     idx: int
     question: str
     category: int
-    answer: str | int | None = None      # 对抗题为 None（judge/analyze 专用）
-    adversarial_answer: str | None = None    # 陷阱答案（judge/analyze 专用）
-    evidence: list[str] = field(default_factory=list)   # dia_id 列表（analyze 专用）
+    answer: str | int | None = None  # 对抗题为 None（judge/analyze 专用）
+    adversarial_answer: str | None = None  # 陷阱答案（judge/analyze 专用）
+    evidence: list[str] = field(default_factory=list)  # dia_id 列表（analyze 专用）
 
     @property
     def cat_name(self) -> str:
@@ -68,7 +69,7 @@ class Conversation:
     qas: list[QA] = field(default_factory=list)
     # 数据集自带的已翻译标注字段（语料所有方指示并入建图语料，评测报告须披露）
     observations: list[tuple[str, str, str]] = field(default_factory=list)  # (dia_id, 主体, 观察句)
-    events: list[tuple[str, str, str]] = field(default_factory=list)       # (日期iso, 主体, 事件句)
+    events: list[tuple[str, str, str]] = field(default_factory=list)  # (日期iso, 主体, 事件句)
 
     @property
     def speakers(self) -> list[str]:
@@ -109,28 +110,43 @@ def load_conversation(path: Path, sample_id: str) -> Conversation:
     ses_nums = sorted(
         int(k.split("_", 1)[1])
         for k in conv_d
-        if k.startswith("session_") and not k.endswith("date_time")
-        and k.split("_", 1)[1].isdigit() and conv_d[k]
+        if k.startswith("session_")
+        and not k.endswith("date_time")
+        and k.split("_", 1)[1].isdigit()
+        and conv_d[k]
     )
     for no in ses_nums:
         date_raw = conv_d.get(f"session_{no}_date_time", "")
         turns = [
-            Turn(speaker=t.get("speaker", ""), dia_id=t.get("dia_id", ""),
-                 text=t.get("text", ""), image_caption=t.get("blip_caption") or "",
-                 image_query=t.get("query") or "")
+            Turn(
+                speaker=t.get("speaker", ""),
+                dia_id=t.get("dia_id", ""),
+                text=t.get("text", ""),
+                image_caption=t.get("blip_caption") or "",
+                image_query=t.get("query") or "",
+            )
             for t in conv_d[f"session_{no}"]
             if t.get("text")
         ]
         if not turns:
             continue
-        conv.sessions.append(Session(
-            no=no, date_iso=parse_session_datetime(date_raw),
-            date_raw=date_raw, turns=turns,
-        ))
+        conv.sessions.append(
+            Session(
+                no=no,
+                date_iso=parse_session_datetime(date_raw),
+                date_raw=date_raw,
+                turns=turns,
+            )
+        )
     conv.qas = [
-        QA(idx=i, question=q["question"], category=int(q["category"]),
-           answer=q.get("answer"), adversarial_answer=q.get("adversarial_answer"),
-           evidence=list(q.get("evidence") or []))
+        QA(
+            idx=i,
+            question=q["question"],
+            category=int(q["category"]),
+            answer=q.get("answer"),
+            adversarial_answer=q.get("adversarial_answer"),
+            evidence=list(q.get("evidence") or []),
+        )
         for i, q in enumerate(raw["qa"])
     ]
     # ---- 数据集自带标注（已翻译；语料所有方指示并入建图语料，报告须披露）----

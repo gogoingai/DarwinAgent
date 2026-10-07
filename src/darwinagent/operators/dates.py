@@ -2,6 +2,7 @@
 
 全部纯函数（零 LLM）——时间题的"计算日期"工具与判题预检共用此内核。
 """
+
 from __future__ import annotations
 
 import re
@@ -10,8 +11,17 @@ from datetime import date, timedelta
 
 # ---------------------------------------------------------------- 英文会话日期
 _MONTHS_EN = {
-    "january": 1, "february": 2, "march": 3, "april": 4, "may": 5, "june": 6,
-    "july": 7, "august": 8, "september": 9, "october": 10, "november": 11,
+    "january": 1,
+    "february": 2,
+    "march": 3,
+    "april": 4,
+    "may": 5,
+    "june": 6,
+    "july": 7,
+    "august": 8,
+    "september": 9,
+    "october": 10,
+    "november": 11,
     "december": 12,
 }
 _DT_RE = re.compile(
@@ -38,11 +48,35 @@ def parse_session_datetime(raw: str) -> date | None:
 
 
 # ---------------------------------------------------------------- 中文数字
-_CN_DIGITS = {"零": 0, "一": 1, "二": 2, "两": 2, "三": 3, "四": 4,
-              "五": 5, "六": 6, "七": 7, "八": 8, "九": 9}
-_CN_MONTH_WORDS = {"一月": 1, "二月": 2, "三月": 3, "四月": 4, "五月": 5, "六月": 6,
-                   "七月": 7, "八月": 8, "九月": 9, "十月": 10, "十一月": 11, "十二月": 12,
-                   "元月": 1, "正月": 1}
+_CN_DIGITS = {
+    "零": 0,
+    "一": 1,
+    "二": 2,
+    "两": 2,
+    "三": 3,
+    "四": 4,
+    "五": 5,
+    "六": 6,
+    "七": 7,
+    "八": 8,
+    "九": 9,
+}
+_CN_MONTH_WORDS = {
+    "一月": 1,
+    "二月": 2,
+    "三月": 3,
+    "四月": 4,
+    "五月": 5,
+    "六月": 6,
+    "七月": 7,
+    "八月": 8,
+    "九月": 9,
+    "十月": 10,
+    "十一月": 11,
+    "十二月": 12,
+    "元月": 1,
+    "正月": 1,
+}
 
 
 def cn_num(s: str) -> int | None:
@@ -63,15 +97,14 @@ def cn_num(s: str) -> int | None:
         if (left and left not in _CN_DIGITS) or (right and right not in _CN_DIGITS):
             return None
         return tens * 10 + ones
-    if all(c in _CN_DIGITS for c in s) and len(s) <= 4:   # 简单连写（一三 不常见，容忍）
+    if all(c in _CN_DIGITS for c in s) and len(s) <= 4:  # 简单连写（一三 不常见，容忍）
         v = int("".join(str(_CN_DIGITS[c]) for c in s))
         return v if v < 32 else None
     return None
 
 
 # ---------------------------------------------------------------- 星期与月份
-_WEEKDAY_WORDS = {"一": 0, "二": 1, "三": 2, "四": 3, "五": 4, "六": 5,
-                  "日": 6, "天": 6}
+_WEEKDAY_WORDS = {"一": 0, "二": 1, "三": 2, "四": 3, "五": 4, "六": 5, "日": 6, "天": 6}
 
 
 def _weekday_of(s: str) -> int | None:
@@ -130,7 +163,7 @@ def resolve_relative(anchor: date, expr: str) -> tuple[str, str]:
     if m:
         base = _resolve_core(anchor, m.group(1))
         if base:
-            d = _last_weekday_before(base, 6)      # 周日=6
+            d = _last_weekday_before(base, 6)  # 周日=6
             return (d.isoformat(), "日")
     m = re.search(r"(.+?)之前的那个?(周|星期|礼拜|那?一周)", e)
     if m:
@@ -174,7 +207,7 @@ def resolve_relative(anchor: date, expr: str) -> tuple[str, str]:
 
     # 上周末/上礼拜末：锚日之前的最近一个周末（周六~周日，周粒度）
     if re.search(r"上[周礼拜]+末", e):
-        sat = _last_weekday_before(anchor, 5)      # 最近周六（周一=0…周六=5）
+        sat = _last_weekday_before(anchor, 5)  # 最近周六（周一=0…周六=5）
         return (f"{sat.isoformat()}~{(sat + timedelta(days=1)).isoformat()}", "周")
 
     # 上周/这周/下周（整周，周粒度，取周一为锚）
@@ -229,7 +262,7 @@ def _resolve_core(anchor: date, e: str) -> date | None:
         this_mon = _monday_of(anchor)
         if "下周" in e or "下星期" in e or "下礼拜" in e:
             mon = this_mon + timedelta(days=7)
-        else:                                        # 这周/本周/周X
+        else:  # 这周/本周/周X
             mon = this_mon
         return mon + timedelta(days=wd)
 
@@ -260,8 +293,9 @@ def _resolve_core(anchor: date, e: str) -> date | None:
         n = cn_num(m.group(1)) or 0
         if n < 200:
             try:
-                return date(anchor.year - n if "前" in e else anchor.year + n,
-                            anchor.month, anchor.day)
+                return date(
+                    anchor.year - n if "前" in e else anchor.year + n, anchor.month, anchor.day
+                )
             except ValueError:
                 return None
     m = re.search(r"([0-9一二两三四五六七八九十]+)\s*天[前后]", e)
@@ -293,7 +327,7 @@ def _resolve_core(anchor: date, e: str) -> date | None:
             return date(*ymd) if ymd[2] else date(ymd[0], ymd[1], 1)
         except ValueError:
             return None
-    if ymd and ymd[1]:                                # 只有 X月X日，无年
+    if ymd and ymd[1]:  # 只有 X月X日，无年
         try:
             return date(anchor.year, ymd[1], ymd[2] or 1)
         except ValueError:
@@ -343,13 +377,13 @@ def normalize_answer_text(s: str) -> str:
 
     t = _CN_MONTH_RE.sub(_mon_repl, t)
     # 中文数字日：X日/X号（≤三十一）
-    t = re.sub(r"([一二三四五六七八九十]{1,3})\s*[日号]",
-               lambda m: (f"{cn_num(m.group(1))}日"
-                          if cn_num(m.group(1)) is not None else m.group(0)),
-               t)
+    t = re.sub(
+        r"([一二三四五六七八九十]{1,3})\s*[日号]",
+        lambda m: f"{cn_num(m.group(1))}日" if cn_num(m.group(1)) is not None else m.group(0),
+        t,
+    )
     # 年月日 → y-m-d（保留可缺省成分）
-    t = re.sub(r"(\d{4})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*[日号]?",
-               r"\1-\2-\3", t)
+    t = re.sub(r"(\d{4})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*[日号]?", r"\1-\2-\3", t)
     t = re.sub(r"(\d{4})\s*年\s*(\d{1,2})\s*月", r"\1-\2", t)
     t = re.sub(r"(\d{4})\s*年", r"\1", t)
     t = re.sub(r"(\d{1,2})\s*月\s*(\d{1,2})\s*[日号]?", r"\1-\2", t)
@@ -414,11 +448,11 @@ def answer_equivalent(gold: str | int, pred: str) -> bool:
             if gv and pv and gv != pv:
                 return False
             if gv and not pv:
-                return False            # gold 有年份 pred 没有 → 交给 LLM
+                return False  # gold 有年份 pred 没有 → 交给 LLM
         return True
     # 多元素列表（、/,/;分隔）集合等价（顺序无关，元素须逐一完全一致）
     gs = {normalize_answer_text(x) for x in re.split(r"[、,，;；]", str(gold)) if x.strip()}
     ps = {normalize_answer_text(x) for x in re.split(r"[、,，;；]", str(pred)) if x.strip()}
     if gs and ps and gs == ps and len(gs) > 0:
-        return not gs & {""}            # 元素皆非空
+        return not gs & {""}  # 元素皆非空
     return False

@@ -1,4 +1,5 @@
 """OpenAI-compatible chat transport with bounded retries, cache, and attempt accounting."""
+
 from __future__ import annotations
 
 import asyncio
@@ -55,7 +56,9 @@ class LLMResult:
 class LLMClient:
     def __init__(self, cfg: Config) -> None:
         self.cfg = cfg
-        self._http_budget_path = Path(cfg.request_budget_path or (Path(cfg.work_dir)/"http_attempts.json"))
+        self._http_budget_path = Path(
+            cfg.request_budget_path or (Path(cfg.work_dir) / "http_attempts.json")
+        )
         if cfg.max_http_requests is not None and cfg.max_http_requests < 1:
             raise ValueError("max_http_requests must be positive")
         if not cfg.fast_base_url:
@@ -81,9 +84,15 @@ class LLMClient:
         # 直连不走系统代理（本地代理会吞掉国内 API 的长请求）
         def _mk(base_url: str, api_key: str) -> AsyncOpenAI:
             return AsyncOpenAI(
-                base_url=base_url, api_key=api_key, timeout=cfg.request_timeout_s, max_retries=0,
-                http_client=httpx.AsyncClient(trust_env=False, timeout=cfg.request_timeout_s,
-                    event_hooks={"request": [self._reserve_http_attempt]}),
+                base_url=base_url,
+                api_key=api_key,
+                timeout=cfg.request_timeout_s,
+                max_retries=0,
+                http_client=httpx.AsyncClient(
+                    trust_env=False,
+                    timeout=cfg.request_timeout_s,
+                    event_hooks={"request": [self._reserve_http_attempt]},
+                ),
             )
 
         self._mk = _mk
@@ -94,12 +103,17 @@ class LLMClient:
     async def _reserve_http_attempt(self, request):
         # Reserve immediately before HTTP dispatch, including retries; crash-safe and
         # shared across all role clients. No prompts or credentials enter this file.
-        if self.cfg.deadline_monotonic is not None and time.monotonic() >= self.cfg.deadline_monotonic:
+        if (
+            self.cfg.deadline_monotonic is not None
+            and time.monotonic() >= self.cfg.deadline_monotonic
+        ):
             raise BudgetExceeded("Model request deadline exceeded")
         with counter_transaction(self._http_budget_path) as counts:
             used = counts.get("attempts", 0)
             if self.cfg.max_http_requests is not None and used >= self.cfg.max_http_requests:
-                raise BudgetExceeded(f"HTTP request cap reached ({used}/{self.cfg.max_http_requests})")
+                raise BudgetExceeded(
+                    f"HTTP request cap reached ({used}/{self.cfg.max_http_requests})"
+                )
             counts["attempts"] = used + 1
 
     def http_attempts(self):
@@ -111,8 +125,10 @@ class LLMClient:
         resolved = resolve(model, self.cfg)
         site = self._sites.get(resolved.pool_id)
         if site is None:
-            site = (self._mk(resolved.base_url, resolved.api_key),
-                    asyncio.Semaphore(resolved.pool_size))
+            site = (
+                self._mk(resolved.base_url, resolved.api_key),
+                asyncio.Semaphore(resolved.pool_size),
+            )
             self._sites[resolved.pool_id] = site
         return site
 
@@ -162,9 +178,15 @@ class LLMClient:
         namespace: str = "default",
         use_cache: bool = True,
     ) -> LLMResult:
-        request = dict(role=role, messages=messages, temperature=temperature,
-                       max_tokens=max_tokens, json_mode=json_mode, namespace=namespace,
-                       use_cache=use_cache)
+        request = dict(
+            role=role,
+            messages=messages,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            json_mode=json_mode,
+            namespace=namespace,
+            use_cache=use_cache,
+        )
         deadline = self.cfg.deadline_monotonic
         if deadline is None:
             return await self._chat(**request)
@@ -177,14 +199,22 @@ class LLMClient:
         except TimeoutError:
             raise BudgetExceeded("Model request deadline exceeded") from None
 
-    async def _chat(self, *, role, messages, temperature, max_tokens, json_mode,
-                    namespace, use_cache):
+    async def _chat(
+        self, *, role, messages, temperature, max_tokens, json_mode, namespace, use_cache
+    ):
         model = self.cfg.model_for(role)
         resolved = resolve(model, self.cfg)
         thinking_off = role in THINKING_OFF_ROLES or role in self.cfg.thinking_disabled_roles
         extra_body, buffer = request_policy(resolved, thinking_off, self.cfg.reasoning_effort)
-        key = self._cache_key(model, messages, temperature, max_tokens, json_mode,
-                              base_url=resolved.base_url, extra_body=extra_body)
+        key = self._cache_key(
+            model,
+            messages,
+            temperature,
+            max_tokens,
+            json_mode,
+            base_url=resolved.base_url,
+            extra_body=extra_body,
+        )
         cache_file = self.cfg.cache_dir / namespace / f"{key}.json"
 
         async with self._budget_lock:
@@ -196,8 +226,12 @@ class LLMClient:
             try:
                 data = json.loads(cache_file.read_text())
                 return LLMResult(
-                    content=data["content"], usage=data.get("usage", {}),
-                    cache_hit=True, elapsed_s=0.0, model=model, role=role,
+                    content=data["content"],
+                    usage=data.get("usage", {}),
+                    cache_hit=True,
+                    elapsed_s=0.0,
+                    model=model,
+                    role=role,
                 )
             except Exception:
                 pass  # 缓存损坏则重打
@@ -209,16 +243,20 @@ class LLMClient:
                 async with use_sem:
                     t0 = time.time()
                     kwargs: dict[str, Any] = dict(
-                        model=model, messages=messages,
+                        model=model,
+                        messages=messages,
                         temperature=temperature,
                         # 推理模型的 reasoning 与正文共享补全预算：缓冲来自注册表
                         # （offable 已关→disabled_buffer；effort/forced→reasoning_buffer）
                         max_tokens=max_tokens + buffer,
-                        stream=True,                          # 流式：防 TUN 代理掐长连接
+                        stream=True,  # 流式：防 TUN 代理掐长连接
                         stream_options={"include_usage": True},
-                        timeout=min(self.cfg.request_timeout_s,
-                            max(0.001, self.cfg.deadline_monotonic-time.monotonic()))
-                            if self.cfg.deadline_monotonic is not None else self.cfg.request_timeout_s,
+                        timeout=min(
+                            self.cfg.request_timeout_s,
+                            max(0.001, self.cfg.deadline_monotonic - time.monotonic()),
+                        )
+                        if self.cfg.deadline_monotonic is not None
+                        else self.cfg.request_timeout_s,
                     )
                     if json_mode:
                         kwargs["response_format"] = {"type": "json_object"}
@@ -252,8 +290,12 @@ class LLMClient:
                     if reasoning_chars:
                         usage["reasoning_chars"] = reasoning_chars
                 result = LLMResult(
-                    content=content, usage=usage, cache_hit=False,
-                    elapsed_s=round(time.time() - t0, 2), model=model, role=role,
+                    content=content,
+                    usage=usage,
+                    cache_hit=False,
+                    elapsed_s=round(time.time() - t0, 2),
+                    model=model,
+                    role=role,
                 )
                 # 空正文（思考吃光预算）不入缓存，下次调用自动重试
                 if content.strip():
@@ -277,17 +319,26 @@ class LLMClient:
             except APIError as e:
                 raise self._sanitize_transport_error(e) from None
             # 指数退避 + 抖动（429 首次退避从 8s 起，避免反复撞限流）
-            base = 8.0 if (isinstance(last_err, APIStatusError)
-                           and getattr(last_err, "status_code", None) == 429) else 1.0
-            backoff = min(60.0, base * (2 ** attempt)) + random.uniform(0, 2)
+            base = (
+                8.0
+                if (
+                    isinstance(last_err, APIStatusError)
+                    and getattr(last_err, "status_code", None) == 429
+                )
+                else 1.0
+            )
+            backoff = min(60.0, base * (2**attempt)) + random.uniform(0, 2)
             self._log_retry(namespace, role, attempt, repr(last_err), backoff)
             if attempt + 1 >= self.cfg.max_retries:
                 break
-            if self.cfg.deadline_monotonic is not None and time.monotonic()+backoff >= self.cfg.deadline_monotonic:
+            if (
+                self.cfg.deadline_monotonic is not None
+                and time.monotonic() + backoff >= self.cfg.deadline_monotonic
+            ):
                 raise BudgetExceeded("Model request deadline would be exceeded by retry")
             await asyncio.sleep(backoff)
 
-        raise TransportExhausted(role,last_err) from last_err
+        raise TransportExhausted(role, last_err) from last_err
 
     def chat_sync(self, **kwargs) -> LLMResult:
         return asyncio.run(self.chat(**kwargs))
@@ -312,8 +363,11 @@ class LLMClient:
         n = self._ns_calls.get(namespace, 0)
         for scope, explicit in self.cfg.namespace_limits.items():
             if namespace == scope or namespace.startswith(scope + "_"):
-                used = sum(count for name, count in self._ns_calls.items()
-                           if name == scope or name.startswith(scope + "_"))
+                used = sum(
+                    count
+                    for name, count in self._ns_calls.items()
+                    if name == scope or name.startswith(scope + "_")
+                )
                 if used >= explicit:
                     raise BudgetExceeded(f"{scope}: {used} >= explicit_limit={explicit}")
         if namespace.startswith("r") and "_inf" not in namespace:
@@ -328,17 +382,31 @@ class LLMClient:
     async def _append_ledger(self, namespace, role, model, usage, cache_hit: bool) -> None:
         async with self._ledger_lock:
             with self.cfg.ledger_path.open("a") as f:
-                f.write(json.dumps({
-                    "ts": round(time.time(), 1), "namespace": namespace,
-                    "role": role, "model": model, "cache_hit": cache_hit,
-                    **usage,
-                }, ensure_ascii=False) + "\n")
+                f.write(
+                    json.dumps(
+                        {
+                            "ts": round(time.time(), 1),
+                            "namespace": namespace,
+                            "role": role,
+                            "model": model,
+                            "cache_hit": cache_hit,
+                            **usage,
+                        },
+                        ensure_ascii=False,
+                    )
+                    + "\n"
+                )
 
     def ledger_summary(self) -> dict:
         """汇总台账：按模型/命名空间的调用数与 token。"""
-        summary: dict[str, Any] = {"total_calls": 0, "cache_hits": 0,
-                                   "prompt_tokens": 0, "completion_tokens": 0,
-                                   "by_model": {}, "by_ns": {}}
+        summary: dict[str, Any] = {
+            "total_calls": 0,
+            "cache_hits": 0,
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "by_model": {},
+            "by_ns": {},
+        }
         if not self.cfg.ledger_path.exists():
             return summary
         for line in self.cfg.ledger_path.read_text().splitlines():
@@ -359,31 +427,46 @@ class LLMClient:
 
     # ---------- 缓存 ----------
     @staticmethod
-    def _cache_key(model, messages, temperature, max_tokens, json_mode, *,
-                   base_url="", extra_body=None) -> str:
+    def _cache_key(
+        model, messages, temperature, max_tokens, json_mode, *, base_url="", extra_body=None
+    ) -> str:
         # 缓存随「有效传输策略」失效：站点 + 实际发送的参数。推理缓冲是
         # (模型注册档, 参数) 的确定函数，不必单独入键。
         value = {
-            "m": model, "msg": messages, "t": temperature,
-            "mt": max_tokens, "j": json_mode, "base_url": base_url,
+            "m": model,
+            "msg": messages,
+            "t": temperature,
+            "mt": max_tokens,
+            "j": json_mode,
+            "base_url": base_url,
             "extra_body": extra_body or {},
-            "transport_version": 3, "registry_version": REGISTRY_VERSION,
+            "transport_version": 3,
+            "registry_version": REGISTRY_VERSION,
         }
         blob = json.dumps(value, ensure_ascii=False, sort_keys=True)
         return hashlib.sha256(blob.encode()).hexdigest()
 
     @staticmethod
     def _save_cache(path: Path, result: LLMResult) -> None:
-        atomic_json(path, {"content": result.content, "usage": result.usage,
-                           "model": result.model})
+        atomic_json(path, {"content": result.content, "usage": result.usage, "model": result.model})
 
     def _log_retry(self, namespace, role, attempt, err, backoff) -> None:
         err = self._redact_error(err)
         try:
             with self._retry_log.open("a") as f:
-                f.write(json.dumps({
-                    "ts": round(time.time(), 1), "ns": namespace, "role": role,
-                    "attempt": attempt, "err": err, "backoff_s": round(backoff, 1),
-                }, ensure_ascii=False) + "\n")
+                f.write(
+                    json.dumps(
+                        {
+                            "ts": round(time.time(), 1),
+                            "ns": namespace,
+                            "role": role,
+                            "attempt": attempt,
+                            "err": err,
+                            "backoff_s": round(backoff, 1),
+                        },
+                        ensure_ascii=False,
+                    )
+                    + "\n"
+                )
         except Exception:
             pass

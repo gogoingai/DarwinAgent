@@ -1,4 +1,5 @@
 """The only dataset boundary. Generation inputs never contain evaluation references."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -16,7 +17,9 @@ def freeze(value):
         return tuple(freeze(v) for v in value)
     if type(value) is float:
         import math
-        if not math.isfinite(value): raise ValueError("Nonfinite input")
+
+        if not math.isfinite(value):
+            raise ValueError("Nonfinite input")
     if value is None or type(value) in (str, bool, int, float):
         return value
     raise ValueError(f"Non-primitive boundary value: {type(value).__name__}")
@@ -37,12 +40,15 @@ class SourceRef:
     location: str
 
     def __post_init__(self):
-        if not all(type(x) is str and x.strip() for x in (self.kind, self.document_id, self.location)):
+        if not all(
+            type(x) is str and x.strip() for x in (self.kind, self.document_id, self.location)
+        ):
             raise ValueError("Source kind, document and location are required")
 
     @property
     def id(self) -> str:
         from .runtime.artifacts import digest
+
         return digest(self.to_dict())
 
     def to_dict(self):
@@ -56,13 +62,21 @@ class CorpusBlock:
     metadata: Mapping[str, Any] = field(default_factory=dict)
 
     def __post_init__(self):
-        if not isinstance(self.source, SourceRef) or not isinstance(self.text, str) or not self.text.strip():
+        if (
+            not isinstance(self.source, SourceRef)
+            or not isinstance(self.text, str)
+            or not self.text.strip()
+        ):
             raise ValueError("Corpus requires a registered source and text")
         object.__setattr__(self, "metadata", freeze(self.metadata))
 
     def to_dict(self):
-        return {"source": self.source.to_dict(), "source_id": self.source.id,
-                "text": self.text, "metadata": plain(self.metadata)}
+        return {
+            "source": self.source.to_dict(),
+            "source_id": self.source.id,
+            "text": self.text,
+            "metadata": plain(self.metadata),
+        }
 
 
 @dataclass(frozen=True)
@@ -72,7 +86,12 @@ class QuestionInput:
     parameters: Mapping[str, Any] = field(default_factory=dict)
 
     def __post_init__(self):
-        if not isinstance(self.id, str) or not self.id or not isinstance(self.text, str) or not self.text.strip():
+        if (
+            not isinstance(self.id, str)
+            or not self.id
+            or not isinstance(self.text, str)
+            or not self.text.strip()
+        ):
             raise ValueError("Question requires an id and text")
         object.__setattr__(self, "parameters", freeze(self.parameters))
 
@@ -91,17 +110,22 @@ class CaseInput:
         object.__setattr__(self, "questions", tuple(self.questions))
         if not self.id or not self.corpus or not self.questions:
             raise ValueError("Case requires corpus and questions")
-        if any(c in self.id for c in ('/', '\\')) or self.id in {'.','..'}:
+        if any(c in self.id for c in ("/", "\\")) or self.id in {".", ".."}:
             raise ValueError("Invalid case identifier")
-        if not all(isinstance(x, CorpusBlock) for x in self.corpus) or not all(isinstance(x, QuestionInput) for x in self.questions):
+        if not all(isinstance(x, CorpusBlock) for x in self.corpus) or not all(
+            isinstance(x, QuestionInput) for x in self.questions
+        ):
             raise ValueError("Invalid case boundary types")
         for ids in ([x.source.id for x in self.corpus], [x.id for x in self.questions]):
             if len(ids) != len(set(ids)):
                 raise ValueError("Duplicate source or question id")
 
     def to_dict(self):
-        return {"id": self.id, "corpus": [x.to_dict() for x in self.corpus],
-                "questions": [x.to_dict() for x in self.questions]}
+        return {
+            "id": self.id,
+            "corpus": [x.to_dict() for x in self.corpus],
+            "questions": [x.to_dict() for x in self.questions],
+        }
 
 
 @dataclass(frozen=True)
@@ -122,19 +146,32 @@ class AnswerResult:
         object.__setattr__(self, "trace", tuple(freeze(x) for x in self.trace))
         if self.status not in {"answered", "abstained", "execution_error"}:
             raise ValueError("Invalid answer status")
-        if self.status == "answered" and (not self.answer.strip() or not self.evidence or self.error):
+        if self.status == "answered" and (
+            not self.answer.strip() or not self.evidence or self.error
+        ):
             raise ValueError("Answered results require evidence and no error")
-        if self.status == "abstained" and (not self.answer.strip() or self.evidence or self.node_ids or self.error):
+        if self.status == "abstained" and (
+            not self.answer.strip() or self.evidence or self.node_ids or self.error
+        ):
             raise ValueError("Semantic abstention cannot carry evidence or an execution error")
-        if self.status == "execution_error" and (not self.error or self.answer or self.evidence or self.node_ids):
+        if self.status == "execution_error" and (
+            not self.error or self.answer or self.evidence or self.node_ids
+        ):
             raise ValueError("Execution errors cannot publish an answer")
         if not all(isinstance(x, SourceRef) for x in self.evidence):
             raise ValueError("Invalid evidence type")
 
     def to_dict(self):
-        return {"question_id": self.question_id, "status": self.status, "answer": self.answer,
-                "evidence": [x.to_dict() for x in self.evidence], "error": self.error,
-                "node_ids": list(self.node_ids), "raw_outputs": list(self.raw_outputs), "trace": plain(self.trace)}
+        return {
+            "question_id": self.question_id,
+            "status": self.status,
+            "answer": self.answer,
+            "evidence": [x.to_dict() for x in self.evidence],
+            "error": self.error,
+            "node_ids": list(self.node_ids),
+            "raw_outputs": list(self.raw_outputs),
+            "trace": plain(self.trace),
+        }
 
     @classmethod
     def from_dict(cls, data):
@@ -155,6 +192,7 @@ def _iso_date_or_empty(value: str) -> str:
     if not value:
         return ""
     from datetime import date
+
     return date.fromisoformat(str(value)).isoformat()
 
 
@@ -183,7 +221,11 @@ class FactValue:
     value: str
 
     def __post_init__(self):
-        if self.dtype not in FACT_VALUE_DTYPES or type(self.value) is not str or not self.value.strip():
+        if (
+            self.dtype not in FACT_VALUE_DTYPES
+            or type(self.value) is not str
+            or not self.value.strip()
+        ):
             raise ValueError("Fact value requires a declared dtype and canonical text")
 
     def to_dict(self):
@@ -209,8 +251,13 @@ class FactTime:
             raise ValueError("Invalid time anchor")
 
     def to_dict(self):
-        return {"raw": self.raw, "precision": self.precision, "start": self.start,
-                "end": self.end, "anchor_source_id": self.anchor_source_id}
+        return {
+            "raw": self.raw,
+            "precision": self.precision,
+            "start": self.start,
+            "end": self.end,
+            "anchor_source_id": self.anchor_source_id,
+        }
 
 
 @dataclass(frozen=True)
@@ -223,11 +270,20 @@ class FactEvidence:
     def __post_init__(self):
         if not all(type(x) is str and x.strip() for x in (self.source_id, self.quote)):
             raise ValueError("Evidence requires a registered source and a verbatim quote")
-        if type(self.start) is not int or type(self.end) is not int or not 0 <= self.start < self.end:
+        if (
+            type(self.start) is not int
+            or type(self.end) is not int
+            or not 0 <= self.start < self.end
+        ):
             raise ValueError("Evidence offsets must bracket the quote")
 
     def to_dict(self):
-        return {"source_id": self.source_id, "quote": self.quote, "start": self.start, "end": self.end}
+        return {
+            "source_id": self.source_id,
+            "quote": self.quote,
+            "start": self.start,
+            "end": self.end,
+        }
 
 
 @dataclass(frozen=True)
@@ -268,25 +324,51 @@ class AtomicFact:
 
     def content(self):
         """Normalized body without the identity; the id material."""
-        return {"text": self.text, "subject": self.subject.to_dict(), "predicate": self.predicate,
-                "object_entity": self.object_entity.to_dict() if self.object_entity else None,
-                "object_value": self.object_value.to_dict() if self.object_value else None,
-                "polarity": self.polarity, "modality": self.modality, "time": self.time.to_dict(),
-                "evidence": [e.to_dict() for e in self.evidence]}
+        return {
+            "text": self.text,
+            "subject": self.subject.to_dict(),
+            "predicate": self.predicate,
+            "object_entity": self.object_entity.to_dict() if self.object_entity else None,
+            "object_value": self.object_value.to_dict() if self.object_value else None,
+            "polarity": self.polarity,
+            "modality": self.modality,
+            "time": self.time.to_dict(),
+            "evidence": [e.to_dict() for e in self.evidence],
+        }
 
     def derived_id(self):
         from .runtime.artifacts import digest
-        return digest({"sources": sorted({e.source_id for e in self.evidence}), "fact": self.content()})
+
+        return digest(
+            {"sources": sorted({e.source_id for e in self.evidence}), "fact": self.content()}
+        )
 
     @classmethod
     def create(cls, **fields):
-        probe = cls("0", fields["text"], fields["subject"], fields["predicate"],
-                    fields.get("object_entity"), fields.get("object_value"),
-                    fields.get("polarity", "positive"), fields.get("modality", "statement"),
-                    fields.get("time") or FactTime("未注明"), tuple(fields.get("evidence") or ()))
-        return cls(probe.derived_id(), probe.text, probe.subject, probe.predicate,
-                   probe.object_entity, probe.object_value, probe.polarity, probe.modality,
-                   probe.time, probe.evidence)
+        probe = cls(
+            "0",
+            fields["text"],
+            fields["subject"],
+            fields["predicate"],
+            fields.get("object_entity"),
+            fields.get("object_value"),
+            fields.get("polarity", "positive"),
+            fields.get("modality", "statement"),
+            fields.get("time") or FactTime("未注明"),
+            tuple(fields.get("evidence") or ()),
+        )
+        return cls(
+            probe.derived_id(),
+            probe.text,
+            probe.subject,
+            probe.predicate,
+            probe.object_entity,
+            probe.object_value,
+            probe.polarity,
+            probe.modality,
+            probe.time,
+            probe.evidence,
+        )
 
     def to_dict(self):
         return {"id": self.id, **self.content()}
@@ -295,11 +377,19 @@ class AtomicFact:
     def from_dict(cls, data):
         def ref(x):
             return EntityRef(x["class"], x["name"]) if x else None
-        fact = cls(data["id"], data["text"], ref(data["subject"]), data["predicate"],
-                   ref(data["object_entity"]),
-                   FactValue(**data["object_value"]) if data["object_value"] else None,
-                   data["polarity"], data["modality"], FactTime(**data["time"]),
-                   tuple(FactEvidence(**e) for e in data["evidence"]))
+
+        fact = cls(
+            data["id"],
+            data["text"],
+            ref(data["subject"]),
+            data["predicate"],
+            ref(data["object_entity"]),
+            FactValue(**data["object_value"]) if data["object_value"] else None,
+            data["polarity"],
+            data["modality"],
+            FactTime(**data["time"]),
+            tuple(FactEvidence(**e) for e in data["evidence"]),
+        )
         if fact.id != fact.derived_id():
             raise ValueError("Fact identity does not match its content")
         return fact
@@ -325,16 +415,24 @@ class MemoryResult:
     @property
     def fingerprint(self):
         from .runtime.artifacts import digest
+
         return digest([f.to_dict() for f in sorted(self.facts, key=lambda x: x.id)])
 
     def to_dict(self):
-        return {"facts": [f.to_dict() for f in self.facts], "raw_outputs": list(self.raw_outputs),
-                "diagnostics": plain(self.diagnostics)}
+        return {
+            "facts": [f.to_dict() for f in self.facts],
+            "raw_outputs": list(self.raw_outputs),
+            "diagnostics": plain(self.diagnostics),
+        }
 
     @classmethod
     def from_dict(cls, data, corpus):
-        return cls(corpus, tuple(AtomicFact.from_dict(x) for x in data["facts"]),
-                   tuple(data.get("raw_outputs", ())), tuple(data.get("diagnostics", ())))
+        return cls(
+            corpus,
+            tuple(AtomicFact.from_dict(x) for x in data["facts"]),
+            tuple(data.get("raw_outputs", ())),
+            tuple(data.get("diagnostics", ())),
+        )
 
 
 @dataclass(frozen=True)
@@ -361,10 +459,17 @@ class RunResult:
     graph_fingerprint: str = ""
 
     def to_dict(self):
-        return {"case_id": self.case_id, "identity": self.identity, "asset_version": self.asset_version,
-                "answers": [x.to_dict() for x in self.answers], "graph_nodes": self.graph_nodes,
-                "graph_diagnostics": plain(self.graph_diagnostics), "memory_count": self.memory_count,
-                "memory_fingerprint": self.memory_fingerprint, "graph_fingerprint": self.graph_fingerprint}
+        return {
+            "case_id": self.case_id,
+            "identity": self.identity,
+            "asset_version": self.asset_version,
+            "answers": [x.to_dict() for x in self.answers],
+            "graph_nodes": self.graph_nodes,
+            "graph_diagnostics": plain(self.graph_diagnostics),
+            "memory_count": self.memory_count,
+            "memory_fingerprint": self.memory_fingerprint,
+            "graph_fingerprint": self.graph_fingerprint,
+        }
 
 
 @dataclass(frozen=True)
@@ -381,9 +486,14 @@ class EvaluationResult:
         object.__setattr__(self, "diagnostics", tuple(freeze(x) for x in self.diagnostics))
 
     def to_dict(self):
-        return {"metrics": plain(self.metrics), "total": self.total, "completed": self.completed,
-                "generation_faults": self.generation_faults, "evaluation_faults": self.evaluation_faults,
-                "diagnostics": plain(self.diagnostics)}
+        return {
+            "metrics": plain(self.metrics),
+            "total": self.total,
+            "completed": self.completed,
+            "generation_faults": self.generation_faults,
+            "evaluation_faults": self.evaluation_faults,
+            "diagnostics": plain(self.diagnostics),
+        }
 
 
 @runtime_checkable

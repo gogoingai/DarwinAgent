@@ -3,6 +3,7 @@
 VectorStore 协议保持最小（load/upsert/search/save），后续换 OceanBase
 （pyobvector：建向量列 + approx_cosine_distance 查询）只替换实现，不动调用方。
 记录形态 {id, text, meta, vector} 与 Mem0 记忆接口兼容（meta 携带主体/类型/日期/出处）。"""
+
 from __future__ import annotations
 
 import json
@@ -25,7 +26,7 @@ class LocalVectorStore:
         self.ids: list[str] = []
         self.texts: list[str] = []
         self.metas: list[dict] = []
-        self._matrix: np.ndarray | None = None      # 已归一化的向量矩阵
+        self._matrix: np.ndarray | None = None  # 已归一化的向量矩阵
 
     # ---------------------------------------------------------------- 持久化
     @classmethod
@@ -36,7 +37,7 @@ class LocalVectorStore:
         for line in path.read_text().splitlines():
             try:
                 o = json.loads(line)
-            except Exception:                       # noqa: BLE001
+            except Exception:  # noqa: BLE001
                 continue
             s.ids.append(str(o["id"]))
             s.texts.append(str(o.get("text", "")))
@@ -47,8 +48,7 @@ class LocalVectorStore:
         return s
 
     def _append_vec(self, normalized: np.ndarray) -> None:
-        self._matrix = normalized if self._matrix is None else \
-            np.vstack([self._matrix, normalized])
+        self._matrix = normalized if self._matrix is None else np.vstack([self._matrix, normalized])
 
     def upsert(self, items: list[dict]) -> None:
         """items: [{id, text, vector, meta}]，按 id 去重（后写覆盖）。"""
@@ -61,7 +61,7 @@ class LocalVectorStore:
                 k = existing[it["id"]]
                 self.texts[k] = str(it.get("text", ""))
                 self.metas[k] = dict(it.get("meta") or {})
-                self._matrix[k] = norm                 # type: ignore[index]
+                self._matrix[k] = norm  # type: ignore[index]
             else:
                 existing[it["id"]] = len(self.ids)
                 self.ids.append(str(it["id"]))
@@ -71,23 +71,32 @@ class LocalVectorStore:
 
     def save(self, path: Path) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
-        denorm = self._matrix                       # 归一化向量即方向，余弦不依赖模长
+        denorm = self._matrix  # 归一化向量即方向，余弦不依赖模长
         with path.open("w") as f:
             for i, fid in enumerate(self.ids):
-                f.write(json.dumps({
-                    "id": fid, "text": self.texts[i], "meta": self.metas[i],
-                    "vector": denorm[i].tolist(),
-                }, ensure_ascii=False) + "\n")
+                f.write(
+                    json.dumps(
+                        {
+                            "id": fid,
+                            "text": self.texts[i],
+                            "meta": self.metas[i],
+                            "vector": denorm[i].tolist(),
+                        },
+                        ensure_ascii=False,
+                    )
+                    + "\n"
+                )
 
     # ---------------------------------------------------------------- 检索
     def __len__(self) -> int:
         return len(self.ids)
 
     def meta(self) -> dict:
-        return {'n_records': len(self.ids)}
+        return {"n_records": len(self.ids)}
 
-    def search(self, query_vec: list[float], top_k: int = 10,
-               pool: str | None = None) -> list[VecHit]:
+    def search(
+        self, query_vec: list[float], top_k: int = 10, pool: str | None = None
+    ) -> list[VecHit]:
         if self._matrix is None or not len(self.ids):
             return []
         q = np.asarray(query_vec, dtype=np.float32)
@@ -103,6 +112,7 @@ class LocalVectorStore:
             meta = dict(self.metas[k])
             if pool and meta.get("pool") not in (pool, None):
                 continue
-            out.append(VecHit(id=self.ids[k], score=float(scores[k]),
-                              text=self.texts[k], meta=meta))
+            out.append(
+                VecHit(id=self.ids[k], score=float(scores[k]), text=self.texts[k], meta=meta)
+            )
         return out

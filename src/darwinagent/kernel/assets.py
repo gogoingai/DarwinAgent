@@ -1,4 +1,5 @@
 """Relocatable, fingerprinted S/F/C/P bundles; permissions live in framework code."""
+
 from __future__ import annotations
 
 import hashlib
@@ -32,7 +33,11 @@ class Asset:
     def __post_init__(self):
         if self.kind not in KINDS or not re.fullmatch(r"[A-Za-z][A-Za-z0-9_.-]{0,79}", self.id):
             raise ValueError("Invalid asset type or id; only S/F/C/P are assets")
-        if self.id.startswith(RESERVED_PREFIX) or not isinstance(self.content, str) or not self.content.strip():
+        if (
+            self.id.startswith(RESERVED_PREFIX)
+            or not isinstance(self.content, str)
+            or not self.content.strip()
+        ):
             raise ValueError("Reserved check id or empty asset")
         object.__setattr__(self, "input_contract", freeze(self.input_contract))
         object.__setattr__(self, "output_contract", freeze(self.output_contract))
@@ -54,10 +59,18 @@ class Asset:
             raise ValueError("Only checks have stages")
 
     def to_dict(self):
-        return {"id": self.id, "kind": self.kind, "content": self.content,
-                "input_contract": plain(self.input_contract), "output_contract": plain(self.output_contract),
-                "schema_dependencies": list(self.schema_dependencies), "role": self.role,
-                "stage": self.stage, "description": self.description, "trial_inputs": plain(self.trial_inputs)}
+        return {
+            "id": self.id,
+            "kind": self.kind,
+            "content": self.content,
+            "input_contract": plain(self.input_contract),
+            "output_contract": plain(self.output_contract),
+            "schema_dependencies": list(self.schema_dependencies),
+            "role": self.role,
+            "stage": self.stage,
+            "description": self.description,
+            "trial_inputs": plain(self.trial_inputs),
+        }
 
     @property
     def fingerprint(self):
@@ -91,10 +104,21 @@ class KernelAssets:
         rows = []
         for a in sorted(self.assets, key=lambda x: x.id):
             ext = {"S": "yaml", "F": "py", "C": "py", "P": "txt"}[a.kind]
-            rows.append({**a.to_dict(), "content": None, "path": f"assets/{a.kind}/{a.id}.{ext}",
-                         "sha256": hashlib.sha256(a.content.encode()).hexdigest(), "fingerprint": a.fingerprint})
-        data = {"format_version": FORMAT_VERSION, "capability_version": CAPABILITY_VERSION,
-                "assets": rows, "origin": plain(self.origin)}
+            rows.append(
+                {
+                    **a.to_dict(),
+                    "content": None,
+                    "path": f"assets/{a.kind}/{a.id}.{ext}",
+                    "sha256": hashlib.sha256(a.content.encode()).hexdigest(),
+                    "fingerprint": a.fingerprint,
+                }
+            )
+        data = {
+            "format_version": FORMAT_VERSION,
+            "capability_version": CAPABILITY_VERSION,
+            "assets": rows,
+            "origin": plain(self.origin),
+        }
         return {**data, "version": digest(data)}
 
     def export(self, root: Path):
@@ -121,6 +145,7 @@ class KernelAssets:
 class KernelBundle:
     def __init__(self, root: Path):
         import json
+
         self.root = Path(root).resolve()
         self._manifest = json.loads((self.root / "manifest.json").read_text())
         self.version = self._manifest["version"]
@@ -128,10 +153,17 @@ class KernelBundle:
 
     def verify(self):
         import json
+
         manifest = json.loads((self.root / "manifest.json").read_text())
-        if manifest != self._manifest or digest({k: v for k, v in manifest.items() if k != "version"}) != self.version:
+        if (
+            manifest != self._manifest
+            or digest({k: v for k, v in manifest.items() if k != "version"}) != self.version
+        ):
             raise ValueError("Asset manifest changed")
-        if manifest["format_version"] != FORMAT_VERSION or manifest["capability_version"] != CAPABILITY_VERSION:
+        if (
+            manifest["format_version"] != FORMAT_VERSION
+            or manifest["capability_version"] != CAPABILITY_VERSION
+        ):
             raise ValueError("Unsupported asset contract version")
         assets = []
         for row in manifest["assets"]:
@@ -143,7 +175,14 @@ class KernelBundle:
             content = path.read_text()
             if hashlib.sha256(content.encode()).hexdigest() != row["sha256"]:
                 raise ValueError(f"Asset tampered: {row['id']}")
-            a = Asset(**{k: v for k, v in row.items() if k not in {"path", "sha256", "fingerprint", "content"}}, content=content)
+            a = Asset(
+                **{
+                    k: v
+                    for k, v in row.items()
+                    if k not in {"path", "sha256", "fingerprint", "content"}
+                },
+                content=content,
+            )
             if a.fingerprint != row["fingerprint"]:
                 raise ValueError("Asset contract tampered")
             assets.append(a)
