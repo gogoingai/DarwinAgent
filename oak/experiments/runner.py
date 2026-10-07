@@ -1802,11 +1802,16 @@ class ExperimentRunner:
                             _,val_scores=await self._stage(f'{name}-val',(val_case,),
                                                            spec.with_bundle(candidate))
                             policy=self.validation_plan['policy']
+                            from .policy import split_faults
+                            ext_val,det_val=split_faults(val_scores)
                             v_failures=[]
+                            # 外部故障不拦（操作者指令 2026-10-07）：传输/限流族留分母、
+                            # 入决策披露；确定性生成故障、非故障性缺题与评测故障照拦。
                             if val_scores.total!=val_baseline.total \
-                                    or val_scores.completed!=val_scores.total:
+                                    or val_scores.completed!=val_scores.total-ext_val \
+                                    or det_val:
                                 v_failures.append('incomplete_evaluation')
-                            if val_scores.evaluation_faults or val_scores.generation_faults:
+                            if val_scores.evaluation_faults:
                                 v_failures.append('evaluation_fault')
                             if set(val_scores.metrics)!=set(val_baseline.metrics):
                                 v_failures.append('metric_contract_changed')
@@ -1817,10 +1822,14 @@ class ExperimentRunner:
                                 if val_scores.metrics.get(policy.floor,-1) \
                                         < val_baseline.metrics.get(policy.floor,-1):
                                     v_failures.append('metric_decreased:'+policy.floor)
+                            # 外部故障披露放 decision 顶层：validation 字典必须保持
+                            # EvaluationResult 形状（resume 处 EvaluationResult(**d) 重建）。
                             decision['validation']={'metrics':plain(dict(val_scores.metrics)),
                                 'total':val_scores.total,'completed':val_scores.completed,
                                 'generation_faults':val_scores.generation_faults,
                                 'evaluation_faults':val_scores.evaluation_faults}
+                            if ext_val:
+                                decision['validation_external_faults']=ext_val
                             val_history[name]=val_scores.to_dict()
                             atomic_json(self.root/'validation.json',val_history)
                             if v_failures:

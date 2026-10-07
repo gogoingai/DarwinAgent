@@ -58,6 +58,25 @@ class AnswerAgent:
                         observation={}
                         try:
                             result=self.runtime.call(aid,action['parameters'],graph,observation)
+                        except ValueError as exc:
+                            if not str(exc).startswith('tool.params:'):
+                                raise
+                            # 参数契约违规进反馈环（2026-10-07 运行二事故：DeepSeek 工具
+                            # 调用发明未声明字段 {'主题'}，一击致命成题级确定性故障，B0 门
+                            # 即挂）。调用仍被拒（契约不放松），但同题内给出「未声明字段
+                            # ＋合法 schema」反馈让模型重试；步数与协议重试天然有界，
+                            # 反复不改才由既有 ProtocolError 兜底成故障。
+                            contract=asset.input_contract or {}
+                            allowed=sorted((contract.get('properties') or {}).keys())
+                            trace.append({'stage':'tool_error',**{k:v for k,v in call.items()
+                                          if k!='stage'},'error_type':'ValueError',
+                                          'error':str(exc),'observation':observation})
+                            feedback.append({'tool_call_reject':{'asset_id':aid,
+                                'parameters':plain(action['parameters']),'error':str(exc),
+                                'allowed_fields':allowed,
+                                'hint':'工具参数违反声明契约：未声明字段会被拒绝执行；'
+                                      '请只用 allowed_fields 里的字段重新调用'}})
+                            continue
                         except Exception as exc:
                             trace.append({'stage':'tool_error',**{k:v for k,v in call.items()
                                           if k!='stage'},'error_type':type(exc).__name__,
