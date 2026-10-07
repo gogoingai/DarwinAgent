@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import inspect
 import json
 import random
 import time
@@ -10,7 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from openai import AsyncOpenAI, APIConnectionError, APIStatusError, APITimeoutError
+from openai import AsyncOpenAI, APIError, APIConnectionError, APIStatusError, APITimeoutError
 import httpx
 
 from ..config import Config
@@ -115,6 +116,40 @@ class LLMClient:
             self._sites[resolved.pool_id] = site
         return site
 
+    def _redact_error(self, value):
+        """Redact transport-error data only; successful model output is unchanged."""
+        secrets = {self.cfg.api_key, self.cfg.fast_api_key, self.cfg.middle_api_key}
+        secrets.update(api_key for _base_url, api_key in self._sites)
+        if isinstance(value, str):
+            for secret in sorted((s for s in secrets if s), key=len, reverse=True):
+                value = value.replace(secret, "[redacted]")
+            return value
+        if isinstance(value, bytes):
+            for secret in sorted((s for s in secrets if s), key=len, reverse=True):
+                value = value.replace(secret.encode(), b"[redacted]")
+            return value
+        if isinstance(value, dict):
+            return {self._redact_error(k): self._redact_error(v) for k, v in value.items()}
+        if isinstance(value, (list, tuple)):
+            return type(value)(self._redact_error(v) for v in value)
+        return value
+
+    def _sanitize_transport_error(self, error):
+        # Retain SDK exception types/status codes for retry classification while
+        # cleaning strings and structured error metadata before runtime persistence.
+        pending, seen = [error], set()
+        while pending:
+            current = pending.pop()
+            if id(current) in seen:
+                continue
+            seen.add(id(current))
+            pending.extend(e for e in (current.__cause__, current.__context__) if e is not None)
+            current.args = tuple(self._redact_error(arg) for arg in current.args)
+            for name in ("message", "body", "code", "param", "type"):
+                if hasattr(current, name):
+                    setattr(current, name, self._redact_error(getattr(current, name)))
+        return error
+
     # ---------- 对外主入口 ----------
     async def chat(
         self,
@@ -127,6 +162,23 @@ class LLMClient:
         namespace: str = "default",
         use_cache: bool = True,
     ) -> LLMResult:
+        request = dict(role=role, messages=messages, temperature=temperature,
+                       max_tokens=max_tokens, json_mode=json_mode, namespace=namespace,
+                       use_cache=use_cache)
+        deadline = self.cfg.deadline_monotonic
+        if deadline is None:
+            return await self._chat(**request)
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise BudgetExceeded("Model request deadline exceeded")
+        try:
+            async with asyncio.timeout(remaining):
+                return await self._chat(**request)
+        except TimeoutError:
+            raise BudgetExceeded("Model request deadline exceeded") from None
+
+    async def _chat(self, *, role, messages, temperature, max_tokens, json_mode,
+                    namespace, use_cache):
         model = self.cfg.model_for(role)
         resolved = resolve(model, self.cfg)
         thinking_off = role in THINKING_OFF_ROLES or role in self.cfg.thinking_disabled_roles
@@ -176,18 +228,26 @@ class LLMClient:
                     parts: list[str] = []
                     usage: dict = {}
                     reasoning_chars = 0
-                    async for chunk in await use_client.chat.completions.create(**kwargs):
-                        if chunk.choices:
-                            delta = chunk.choices[0].delta
-                            if delta and delta.content:
-                                parts.append(delta.content)
-                            if delta and getattr(delta, "reasoning_content", None):
-                                reasoning_chars += len(delta.reasoning_content)
-                        if getattr(chunk, "usage", None):
-                            usage = {
-                                "prompt_tokens": chunk.usage.prompt_tokens or 0,
-                                "completion_tokens": chunk.usage.completion_tokens or 0,
-                            }
+                    stream = await use_client.chat.completions.create(**kwargs)
+                    try:
+                        async for chunk in stream:
+                            if chunk.choices:
+                                delta = chunk.choices[0].delta
+                                if delta and delta.content:
+                                    parts.append(delta.content)
+                                if delta and getattr(delta, "reasoning_content", None):
+                                    reasoning_chars += len(delta.reasoning_content)
+                            if getattr(chunk, "usage", None):
+                                usage = {
+                                    "prompt_tokens": chunk.usage.prompt_tokens or 0,
+                                    "completion_tokens": chunk.usage.completion_tokens or 0,
+                                }
+                    finally:
+                        close = getattr(stream, "close", None) or getattr(stream, "aclose", None)
+                        if close is not None:
+                            closing = close()
+                            if inspect.isawaitable(closing):
+                                await closing
                     content = "".join(parts)
                     if reasoning_chars:
                         usage["reasoning_chars"] = reasoning_chars
@@ -209,11 +269,13 @@ class LLMClient:
             except EmptyCompletion as e:
                 last_err = e
             except (APIConnectionError, APITimeoutError) as e:
-                last_err = e
+                last_err = self._sanitize_transport_error(e)
             except APIStatusError as e:
-                last_err = e
+                last_err = self._sanitize_transport_error(e)
                 if e.status_code not in (429, 500, 502, 503, 504, 529):
-                    raise                      # Retry only transient service status codes.
+                    raise last_err from None  # Retry only transient service status codes.
+            except APIError as e:
+                raise self._sanitize_transport_error(e) from None
             # 指数退避 + 抖动（429 首次退避从 8s 起，避免反复撞限流）
             base = 8.0 if (isinstance(last_err, APIStatusError)
                            and getattr(last_err, "status_code", None) == 429) else 1.0
@@ -316,9 +378,7 @@ class LLMClient:
                            "model": result.model})
 
     def _log_retry(self, namespace, role, attempt, err, backoff) -> None:
-        for secret in (self.cfg.api_key, self.cfg.fast_api_key, self.cfg.middle_api_key):
-            if secret:
-                err = err.replace(secret, "[redacted]")
+        err = self._redact_error(err)
         try:
             with self._retry_log.open("a") as f:
                 f.write(json.dumps({

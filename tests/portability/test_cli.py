@@ -15,12 +15,12 @@ from unittest.mock import patch
 from darwinagent import Config, EvaluationResult, RunResult, AnswerResult, SourceRef
 from darwinagent.cli import main
 from darwinagent.demo import MaintenanceEvaluator, ScriptedTransport
-from darwinagent.llm.client import LLMClient
+from darwinagent.llm.client import LLMClient, BudgetExceeded, TransportExhausted
 from darwinagent.llm.registry import resolve, request_policy
 
 
 @contextmanager
-def endpoint(statuses=()):
+def endpoint(statuses=(), *, error_message="temporary", stream_chunks=1, chunk_delay=0, completion=None):
     received = []
     remaining = list(statuses)
     class Handler(BaseHTTPRequestHandler):
@@ -34,7 +34,8 @@ def endpoint(statuses=()):
                 self.send_response(status)
                 self.send_header('Content-Type', 'application/json')
                 self.end_headers()
-                self.wfile.write(b'{"error":{"message":"temporary","type":"server_error"}}')
+                body = {'error': {'message': error_message, 'type': 'server_error'}}
+                self.wfile.write(json.dumps(body).encode())
                 return
             messages = data['messages']
             try:
@@ -53,7 +54,17 @@ def endpoint(statuses=()):
             self.end_headers()
             chunk = {'id':'fake','object':'chat.completion.chunk','created':0,'model':data['model'],
                      'choices':[{'index':0,'delta':{'content':text},'finish_reason':None}]}
-            self.wfile.write(('data: '+json.dumps(chunk)+'\n\ndata: [DONE]\n\n').encode())
+            if completion is not None:
+                chunk['choices'][0]['delta']['content'] = completion
+            try:
+                for _ in range(stream_chunks):
+                    self.wfile.write(('data: '+json.dumps(chunk)+'\n\n').encode())
+                    self.wfile.flush()
+                    time.sleep(chunk_delay)
+                self.wfile.write(b'data: [DONE]\n\n')
+                self.wfile.flush()
+            except (BrokenPipeError, ConnectionResetError):
+                pass
     server = ThreadingHTTPServer(('127.0.0.1', 0), Handler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -146,6 +157,149 @@ class PublicCLI(unittest.TestCase):
 
 
 class TransportLimits(unittest.TestCase):
+    def test_auth_failure_redacts_console_and_all_persisted_demo_artifacts(self):
+        sentinel = 'sentinel-review-key-never-real'
+        with tempfile.TemporaryDirectory() as tmp, endpoint([401,401,401],
+                error_message='Invalid API key provided: '+sentinel) as (url, received):
+            root=Path(tmp)
+            out, err=io.StringIO(),io.StringIO()
+            env={'DARWINAGENT_API_KEY':sentinel,'DARWINAGENT_BASE_URL':url,'DARWINAGENT_MODEL':'test'}
+            with patch.dict(os.environ,env,clear=True),redirect_stdout(out),redirect_stderr(err):
+                status=main(['demo','--mode','live','--rounds','0','--output',tmp,'--timeout','3'])
+            self.assertEqual(status,1)
+            self.assertNotIn(sentinel,out.getvalue()+err.getvalue())
+            self.assertTrue((root/'demo-summary.json').is_file())
+            artifacts=[p for p in root.rglob('*') if p.is_file()]
+            self.assertGreater(len(artifacts),10)
+            for path in artifacts:
+                self.assertNotIn(sentinel.encode(),path.read_bytes(),str(path))
+            failure=(root/'B0/generation/maintenance-demo/graph.failure.json').read_text()
+            self.assertIn('[redacted]',failure)
+            self.assertIn('Error code: 401',failure)
+            self.assertEqual(len(received),2)  # B0 generation and Wiki attribution both fail safely.
+
+    def test_error_metadata_and_retry_exhaustion_redact_all_configured_key_tiers(self):
+        secrets=('sentinel-strong-secret','sentinel-middle-secret','sentinel-fast-secret')
+        async def perform(url,root):
+            cfg=Config(api_base_url=url,api_key=secrets[0],middle_api_key=secrets[1],
+                       fast_api_key=secrets[2],model_strong='test',max_retries=2,work_dir=root)
+            async with LLMClient(cfg) as client:
+                with patch('darwinagent.llm.client.asyncio.sleep',new=__import__('unittest.mock',fromlist=['AsyncMock']).AsyncMock()):
+                    with self.assertRaises(TransportExhausted) as caught:
+                        await client.chat(role='answer',messages=[{'role':'user','content':'OK'}],use_cache=False)
+                error=caught.exception
+                self.assertEqual(error.cause_type,'InternalServerError')
+                self.assertEqual(error.__cause__.status_code,500)
+                text=repr(error)+str(error)+repr(error.__cause__)+repr(error.__cause__.body)
+                for secret in secrets:
+                    self.assertNotIn(secret,text)
+                self.assertIn('[redacted]',text)
+        with tempfile.TemporaryDirectory() as tmp, endpoint([500,500],
+                error_message='Provider echoed '+' '.join(secrets)) as (url,received):
+            root=Path(tmp)
+            asyncio.run(perform(url,root))
+            self.assertEqual(len(received),2)
+            for path in root.rglob('*'):
+                if path.is_file():
+                    for secret in secrets:
+                        self.assertNotIn(secret.encode(),path.read_bytes(),str(path))
+
+    def test_connection_failure_cause_redacted_without_changing_exception_type(self):
+        import openai,httpx
+        secret='sentinel-connection-secret'
+        async def perform(root):
+            cfg=Config(api_key=secret,work_dir=root,max_retries=1)
+            async with LLMClient(cfg) as client:
+                cause=ValueError('Connection rejected '+secret)
+                error=openai.APIConnectionError(message='Could not connect '+secret,
+                        request=httpx.Request('POST','http://example/v1'))
+                error.__cause__=cause
+                class Completions:
+                    async def create(self,**kwargs):
+                        raise error
+                from types import SimpleNamespace
+                fake=SimpleNamespace(chat=SimpleNamespace(completions=Completions()))
+                client._site_for=lambda _model:(fake,asyncio.Semaphore(1))
+                with self.assertRaises(TransportExhausted) as caught:
+                    await client.chat(role='answer',messages=[],use_cache=False)
+                wrapped=caught.exception
+                self.assertEqual(wrapped.cause_type,'APIConnectionError')
+                self.assertNotIn(secret,repr(wrapped)+repr(error)+repr(error.__cause__))
+        with tempfile.TemporaryDirectory() as tmp:
+            asyncio.run(perform(Path(tmp)))
+
+    def test_successful_model_text_is_preserved(self):
+        async def perform(url,root):
+            cfg=Config(api_base_url=url,api_key='test',model_strong='test',work_dir=root)
+            async with LLMClient(cfg) as client:
+                result=await client.chat(role='answer',messages=[{'role':'user','content':'OK'}],use_cache=False)
+                self.assertEqual(result.content,'test subject')
+        with tempfile.TemporaryDirectory() as tmp,endpoint(completion='test subject') as (url,_received):
+            asyncio.run(perform(url,Path(tmp)))
+
+    def test_absolute_deadline_interrupts_continuous_stream_and_prevents_retries(self):
+        async def perform(url,root):
+            cfg=Config(api_base_url=url,api_key='test',model_strong='test',max_retries=3,
+                       request_timeout_s=0.1,work_dir=root)
+            async with LLMClient(cfg) as client:
+                cfg.deadline_monotonic=time.monotonic()+0.1
+                started=time.monotonic()
+                with self.assertRaisesRegex(BudgetExceeded,'deadline exceeded'):
+                    await client.chat(role='answer',messages=[{'role':'user','content':'OK'}],use_cache=False)
+                elapsed=time.monotonic()-started
+                self.assertLess(elapsed,0.25)
+                self.assertEqual(client.http_attempts(),1)
+                self.assertFalse(cfg.cache_dir.exists())
+                self.assertEqual(client.ledger_summary()['total_calls'],0)
+        with tempfile.TemporaryDirectory() as tmp, endpoint(stream_chunks=8,chunk_delay=.035) as (url,received):
+            asyncio.run(perform(url,Path(tmp)))
+            self.assertEqual(len(received),1)
+
+    def test_absolute_deadline_includes_semaphore_wait_and_closes_active_stream(self):
+        from types import SimpleNamespace
+        async def perform(root):
+            cfg=Config(api_key='test',work_dir=root,max_retries=1)
+            async with LLMClient(cfg) as client:
+                closed=[]
+                class Stream:
+                    def __aiter__(self): return self
+                    async def __anext__(self):
+                        await asyncio.sleep(.035)
+                        return SimpleNamespace(choices=[SimpleNamespace(delta=SimpleNamespace(content='x'))],usage=None)
+                    async def close(self): closed.append(True)
+                class Completions:
+                    async def create(self,**kwargs): return Stream()
+                fake=SimpleNamespace(chat=SimpleNamespace(completions=Completions()))
+                sem=asyncio.Semaphore(0)
+                client._site_for=lambda _model:(fake,sem)
+                cfg.deadline_monotonic=time.monotonic()+.05
+                with self.assertRaises(BudgetExceeded):
+                    await client.chat(role='answer',messages=[],use_cache=False)
+                self.assertEqual(closed,[])
+                self.assertEqual(client.http_attempts(),0)
+                sem.release()
+                cfg.deadline_monotonic=time.monotonic()+.05
+                with self.assertRaises(BudgetExceeded):
+                    await client.chat(role='answer',messages=[],use_cache=False)
+                self.assertEqual(closed,[True])
+        with tempfile.TemporaryDirectory() as tmp:
+            asyncio.run(perform(Path(tmp)))
+
+    def test_doctor_wraps_whole_model_check_in_explicit_time_limit(self):
+        from darwinagent.cli import _doctor
+        real_timeout=asyncio.timeout
+        limits=[]
+        def short_timeout(seconds):
+            limits.append(seconds)
+            return real_timeout(.1)
+        with tempfile.TemporaryDirectory() as tmp,endpoint(stream_chunks=8,chunk_delay=.035) as (url,received):
+            env={'DARWINAGENT_API_KEY':'test','DARWINAGENT_BASE_URL':url,'DARWINAGENT_MODEL':'test'}
+            with patch.dict(os.environ,env,clear=True),patch('darwinagent.cli.asyncio.timeout',side_effect=short_timeout):
+                with redirect_stdout(io.StringIO()),self.assertRaises(TimeoutError):
+                    asyncio.run(_doctor(True,Path(tmp)))
+            self.assertEqual(limits[0],30)
+            self.assertEqual(len(received),1)
+
     def test_generic_model_names_do_not_silently_enable_vendor_routing(self):
         cfg=Config(api_base_url='http://example/v1',api_key='k',model_strong='MiniMax-M3.1-Flash-Preview')
         resolved=resolve(cfg.model_strong,cfg)

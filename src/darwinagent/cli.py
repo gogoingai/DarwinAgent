@@ -58,11 +58,12 @@ async def _doctor(check_model, output):
             cfg.max_http_requests = 1
             cfg.request_timeout_s = 30
             cfg.deadline_monotonic = time.monotonic()+30
-            async with LLMClient(cfg) as client:
-                result = await client.chat(role='answer', messages=[{'role': 'user', 'content': 'Reply OK.'}],
-                                           max_tokens=16, use_cache=False, namespace='doctor')
-                if not result.content.strip():
-                    raise ValueError('Endpoint returned an empty model response')
+            async with asyncio.timeout(30):
+                async with LLMClient(cfg) as client:
+                    result = await client.chat(role='answer', messages=[{'role': 'user', 'content': 'Reply OK.'}],
+                                               max_tokens=16, use_cache=False, namespace='doctor')
+                    if not result.content.strip():
+                        raise ValueError('Endpoint returned an empty model response')
             print('Model endpoint OK: one authenticated Chat Completions response received.')
     return 0
 
