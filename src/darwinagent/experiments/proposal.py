@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-from darwinagent.agents.protocol import ModelSession
 from darwinagent.kernel.assets import Asset
 from darwinagent.kernel.revision import AssetPatch, training_id
-from darwinagent.runtime.artifacts import atomic_json
 
 from .bootstrap import revision_protocol
+from .proposal_session import ProposalSession, decode_action
 
 
 class ProposalGenerator:
@@ -23,6 +22,10 @@ class ProposalGenerator:
         allowed_kinds=(),
         admission_error=None,
         wiki_context=None,
+        wiki_service=None,
+        call_limit=None,
+        previous_session=None,
+        objective=None,
     ):
         """allowed_kinds 与上一轮的准入错误都明示给提案模型：范围外补丁与指纹回显错
         应在模型侧重试消化，而不是整轮作废后重复同类错误。"""
@@ -36,13 +39,14 @@ class ProposalGenerator:
                 for case in cases
                 for q in case.questions
             ]
-        session = ModelSession(client, config, "proposal", limit=6)
         payload = {
             "base_version": base.version,
             "assets": [dict(a.to_dict(), fingerprint=a.fingerprint) for a in base.assets.assets],
             "questions": questions,
             "allowed_asset_kinds": sorted(set(allowed_kinds)) if allowed_kinds else [],
         }
+        if objective is not None:
+            payload["objective"] = {"direction": objective, "source": "human"}
         if wiki_context is None:
             payload["task_training_feedback"] = feedback
         else:
@@ -60,24 +64,41 @@ class ProposalGenerator:
                 "The framework resolves this reference against the frozen base_version and verifies the full fingerprint. "
                 "Do not copy or edit the 64-character fingerprint. New assets still use null."
             )
-        try:
-            return await session.request(
-                config.proposal_role,
-                protocol,
-                payload,
-                lambda obj: self.decode(obj, base if wiki_context is not None else None),
-                max_tokens=14000,
-            )
-        finally:
-            atomic_json(
-                target,
-                {
-                    "input": payload,
-                    "protocol": protocol,
-                    "raw_outputs": session.raw,
-                    "events": session.events,
-                },
-            )
+        protocol += (
+            '\nYou may return {"action":"query_wiki","query":{"question":"specific question",'
+            '"scope":{},"view":"raw|summary|regroup","cursor":null,"max_chars":8000}} '
+            "to obtain evidence and continue this same dialogue; "
+            'or {"action":"submit_patch","patches":[...]} using the patch protocol; '
+            'or {"action":"no_change","reason":"why","unresolved":[]}.'
+        )
+        session = ProposalSession(
+            target,
+            payload=payload,
+            protocol=protocol,
+            call_limit=call_limit,
+            previous=previous_session,
+            workspace=getattr(wiki_service, "workspace", None),
+        )
+
+        if admission_error and session.state.get("admission_feedback") != admission_error:
+            session.feedback(admission_error)
+            session.state["admission_feedback"] = admission_error
+            session.save()
+
+        def validate(action):
+            if action["action"] == "submit_patch":
+                return self.decode(
+                    {"patches": action["patches"]}, base if wiki_context is not None else None
+                )
+            if action["action"] == "no_change":
+                return ()
+            return action
+
+        return await session.run(client, config, validate, wiki_service)
+
+    @staticmethod
+    def decode_action(obj):
+        return decode_action(obj)
 
     @staticmethod
     def decode(obj, base=None):

@@ -23,9 +23,10 @@ def parse_json(text):
 
 
 class ModelSession:
-    def __init__(self, client, config, namespace, limit=None):
+    def __init__(self, client, config, namespace, limit=None, journal=None):
         self.client, self.config, self.namespace = client, config, namespace
         self.limit = limit
+        self.journal = journal
         self.calls = 0
         self.raw = []
         self.events = []
@@ -37,20 +38,60 @@ class ModelSession:
         ]
         last = "No valid response"
         for attempt in range(self.config.protocol_attempts):
+            boundary = getattr(self.client, "_control_boundary", None)
+            if boundary is not None:
+                boundary("model:" + role)
             if self.limit is not None and self.calls >= self.limit:
                 raise ProtocolError("Fixed question call budget exhausted", self.raw)
             self.calls += 1
             raw = ""
-            try:
-                response = await self.client.chat(
-                    role=role,
-                    messages=messages,
-                    temperature=self.config.temperature,
-                    max_tokens=max_tokens or self.config.max_tokens,
-                    json_mode=True,
-                    namespace=self.namespace,
-                    use_cache=(attempt == 0),
+            step_path, saved = (None, None)
+            if self.journal is not None:
+                step_path, saved = self.journal.reserve(
+                    "model",
+                    {
+                        "role": role,
+                        "messages": messages,
+                        "temperature": self.config.temperature,
+                        "max_tokens": max_tokens or self.config.max_tokens,
+                    },
                 )
+            try:
+                if saved is not None:
+                    from types import SimpleNamespace
+
+                    response = SimpleNamespace(**saved)
+                else:
+                    if step_path is not None:
+                        self.journal.submitted(step_path)
+                    response = await self.client.chat(
+                        role=role,
+                        messages=messages,
+                        temperature=self.config.temperature,
+                        max_tokens=max_tokens or self.config.max_tokens,
+                        json_mode=True,
+                        namespace=self.namespace,
+                        use_cache=(
+                            attempt == 0 and not (self.journal and self.journal.bypass_cache)
+                        ),
+                        **({"durable": True} if self.journal is not None else {}),
+                    )
+                    if step_path is not None:
+                        self.journal.respond(
+                            step_path,
+                            {
+                                "content": response.content,
+                                "usage": getattr(response, "usage", {}),
+                                "model": getattr(response, "model", None),
+                                "role": role,
+                                "requested_model": getattr(
+                                    response, "requested_model", getattr(response, "model", None)
+                                ),
+                                "provider_model": getattr(response, "provider_model", None),
+                                "response_id": getattr(response, "response_id", None),
+                                "cache_hit": getattr(response, "cache_hit", False),
+                            },
+                        )
             except Exception as exc:
                 self.events.append(
                     {
@@ -60,6 +101,21 @@ class ModelSession:
                         "error": f"{type(exc).__name__}: {exc}",
                     }
                 )
+                if step_path is not None:
+                    from openai import APIStatusError
+
+                    from darwinagent.llm.client import BudgetExceeded
+                    from darwinagent.runtime.steps import AwaitingBudget, UnknownRequest
+
+                    if isinstance(exc, APIStatusError):
+                        self.journal.fail(step_path, exc)
+                        raise
+                    if isinstance(exc, BudgetExceeded) and not exc.dispatched:
+                        self.journal.awaiting_budget(step_path, exc)
+                        raise AwaitingBudget(str(exc)) from exc
+                    raise UnknownRequest(
+                        f"Submitted request has no receipt at {step_path}: {type(exc).__name__}: {exc}"
+                    ) from exc
                 raise
             try:
                 raw = response.content

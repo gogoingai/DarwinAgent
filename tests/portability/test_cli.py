@@ -246,7 +246,7 @@ class TransportLimits(unittest.TestCase):
             self.assertGreater(len(artifacts), 10)
             for path in artifacts:
                 self.assertNotIn(sentinel.encode(), path.read_bytes(), str(path))
-            failure = (root / "B0/generation/maintenance-demo/graph.failure.json").read_text()
+            failure = next(root.rglob("graph.failure.json")).read_text()
             self.assertIn("[redacted]", failure)
             self.assertIn("Error code: 401", failure)
             self.assertEqual(

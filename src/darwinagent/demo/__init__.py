@@ -172,7 +172,10 @@ class ScriptedTransport:
         return {"total_calls": len(self.calls)}
 
 
-async def run_demo(output, *, mode="replay", rounds=2, resume=False, config=None):
+async def run_demo(output, *, mode="replay", rounds=2, resume=False, config=None, execution=None):
+    from darwinagent.runtime.execution import ExecutionSelection
+
+    execution = execution or ExecutionSelection()
     root = Path(output).resolve()
     root.mkdir(parents=True, exist_ok=True)
     cfg = config or Config(work_dir=root)
@@ -190,9 +193,14 @@ async def run_demo(output, *, mode="replay", rounds=2, resume=False, config=None
             for a in assets.assets
         )
         KernelAssets(baseline).export(seed)
+
+    def evaluator_factory(_client, _path):
+        return MaintenanceEvaluator()
+
+    evaluator_factory.criterion_id = "maintenance-technician-date-v1"
     runner = ExperimentRunner(
         MaintenanceAdapter(),
-        lambda _client, _path: MaintenanceEvaluator(),
+        evaluator_factory,
         cfg,
         RunConfig(protocol_attempts=2, answer_attempts=2, tool_steps=3, max_tokens=1800),
         AdoptionPolicy("accuracy", ()),
@@ -209,6 +217,7 @@ async def run_demo(output, *, mode="replay", rounds=2, resume=False, config=None
         rounds=rounds,
         resume=resume,
         scope=("P",),
+        execution=execution,
     )
     atomic_json(
         root / "demo-summary.json",
@@ -216,7 +225,7 @@ async def run_demo(output, *, mode="replay", rounds=2, resume=False, config=None
             "mode": mode,
             "notice": "Replay demonstrates mechanisms, not measured model performance."
             if mode == "replay"
-            else "Live scores measure this tiny example only.",
+            else "Live execution requested; inspect retained and new step provenance. Scores describe this tiny example only.",
             "summary": summary,
         },
     )

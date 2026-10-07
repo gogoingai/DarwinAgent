@@ -101,6 +101,21 @@ class KernelAssets:
             if a.kind != "S" and set(a.schema_dependencies) != schemas:
                 raise ValueError(f"{a.id}: schema dependency must reference the registered schema")
 
+    @property
+    def content_id(self):
+        """Content and interface identity, independent of generation origin.
+
+        Kept outside the historical manifest so existing bundle versions and
+        serialized bytes remain unchanged.
+        """
+        return digest(
+            {
+                "format_version": FORMAT_VERSION,
+                "capability_version": CAPABILITY_VERSION,
+                "assets": [a.to_dict() for a in sorted(self.assets, key=lambda a: a.id)],
+            }
+        )
+
     def manifest(self):
         rows = []
         for a in sorted(self.assets, key=lambda x: x.id):
@@ -188,6 +203,11 @@ class KernelBundle:
                 raise ValueError("Asset contract tampered")
             assets.append(a)
         self.assets = KernelAssets(tuple(assets), manifest["origin"])
+
+    @property
+    def content_id(self):
+        self.verify()
+        return self.assets.content_id
 
     def get(self, asset_id):
         self.verify()

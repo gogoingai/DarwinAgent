@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import os
-import shutil
 import time
 
 from darwinagent.agents.protocol import ProtocolError
@@ -13,6 +12,7 @@ from darwinagent.kernel import KernelBundle
 from darwinagent.kernel.validation import capability_names
 from darwinagent.runtime.artifacts import atomic_json, digest
 from darwinagent.runtime.deadline import RoundDeadlineExceeded
+from darwinagent.runtime.workspace import Workspace
 
 from .constants import ADMISSION_ATTEMPTS
 from .feedback import (
@@ -66,6 +66,18 @@ async def _wiki_bootstrap_trials(wiki, *, root):
         await wiki.record("B0", "bootstrap_trial", report, source=str(report_file), scope="trial")
 
 
+def _human_objective(workspace, branch="main"):
+    for event in reversed(workspace.events(kind="human_intervention")):
+        if event["payload"].get("branch", "main") != branch:
+            continue
+        change = workspace.read_json(event["payload"]["draft_ref"])
+        if change.get("kind") in ("objective", "goal"):
+            goal = change.get("objective", change.get("goal", change.get("direction")))
+            if goal is not None:
+                return goal
+    return None
+
+
 async def _wiki_attempt(
     wiki,
     stage,
@@ -89,6 +101,7 @@ async def _wiki_attempt(
     revisions,
     round_deadline_s,
     snapshot_root,
+    branch="main",
 ):
     """Resume at the first uncompleted attempt; never reuse an uncertain model call."""
     from darwinagent.agents.protocol import parse_json
@@ -113,14 +126,20 @@ async def _wiki_attempt(
             ),
             None,
         )
+        manual_goal = _human_objective(wiki.service.workspace, branch)
         atomic_json(
             goal_path,
             {
                 "base_version": adopted.version,
                 "stage": name,
-                "direction": origin["attribution"]["action"]
-                if origin
-                else "根据训练证据修复未解决问题，可联合调整 S/F/C/P；不降低验收门槛。",
+                "direction": manual_goal
+                if manual_goal is not None
+                else (
+                    origin["attribution"]["action"]
+                    if origin
+                    else "根据训练证据修复未解决问题，可联合调整 S/F/C/P；不降低验收门槛。"
+                ),
+                "objective_source": "human" if manual_goal is not None else "wiki",
                 "evidence_ids": [origin["id"]] if origin else [],
             },
         )
@@ -151,7 +170,14 @@ async def _wiki_attempt(
         proposal_path = record_dir / "proposal-call.json"
         staged_path = stage / f".candidate-attempt-{attempt}"
         record = json.loads(record_path.read_text()) if record_path.exists() else None
-        if record and record["state"] in ("failed", "uncertain"):
+        if record and record["state"] == "no_change":
+            raise WikiAdmissionExhausted("Proposal explicitly requested no change")
+        if record and record["state"] == "uncertain":
+            # A recovered response may now be present; the dialogue itself makes
+            # the receipt check and never sends a replacement automatically.
+            if not proposal_path.exists():
+                raise ProtocolError("Proposal request outcome unknown; recover it explicitly")
+        if record and record["state"] == "failed":
             continue
         if (
             record
@@ -192,7 +218,7 @@ async def _wiki_attempt(
         try:
             if (staged_path / "bundle" / "manifest.json").exists():
                 patches = ()
-            elif proposal_path.exists():
+            elif proposal_path.exists() and "phase" not in json.loads(proposal_path.read_text()):
                 saved = json.loads(proposal_path.read_text())
                 if saved["input"]["base_version"] != adopted.version or (
                     saved["input"].get("wiki", {}).get("version") != record["wiki_version"]
@@ -211,7 +237,11 @@ async def _wiki_attempt(
                     atomic_json(record_path, record)
                     continue
             else:
-                if record_path.exists() and record.get("request_started"):
+                if (
+                    not proposal_path.exists()
+                    and record_path.exists()
+                    and record.get("request_started")
+                ):
                     record.update(state="uncertain", error="Proposal reply not persisted")
                     atomic_json(record_path, record)
                     continue
@@ -219,6 +249,13 @@ async def _wiki_attempt(
                 try:
                     record["request_started"] = True
                     atomic_json(record_path, record)
+                    previous = stage / "optimization" / f"attempt-{attempt - 1}"
+                    prior_status = previous / "status.json"
+                    prior_error = (
+                        json.loads(prior_status.read_text()).get("error")
+                        if prior_status.exists()
+                        else None
+                    )
                     patches = await ProposalGenerator().propose(
                         adopted,
                         cases,
@@ -229,9 +266,20 @@ async def _wiki_attempt(
                         questions,
                         allowed_kinds=tuple(scope or ()),
                         wiki_context=record["wiki_context"],
+                        wiki_service=wiki.service,
+                        call_limit=getattr(config, "proposal_call_limit", None),
+                        previous_session=previous / "proposal-call.json",
+                        admission_error=prior_error,
                     )
                 finally:
                     await client.aclose()
+            if not patches and not (staged_path / "bundle" / "manifest.json").exists():
+                record.update(
+                    state="no_change",
+                    reason=json.loads(proposal_path.read_text()).get("action", {}).get("reason"),
+                )
+                atomic_json(record_path, record)
+                raise WikiAdmissionExhausted("Proposal explicitly requested no change")
             if patches:
                 atomic_json(
                     record_dir / "patches.json", {"patches": [p.to_dict() for p in patches]}
@@ -324,7 +372,17 @@ async def _wiki_attempt(
                 source=str(record_path),
             )
             return KernelBundle(candidate_path)
+        except WikiAdmissionExhausted:
+            raise
         except (ValueError, ProtocolError) as exc:
+            if isinstance(exc, ProtocolError) and (
+                "outcome unknown" in str(exc) or "budget exhausted" in str(exc)
+            ):
+                record.update(
+                    state="uncertain" if "outcome unknown" in str(exc) else "paused", error=str(exc)
+                )
+                atomic_json(record_path, record)
+                raise
             if record.get("state") == "passed":
                 raise
             record.update(state="failed", error=f"{type(exc).__name__}: {exc}")
@@ -437,6 +495,7 @@ async def _legacy_candidate(
     revisions,
     root,
     snapshot_root,
+    branch="main",
 ):
     """Keep the old proposal and error-feedback path unchanged for legacy runs."""
     client = client_factory(name)
@@ -469,7 +528,11 @@ async def _legacy_candidate(
         for attempt in range(ADMISSION_ATTEMPTS):
             attempt_path = stage / f".candidate-attempt-{attempt}"
             if attempt_path.exists():
-                shutil.rmtree(attempt_path)
+                from uuid import uuid4
+
+                retained = stage / "draft-history" / (f"attempt-{attempt}-" + uuid4().hex)
+                retained.parent.mkdir(parents=True, exist_ok=True)
+                os.replace(attempt_path, retained)
             try:
                 patches = await ProposalGenerator().propose(
                     adopted,
@@ -481,7 +544,19 @@ async def _legacy_candidate(
                     questions,
                     allowed_kinds=tuple(scope or ()),
                     admission_error=admission_error,
+                    objective=_human_objective(Workspace(stage.parent / "workspace"), branch),
                 )
+                if not patches:
+                    decision = {
+                        "accepted": False,
+                        "status": "no_change",
+                        "reasons": ["explicit_no_change"],
+                        "base_version": adopted.version,
+                        "candidate": None,
+                    }
+                    atomic_json(decision_path, decision)
+                    decisions.append(decision)
+                    return None
                 training_ids = [tid for case in cases for tid in question_identity(case)]
                 forbidden = [q.text for case in cases for q in case.questions]
                 revisions.propose(

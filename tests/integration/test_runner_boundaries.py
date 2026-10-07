@@ -19,7 +19,7 @@ from tests.support.recorded_fastloop import FastLoopExperiment, _run
 
 
 class RunnerBoundaryTests(unittest.TestCase):
-    def test_wiki_observes_original_decision_publication_order(self):
+    def test_wiki_observes_committed_decision_and_publication(self):
         for limit in (None, 30):
             with self.subTest(deadline=limit), tempfile.TemporaryDirectory() as tmp:
                 root = Path(tmp)
@@ -41,10 +41,10 @@ class RunnerBoundaryTests(unittest.TestCase):
                 ):
                     if stage == "R1" and kind in ("formal", "decision"):
                         decision_path = root / "R1/decision.json"
-                        self.assertEqual(decision_path.exists(), limit is None)
+                        self.assertTrue(decision_path.exists())
                         pointer = json.loads((root / "published/current.json").read_text())
-                        b0 = json.loads((root / "B0/stage.json").read_text())
-                        self.assertEqual(pointer["version"], b0["asset_version"])
+                        saved_decision = json.loads(decision_path.read_text())
+                        self.assertEqual(pointer["version"], saved_decision["candidate_version"])
                         if decision_path.exists():
                             self.assertTrue(json.loads(decision_path.read_text())["accepted"])
                         observed.append(kind)

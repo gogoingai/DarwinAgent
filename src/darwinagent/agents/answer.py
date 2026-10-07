@@ -28,7 +28,7 @@ class AnswerAgent:
             namespace,
         )
 
-    async def answer(self, question, graph):
+    async def answer(self, question, graph, journal=None, stages=None):
         from darwinagent.runtime.artifacts import digest
 
         session = ModelSession(
@@ -36,6 +36,7 @@ class AnswerAgent:
             self.config,
             f"{self.namespace}_q_{digest(question.id)[:12]}",
             self.config.calls_per_question,
+            journal=journal,
         )
         caps = DataCapabilities(graph)
         visible = set()
@@ -43,9 +44,20 @@ class AnswerAgent:
         feedback = []
         trace = []
         vector_once = self.config.retrieval_mode == "vector_once"
+        stages = set(stages or ("retrieval", "answer", "check", "review"))
+        prior = None
+        if "retrieval" not in stages:
+            if journal is None:
+                raise ValueError("Missing saved retrieval input")
+            prior = journal.state()
+            visible = set(prior["visible"])
+            tool_results, feedback, trace = prior["tool_results"], prior["feedback"], prior["trace"]
+            journal.position = prior["position"]
         try:
             for attempt in range(self.config.answer_attempts):
-                if vector_once:
+                if "retrieval" not in stages:
+                    pass
+                elif vector_once:
                     # V0 纯向量基线：一次确定性检索即全部证据预算——无工具循环，检索后冻结；
                     # 作答/检查/审查流程与 G1 完全共享。
                     rows = await asyncio.to_thread(
@@ -113,10 +125,31 @@ class AnswerAgent:
                         }
                         trace.append(call)
                         observation = {}
+                        boundary = getattr(self.client, "_control_boundary", None)
+                        if boundary is not None:
+                            boundary("tool:" + aid)
                         try:
-                            result = self.runtime.call(
-                                aid, action["parameters"], graph, observation
+
+                            def execute_tool(aid=aid, action=action, observation=observation):
+                                value = self.runtime.call(
+                                    aid, action["parameters"], graph, observation
+                                )
+                                return {"result": plain(value), "observation": plain(observation)}
+
+                            saved_tool = (
+                                execute_tool()
+                                if journal is None
+                                else journal.tool(
+                                    {
+                                        "asset_id": aid,
+                                        "asset_fingerprint": asset.fingerprint,
+                                        "parameters": plain(action["parameters"]),
+                                    },
+                                    execute_tool,
+                                )
                             )
+                            result = saved_tool["result"]
+                            observation.update(saved_tool["observation"])
                         except ValueError as exc:
                             if not str(exc).startswith("tool.params:"):
                                 raise
@@ -174,20 +207,38 @@ class AnswerAgent:
                                 **result,
                             }
                         )
-                candidate = await session.request(
-                    self.config.answer_role,
-                    ANSWER_PROTOCOL + "\n任务作答指引：\n" + self.runtime.prompt("answer"),
-                    {
-                        "question": question.text,
-                        "parameters": plain(question.parameters),
-                        "answer_format": self.spec.answer_format,
-                        "answer_contract": plain(self.spec.answer_contract),
-                        "tool_results": tool_results,
-                        "visible_evidence": [caps.rows[x] for x in sorted(visible)],
-                        "feedback": feedback,
-                    },
-                    lambda obj, visible=visible: self._candidate(obj, visible),
-                )
+                if journal is not None:
+                    journal.save_state(
+                        {
+                            "phase": "retrieved",
+                            "visible": sorted(visible),
+                            "tool_results": tool_results,
+                            "feedback": feedback,
+                            "trace": trace,
+                            "candidate": None if prior is None else prior.get("candidate"),
+                        }
+                    )
+                if not (stages & {"answer", "check", "review"}):
+                    return None
+                if "answer" not in stages:
+                    candidate = None if prior is None else prior.get("candidate")
+                    if candidate is None:
+                        raise ValueError("Missing saved candidate; answer stage is not selected")
+                else:
+                    candidate = await session.request(
+                        self.config.answer_role,
+                        ANSWER_PROTOCOL + "\n任务作答指引：\n" + self.runtime.prompt("answer"),
+                        {
+                            "question": question.text,
+                            "parameters": plain(question.parameters),
+                            "answer_format": self.spec.answer_format,
+                            "answer_contract": plain(self.spec.answer_contract),
+                            "tool_results": tool_results,
+                            "visible_evidence": [caps.rows[x] for x in sorted(visible)],
+                            "feedback": feedback,
+                        },
+                        lambda obj, visible=visible: self._candidate(obj, visible),
+                    )
                 if candidate["status"] == "abstained" and not any(
                     t["read_operations"] for t in tool_results
                 ):
@@ -206,9 +257,27 @@ class AnswerAgent:
                         }
                     )
                     continue
-                snapshot, opinions = self.runtime.check_candidate(
-                    question, candidate, graph, visible
-                )
+                if journal is not None:
+                    journal.save_state(
+                        {
+                            "phase": "candidate",
+                            "visible": sorted(visible),
+                            "tool_results": tool_results,
+                            "feedback": feedback,
+                            "trace": trace,
+                            "candidate": candidate,
+                        }
+                    )
+                if "check" in stages:
+                    snapshot, opinions = self.runtime.check_candidate(
+                        question, candidate, graph, visible
+                    )
+                else:
+                    # Fixed shape/evidence validation still applies; semantic C is optional by selection.
+                    self._candidate(candidate, visible)
+                    snapshot = {"question": question.text, **candidate}
+                    opinions = []
+                    trace.append({"stage": "check", "status": "not_selected"})
                 trace.append(
                     {
                         "stage": "candidate",
@@ -219,6 +288,10 @@ class AnswerAgent:
                 )
                 failures = [x for x in opinions if not x["ok"]]
                 if failures:
+                    if "answer" not in stages:
+                        raise ProtocolError(
+                            "Saved candidate rejected; answer stage is not selected", session.raw
+                        )
                     # C 失败候选的检查快照原地留存（可验证经验回放原料，2026-10-05 Travel
                     # 冻结容器误判事故）：输入与判定事实原样进检查点，供后续候选准入回放；
                     # visible_evidence 行数封顶防爆轨迹，整体超限则只留截断标记。
@@ -265,6 +338,9 @@ class AnswerAgent:
                         }
                     ]
                 rejected = None
+                if "review" not in stages:
+                    trace.append({"stage": "review", "status": "not_selected"})
+                    review_inputs = []
                 for review_input in review_inputs:
                     review = await session.request(
                         self.config.review_role,
@@ -276,8 +352,23 @@ class AnswerAgent:
                     if not review["accepted"]:
                         rejected = review
                         break
+                if journal is not None:
+                    journal.save_state(
+                        {
+                            "phase": "reviewed",
+                            "visible": sorted(visible),
+                            "tool_results": tool_results,
+                            "feedback": feedback,
+                            "trace": trace,
+                            "candidate": candidate,
+                        }
+                    )
                 if rejected:
                     feedback.append({"candidate": candidate, "review": rejected})
+                    if "answer" not in stages:
+                        raise ProtocolError(
+                            "Saved candidate rejected; answer stage is not selected", session.raw
+                        )
                     continue
                 evidence = (
                     tuple(graph.sources[s].source for s in sorted(source_ids))
@@ -322,6 +413,12 @@ class AnswerAgent:
                 "Feedback retries exhausted without a publishable candidate", session.raw
             )
         except Exception as exc:
+            from darwinagent.runtime.steps import AwaitingBudget, RequestAbandoned, UnknownRequest
+
+            if getattr(exc, "continuation_signal", False) or isinstance(
+                exc, (UnknownRequest, AwaitingBudget, RequestAbandoned)
+            ):
+                raise
             trace.append(
                 {
                     "stage": "execution_error",

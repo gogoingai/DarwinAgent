@@ -22,7 +22,9 @@ from .registry import REGISTRY_VERSION, request_policy, resolve
 
 
 class BudgetExceeded(RuntimeError):
-    pass
+    def __init__(self, message, *, dispatched=False):
+        super().__init__(message)
+        self.dispatched = dispatched
 
 
 class EmptyCompletion(RuntimeError):
@@ -51,6 +53,9 @@ class LLMResult:
     elapsed_s: float
     model: str
     role: str
+    requested_model: str | None = None
+    provider_model: str | None = None
+    response_id: str | None = None
 
 
 class LLMClient:
@@ -177,6 +182,7 @@ class LLMClient:
         json_mode: bool = False,
         namespace: str = "default",
         use_cache: bool = True,
+        durable: bool = False,
     ) -> LLMResult:
         request = dict(
             role=role,
@@ -186,6 +192,7 @@ class LLMClient:
             json_mode=json_mode,
             namespace=namespace,
             use_cache=use_cache,
+            durable=durable,
         )
         deadline = self.cfg.deadline_monotonic
         if deadline is None:
@@ -197,10 +204,19 @@ class LLMClient:
             async with asyncio.timeout(remaining):
                 return await self._chat(**request)
         except TimeoutError:
-            raise BudgetExceeded("Model request deadline exceeded") from None
+            raise BudgetExceeded("Model request deadline exceeded", dispatched=True) from None
 
     async def _chat(
-        self, *, role, messages, temperature, max_tokens, json_mode, namespace, use_cache
+        self,
+        *,
+        role,
+        messages,
+        temperature,
+        max_tokens,
+        json_mode,
+        namespace,
+        use_cache,
+        durable=False,
     ):
         model = self.cfg.model_for(role)
         resolved = resolve(model, self.cfg)
@@ -232,6 +248,9 @@ class LLMClient:
                     elapsed_s=0.0,
                     model=model,
                     role=role,
+                    requested_model=model,
+                    provider_model=data.get("provider_model"),
+                    response_id=data.get("response_id"),
                 )
             except Exception:
                 pass  # 缓存损坏则重打
@@ -266,9 +285,12 @@ class LLMClient:
                     parts: list[str] = []
                     usage: dict = {}
                     reasoning_chars = 0
+                    provider_model, response_id = None, None
                     stream = await use_client.chat.completions.create(**kwargs)
                     try:
                         async for chunk in stream:
+                            provider_model = getattr(chunk, "model", None) or provider_model
+                            response_id = getattr(chunk, "id", None) or response_id
                             if chunk.choices:
                                 delta = chunk.choices[0].delta
                                 if delta and delta.content:
@@ -296,6 +318,9 @@ class LLMClient:
                     elapsed_s=round(time.time() - t0, 2),
                     model=model,
                     role=role,
+                    requested_model=model,
+                    provider_model=provider_model,
+                    response_id=response_id,
                 )
                 # 空正文（思考吃光预算）不入缓存，下次调用自动重试
                 if content.strip():
@@ -303,7 +328,11 @@ class LLMClient:
                 else:
                     result.usage["empty_content"] = True
                 await self._append_ledger(namespace, role, model, usage, cache_hit=False)
-                if not content.strip() and role not in self.cfg.empty_response_passthrough_roles:
+                if (
+                    not durable
+                    and not content.strip()
+                    and role not in self.cfg.empty_response_passthrough_roles
+                ):
                     raise EmptyCompletion(f"Empty generation response from {model}")
                 return result
             except BudgetExceeded:
@@ -312,9 +341,11 @@ class LLMClient:
                 last_err = e
             except (APIConnectionError, APITimeoutError) as e:
                 last_err = self._sanitize_transport_error(e)
+                if durable:
+                    raise last_err from None
             except APIStatusError as e:
                 last_err = self._sanitize_transport_error(e)
-                if e.status_code not in (429, 500, 502, 503, 504, 529):
+                if durable or e.status_code not in (429, 500, 502, 503, 504, 529):
                     raise last_err from None  # Retry only transient service status codes.
             except APIError as e:
                 raise self._sanitize_transport_error(e) from None
@@ -448,7 +479,16 @@ class LLMClient:
 
     @staticmethod
     def _save_cache(path: Path, result: LLMResult) -> None:
-        atomic_json(path, {"content": result.content, "usage": result.usage, "model": result.model})
+        atomic_json(
+            path,
+            {
+                "content": result.content,
+                "usage": result.usage,
+                "model": result.model,
+                "provider_model": result.provider_model,
+                "response_id": result.response_id,
+            },
+        )
 
     def _log_retry(self, namespace, role, attempt, err, backoff) -> None:
         err = self._redact_error(err)

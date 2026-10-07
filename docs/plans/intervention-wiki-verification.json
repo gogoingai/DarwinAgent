@@ -1,0 +1,439 @@
+{
+  "date": "2026-10-07",
+  "base_commit": "7b25da29d524ff9fa6497fdeb021dadcb5cf4741",
+  "core": {
+    "tests": 515,
+    "passed": 508,
+    "skipped": 7,
+    "result": "pass",
+    "seconds": 37.933
+  },
+  "locomo": {
+    "tests": 18,
+    "result": "pass"
+  },
+  "travelplanner": {
+    "tests": 11,
+    "result": "pass"
+  },
+  "ruff_check": "pass",
+  "ruff_format_check": "pass",
+  "diff_check": "pass",
+  "installed_wheel_outside_checkout": "pass",
+  "smoke": {
+    "mode": "offline_replay",
+    "questions": 5,
+    "statuses": [
+      "answered",
+      "answered",
+      "answered",
+      "answered",
+      "abstained"
+    ],
+    "initial_calls": 23,
+    "reuse_new_calls": 0,
+    "dynamic_dialogue_calls": 13,
+    "evaluation": {
+      "metrics": {
+        "fixture_exact": 5
+      },
+      "total": 5,
+      "completed": 5,
+      "generation_faults": 0,
+      "evaluation_faults": 0,
+      "diagnostics": []
+    },
+    "http_attempts": 0,
+    "concurrency": 1,
+    "live_limits": {
+      "http_attempts": 80,
+      "active_seconds": 900
+    },
+    "note": "offline replay; separate from real model results"
+  },
+  "real_model_http_attempts": 109,
+  "live_smoke": "complete",
+  "logs": {
+    "core": "/tmp/darwin-release-core-final.log",
+    "locomo": "/tmp/darwin-release-locomo-final.log",
+    "travelplanner": "/tmp/darwin-release-travel-final.log",
+    "installed_wheel": "/tmp/darwin-installed-release-final3.log"
+  },
+  "implementation_branch": "feature/intervention-wiki",
+  "target_branch": "main",
+  "publication_authorization": "user_requested_publish_main_after_passing_tests",
+  "active_seconds": 2788.704,
+  "currency_cost": "unknown; provider invoice not supplied",
+  "live": {
+    "model": "glm-5.3-flash",
+    "concurrency": 1,
+    "cases": 4,
+    "questions": 11,
+    "five": {
+      "status": "complete",
+      "http_attempts": 76,
+      "evaluation": {
+        "metrics": {
+          "fixture_exact": 0
+        },
+        "total": 5,
+        "completed": 5,
+        "generation_faults": 0,
+        "evaluation_faults": 0,
+        "diagnostics": []
+      },
+      "factual_audit": "runs/intervention-five-live-glm53/factual-audit.json",
+      "reuse_new_http_attempts": 0,
+      "ledger": {
+        "total_calls": 76,
+        "cache_hits": 0,
+        "prompt_tokens": 1067730,
+        "completion_tokens": 136287,
+        "by_model": {
+          "glm-5.3-flash": {
+            "calls": 76
+          }
+        },
+        "by_ns": {
+          "550c241b7e2ca933_q_0941b0349368": {
+            "calls": 4
+          },
+          "550c241b7e2ca933_q_b90d71ac9ede": {
+            "calls": 5
+          },
+          "550c241b7e2ca933_q_f5c8604e5f49": {
+            "calls": 6
+          },
+          "550c241b7e2ca933_q_a96dece7cc92": {
+            "calls": 8
+          },
+          "550c241b7e2ca933_q_8f6c258a5d2e": {
+            "calls": 6
+          },
+          "proposal": {
+            "calls": 22
+          },
+          "wiki_regroup:a4349c3aa32dcefff58b18fb3505b80ee82afd9f670ecbb361448fe470e5f21d:0": {
+            "calls": 8
+          },
+          "wiki_regroup:a4349c3aa32dcefff58b18fb3505b80ee82afd9f670ecbb361448fe470e5f21d:1": {
+            "calls": 1
+          },
+          "wiki_regroup:a4349c3aa32dcefff58b18fb3505b80ee82afd9f670ecbb361448fe470e5f21d:2": {
+            "calls": 1
+          },
+          "wiki_regroup:a4349c3aa32dcefff58b18fb3505b80ee82afd9f670ecbb361448fe470e5f21d:3": {
+            "calls": 1
+          },
+          "wiki_regroup:a4349c3aa32dcefff58b18fb3505b80ee82afd9f670ecbb361448fe470e5f21d:4": {
+            "calls": 1
+          },
+          "wiki_regroup:a4349c3aa32dcefff58b18fb3505b80ee82afd9f670ecbb361448fe470e5f21d:5": {
+            "calls": 1
+          },
+          "wiki_regroup:a4349c3aa32dcefff58b18fb3505b80ee82afd9f670ecbb361448fe470e5f21d:merge:0:0": {
+            "calls": 2
+          },
+          "wiki_regroup:a4349c3aa32dcefff58b18fb3505b80ee82afd9f670ecbb361448fe470e5f21d:merge:0:1": {
+            "calls": 2
+          },
+          "wiki_regroup:a4349c3aa32dcefff58b18fb3505b80ee82afd9f670ecbb361448fe470e5f21d:merge:0:2": {
+            "calls": 2
+          },
+          "wiki_regroup:a4349c3aa32dcefff58b18fb3505b80ee82afd9f670ecbb361448fe470e5f21d:merge:1:0": {
+            "calls": 3
+          },
+          "wiki_regroup:a4349c3aa32dcefff58b18fb3505b80ee82afd9f670ecbb361448fe470e5f21d:merge:2:0": {
+            "calls": 3
+          }
+        }
+      },
+      "limits": {
+        "http_attempts": 80,
+        "active_seconds": 2700,
+        "concurrency": 1
+      }
+    },
+    "extended": {
+      "status": "complete",
+      "http_attempts": 33,
+      "evaluations": [
+        {
+          "case_id": "subject-date",
+          "evaluation": {
+            "total": 2,
+            "passed": 2,
+            "rows": [
+              {
+                "question_id": "q1",
+                "status": "answered",
+                "actual": {
+                  "technician": "赵",
+                  "date": "2026-03-09"
+                },
+                "expected": {
+                  "technician": "赵",
+                  "date": "2026-03-09"
+                },
+                "passed": true,
+                "answer": "{\"technician\": \"赵\", \"date\": \"2026-03-09\"}",
+                "node_ids": [
+                  "n000001"
+                ]
+              },
+              {
+                "question_id": "q2",
+                "status": "answered",
+                "actual": {
+                  "technician": "林",
+                  "date": "2026-01-02"
+                },
+                "expected": {
+                  "technician": "林",
+                  "date": "2026-01-02"
+                },
+                "passed": true,
+                "answer": "{\"technician\": \"林\", \"date\": \"2026-01-02\"}",
+                "node_ids": [
+                  "n000000"
+                ]
+              }
+            ]
+          },
+          "reuse_new_http_attempts": 0
+        },
+        {
+          "case_id": "historical-refusal",
+          "evaluation": {
+            "total": 2,
+            "passed": 2,
+            "rows": [
+              {
+                "question_id": "q1",
+                "status": "answered",
+                "actual": {
+                  "technician": "李",
+                  "date": "2026-07-03",
+                  "count": 1
+                },
+                "expected": {
+                  "technician": "李",
+                  "date": "2026-07-03"
+                },
+                "passed": true,
+                "answer": "{\"technician\": \"李\", \"date\": \"2026-07-03\", \"count\": 1}",
+                "node_ids": [
+                  "n000001"
+                ]
+              },
+              {
+                "question_id": "q2",
+                "status": "abstained",
+                "actual": null,
+                "expected": null,
+                "passed": true,
+                "answer": "无 D-59 的维护记录（device_lookup 与事实检索均返回空），无法提供维护人与日期。",
+                "node_ids": []
+              }
+            ]
+          },
+          "reuse_new_http_attempts": 0
+        },
+        {
+          "case_id": "paging-tail",
+          "evaluation": {
+            "total": 2,
+            "passed": 2,
+            "rows": [
+              {
+                "question_id": "q1",
+                "status": "answered",
+                "actual": {
+                  "count": 75
+                },
+                "expected": {
+                  "count": 75
+                },
+                "passed": true,
+                "answer": "{\"count\": 75}",
+                "node_ids": [
+                  "n000000",
+                  "n000001",
+                  "n000002",
+                  "n000003",
+                  "n000004",
+                  "n000005",
+                  "n000006",
+                  "n000007",
+                  "n000008",
+                  "n000009",
+                  "n000010",
+                  "n000011",
+                  "n000012",
+                  "n000013",
+                  "n000014",
+                  "n000015",
+                  "n000016",
+                  "n000017",
+                  "n000018",
+                  "n000019",
+                  "n000020",
+                  "n000021",
+                  "n000022",
+                  "n000023",
+                  "n000024",
+                  "n000025",
+                  "n000026",
+                  "n000027",
+                  "n000028",
+                  "n000029",
+                  "n000030",
+                  "n000031",
+                  "n000032",
+                  "n000033",
+                  "n000034",
+                  "n000035",
+                  "n000036",
+                  "n000037",
+                  "n000038",
+                  "n000039",
+                  "n000040",
+                  "n000041",
+                  "n000042",
+                  "n000043",
+                  "n000044",
+                  "n000045",
+                  "n000046",
+                  "n000047",
+                  "n000048",
+                  "n000049",
+                  "n000050",
+                  "n000051",
+                  "n000052",
+                  "n000053",
+                  "n000054",
+                  "n000055",
+                  "n000056",
+                  "n000057",
+                  "n000058",
+                  "n000059",
+                  "n000060",
+                  "n000061",
+                  "n000062",
+                  "n000063",
+                  "n000064",
+                  "n000065",
+                  "n000066",
+                  "n000067",
+                  "n000068",
+                  "n000069",
+                  "n000070",
+                  "n000071",
+                  "n000072",
+                  "n000073",
+                  "n000074"
+                ]
+              },
+              {
+                "question_id": "q2",
+                "status": "answered",
+                "actual": {
+                  "technician": "陈",
+                  "date": "2026-03-16",
+                  "count": 75
+                },
+                "expected": {
+                  "technician": "陈",
+                  "date": "2026-03-16"
+                },
+                "passed": true,
+                "answer": "{\"technician\": \"陈\", \"date\": \"2026-03-16\", \"count\": 75}",
+                "node_ids": [
+                  "n000074"
+                ]
+              }
+            ]
+          },
+          "reuse_new_http_attempts": 0
+        }
+      ],
+      "receipt_resume": {
+        "same_request_id": true,
+        "saved_response_reused": true
+      },
+      "ledger": {
+        "total_calls": 33,
+        "cache_hits": 0,
+        "prompt_tokens": 134736,
+        "completion_tokens": 19912,
+        "by_model": {
+          "glm-5.3-flash": {
+            "calls": 33
+          }
+        },
+        "by_ns": {
+          "3b6761127415caea_q_0941b0349368": {
+            "calls": 4
+          },
+          "3b6761127415caea_q_b90d71ac9ede": {
+            "calls": 4
+          },
+          "0e0d9092d4be039f_q_0941b0349368": {
+            "calls": 4
+          },
+          "0e0d9092d4be039f_q_b90d71ac9ede": {
+            "calls": 7
+          },
+          "b2309d65bcf42daa_q_0941b0349368": {
+            "calls": 6
+          },
+          "b2309d65bcf42daa_q_b90d71ac9ede": {
+            "calls": 8
+          }
+        }
+      },
+      "limits": {
+        "http_attempts": 70,
+        "active_seconds": 1200
+      }
+    },
+    "dynamic": {
+      "status": "complete",
+      "job_id": "a4349c3aa32dcefff58b18fb3505b80ee82afd9f670ecbb361448fe470e5f21d",
+      "completed_chunks": 6,
+      "completed_merge_groups": 5,
+      "proposal_calls": 22,
+      "exchanges": 19,
+      "terminal_action": {
+        "action": "no_change",
+        "reason": "采纳人工反证（correction_ref: 296805c8158c77f4578e4809762d71c6a1463c4db12b4f8f0003002961217560）并撤回先前理由中的错误泛化：明确撤回「每页行数=limit」及「每页行数等于limit」的表述——limit 仅为单次请求的上限，末页允许少于 limit；本例末页 f_page_facts(offset=40, limit=100) 实际返回 90 条（n000040-n000129），next_offset=130、more_remain=false，90<100 恰为该规则的正确实例，而非「每页行数等于limit」的证据。该错误仅存在于我此前 no_change 理由的归纳中，q3 案例记录本身（generated_answer 仅陈述各页条数 20/20/90 与末页字段，未声称条数等于 limit）并无此错误。修正后的核对结论保持不变：(1) 分页链原件核实无误——step 0 device_lookup{serial:D-17} 返回 n000000-n000019 共20条；step 1 f_page_facts{offset:20, limit:20} 返回 n000020-n000039 共20条，next_offset=40、more_remain=true、matched_count=130；step 2 f_page_facts{offset:40, limit:100} 返回 n000040-n000129 共90条，next_offset=130、more_remain=false、matched_count=130；offset 衔接连续，各次返回条数均不超过对应 limit。(2) 130=20+20+90 的计数结论经反证确认仍正确：与 source_text 原文逐日一致（2026-09-01 至 2027-01-08，9月30+10月31+11月30+12月31+1月8=130），末条 D-18（2027-01-09，赵）被正确排除。(3) candidate（device_subject ok=true）与 review（各项全 true）结论与原始数据吻合。综上，q3 记录与原件一致，无需修改案例；仅理由中的无证据泛化已按反证撤回并更正为「各次调用返回条数≤limit，末页可少于limit」。",
+        "unresolved": []
+      },
+      "wiki_new_calls_for_reply_refresh_and_human_correction": 0,
+      "human_refutation": "runs/intervention-five-live-glm53/human-refutation.json"
+    }
+  },
+  "migration_extended": {
+    "export": "complete",
+    "native_objects": 143,
+    "progress_files": 351,
+    "missing": 0,
+    "isolated": 0,
+    "import": "complete",
+    "continued_questions": 6,
+    "new_calls": 0
+  },
+  "migration_five": {
+    "export": "complete",
+    "native_objects": 216,
+    "progress_files": 411,
+    "missing": 0,
+    "import": "complete",
+    "isolated": 0,
+    "continued_questions": 5,
+    "new_calls": 0,
+    "pinned_wiki_reply_reused": true,
+    "human_correction_retained": true,
+    "verification_scope_note": "An initial offline check requested a fresh post-correction snapshot, which legitimately needs regrouping. Its zero-HTTP RecordedClient attempt was explicitly abandoned. Saved-cursor continuation then passed with zero calls."
+  }
+}

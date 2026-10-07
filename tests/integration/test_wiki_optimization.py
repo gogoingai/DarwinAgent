@@ -54,7 +54,7 @@ class WikiOptimizationTests(unittest.TestCase):
             self.assertGreater(second["input"]["wiki"]["version"], 0)
             self.assertTrue((root / "R1/optimization/attempt-0/status.json").exists())
 
-    def test_ten_recorded_rounds_keep_rejected_experience_without_candidate_carryover(self):
+    def test_ten_recorded_rounds_continue_working_candidates_separately_from_adoption(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             runner = WikiRecordedExperiment(root)
@@ -80,7 +80,7 @@ class WikiOptimizationTests(unittest.TestCase):
                 )
             )
             self.assertEqual(
-                input_10["input"]["base_version"], result["rounds"][0]["candidate_version"]
+                input_10["input"]["base_version"], result["rounds"][8]["candidate_version"]
             )
             self.assertEqual(len(wiki["consumed_ids"]), len(set(wiki["consumed_ids"])))
             resumed = WikiRecordedExperiment(root)
@@ -150,16 +150,17 @@ class WikiOptimizationTests(unittest.TestCase):
                 return await original(self, stage, kind, facts, **kwargs)
 
             with mock.patch.object(WikiMaintainer, "record", interrupt):
-                with self.assertRaisesRegex(RuntimeError, "interrupt after decision"):
-                    with contextlib.redirect_stdout(io.StringIO()):
-                        asyncio.run(
-                            runner.run(
-                                runner.case.id,
-                                TaskSpec.load(TASK / "task.yaml"),
-                                rounds=1,
-                                scope=("S", "F", "C", "P"),
-                            )
+                with contextlib.redirect_stdout(io.StringIO()):
+                    initial = asyncio.run(
+                        runner.run(
+                            runner.case.id,
+                            TaskSpec.load(TASK / "task.yaml"),
+                            rounds=1,
+                            scope=("S", "F", "C", "P"),
                         )
+                    )
+                self.assertEqual(initial["status"], "complete")
+                self.assertTrue(initial["pending_wiki_tasks"])
             self.assertTrue((root / "R1/decision.json").exists())
             resumed = WikiRecordedExperiment(root)
             with contextlib.redirect_stdout(io.StringIO()):

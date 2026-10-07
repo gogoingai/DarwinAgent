@@ -114,5 +114,7 @@ class DatasetBoundary(unittest.TestCase):
     def test_dataset_entries_use_same_pipeline(self):
         for name in ["locomo", "travelplanner"]:
             source = (ROOT / "datasets" / name / "run.py").read_text()
-            self.assertIn("from darwinagent.engine import Pipeline", source)
+            self.assertIn("from darwinagent.experiments.stages import selected_stage", source)
+            shared = (ROOT / "src/darwinagent/experiments/stages.py").read_text()
+            self.assertIn("from darwinagent.engine.pipeline import Pipeline", shared)
             self.assertNotIn("class ", source)

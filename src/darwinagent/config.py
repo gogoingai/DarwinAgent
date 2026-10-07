@@ -41,6 +41,7 @@ class RunConfig:
     tool_steps: int = 5
     calls_per_question: int = 32
     max_tokens: int = 4096
+    wiki_max_tokens: int | None = None
     temperature: float = 0.2
     function_steps: int = 30000
     function_timeout_s: float = 2.0
@@ -73,6 +74,10 @@ class RunConfig:
         ):
             if type(getattr(self, key)) is not int or getattr(self, key) <= 0:
                 raise ValueError(f"{key} must be a positive integer")
+        if self.wiki_max_tokens is not None and (
+            type(self.wiki_max_tokens) is not int or self.wiki_max_tokens <= 0
+        ):
+            raise ValueError("wiki_max_tokens must be a positive integer or None")
         if self.retrieval_mode not in ("agentic", "vector_once"):
             raise ValueError("retrieval_mode must be 'agentic' or 'vector_once'")
         if (

@@ -458,6 +458,12 @@ class RunResult:
     memory_count: int = 0
     memory_fingerprint: str = ""
     graph_fingerprint: str = ""
+    answer_provenance: tuple[Mapping[str, Any], ...] = ()
+
+    def __post_init__(self):
+        object.__setattr__(
+            self, "answer_provenance", tuple(freeze(row) for row in self.answer_provenance)
+        )
 
     def to_dict(self):
         return {
@@ -470,6 +476,7 @@ class RunResult:
             "memory_count": self.memory_count,
             "memory_fingerprint": self.memory_fingerprint,
             "graph_fingerprint": self.graph_fingerprint,
+            "answer_provenance": plain(self.answer_provenance),
         }
 
 

@@ -63,6 +63,7 @@ async def run(
     verify,
     wiki_call_limit,
     coordinate_rounds,
+    execution=None,
 ):
     """case_ids: one conversation id or a tuple; every case runs fully each round on the
     same candidate bundle. rounds=None iterates until stop_file appears. scope limits
@@ -113,7 +114,17 @@ async def run(
         # 兼容旧声明：rounds 已移出身份（2026-10-06 缺口①修复——轮数是预算
         # 上限不是数据身份）；旧运行的 wiki/检查点身份仍按冻结纪律校验。
         recorded.pop("rounds", None)
-        if not resume or recorded != declaration:
+        if recorded != declaration and execution is not None and not execution.strict:
+            from darwinagent.runtime.workspace import Workspace
+
+            workspace = Workspace(root / "workspace")
+            original = workspace.put_json(recorded)
+            current = workspace.put_json(declaration)
+            workspace.append_event(
+                "execution_conditions_changed",
+                {"original": original, "current": current, "comparison": "mixed_sources"},
+            )
+        elif not resume or recorded != declaration:
             raise ValueError(
                 "Existing experiment requires explicit resume with exactly the same identity"
             )

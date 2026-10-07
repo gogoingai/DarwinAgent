@@ -37,7 +37,7 @@ The kernel, evaluator, permissions, and adoption rules stay outside the proposal
 | Shared task runtime | `ExtractionAgent` → attributed graph → `AnswerAgent`, through one `Pipeline` |
 | Bounded task assets | **S** schemas, **F** query functions, **C** task checks, **P** role prompts |
 | Experience | Wiki stores observations and accepted/rejected decisions for subsequent proposals |
-| Reproducibility | Fingerprinted bundles, frozen run identity, persistent artifacts, explicit resume |
+| Reproducibility | Content identities, separate provenance, scoped resume and optional strict comparison |
 | Evaluation | Separate `DatasetAdapter` and `Evaluator`; metric names supplied by the task |
 | Experiment control | `ExperimentRunner`; separate `CampaignController` for train/validation/test protocols |
 | Model connection | One explicit OpenAI-compatible Chat Completions endpoint by default; optional tier overrides |
@@ -61,7 +61,7 @@ The output directory contains:
 
 ```text
 runs/demo-replay/
-├── experiment.json                           # frozen identity
+├── experiment.json                           # original experiment declaration
 ├── B0/evaluation/maintenance-demo.json         # baseline score
 ├── R1/evaluation/maintenance-demo.json         # candidate score (also R2)
 ├── R1/optimization/attempt-0/proposal-call.json # proposal input (also R2)
@@ -81,7 +81,7 @@ uv run darwinagent demo --mode live --rounds 2 --output runs/demo-live \
 
 The CLI reads the current directory's `.env` without overriding shell variables. Live uses the actual model, with no recorded fallback. The cap counts dispatched HTTP attempts, including retries; the timeout covers the whole run. A live baseline may already be correct, so ties are rejected. Success means the stages execute and decisions are recorded, not that the score must improve.
 
-Resume an existing run only with the same frozen mode, model, configuration, and source identity:
+Daily continuation retains saved work across changes to models and execution controls. Source changes take effect after a safe restart; use `--strict-comparison` when requiring the original frozen comparison conditions:
 
 ```bash
 uv run darwinagent demo --mode replay --rounds 2 --output runs/demo-replay --resume
@@ -172,3 +172,7 @@ The S/F kernel is inspired by [*Toward Effective and Reliable LLM Agents via Dyn
 [Contributing](CONTRIBUTING.md) · [中文贡献指南](CONTRIBUTING.zh-CN.md) · [Changelog](CHANGELOG.md) · [Software citation](CITATION.cff)
 
 MIT © 2026 DarwinAgent contributors. See [LICENSE](LICENSE); third-party material retains its own license and provenance.
+
+## Durable continuation and Wiki queries
+
+The Workspace APIs and offline CLI retain original evidence, request receipts, human selection history and scoped previews. Wiki queries can return raw evidence or create a resumable regroup task. See [the continuation guide](docs/workspace-continuation.md). Real model smoke remains pending explicit model selection and execution; these interfaces do not establish benchmark gains.

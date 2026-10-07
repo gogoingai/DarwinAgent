@@ -6,12 +6,12 @@ import json
 from collections.abc import Mapping
 from pathlib import Path
 
-from darwinagent.contracts import plain
+from darwinagent.contracts import CorpusBlock, SourceRef, plain
 from darwinagent.kernel.revision import training_id
 
 from .constants import _DIAG_ROW_CHARS, _TRACE_CHARS
 from .constants import FEEDBACK_BUDGET_CHARS as FEEDBACK_BUDGET_CHARS
-from .wiki_evidence import bounded_trace
+from .wiki_evidence import bounded_trace, pagination_metadata
 
 
 def _clip(value, limit):
@@ -354,15 +354,68 @@ def _wiki_training_evidence(cases, results, baseline_results=(), diagnostics=())
                 and isinstance(value.get("precise"), bool)
             }
     examples = []
+    original_examples = []
     for case in cases:
         answers = {a.question_id: a for a in getattr(current.get(case.id), "answers", ())}
         old = {a.question_id: a for a in getattr(previous.get(case.id), "answers", ())}
-        sources = {b.source.location: b for b in case.corpus}
-        sources.update({b.source.id: b for b in case.corpus})
+        producers = {
+            row["question_id"]: plain(row)
+            for row in getattr(current.get(case.id), "answer_provenance", ())
+        }
+        if not producers:
+            for diagnostic in getattr(current.get(case.id), "graph_diagnostics", ()):
+                producers.update(
+                    {row["question_id"]: plain(row) for row in diagnostic.get("answer_sources", ())}
+                )
         for q in case.questions:
             a = answers.get(q.id)
             if a is None:
                 continue
+            producer = producers.get(q.id, {})
+            original_case = producer.get("original_case", {})
+            source_blocks = []
+            source_status = producer.get("source_status", "unknown")
+            for block in original_case.get("corpus", []):
+                source = SourceRef(**block["source"])
+                source_blocks.append(CorpusBlock(source, block["text"], block.get("metadata", {})))
+            sources = {b.source.location: b for b in source_blocks}
+            sources.update({b.source.id: b for b in source_blocks})
+            original_question = next(
+                (row for row in original_case.get("questions", []) if row["id"] == q.id), None
+            )
+            original_examples.append(
+                {
+                    "case_id": case.id,
+                    "question_id": q.id,
+                    "training_id": training_id(case.id, q.id),
+                    "run_identity": producer.get("identity"),
+                    "asset_version": producer.get("asset_version"),
+                    "graph_fingerprint": producer.get("graph_fingerprint"),
+                    "producer": producer,
+                    "source_status": source_status,
+                    "source_gap": None
+                    if source_blocks
+                    else "Original answer source unavailable; current corpus was not substituted",
+                    "question": original_question["text"] if original_question else None,
+                    "question_parameters": original_question["parameters"]
+                    if original_question
+                    else None,
+                    "question_status": "recorded" if original_question else "unknown",
+                    "selected_question": q.to_dict(),
+                    "status": a.status,
+                    "generated_answer": a.answer,
+                    "trace": plain(a.trace or ()),
+                    "source_text": [
+                        {
+                            "source_id": b.source.id,
+                            "location": b.source.location,
+                            "text": b.text,
+                            "metadata": plain(b.metadata),
+                        }
+                        for b in source_blocks
+                    ],
+                }
+            )
             pointers = set(e.location for e in a.evidence)
             trace = []
             for ev in plain(a.trace or ()):
@@ -398,6 +451,9 @@ def _wiki_training_evidence(cases, results, baseline_results=(), diagnostics=())
                         "json_type": json_type,
                         "node_ids": list(candidate.get("node_ids", ()))[:12],
                     }
+                metadata = pagination_metadata(ev)
+                if metadata:
+                    item["pagination"] = metadata
                 data = ev.get("data")
                 rows = data.get("rows", ()) if isinstance(data, dict) else data
                 if isinstance(rows, (tuple, list)):
@@ -430,8 +486,12 @@ def _wiki_training_evidence(cases, results, baseline_results=(), diagnostics=())
             examples.append(
                 {
                     "training_id": training_id(case.id, q.id),
-                    "question": q.text,
-                    "question_parameters": plain(q.parameters),
+                    "question": original_question["text"] if original_question else None,
+                    "question_parameters": original_question["parameters"]
+                    if original_question
+                    else None,
+                    "selected_question": q.to_dict(),
+                    "source_status": source_status,
                     "status": a.status,
                     "generated_answer": a.answer[:1200],
                     "error": a.error,
@@ -446,7 +506,11 @@ def _wiki_training_evidence(cases, results, baseline_results=(), diagnostics=())
             all(e["score_flags"].values()) if e["score_flags"] else e["status"] == "answered"
         )
     )
-    return {"training_examples": examples, "training_examples_total": len(examples)}
+    return {
+        "training_examples": examples,
+        "training_examples_total": len(examples),
+        "_original_training_evidence": original_examples,
+    }
 
 
 def _per_case_feedback_facts(root, name, cases):

@@ -37,7 +37,7 @@ DarwinAgent **0.1.0 是实验版本**。它围绕基于图的共享 Agent 运行
 | 共享任务运行时 | `ExtractionAgent` → 带来源的图 → `AnswerAgent`，由一个 `Pipeline` 执行 |
 | 有边界的任务资产 | **S** 本体／模式、**F** 查询工具函数、**C** 任务检查、**P** 角色提示词 |
 | 经验积累 | Wiki 保存观察和采纳／拒绝决策，供后续提案使用 |
-| 可复查运行 | 资产指纹、冻结运行身份、持久化产物、显式续跑 |
+| 可复查运行 | 内容编号、独立来源、局部续跑与显式严格比较 |
 | 独立评测 | 分开的 `DatasetAdapter` 和 `Evaluator`，任务自行定义指标名称 |
 | 实验控制 | `ExperimentRunner`；另有 `CampaignController` 管理训练／验证／测试协议 |
 | 模型连接 | 默认共用一个显式配置的 OpenAI 兼容 Chat Completions 端点，可按档位覆盖 |
@@ -61,7 +61,7 @@ uv run darwinagent demo --mode replay --rounds 2 --output runs/demo-replay
 
 ```text
 runs/demo-replay/
-├── experiment.json                           # frozen identity
+├── experiment.json                           # original experiment declaration
 ├── B0/evaluation/maintenance-demo.json         # baseline score
 ├── R1/evaluation/maintenance-demo.json         # candidate score (also R2)
 ├── R1/optimization/attempt-0/proposal-call.json # proposal input (also R2)
@@ -81,7 +81,7 @@ uv run darwinagent demo --mode live --rounds 2 --output runs/demo-live \
 
 CLI 读取当前目录的 `.env`，不覆盖已有环境变量。真实模式调用实际模型，不回退到录制响应。请求上限按实际发出的 HTTP 尝试计数，包括重试；超时限制覆盖整个运行。真实模型可能在 B0 就全部答对，同分候选应当被拒绝。验收成功表示各阶段执行且决策留痕，不要求分数必然上升。
 
-已有目录只能在模式、模型、配置与源码身份一致时续跑：
+日常续跑保留已有成果，模型和执行控制变化不会清空进度。源码修改在安全重启后生效；需要原冻结条件比较时显式添加 `--strict-comparison`：
 
 ```bash
 uv run darwinagent demo --mode replay --rounds 2 --output runs/demo-replay --resume
@@ -172,3 +172,7 @@ S/F 内核受 [*Toward Effective and Reliable LLM Agents via Dynamic Ontology*](
 [贡献指南](CONTRIBUTING.zh-CN.md) · [English contribution guide](CONTRIBUTING.md) · [变更记录](CHANGELOG.md) · [软件引用](CITATION.cff)
 
 MIT © 2026 DarwinAgent contributors。见 [LICENSE](LICENSE)，第三方材料保留各自的许可证与来源。
+
+## 人工干预、续跑与 Wiki 补查
+
+Workspace 将原始内容、执行来源和分支选择分别保存，提供人工登记、执行预览、请求恢复及安全导入导出。Wiki 可以返回原件，并建立可续跑的重新归纳任务。操作说明见[续跑与补查指南](docs/workspace-continuation.zh-CN.md)。真实模型仍需操作者指定并实际执行五题冒烟；离线检查不代表真实冒烟通过或指标提升。

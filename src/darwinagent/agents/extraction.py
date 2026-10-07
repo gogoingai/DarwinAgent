@@ -319,8 +319,23 @@ def _make_validator(segments, classes):
 
 
 class ExtractionAgent:
-    def __init__(self, runtime, client, config, namespace):
+    def __init__(self, runtime, client, config, namespace, journal_root=None, workspace=None):
         self.runtime, self.client, self.config, self.namespace = runtime, client, config, namespace
+        self.journal_root = journal_root
+        self.workspace = workspace
+
+    def _journal(self, slot):
+        if self.journal_root is None:
+            return None
+        from pathlib import Path
+
+        from darwinagent.runtime.steps import StepJournal
+
+        return StepJournal(
+            Path(self.journal_root) / str(slot),
+            workspace=self.workspace,
+            provenance={"stage": "facts", "asset_version": self.runtime.bundle.version},
+        )
 
     async def extract(self, corpus) -> MemoryResult:
         classes = frozenset(self.runtime.schema.meta.get("entity_classes") or ())
@@ -351,7 +366,10 @@ class ExtractionAgent:
                     return
                 async with sem:
                     session = ModelSession(
-                        self.client, session_config, f"{self.namespace}_extract_{slot}"
+                        self.client,
+                        session_config,
+                        f"{self.namespace}_extract_{slot}",
+                        journal=self._journal(slot),
                     )
                     payload = {
                         "schema": {"entity_classes": sorted(classes)},
@@ -463,7 +481,10 @@ class ExtractionAgent:
         async def one(index, blocks):
             async with sem:
                 session = ModelSession(
-                    self.client, self.config, f"{self.namespace}_extract_{index}"
+                    self.client,
+                    self.config,
+                    f"{self.namespace}_extract_{index}",
+                    journal=self._journal(index),
                 )
                 allowed = {b.source.id: b for b in blocks}
 
@@ -552,6 +573,16 @@ class ExtractionAgent:
         faults = []
         for i, outcome in enumerate(outcomes):
             if isinstance(outcome, Exception):
+                from darwinagent.runtime.steps import (
+                    AwaitingBudget,
+                    RequestAbandoned,
+                    UnknownRequest,
+                )
+
+                if getattr(outcome, "continuation_signal", False) or isinstance(
+                    outcome, (UnknownRequest, AwaitingBudget, RequestAbandoned)
+                ):
+                    raise outcome
                 raw.extend(getattr(outcome, "raw_outputs", ()))
                 faults.append(f"batch {i}: {outcome}")
                 diagnostics.append({"batch": i, "status": "execution_error", "error": str(outcome)})
@@ -575,5 +606,11 @@ class ExtractionAgent:
         try:
             self.runtime.validate_graph(result)
         except Exception as exc:
+            from darwinagent.runtime.steps import AwaitingBudget, RequestAbandoned, UnknownRequest
+
+            if getattr(exc, "continuation_signal", False) or isinstance(
+                exc, (UnknownRequest, AwaitingBudget, RequestAbandoned)
+            ):
+                raise
             raise ProtocolError(f"Graph validation failed: {exc}", raw) from exc
         return result

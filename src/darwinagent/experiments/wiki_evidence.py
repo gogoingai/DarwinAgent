@@ -57,9 +57,6 @@ def asset_evidence(base, candidate=None):
                 return None
             result = a.to_dict()
             result["fingerprint"] = a.fingerprint
-            if len(result["content"]) > 4000:
-                result["content"] = result["content"][:4000]
-                result["content_truncated"] = True
             return result
 
         rows.append(
@@ -245,12 +242,58 @@ def _compress_training_evidence(facts, budget=35000):
                 cap(asset, "content", 300)
 
 
+def pagination_metadata(event):
+    """Control fields remain structured even when row text is clipped."""
+    keys = {
+        "offset",
+        "limit",
+        "cursor",
+        "next_offset",
+        "next_cursor",
+        "more_remain",
+        "has_more",
+        "returned_count",
+        "scanned_count",
+        "matched_count",
+        "scan_limit",
+        "truncated",
+        "truncation_reason",
+        "complete",
+        "row_count",
+    }
+    result = dict(event.get("pagination", {}))
+    for name in ("parameters", "data", "observation"):
+        obj = event.get(name)
+        if isinstance(obj, dict):
+            values = {k: v for k, v in obj.items() if k in keys}
+            if values:
+                result[name] = values
+    return result
+
+
+def pagination_anomalies(event):
+    meta = pagination_metadata(event)
+    params, data = meta.get("parameters", {}), meta.get("data", {})
+    hints = []
+    if data.get("more_remain") or data.get("has_more"):
+        if data.get("next_offset") is not None and data["next_offset"] == params.get("offset"):
+            hints.append("offset_not_advanced")
+        if data.get("next_cursor") is not None and data["next_cursor"] == params.get("cursor"):
+            hints.append("cursor_not_advanced")
+        rows = event.get("data", {}).get("rows") if isinstance(event.get("data"), dict) else None
+        if rows == []:
+            hints.append("empty_page_with_more_data_needs_contract_check")
+    return hints
+
+
 def bounded_trace(trace, limit):
     """Keep a late fault and its preceding call before filling chronological context."""
     indices = set()
     for i, event in enumerate(trace):
-        if event.get("stage") == "tool_error" or any(
-            not check.get("ok", True) for check in event.get("checks", [])
+        if (
+            pagination_anomalies(event)
+            or event.get("stage") == "tool_error"
+            or any(not check.get("ok", True) for check in event.get("checks", []))
         ):
             indices.add(i)
             preceding = next(

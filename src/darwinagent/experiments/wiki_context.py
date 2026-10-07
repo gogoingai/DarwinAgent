@@ -5,13 +5,14 @@ from __future__ import annotations
 import json
 from collections import Counter
 
-from .wiki_evidence import bounded_trace
+from .wiki_evidence import bounded_trace, pagination_anomalies, pagination_metadata
 
 
 def _brief_facts(facts):
     if not isinstance(facts, dict):
         return facts
     result = json.loads(json.dumps(facts, ensure_ascii=False))
+    result.pop("_original_training_evidence", None)
     if isinstance(result.get("scenarios"), list):
         scenarios = result["scenarios"]
         result["scenario_count"] = len(scenarios)
@@ -135,6 +136,11 @@ def _formal_runtime_facts(facts):
 def _context_facts(facts):
     result = _brief_facts(facts)
     examples = result.get("training_examples", [])
+    examples = sorted(
+        examples,
+        key=lambda e: any(pagination_anomalies(ev) for ev in e.get("trace", [])),
+        reverse=True,
+    )
     result["training_examples"] = examples[:3] if examples else []
     if len(examples) > 3:
         result["training_examples_truncated"] = True
@@ -142,6 +148,8 @@ def _context_facts(facts):
         example["trace"] = [
             {
                 "stage": event.get("stage"),
+                "pagination": pagination_metadata(event),
+                "anomaly_hints": pagination_anomalies(event),
                 "summary": json.dumps(event, ensure_ascii=False)[:1000],
                 "truncated": len(json.dumps(event, ensure_ascii=False)) > 1000,
             }

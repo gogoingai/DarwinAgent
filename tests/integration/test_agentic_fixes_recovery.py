@@ -70,7 +70,34 @@ class BatchedFaultRetryTests(unittest.TestCase):
         self.assertEqual(still, [])  # 并集实现会留下 q25..q29
         self.assertEqual(result, rerun2)  # 返回最后一份完整答案集
         self.assertEqual(sleeps, [0.0, 0.0])  # lead+gap 各一次（均为 0 秒）
-        self.assertFalse(any(answers_dir.glob("*.json")))  # 30 个故障检查点全部删除
+        self.assertFalse(any(answers_dir.glob("*.json")))  # 当前故障视图已移除，原件仍保留
+        historical = list((answers_dir / "history").glob("*/*.json"))
+        self.assertEqual(len(historical), 30)
+        self.assertTrue(all(path.read_bytes() == b"{}" for path in historical))
+
+    def test_archive_failure_keeps_current_failed_checkpoint(self):
+        from darwinagent.experiments.recovery import batched_fault_retry
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / f"{digest('q1')}.json"
+            original = b'{ "old_failure": "precise bytes" }\n'
+            path.write_bytes(original)
+            with mock.patch(
+                "darwinagent.runtime.continuation._immutable_copy", side_effect=OSError("disk")
+            ):
+                with self.assertRaises(OSError):
+                    asyncio.run(
+                        batched_fault_retry(
+                            mock.Mock(),
+                            "c",
+                            None,
+                            None,
+                            Path(tmp),
+                            [AnswerResult("q1", "execution_error", "", error="x")],
+                            lead_s=0,
+                        )
+                    )
+            self.assertEqual(path.read_bytes(), original)
 
     def test_persistent_faults_reported_from_final_set(self):
         faulted = [

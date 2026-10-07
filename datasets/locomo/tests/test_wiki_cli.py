@@ -19,6 +19,9 @@ def arguments(root, **overrides):
         "train_questions": 10,
         "rounds": 10,
         "stop": False,
+        "strict_comparison": True,
+        "cases": None,
+        "resume": False,
     }
     values.update(overrides)
     return SimpleNamespace(**values)
@@ -43,3 +46,23 @@ class WikiCliBoundary(unittest.TestCase):
                 Path(tmp, "precheck.json").write_text('{"passed": true, "identity": "other-code"}')
                 with self.assertRaisesRegex(ValueError, "identity mismatch"):
                     asyncio.run(run_arm(arguments(tmp)))
+
+    def test_daily_training_continuation_does_not_require_new_model_precheck(self):
+        from unittest.mock import AsyncMock, MagicMock
+
+        runner = MagicMock()
+        runner.run = AsyncMock(return_value={"status": "complete"})
+        with (
+            tempfile.TemporaryDirectory() as tmp,
+            mock.patch("datasets.locomo.run.connection", return_value=object()),
+            mock.patch(
+                "datasets.locomo.run.precheck_identity",
+                side_effect=AssertionError("probe identity"),
+            ),
+            mock.patch("datasets.locomo.run.memory_structure_sample", return_value={}),
+            mock.patch("datasets.locomo.run.bootstrap_trial_graph", return_value=None),
+            mock.patch("datasets.locomo.run.ExperimentRunner", return_value=runner),
+        ):
+            asyncio.run(run_arm(arguments(tmp, strict_comparison=False, scope="p")))
+        self.assertFalse(runner.run.call_args.kwargs["execution"].strict)
+        self.assertEqual(("P",), runner.run.call_args.kwargs["scope"])

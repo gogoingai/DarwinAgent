@@ -62,7 +62,7 @@ class FullRoundDeadlineTests(unittest.TestCase):
             self.verify_timeout(root, summary)
             self.assertFalse((root / "R1/stage.json").exists())
 
-    def test_wiki_overrun_does_not_publish_completed_score(self):
+    def test_wiki_overrun_preserves_completed_score_and_publication(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             runner = FastLoopExperiment(root, round_deadline_s=30)
@@ -84,7 +84,12 @@ class FullRoundDeadlineTests(unittest.TestCase):
             with mock.patch.object(WikiMaintainer, "record", expire_at_wiki):
                 summary = _run(runner, rounds=1)
             self.assertEqual(reached_wiki, ["R1"])
-            self.verify_timeout(root, summary)
+            self.assertTrue(summary["rounds"][0]["accepted"])
+            self.assertEqual(summary["status"], "complete")
+            self.assertEqual(summary["completed_rounds"], 1)
+            pointer = json.loads((root / "published/current.json").read_text())
+            self.assertEqual(pointer["version"], summary["rounds"][0]["candidate_version"])
+            self.assertTrue(summary["pending_wiki_tasks"])
             self.assertTrue((root / "R1/stage.json").exists())
 
     def test_resume_keeps_consumed_budget(self):

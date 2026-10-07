@@ -35,7 +35,8 @@ async def batched_fault_retry(
     gap_s=60.0,
 ):
     """One bounded retry pass for faulted questions: wait out the transient-burst window,
-    then delete their answer checkpoints in small batches and rerun the case (healthy
+    then archive original checkpoint bytes and clear the current view in small batches.
+    Rerun the case (healthy
     questions checkpoint-reuse at zero cost). The final fault set is recomputed from the
     LAST complete answer set — never a union of per-batch snapshots: batches not yet retried
     still carry their stale fault checkpoints, and a union would preserve those pre-retry
@@ -46,7 +47,22 @@ async def batched_fault_retry(
     result = None
     for start in range(0, len(faulted), batch_size):
         for a in faulted[start : start + batch_size]:
-            (Path(answers_dir) / f"{_digest(a.question_id)}.json").unlink(missing_ok=True)
+            checkpoint = Path(answers_dir) / f"{_digest(a.question_id)}.json"
+            if checkpoint.exists():
+                import hashlib
+
+                from darwinagent.runtime.continuation import _immutable_copy
+
+                original = checkpoint.read_bytes()
+                archive = (
+                    Path(answers_dir)
+                    / "history"
+                    / checkpoint.stem
+                    / (hashlib.sha256(original).hexdigest() + ".json")
+                )
+                _immutable_copy(archive, original)
+                # Unlink only after the original bytes are durable; retry writes a new view.
+                checkpoint.unlink()
         result = await pipeline.run(case, spec, config)
         if start + batch_size < len(faulted):
             await sleep(gap_s)

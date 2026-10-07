@@ -13,13 +13,14 @@ from darwinagent.operators.sandbox import BUILTINS, DATA_CAPABILITIES
 from darwinagent.runtime.artifacts import atomic_json, digest
 
 from .wiki_context import _brief_facts, _context_facts, _formal_runtime_facts
-from .wiki_evidence import _compress_training_evidence
+from .wiki_evidence import _compress_training_evidence, pagination_anomalies, pagination_metadata
 from .wiki_evidence import asset_evidence as asset_evidence
 from .wiki_evidence import bounded_trace as bounded_trace
 from .wiki_evidence import safe_feedback as safe_feedback
 from .wiki_evidence import safe_scores as safe_scores
 from .wiki_lessons import _lessons
 from .wiki_lessons import failure_patterns as failure_patterns
+from .wiki_service import WikiService
 
 
 class WikiMaintainer:
@@ -35,19 +36,29 @@ class WikiMaintainer:
         if self.state_path.exists():
             state = json.loads(self.state_path.read_text())
             if state["identity"] != identity or state["limit"] != limit:
-                raise ValueError("Wiki optimization identity or budget mismatch")
+                state.setdefault("source_history", []).append(
+                    {"identity": state["identity"], "limit": state["limit"]}
+                )
+                state.update(identity=identity, limit=limit)
+                atomic_json(self.state_path, state)
         else:
             atomic_json(
                 self.state_path, {"identity": identity, "limit": limit, "reserved_calls": 0}
             )
         if self.wiki_path.exists():
-            if json.loads(self.wiki_path.read_text())["identity"] != identity:
-                raise ValueError("Wiki identity mismatch")
+            # Historical entries retain their recorded producer identity.
+            pass
         else:
             atomic_json(
                 self.wiki_path,
                 {"identity": identity, "version": 0, "consumed_ids": [], "entries": []},
             )
+
+    @property
+    def service(self):
+        return WikiService(
+            self.root.parent, lambda: self.client_factory("optimization"), self.config
+        )
 
     def _wiki(self):
         return json.loads(self.wiki_path.read_text())
@@ -76,6 +87,20 @@ class WikiMaintainer:
             }
             if len(json.dumps(payload, ensure_ascii=False)) <= max_chars:
                 selected = candidate
+                selected_ids.add(index)
+            elif not selected:
+                compact = {
+                    k: entry.get(k) for k in ("id", "stage", "kind", "scope", "training_ids")
+                }
+                compact["facts"] = {
+                    "evidence_refs": entry["facts"].get("evidence_refs", [])[:8],
+                    "evidence_refs_total": len(entry["facts"].get("evidence_refs", [])),
+                    "scores": entry["facts"].get("scores"),
+                    "anomaly_index": entry["facts"].get("anomaly_index", [])[:4],
+                    "anomaly_total": len(entry["facts"].get("anomaly_index", [])),
+                    "view_truncated": True,
+                }
+                selected = [(index, compact)]
                 selected_ids.add(index)
         return {
             "version": wiki["version"],
@@ -110,6 +135,7 @@ class WikiMaintainer:
             k: event[k]
             for k in ("id", "stage", "kind", "category", "scope", "training_ids", "facts", "source")
         }
+        entry["producer_identity"] = event.get("producer_identity", wiki["identity"])
         entry["fact_status"] = "recorded"
         entry["confidence"] = "hypothesis"
         entry["validation_scope"] = event["scope"]
@@ -133,7 +159,60 @@ class WikiMaintainer:
         source="",
         infer=False,
     ):
+        facts = json.loads(json.dumps(facts, ensure_ascii=False))
+        originals = facts.pop("_original_training_evidence", [])
+        facts.pop("evidence_refs", None)
+        stable_facts = json.loads(json.dumps(facts, ensure_ascii=False))
+        original_refs = []
+        for original in originals:
+            original_refs.append(
+                self.service.register(
+                    original,
+                    scope={
+                        "case_ids": [original["case_id"]],
+                        "question_ids": [original["question_id"]],
+                        "asset_ids": sorted(
+                            {
+                                ev["asset_id"]
+                                for ev in original.get("trace", [])
+                                if ev.get("asset_id")
+                            }
+                        ),
+                    },
+                )
+            )
+        raw_ref = self.service.register(
+            facts,
+            source_kind="asset" if "asset_changes" in facts else "training",
+            scope={
+                "asset_ids": [change.get("asset_id") for change in facts.get("asset_changes", [])],
+                "stage_ids": [stage],
+                "candidate_ids": [facts["candidate_version"]]
+                if facts.get("candidate_version")
+                else [],
+            },
+            source_refs=original_refs,
+        )
+        facts["evidence_refs"] = [raw_ref, *original_refs]
+        anomaly_index = []
+        for original, ref in zip(originals, original_refs):
+            for position, trace_event in enumerate(original.get("trace", [])):
+                hints = pagination_anomalies(trace_event)
+                if hints:
+                    anomaly_index.append(
+                        {
+                            "question_id": original["question_id"],
+                            "evidence_ref": ref,
+                            "trace_position": position,
+                            "hints": hints,
+                            "pagination": pagination_metadata(trace_event),
+                            "status": "needs_contract_check",
+                        }
+                    )
+        if anomaly_index:
+            facts["anomaly_index"] = anomaly_index
         event = {
+            "producer_identity": self.identity,
             "stage": stage,
             "kind": kind,
             "facts": facts,
@@ -143,7 +222,7 @@ class WikiMaintainer:
             "source": source,
             "infer": infer,
         }
-        event["id"] = digest({"identity": self.identity, **event})
+        event["id"] = digest({"identity": self.identity, **event, "facts": stable_facts})
         path = self.root / "events" / f"{event['id']}.json"
         if not path.exists():
             atomic_json(path, event)
@@ -290,7 +369,7 @@ class WikiMaintainer:
                 '{"cause":"原因或待验证假设","action":"后续修法","training_ids":[]}',
                 payload,
                 valid,
-                max_tokens=1600,
+                max_tokens=getattr(self.config, "wiki_max_tokens", None) or 1600,
             )
             atomic_json(
                 target,

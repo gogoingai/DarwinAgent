@@ -8,11 +8,12 @@ import time
 from collections.abc import Mapping
 from pathlib import Path
 
-from darwinagent.contracts import EvaluationResult, plain
+from darwinagent.contracts import EvaluationResult, RunResult, plain
 from darwinagent.engine.pipeline import Pipeline
 from darwinagent.kernel.validation import capability_names
 from darwinagent.runtime.artifacts import atomic_json, digest
 from darwinagent.runtime.deadline import bounded_timeout
+from darwinagent.runtime.identity import transport_identity
 
 from .recovery import (
     _prior_failed_check_snapshots,
@@ -489,5 +490,312 @@ async def _smoke_gate(
             elif not any(a.status in ("answered", "abstained") for a in result.answers):
                 return "冒烟题无任何有效作答"
         return None
+    finally:
+        await client.aclose()
+
+
+async def selected_stage(
+    name,
+    cases,
+    spec,
+    *,
+    root,
+    client_factory,
+    config,
+    evaluator_factory,
+    execution,
+    snapshot_root=None,
+    graph_builder=None,
+):
+    """Execute exactly the selected stages. Scoring never implies answering."""
+    from darwinagent.runtime.artifacts import digest
+    from darwinagent.runtime.workspace import Workspace
+
+    workspace = Workspace(Path(root) / "workspace")
+    stage = Path(root) / name
+    client = client_factory(name)
+    results, scores = [], []
+    all_comparable = True
+    criteria = []
+    try:
+        for case in cases:
+            if not execution.includes(case.id):
+                continue
+            selected = tuple(q for q in case.questions if execution.includes(case.id, q.id))
+            if set(execution.stages) & {"facts", "graph", "retrieval", "answer", "check", "review"}:
+                result = await Pipeline(
+                    client,
+                    stage / "generation",
+                    frozen_snapshot=None if snapshot_root is None else snapshot_root / case.id,
+                    graph_builder=graph_builder,
+                    workspace=workspace,
+                    preparation_root=Path(root) / "shared-preparation",
+                ).run(case, spec, config, execution=execution)
+            else:
+                # Existing answers carry their actual graph, question and producer provenance.
+                try:
+                    branch_record = workspace.branch(execution.branch)
+                except KeyError:
+                    branch_record = None
+                if branch_record and branch_record.get("parent"):
+                    from darwinagent.runtime.continuation import fork_case_progress
+
+                    fork_case_progress(
+                        stage / "generation" / case.id,
+                        branch_record["parent"],
+                        execution.branch,
+                        selected,
+                        workspace=workspace,
+                    )
+                answers = []
+                saved_sources = []
+                for q in selected:
+                    path = (
+                        stage
+                        / "generation"
+                        / case.id
+                        / "branches"
+                        / execution.branch
+                        / "answers"
+                        / (digest(q.to_dict()) + ".json")
+                    )
+                    if not path.exists():
+                        legacy = (
+                            stage / "generation" / case.id / "answers" / (digest(q.id) + ".json")
+                        )
+                        if not legacy.exists():
+                            raise ValueError(
+                                f"Missing saved answer for {case.id}/{q.id}; answer stage is not selected"
+                            )
+                        from darwinagent.runtime.continuation import register_legacy_case
+
+                        report = register_legacy_case(
+                            stage / "generation" / case.id,
+                            case,
+                            branch=execution.branch,
+                            workspace=workspace,
+                        )
+                        if not path.exists():
+                            raise ValueError(
+                                f"Question version cannot be established for {case.id}/{q.id}: {report['not_registered']}"
+                            )
+                    stored = json.loads(path.read_text())
+                    if stored.get("question_version") != digest(q.to_dict()):
+                        raise ValueError("Saved answer belongs to a different question version")
+                    if digest(stored["result"]) != stored["digest"]:
+                        raise ValueError("Saved answer checksum mismatch")
+                    from darwinagent.contracts import AnswerResult
+
+                    answers.append(AnswerResult.from_dict(stored["result"]))
+                    from darwinagent.engine.pipeline import answer_source_record
+
+                    saved_sources.append(answer_source_record(stored, q.id, workspace))
+                original = stage / "generation" / case.id / "result.json"
+                if original.exists():
+                    original_result = json.loads(original.read_text())
+                    original_result["answers"] = tuple(answers)
+                    original_result["answer_provenance"] = tuple(saved_sources)
+                    result = RunResult(**original_result)
+                else:
+                    result = RunResult(
+                        case.id,
+                        digest([a.to_dict() for a in answers]),
+                        spec.bundle.version,
+                        tuple(answers),
+                        0,
+                        (),
+                        answer_provenance=tuple(saved_sources),
+                    )
+            answer_ref = workspace.put_json(result.to_dict())
+            workspace.add_provenance(
+                answer_ref,
+                {
+                    "stage": name,
+                    "selection": execution.to_dict(),
+                    "producer_identity": result.identity,
+                },
+            )
+            results.append(result)
+            if "score" in execution.stages:
+                criterion = getattr(evaluator_factory, "criterion_id", None)
+                if callable(criterion):
+                    criterion = criterion()
+                reliable_criterion = criterion is not None
+                criterion = (
+                    criterion if reliable_criterion else "unknown:explicit-rescoring-required"
+                )
+                question_map = {q.id: q for q in selected}
+                per_question = []
+                records = []
+                comparison_reliable = reliable_criterion
+                legacy_navigation = stage / "evaluation" / (case.id + ".json")
+                legacy_score = (
+                    json.loads(legacy_navigation.read_text())
+                    if legacy_navigation.exists()
+                    else None
+                )
+                if (
+                    execution.mode == "continue"
+                    and legacy_score is not None
+                    and not legacy_score.get("question_scores")
+                ):
+                    versions = [
+                        stage
+                        / "generation"
+                        / case.id
+                        / "branches"
+                        / execution.branch
+                        / "answers"
+                        / (digest(q.to_dict()) + ".json")
+                        for q in selected
+                    ]
+                    producer_ids = [
+                        json.loads(p.read_text())["identity"] for p in versions if p.exists()
+                    ]
+                    if (
+                        len(producer_ids) == len(result.answers)
+                        and len(result.answers) == legacy_score["scores"]["total"]
+                        and all(i == legacy_score["run_identity"] for i in producer_ids)
+                    ):
+                        scores.append(EvaluationResult(**legacy_score["scores"]))
+                        comparison_reliable = False
+                        all_comparable = False
+                        criteria.append("legacy:unknown")
+                        continue
+                for answer in result.answers:
+                    q = question_map[answer.question_id]
+                    binding = {
+                        "answer": answer.to_dict(),
+                        "question": q.to_dict(),
+                        "case_id": case.id,
+                    }
+                    binding_id = digest(binding)
+                    key = digest({**binding, "criterion": criterion})
+                    checkpoint = stage / "evaluation" / "by-answer" / (key + ".json")
+                    navigation = stage / "evaluation" / "questions" / (binding_id + ".json")
+                    previous = json.loads(navigation.read_text()) if navigation.exists() else None
+                    saved = json.loads(checkpoint.read_text()) if checkpoint.exists() else None
+                    reuse_score = (
+                        saved is not None and reliable_criterion and execution.mode == "continue"
+                    )
+                    if execution.mode == "continue" and saved is None and previous is not None:
+                        # Changed criterion does not silently launch a new baseline judging pass.
+                        saved, reuse_score = previous, True
+                        comparison_reliable = False
+                    if execution.mode == "retry_failed":
+                        if previous is None:
+                            continue
+                        saved = previous
+                        reuse_score = not previous["scores"].get("evaluation_faults")
+                    if reuse_score:
+                        score = EvaluationResult(**saved["scores"])
+                        actual_criterion = saved["criterion"]
+                    else:
+                        from uuid import uuid4
+
+                        from darwinagent.runtime.journal_client import JournalClient
+                        from darwinagent.runtime.steps import StepJournal
+
+                        attempts_root = stage / "evaluation" / "attempts" / key
+                        if execution.mode in ("rerun", "rerun_all", "retry_failed"):
+                            attempts_root = attempts_root / uuid4().hex
+                        scoring_client = JournalClient(
+                            client,
+                            StepJournal(
+                                attempts_root / "requests",
+                                workspace=workspace,
+                                bypass_cache=execution.mode
+                                in ("rerun", "rerun_all", "retry_failed"),
+                                provenance={
+                                    "stage": "score",
+                                    "criterion": criterion,
+                                    "answer_fingerprint": digest(answer.to_dict()),
+                                    "question_version": digest(q.to_dict()),
+                                },
+                            ),
+                        )
+                        evaluator = evaluator_factory(scoring_client, attempts_root)
+                        from dataclasses import replace
+
+                        single = replace(result, answers=(answer,))
+                        score = await _evaluate_stage(evaluator, single, (q,))
+                        if scoring_client.pending_error is not None:
+                            raise scoring_client.pending_error
+                        score_ref = workspace.put_json(score.to_dict())
+                        workspace.add_reference(
+                            score_ref, "actual_answer", workspace.put_json(answer.to_dict())
+                        )
+                        workspace.add_reference(
+                            score_ref, "question_version", workspace.put_json(q.to_dict())
+                        )
+                        workspace.add_provenance(
+                            score_ref,
+                            {
+                                "criterion": criterion,
+                                "stage": name,
+                                "producer": transport_identity(client),
+                            },
+                        )
+                        saved = {
+                            "scores": score.to_dict(),
+                            "answer_ref": answer_ref,
+                            "criterion": criterion,
+                            "question_version": digest(q.to_dict()),
+                            "answer_fingerprint": digest(answer.to_dict()),
+                            "score_ref": score_ref,
+                        }
+                        atomic_json(checkpoint, saved)
+                        atomic_json(navigation, saved)
+                        actual_criterion = criterion
+                    per_question.append(score)
+                    records.append(
+                        {
+                            "question_id": q.id,
+                            "criterion": actual_criterion,
+                            "checkpoint": str(checkpoint),
+                            "reused": reuse_score,
+                        }
+                    )
+                if not per_question:
+                    continue
+                score = aggregate_scores(per_question)
+                navigation = stage / "evaluation" / (case.id + ".json")
+                if navigation.exists():
+                    workspace.put_bytes(navigation.read_bytes(), format="legacy-score-navigation")
+                atomic_json(
+                    navigation,
+                    {
+                        "run_identity": result.identity,
+                        "asset_version": spec.bundle.version,
+                        "scores": score.to_dict(),
+                        "answer_ref": answer_ref,
+                        "criterion": criterion,
+                        "question_scores": records,
+                        "comparison_reliable": comparison_reliable,
+                    },
+                )
+                scores.append(score)
+                all_comparable = all_comparable and comparison_reliable
+                criteria.append(criterion)
+        aggregate = aggregate_scores(scores) if scores else None
+        atomic_json(
+            stage / "stage.json",
+            {
+                "stage": name,
+                "cases": [c.id for c in cases],
+                "status": "complete"
+                if aggregate is None or aggregate.completed == aggregate.total
+                else "partial",
+                "asset_version": spec.bundle.version,
+                "run_identities": [r.identity for r in results],
+                "scores": None if aggregate is None else aggregate.to_dict(),
+                "selection": execution.to_dict(),
+                "calls": client.ledger_summary() if hasattr(client, "ledger_summary") else {},
+                "elapsed_s": 0,
+                "criterion": sorted(set(criteria)),
+                "comparison_reliable": all_comparable,
+            },
+        )
+        return results, aggregate
     finally:
         await client.aclose()

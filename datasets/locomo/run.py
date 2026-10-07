@@ -13,7 +13,6 @@ from collections import Counter
 from pathlib import Path
 
 from darwinagent.config import RunConfig
-from darwinagent.engine import Pipeline
 from darwinagent.experiments import (
     AdoptionPolicy,
     CampaignController,
@@ -25,6 +24,11 @@ from darwinagent.experiments.spec import precheck_identity
 from darwinagent.kernel import KernelBundle, TaskSpec
 from darwinagent.llm.client import LLMClient
 from darwinagent.llm.settings import load_legacy_connection as load_connection
+from darwinagent.runtime.execution_cli import (
+    add_execution_arguments,
+    has_scoped_flags,
+    selection_from_args,
+)
 
 from .adapter import LocomoAdapter
 from .evaluator import AUDITED, LOCK_PATH, LocomoEvaluator
@@ -34,6 +38,38 @@ ROOT = Path(__file__).resolve().parents[2]
 SNAPSHOTS = ROOT / "datasets/locomo/snapshots/gvtest_v1"
 TASK_DIR = ROOT / "tasks/conversation_memory"
 SCOPE = {"p": ("P",), "pf": ("P", "F"), "sfcp": ("S", "F", "C", "P")}
+
+
+def evaluator_factory(client, path):
+    return LocomoEvaluator(client, path)
+
+
+def _criterion_id():
+    # Actual locked source and reference contents define standards; transport does not.
+    import hashlib
+
+    from darwinagent.runtime.artifacts import digest
+
+    try:
+        lock = json.loads(LOCK_PATH.read_text())
+        files = [
+            LOCK_PATH,
+            *(ROOT / name for name in lock),
+            ROOT / "datasets/locomo/data/locomo10_zh.json",
+            ROOT / "datasets/locomo/data/locomo10.json",
+            AUDITED,
+        ]
+        return digest(
+            {
+                str(path.relative_to(ROOT)): hashlib.sha256(path.read_bytes()).hexdigest()
+                for path in files
+            }
+        )
+    except (OSError, ValueError):
+        return None
+
+
+evaluator_factory.criterion_id = _criterion_id
 
 
 async def smoke_judge(client, case, answers):
@@ -212,7 +248,7 @@ def arm_spec(arm, rounds):
 
 async def run_arm(args):
     root = Path(args.output).resolve()
-    if args.optimization_mode == "wiki":
+    if args.optimization_mode == "wiki" and getattr(args, "strict_comparison", False):
         if args.arm != "g1" or args.scope != "sfcp":
             raise ValueError("Wiki optimization requires --arm g1 --scope sfcp")
         precheck = root / "precheck.json"
@@ -280,7 +316,7 @@ async def run_arm(args):
             }
         runner = ExperimentRunner(
             adapter,
-            lambda client, path: LocomoEvaluator(client, path),
+            evaluator_factory,
             connection(root),
             config,
             spec.adoption,
@@ -307,6 +343,7 @@ async def run_arm(args):
             rounds=args.rounds if args.optimization_mode == "wiki" else 0,
             resume=args.resume,
             scope=SCOPE[args.scope],
+            execution=selection_from_args(args),
         )
         print(summary["status"])
         return
@@ -316,7 +353,7 @@ async def run_arm(args):
         adapter = _trimmed_train_adapter(adapter, spec.train, args.train_questions)
     controller = CampaignController(
         adapter,
-        lambda client, path: LocomoEvaluator(client, path),
+        evaluator_factory,
         connection(root),
         config,
         spec,
@@ -344,6 +381,43 @@ async def run_arm(args):
 
 async def main(args):
     root = Path(args.output).resolve()
+    selection = selection_from_args(args)
+    if getattr(args, "preview", False):
+        from darwinagent.experiments.control import preview
+
+        adapter = LocomoAdapter(ROOT / "datasets/locomo/data/locomo10_zh.json")
+        case_ids = (
+            tuple(c.strip() for c in args.cases.split(","))
+            if getattr(args, "cases", None)
+            else (args.case,)
+        )
+        if getattr(args, "train_only", False) and (
+            getattr(args, "train_questions", None) or getattr(args, "train_question_ids", None)
+        ):
+            selected = getattr(args, "train_question_ids", None)
+            adapter = _trimmed_train_adapter(
+                adapter,
+                case_ids,
+                getattr(args, "train_questions", None),
+                tuple(q.strip() for q in selected.split(",")) if selected else None,
+            )
+        target = root / "train" if getattr(args, "train_only", False) else root
+        print(
+            json.dumps(
+                preview(
+                    target, [adapter.generation_input(c) for c in case_ids], selection
+                ).to_dict(),
+                ensure_ascii=False,
+            )
+        )
+        return
+    if (
+        getattr(args, "campaign", False)
+        or (getattr(args, "arm", None) and not getattr(args, "train_only", False))
+    ) and has_scoped_flags(args):
+        raise ValueError(
+            "Scoped execution uses --train-only; the held-out campaign keeps its frozen protocol"
+        )
     if args.stop:
         (root / "STOP").write_text("operator stop\n")
         print("stop signal written; the campaign will lock candidates after the current round")
@@ -369,7 +443,7 @@ async def main(args):
         )
         controller = CampaignController(
             adapter,
-            lambda client, path: LocomoEvaluator(client, path),
+            evaluator_factory,
             connection(root),
             config,
             protocol,
@@ -388,7 +462,7 @@ async def main(args):
         )
         runner = ExperimentRunner(
             adapter,
-            lambda client, path: LocomoEvaluator(client, path),
+            evaluator_factory,
             connection(root),
             config,
             policy,
@@ -397,20 +471,32 @@ async def main(args):
             snapshot_root=SNAPSHOTS if (SNAPSHOTS / args.case / "manifest.json").exists() else None,
         )
         summary = await runner.run(
-            args.case, spec, rounds=args.rounds, resume=args.resume, scope=SCOPE[args.scope]
+            args.case,
+            spec,
+            rounds=args.rounds,
+            resume=args.resume,
+            scope=SCOPE[args.scope],
+            execution=selection_from_args(args),
         )
         print(summary["status"])
     else:
         if not args.assets:
             raise ValueError("Supply a generated bundle or use --experiment/--campaign/--arm")
-        async with LLMClient(connection(root)) as client:
-            result = await Pipeline(client, root / "generation").run(
-                adapter.generation_input(args.case),
-                spec.with_bundle(KernelBundle(Path(args.assets))),
-                config,
-            )
-            write(result, root / "answers.jsonl")
-            scores = await LocomoEvaluator(client, root / "evaluation").evaluate(result)
+        from darwinagent.experiments.stages import selected_stage
+
+        results, scores = await selected_stage(
+            "",
+            [adapter.generation_input(args.case)],
+            spec.with_bundle(KernelBundle(Path(args.assets))),
+            root=root,
+            client_factory=lambda _stage: LLMClient(connection(root)),
+            config=config,
+            evaluator_factory=evaluator_factory,
+            execution=selection,
+        )
+        if results:
+            write(results[0], root / "answers.jsonl")
+        if scores is not None:
             from darwinagent.runtime.artifacts import atomic_json
 
             atomic_json(root / "evaluation.json", scores.to_dict())
@@ -496,4 +582,5 @@ if __name__ == "__main__":
         action="store_true",
         help="写入 STOP 叫停信号：当前轮完成后锁定候选并进入验证/测试",
     )
+    add_execution_arguments(p)
     asyncio.run(main(p.parse_args()))

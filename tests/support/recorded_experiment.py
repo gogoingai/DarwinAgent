@@ -52,6 +52,17 @@ class RecordedExperiment(ExperimentRunner):
             else:
                 pointer = json.loads((self.root / "published/current.json").read_text())
                 base = KernelBundle(self.root / "published" / pointer["path"])
+                if (
+                    self.optimization_mode == "wiki"
+                    and stage.startswith("R")
+                    and (self.root / "workspace/workspace.sqlite3").exists()
+                ):
+                    from darwinagent.runtime.workspace import Workspace
+
+                    selected = Workspace(self.root / "workspace").branch("main")
+                    saved = self.root / "workspace/bundles" / (selected["working"] + ".json")
+                    if saved.exists():
+                        base = KernelBundle(json.loads(saved.read_text())["path"])
                 asset = next(a for a in base.assets.assets if a.role == "answer")
                 updated = asset.to_dict()
                 updated["content"] += "\nUse the current source records carefully. " + stage
