@@ -35,7 +35,38 @@ benchmarks = [
 ]
 
 [dependency-groups]
-test = ["numpy>=1.26", "pandas>=2.1", "requests>=2.31"]
+test = ["numpy>=1.26", "pandas>=2.1", "requests>=2.31", "ruff==0.16.10"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+indent-width = 4
+preview = false
+force-exclude = true
+include = ["src/**/*.py", "tests/**/*.py", "datasets/**/*.py", "examples/**/*.py", "scripts/check_installed.py"]
+extend-exclude = [
+    "src/darwinagent/demo/device_maintenance/assets",
+    "tests/fixtures",
+    "tasks",
+    "datasets/*/scripts",
+    "datasets/*/data",
+    "datasets/*/runs",
+    "datasets/*/snapshots",
+    "docs/diagnostics",
+    "docs/history",
+    "mem0",
+    "third_party",
+    "oak",
+]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I", "UP", "B006", "B023", "B904"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
+docstring-code-format = false
 
 [tool.uv]
 package = true
