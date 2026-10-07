@@ -3,6 +3,7 @@
 分块策略：每个源的 DataFrame repr 按**整行**切，表头行复制进每个 chunk——
 抽取器每块都能看到原始字段名（大小写与语料逐字一致）。
 """
+
 from __future__ import annotations
 
 import re
@@ -20,16 +21,16 @@ SOURCE_KEYS = {
 
 @dataclass
 class Chunk:
-    source: str          # flights | accommodations | restaurants | attractions | distances
-    seq: int             # 该源内的块序号
-    header: str          # 表头行（含原始字段名）
-    text: str            # 数据行
+    source: str  # flights | accommodations | restaurants | attractions | distances
+    seq: int  # 该源内的块序号
+    header: str  # 表头行（含原始字段名）
+    text: str  # 数据行
 
     def render(self) -> str:
         return f"[source: {self.source}]\n{self.header}\n{self.text}"
 
 
-_ROW_RE = re.compile(r"\n(?=\d+[, ])")     # DataFrame repr 的行首（索引, 字段...）
+_ROW_RE = re.compile(r"\n(?=\d+[, ])")  # DataFrame repr 的行首（索引, 字段...）
 
 
 def _split_rows(content: str) -> tuple[str, list[str]]:
@@ -92,5 +93,5 @@ def distance_chunks(tp_root: Path) -> list[Chunk]:
     out: list[Chunk] = []
     max_rows = 200
     for seq, i in enumerate(range(0, len(rows), max_rows)):
-        out.append(Chunk("distances", seq, header, "\n".join(rows[i:i + max_rows])))
+        out.append(Chunk("distances", seq, header, "\n".join(rows[i : i + max_rows])))
     return out

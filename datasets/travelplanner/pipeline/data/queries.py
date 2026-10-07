@@ -2,6 +2,7 @@
 
 一个样本 = 一道查询 + 它的参考语料（reference_information），对应论文的 (q, C_q)。
 """
+
 from __future__ import annotations
 
 import ast
@@ -14,7 +15,7 @@ from ..config_task import Config
 
 SPLIT_SIZES = {"train": 45, "validation": 180, "test": 1000}
 
-CS_KEY_COUNT = 8     # 官方 CS 恒 8 项/题（未交付也计失败）
+CS_KEY_COUNT = 8  # 官方 CS 恒 8 项/题（未交付也计失败）
 
 
 def applicable_hc_keys(level: str, local_constraint: dict | None) -> list[str]:
@@ -39,7 +40,7 @@ def applicable_hc_keys(level: str, local_constraint: dict | None) -> list[str]:
 
 @dataclass
 class Query:
-    idx: int                    # split 内的行下标（官方评测按下标配对）
+    idx: int  # split 内的行下标（官方评测按下标配对）
     org: str
     dest: str
     days: int
@@ -50,7 +51,9 @@ class Query:
     query: str
     level: str
     visiting_city_number: int = 1
-    reference_information: dict = field(default_factory=dict)  # {"Description": str, "Content": str} 列表转 dict
+    reference_information: dict = field(
+        default_factory=dict
+    )  # {"Description": str, "Content": str} 列表转 dict
 
     @property
     def hc_denominator(self) -> int:
@@ -116,9 +119,12 @@ def parse_dates(raw) -> list[str]:
     return []
 
 
-def load_queries(split: str, cfg: Config | None = None, force_download: bool = False) -> list[Query]:
+def load_queries(
+    split: str, cfg: Config | None = None, force_download: bool = False
+) -> list[Query]:
     """从 HF 拉取并落盘 runs/data/{split}.queries.jsonl，之后离线复用。"""
     from ..config_task import load_config
+
     cfg = cfg or load_config()
     out: Path = cfg.data_dir / f"{split}.queries.jsonl"
     if out.exists() and not force_download:
@@ -127,6 +133,7 @@ def load_queries(split: str, cfg: Config | None = None, force_download: bool = F
     # 防遮蔽：仓库顶层 datasets/ 包与本 HF 库同名——从 site-packages 精确装载
     import importlib.util
     import sys
+
     spec = importlib.util.find_spec("datasets")
     ours = str(Path(__file__).resolve().parents[3] / "datasets" / "__init__.py")
     if spec and str(spec.origin) == ours:
@@ -149,31 +156,45 @@ def load_queries(split: str, cfg: Config | None = None, force_download: bool = F
             desc = item.get("Description", "")
             if desc:
                 ref[desc] = item.get("Content", "")
-        queries.append(Query(
-            idx=i,
-            org=row.get("org", ""),
-            dest=row.get("dest", ""),
-            days=int(row.get("days") or 0),
-            date=parse_dates(row.get("date")),
-            people_number=int(row.get("people_number") or 0),
-            local_constraint=_parse_local_constraint(row.get("local_constraint")),
-            budget=int(row.get("budget") or 0),
-            query=row.get("query", ""),
-            level=row.get("level", ""),
-            visiting_city_number=int(row.get("visiting_city_number") or 1),
-            reference_information=ref,
-        ))
+        queries.append(
+            Query(
+                idx=i,
+                org=row.get("org", ""),
+                dest=row.get("dest", ""),
+                days=int(row.get("days") or 0),
+                date=parse_dates(row.get("date")),
+                people_number=int(row.get("people_number") or 0),
+                local_constraint=_parse_local_constraint(row.get("local_constraint")),
+                budget=int(row.get("budget") or 0),
+                query=row.get("query", ""),
+                level=row.get("level", ""),
+                visiting_city_number=int(row.get("visiting_city_number") or 1),
+                reference_information=ref,
+            )
+        )
     out.parent.mkdir(parents=True, exist_ok=True)
     with out.open("w") as f:
         for q in queries:
-            f.write(json.dumps({
-                "idx": q.idx, "org": q.org, "dest": q.dest, "days": q.days,
-                "date": q.date, "people_number": q.people_number,
-                "local_constraint": q.local_constraint, "budget": q.budget,
-                "query": q.query, "level": q.level,
-                "visiting_city_number": q.visiting_city_number,
-                "reference_information": q.reference_information,
-            }, ensure_ascii=False) + "\n")
+            f.write(
+                json.dumps(
+                    {
+                        "idx": q.idx,
+                        "org": q.org,
+                        "dest": q.dest,
+                        "days": q.days,
+                        "date": q.date,
+                        "people_number": q.people_number,
+                        "local_constraint": q.local_constraint,
+                        "budget": q.budget,
+                        "query": q.query,
+                        "level": q.level,
+                        "visiting_city_number": q.visiting_city_number,
+                        "reference_information": q.reference_information,
+                    },
+                    ensure_ascii=False,
+                )
+                + "\n"
+            )
     return queries
 
 
@@ -181,21 +202,31 @@ def _from_local(path: Path) -> list[Query]:
     queries = []
     for line in path.read_text().splitlines():
         r = json.loads(line)
-        queries.append(Query(
-            idx=r["idx"], org=r["org"], dest=r["dest"], days=r["days"],
-            date=parse_dates(r.get("date")), people_number=r["people_number"],
-            local_constraint=r["local_constraint"], budget=r["budget"],
-            query=r["query"], level=r["level"],
-            visiting_city_number=r.get("visiting_city_number", 1),
-            reference_information=r.get("reference_information", {}),
-        ))
+        queries.append(
+            Query(
+                idx=r["idx"],
+                org=r["org"],
+                dest=r["dest"],
+                days=r["days"],
+                date=parse_dates(r.get("date")),
+                people_number=r["people_number"],
+                local_constraint=r["local_constraint"],
+                budget=r["budget"],
+                query=r["query"],
+                level=r["level"],
+                visiting_city_number=r.get("visiting_city_number", 1),
+                reference_information=r.get("reference_information", {}),
+            )
+        )
     return queries
 
 
-def partition_train(per_round: int = 9, rounds: int = 5, seed: int = 42,
-                    cfg: Config | None = None) -> list[list[int]]:
+def partition_train(
+    per_round: int = 9, rounds: int = 5, seed: int = 42, cfg: Config | None = None
+) -> list[list[int]]:
     """train 45 题切成 rounds 组、每组 per_round 题（互斥，尽量按 level 分层）。"""
     from ..config_task import load_config
+
     cfg = cfg or load_config()
     all_q = load_queries("train", cfg)
     n = len(all_q)
@@ -213,9 +244,12 @@ def partition_train(per_round: int = 9, rounds: int = 5, seed: int = 42,
         for b in buckets:
             if b:
                 pool.append(b.pop())
-    pool = pool[:total] if total <= n else pool + rng.sample(
-        [i for i in range(n) if i not in set(pool)], total - n)
-    groups = [pool[i * per_round:(i + 1) * per_round] for i in range(rounds)]
+    pool = (
+        pool[:total]
+        if total <= n
+        else pool + rng.sample([i for i in range(n) if i not in set(pool)], total - n)
+    )
+    groups = [pool[i * per_round : (i + 1) * per_round] for i in range(rounds)]
     out = cfg.data_dir / "sample_indices.json"
     existing = json.loads(out.read_text()) if out.exists() else {}
     existing["rounds"] = groups
@@ -226,6 +260,7 @@ def partition_train(per_round: int = 9, rounds: int = 5, seed: int = 42,
 def stratified_test_subset(n: int = 50, seed: int = 42, cfg: Config | None = None) -> list[int]:
     """validation 180 题分层抽 n 题做测试。"""
     from ..config_task import load_config
+
     cfg = cfg or load_config()
     all_q = load_queries("validation", cfg)
     rng = random.Random(seed)
