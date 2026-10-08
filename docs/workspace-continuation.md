@@ -4,7 +4,7 @@ The durable Workspace separates immutable content, execution provenance and bran
 
 A branch records `working` and `adopted` independently. Human selection changes the working candidate without claiming it scored better. Automatic publication checks the branch revision before changing either choice. Each task can retain several attempts; a failed attempt is never deleted to make a retry look like a first execution.
 
-These interfaces have offline regression coverage. **Real model smoke remains pending until the operator specifies the model and the five-question test is actually executed.** Offline replay and unit checks are not evidence of benchmark improvement or successful real model operation.
+Real small-task and native improvement-loop checks used the operator-specified `glm-5.3-flash`. See the [2026-10-08 acceptance record](plans/intervention-wiki-loop-acceptance-20261008.md) for measured scope, scores, recovery and pending queries. Offline regressions are reported separately and do not establish full benchmark gains.
 
 ## Installed commands
 
@@ -63,6 +63,16 @@ A scope filters registered case, question, asset or stage identifiers. Replies i
 
 Wiki access permits registered training evidence, assets, corrections and allowed aggregates. Ground truth, raw judge requests and per-question validation/test evidence are outside that interface. Corrections must reference permitted sources. Missing originals remain missing, and partial chunk coverage is not a complete explanation of the requested range.
 
+
+Use each proposal question's supplied `wiki_scope` to select evidence. Its `training_ids` identify exact case/question pairs; local `question_ids` should be combined with `case_ids` when question names repeat. Qualified training IDs in `question_ids` remain supported for older dialogues. A regroup request with no readable matching evidence returns `partial` with a gap and does not claim that model attribution completed.
+
+Wiki maintenance has a separate recovery entry point:
+
+```bash
+darwinagent workspace --root runs/example wiki-maintenance-retry EVENT_ID --reason 'Explicitly retry the interrupted attribution'
+```
+
+This only records a new attempt, preserves the old request and possible duplicate cost, and makes no model call. With the existing configured maintainer, `await wiki.resume_maintenance(EVENT_ID)` consumes that attempt; omitting the ID resumes pending attribution tasks. Completed round outboxes do not hide pending attribution. Reliable saved responses are reused; an unknown submission still requires an explicit recovery choice. Daily candidate smoke results and steps persist under `smoke/<asset-version>/`.
 
 ## Dataset and demo execution scope
 

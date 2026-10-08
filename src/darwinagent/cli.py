@@ -83,6 +83,11 @@ def _parser():
     resolve.add_argument("request_id")
     resolve.add_argument("--action", choices=("response", "new-attempt", "abandon"), required=True)
     resolve.add_argument("--response", type=Path)
+    maintenance = commands.add_parser(
+        "wiki-maintenance-retry", help="Register an explicit attribution retry without model calls"
+    )
+    maintenance.add_argument("event_id")
+    maintenance.add_argument("--reason", required=True)
     query = commands.add_parser(
         "wiki-query", help="Query training evidence or explicitly regroup it"
     )
@@ -286,6 +291,15 @@ async def _workspace(args):
         else:
             workspace.set_request_status(args.request_id, "abandoned")
             result = {"request_id": args.request_id, "status": "abandoned"}
+    elif operation == "wiki-maintenance-retry":
+        from .config import RunConfig
+        from .experiments.wiki import WikiMaintainer
+
+        state = json.loads((args.root / "optimization" / "state.json").read_text())
+        wiki = WikiMaintainer(
+            args.root, state["identity"], lambda _: None, RunConfig(), limit=state["limit"]
+        )
+        result = wiki.retry_maintenance(args.event_id, args.reason)
     elif operation == "preview":
         from types import SimpleNamespace
 

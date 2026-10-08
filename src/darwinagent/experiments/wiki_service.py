@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from darwinagent.agents.protocol import ModelSession
+from darwinagent.kernel.revision import parse_training_id
 from darwinagent.runtime.artifacts import atomic_json, digest
 from darwinagent.runtime.budgets import counter_transaction
 from darwinagent.runtime.steps import AwaitingBudget, RequestAbandoned, StepJournal, UnknownRequest
@@ -34,6 +35,16 @@ class WikiQuery:
             raise ValueError("Unknown Wiki view")
         if not self.question or self.max_chars < 512:
             raise ValueError("Wiki question and at least 512 characters required")
+        if not isinstance(self.scope, dict):
+            raise ValueError("Wiki scope must be an object")
+        for key in ("training_ids", "question_ids"):
+            values = self.scope.get(key, [])
+            values = values if isinstance(values, list) else [values]
+            for value in values:
+                if not isinstance(value, str):
+                    raise ValueError(f"Wiki {key} must contain string identifiers")
+                if key == "training_ids" or re.match(r"[0-9]+:", value):
+                    parse_training_id(value)
 
 
 @dataclass(frozen=True)
@@ -157,15 +168,50 @@ class WikiService:
 
     @staticmethod
     def _matches(row, scope):
-        return all(
-            not value
-            or set(value if isinstance(value, list) else [value])
-            & set(
-                row["scope"].get(key, [])
-                if isinstance(row["scope"].get(key), list)
-                else [row["scope"].get(key)]
+        def values(source, key):
+            value = source.get(key, [])
+            return value if isinstance(value, list) else [value]
+
+        original = row["scope"]
+        identity_keys = {"training_ids", "case_ids", "question_ids"}
+        for key, value in scope.items():
+            if key not in identity_keys and value:
+                if not set(values(scope, key)) & set(values(original, key)):
+                    return False
+
+        pairs = {parse_training_id(tid) for tid in values(original, "training_ids")}
+        cases = set(values(original, "case_ids"))
+        questions = set(values(original, "question_ids"))
+        if not pairs and (len(cases) == 1 or len(questions) == 1):
+            # Legacy ranges establish pairs only when one side is unambiguous.
+            pairs = {(case, question) for case in cases for question in questions}
+
+        requested_cases = set(values(scope, "case_ids"))
+        requested_training = {parse_training_id(tid) for tid in values(scope, "training_ids")}
+        requested_questions = values(scope, "question_ids")
+        qualified_questions = {
+            parse_training_id(qid) for qid in requested_questions if re.match(r"[0-9]+:", qid)
+        }
+        plain_questions = {qid for qid in requested_questions if not re.match(r"[0-9]+:", qid)}
+        if pairs:
+            # Every active filter must be satisfied by the same evidence identity.
+            return any(
+                (not requested_cases or case in requested_cases)
+                and (not requested_training or (case, question) in requested_training)
+                and (
+                    not requested_questions
+                    or (case, question) in qualified_questions
+                    or question in plain_questions
+                )
+                for case, question in pairs
             )
-            for key, value in scope.items()
+
+        # A legacy multi-case/multi-question range lacks the pair relation. It
+        # remains discoverable by a single dimension, but cannot prove a pair.
+        if requested_training or qualified_questions or (requested_cases and requested_questions):
+            return False
+        return (not requested_cases or bool(requested_cases & cases)) and (
+            not plain_questions or bool(plain_questions & questions)
         )
 
     async def query(self, query):
@@ -319,6 +365,22 @@ class WikiService:
             end = start + max(1, (end - start) * 3 // 4)
 
     async def _regroup(self, query, snapshot, parts, refs, missing, start):
+        if not parts:
+            gap = {
+                "reason": "no_matching_evidence"
+                if not snapshot["refs"]
+                else "no_readable_evidence",
+                "requested_scope": query.scope,
+            }
+            return WikiReply(
+                "partial",
+                snapshot["id"],
+                uncertainty=({"reason": "regroup_not_performed", "evidence_gap": gap},),
+                uncovered=(gap,),
+                missing=(*missing, gap),
+                wiki_version=snapshot["version"],
+                matched=tuple(snapshot["refs"]),
+            )
         path = self.root / "jobs" / f"{snapshot['id']}.json"
         job = (
             json.loads(path.read_text())
@@ -490,6 +552,7 @@ class WikiService:
             cursor=cursor,
             job_id=snapshot["id"],
             wiki_version=snapshot["version"],
+            matched=tuple(snapshot["refs"]),
         )
 
     async def _merge_tree(self, query, snapshot, parts, completed, job, path, missing):

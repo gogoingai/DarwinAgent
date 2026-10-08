@@ -477,6 +477,8 @@ class ExperimentRunner:
             graph_builder=self.graph_builder,
             smoke_judge=self.smoke_judge,
             snapshot_root=self.snapshot_root,
+            root=getattr(self, "root", None),
+            execution=getattr(self, "execution", None),
         )
 
     async def run(

@@ -196,33 +196,53 @@ def evaluate(result, expected):
     return {"total": len(expected), "passed": sum(r["passed"] for r in rows), "rows": rows}
 
 
-async def live(root, model, active_seconds=1200, max_requests=70, *, definitions=None):
+async def live(
+    root,
+    model,
+    active_seconds=1200,
+    max_requests=70,
+    *,
+    definitions=None,
+    concurrency=1,
+    tool_steps=10,
+    retry_interrupted=False,
+):
     if not model.strip():
         raise ValueError("Explicit user-selected model required")
     cases = fixtures(root, definitions)
     cfg = Config.from_env(work_dir=root / "transport")
     cfg.model_strong = cfg.model_middle = cfg.model_fast = model
-    cfg.max_concurrency = cfg.fast_max_concurrency = 1
+    if concurrency < 1:
+        raise ValueError("Concurrency must be positive")
+    cfg.max_concurrency = cfg.fast_max_concurrency = concurrency
+    cfg.max_retries = 1
     cfg.request_timeout_s = 240
     cfg.max_http_requests = max_requests
     cfg.request_budget_path = root / "http-attempts.json"
     cfg.validate_model()
     workspace = Workspace(root / "workspace")
-    run_config = RunConfig(concurrency=1, protocol_attempts=3, answer_attempts=3, tool_steps=10)
+    run_config = RunConfig(
+        concurrency=concurrency, protocol_attempts=3, answer_attempts=3, tool_steps=tool_steps
+    )
     report = {
         "requested_model": model,
-        "concurrency": 1,
+        "concurrency": concurrency,
         "status": "pending",
         "cases": [],
         "limits": {"http_attempts": max_requests, "active_seconds": active_seconds},
     }
     client = None
+    transport_audit = {"peak": 0}
     try:
         with ActiveBudget(root / "active-budget.json", active_seconds) as budget:
             if not budget.remaining:
                 raise ValueError("Active budget exhausted; progress retained")
             cfg.deadline_monotonic = time.monotonic() + budget.remaining
             client = base.LLMClient(cfg)
+            from smoke_transport_audit import instrument_pool
+
+            if hasattr(client, "_site_for"):
+                transport_audit = instrument_pool(client, root / "transport-concurrency.json")
             async with asyncio.timeout(budget.remaining):
                 for index, (case, snapshot, bundle, task, expected) in enumerate(cases):
                     pipeline = Pipeline(
@@ -266,14 +286,47 @@ async def live(root, model, active_seconds=1200, max_requests=70, *, definitions
                             StepJournal.respond = original
                         if not injected:
                             raise AssertionError("Receipt interruption fixture did not execute")
-                    try:
-                        result = await pipeline.run(
-                            case, task, run_config, execution=ExecutionSelection()
-                        )
-                    except UnknownRequest as exc:
-                        report.setdefault("unresolved", []).append(
-                            {"case_id": case.id, "error": str(exc)}
-                        )
+                    result = None
+                    for recovery_attempt in range(4 if retry_interrupted else 1):
+                        try:
+                            result = await pipeline.run(
+                                case, task, run_config, execution=ExecutionSelection()
+                            )
+                            break
+                        except UnknownRequest as exc:
+                            if not retry_interrupted or recovery_attempt == 3:
+                                report.setdefault("unresolved", []).append(
+                                    {"case_id": case.id, "error": str(exc)}
+                                )
+                                break
+                            # Pipeline has settled all sibling workers before raising.
+                            # Recover durable receipts first, then link explicitly
+                            # authorized attempts only for this case's missing responses.
+                            workspace.recover_requests()
+                            linked = []
+                            for step_path in (root / "generation" / case.id / "steps").rglob(
+                                "*.json"
+                            ):
+                                step = json.loads(step_path.read_text())
+                                request_id = step.get("request_id")
+                                if not request_id or step.get("kind") != "model":
+                                    continue
+                                current = workspace.replacement_for(
+                                    request_id
+                                ) or workspace.request(request_id)
+                                if current["status"] not in ("unknown", "failed"):
+                                    continue
+                                replacement = workspace.retry_request(
+                                    current["id"],
+                                    reason="User authorization 2026-10-08: 中断问题就重试; retain possible duplicate cost",
+                                )
+                                linked.append({"previous": current["id"], "request": replacement})
+                            report.setdefault("interruption_retries", []).extend(linked)
+                            atomic_json(root / "extended-report.json", report)
+                            if not linked:
+                                raise
+                            await asyncio.sleep(min(2**recovery_attempt, 4))
+                    if result is None:
                         atomic_json(root / "extended-report.json", report)
                         continue
                     evaluation = evaluate(result, expected)
@@ -281,7 +334,7 @@ async def live(root, model, active_seconds=1200, max_requests=70, *, definitions
                     await pipeline.run(
                         case,
                         task,
-                        replace(run_config, concurrency=2),
+                        replace(run_config, concurrency=1 if concurrency == 2 else 2),
                         execution=ExecutionSelection(),
                     )
                     reuse = client.http_attempts() - start
@@ -348,6 +401,7 @@ async def live(root, model, active_seconds=1200, max_requests=70, *, definitions
         report.update(status="pending", error=f"{type(exc).__name__}: {exc}")
     finally:
         if client is not None:
+            report["transport_peak"] = transport_audit["peak"]
             report["http_attempts"] = client.http_attempts()
             report["ledger"] = client.ledger_summary()
             await client.aclose()

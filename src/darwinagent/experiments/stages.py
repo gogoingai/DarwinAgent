@@ -414,20 +414,47 @@ async def _smoke_gate(
     graph_builder,
     smoke_judge,
     snapshot_root,
+    root=None,
+    execution=None,
 ):
     """B0 全量提交前的冒烟门（用户拍板：先保证能答对，再启动跑；v10 追加：6 题对 2）：
-    每训练对话抽前 6 题走完整真实管线＋冻结判题（临时目录、真模型、~5 分钟）。
+    每训练对话抽前 6 题走完整真实管线＋冻结判题（真模型、~5 分钟）。
+    显式非 strict 执行持久保存每版冒烟步骤和回执；旧模式仍用临时目录。
     过门条件＝执行错误 <2/3、判题完整、至少 2/6 precise 答对；不满足分钟级中止换根
     ——确定性全灭（v1/v3/v6 事故类）与「能跑但全答错」的弱冷启动都不再烧全量预算。
     门槛与 B0 冷门成比例：单题低概率故障（如 F 输出契约被个别调用绊倒）由冷门吸收，
     只有系统性破绽（≥2/3）才在此拦下。"""
     import dataclasses as _dc
     import tempfile
+    from contextlib import nullcontext
+
+    durable = execution is not None and not execution.strict
+    if durable and root is None:
+        raise ValueError("Explicit daily smoke requires a persistent experiment root")
+    if durable:
+        from darwinagent.runtime.workspace import Workspace
+
+        smoke_root = Path(root) / "smoke" / spec.bundle.version
+        workspace = Workspace(Path(root) / "workspace")
+        atomic_json(
+            smoke_root / "identity.json",
+            {
+                "candidate_version": spec.bundle.version,
+                "config": config.to_dict(),
+                "execution": execution.to_dict(),
+            },
+        )
 
     client = client_factory("B0-smoke")
     try:
         for case in cases:
-            questions = case.questions
+            if durable and not execution.includes(case.id):
+                continue
+            questions = tuple(
+                q for q in case.questions if not durable or execution.includes(case.id, q.id)
+            )
+            if not questions:
+                continue
             if candidate:
                 risk = (
                     "时间|日期|哪天|何时|上周|昨天",
@@ -447,17 +474,29 @@ async def _smoke_gate(
                 selected.extend(q for q in questions if q not in selected)
                 questions = tuple(selected)
             sampled = _dc.replace(case, questions=tuple(questions[:questions_per_case]))
-            with tempfile.TemporaryDirectory() as td:
+            with nullcontext(smoke_root) if durable else tempfile.TemporaryDirectory() as td:
                 pipeline = Pipeline(
                     client,
                     Path(td),
                     frozen_snapshot=None if snapshot_root is None else snapshot_root / case.id,
                     graph_builder=graph_builder,
+                    **(
+                        {
+                            "workspace": workspace,
+                            "preparation_root": Path(root) / "shared-preparation",
+                        }
+                        if durable
+                        else {}
+                    ),
                 )
-                result = await pipeline.run(sampled, spec, config)
+                result = await pipeline.run(
+                    sampled, spec, config, **({"execution": execution} if durable else {})
+                )
                 faults = [a for a in result.answers if a.status == "execution_error"]
                 recoverable = [a for a in faults if _retryable_answer(a)]
-                if candidate and recoverable and len(recoverable) == len(faults):
+                # Daily retries are selected explicitly by ExecutionSelection; the legacy
+                # helper clears legacy checkpoints and omits journals, so never use it here.
+                if not durable and candidate and recoverable and len(recoverable) == len(faults):
                     result, _ = await batched_fault_retry(
                         pipeline,
                         sampled,

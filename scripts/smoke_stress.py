@@ -292,11 +292,12 @@ def definitions():
     ]
 
 
-def audit_saved_answers(root):
+def audit_saved_answers(root, case_definitions=None):
     """Independently audit completed answers, including partly finished cases."""
     rows = []
     missing = []
-    for case_id, _, questions in definitions():
+    selected = definitions() if case_definitions is None else case_definitions
+    for case_id, _, questions in selected:
         saved = {}
         for path in (root / "generation" / case_id).glob("branches/main/answers/*.json"):
             record = json.loads(path.read_text())
@@ -340,8 +341,8 @@ def audit_saved_answers(root):
                 )
             rows.append({"case_id": case_id, **field_result, "tools": tools})
     report = {
-        "expected_cases": 12,
-        "expected_questions": 28,
+        "expected_cases": len(selected),
+        "expected_questions": sum(len(case[2]) for case in selected),
         "completed_questions": len(rows),
         "passed": sum(row["passed"] for row in rows),
         "missing": missing,
@@ -351,29 +352,55 @@ def audit_saved_answers(root):
     return report
 
 
-async def wiki_checks(root, model, active_seconds, max_requests):
+async def wiki_checks(
+    root,
+    model,
+    active_seconds,
+    max_requests,
+    *,
+    case_definitions=None,
+    wiki_case_ids=None,
+    concurrency=1,
+    identity="stress-twelve",
+    tool_steps=10,
+):
     cfg = Config.from_env(work_dir=root / "transport")
     cfg.model_strong = cfg.model_middle = cfg.model_fast = model
-    cfg.max_concurrency = cfg.fast_max_concurrency = 1
+    cfg.max_concurrency = cfg.fast_max_concurrency = concurrency
+    cfg.max_retries = 1
     cfg.request_timeout_s = 240
     cfg.max_http_requests = max_requests
     cfg.request_budget_path = root / "http-attempts.json"
     cfg.validate_model()
     config = RunConfig(
-        concurrency=1, protocol_attempts=3, answer_attempts=3, tool_steps=10, wiki_max_tokens=12000
+        concurrency=concurrency,
+        protocol_attempts=3,
+        answer_attempts=3,
+        tool_steps=tool_steps,
+        wiki_max_tokens=12000,
     )
     workspace = Workspace(root / "workspace")
     rows = []
     client = None
+    selected = definitions() if case_definitions is None else case_definitions
+    wiki_case_ids = (
+        {"one-past-page", "filtered-tail", "technician-change"}
+        if wiki_case_ids is None
+        else set(wiki_case_ids)
+    )
     try:
         with ActiveBudget(root / "active-budget.json", active_seconds) as budget:
             cfg.deadline_monotonic = time.monotonic() + budget.remaining
             client = base.LLMClient(cfg)
-            wiki = WikiMaintainer(root, "stress-twelve", lambda _: client, config)
+            from smoke_transport_audit import instrument_pool
+
+            transport_audit = instrument_pool(client, root / "wiki-transport-concurrency.json")
+            wiki = WikiMaintainer(root, identity, lambda _: client, config)
             async with asyncio.timeout(budget.remaining):
-                for case, snapshot, bundle, task, _ in extended.fixtures(root, definitions()):
-                    if case.id not in {"one-past-page", "filtered-tail", "technician-change"}:
+                for case, snapshot, bundle, task, _ in extended.fixtures(root, selected):
+                    if case.id not in wiki_case_ids:
                         continue
+                    qid = case.questions[0].id
                     start = client.http_attempts()
                     pipeline = Pipeline(
                         client,
@@ -385,7 +412,7 @@ async def wiki_checks(root, model, active_seconds, max_requests):
                     )
                     try:
                         result = await pipeline.run(
-                            case, task, config, execution=ExecutionSelection(question_ids=("q1",))
+                            case, task, config, execution=ExecutionSelection(question_ids=(qid,))
                         )
                     except UnknownRequest as exc:
                         rows.append({"case_id": case.id, "status": "pending", "error": str(exc)})
@@ -402,8 +429,8 @@ async def wiki_checks(root, model, active_seconds, max_requests):
                             **base._wiki_training_evidence((case,), (result,)),
                         },
                     )
-                    scope = {"case_ids": [case.id], "question_ids": ["q1"]}
-                    allowed_evidence = (training_id(case.id, "q1"),)
+                    scope = {"case_ids": [case.id], "question_ids": [qid]}
+                    allowed_evidence = (training_id(case.id, qid),)
                     assets = [
                         dict(a.to_dict(), fingerprint=a.fingerprint, current_ref="current:" + a.id)
                         for a in bundle.assets.assets
@@ -412,7 +439,7 @@ async def wiki_checks(root, model, active_seconds, max_requests):
                         root / f"proposal-{case.id}.json",
                         payload={
                             "base_version": bundle.version,
-                            "goal": "先查询Wiki重新归纳q1原件，再核对参数、返回数据及覆盖。之后在同一会话继续，证据不足保留不确定性。",
+                            "goal": f"先查询Wiki重新归纳{qid}原件，再核对参数、返回数据及覆盖。之后在同一会话继续，证据不足保留不确定性。",
                             "scope": scope,
                             "assets": assets,
                             "questions": [
@@ -524,11 +551,15 @@ async def wiki_checks(root, model, active_seconds, max_requests):
         report = {
             "sessions": rows,
             "status": "complete"
-            if len(rows) == 3 and all(row["status"] == "complete" for row in rows)
+            if len(rows) == len(wiki_case_ids) and all(row["status"] == "complete" for row in rows)
             else "pending",
         }
         if client:
-            report.update(http_attempts=client.http_attempts(), ledger=client.ledger_summary())
+            report.update(
+                http_attempts=client.http_attempts(),
+                ledger=client.ledger_summary(),
+                transport_peak=transport_audit["peak"],
+            )
             await client.aclose()
         atomic_json(root / "wiki-stress-report.json", report)
     return report

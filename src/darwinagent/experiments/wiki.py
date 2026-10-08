@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import inspect
 import json
+import re
 from pathlib import Path
 
 from darwinagent.agents.protocol import ModelSession
@@ -11,6 +12,8 @@ from darwinagent.contracts import freeze
 from darwinagent.operators.data import DataCapabilities
 from darwinagent.operators.sandbox import BUILTINS, DATA_CAPABILITIES
 from darwinagent.runtime.artifacts import atomic_json, digest
+from darwinagent.runtime.budgets import counter_transaction
+from darwinagent.runtime.steps import AwaitingBudget, RequestAbandoned, StepJournal, UnknownRequest
 
 from .wiki_context import _brief_facts, _context_facts, _formal_runtime_facts
 from .wiki_evidence import _compress_training_evidence, pagination_anomalies, pagination_metadata
@@ -245,19 +248,7 @@ class WikiMaintainer:
                 )
         return event["id"]
 
-    async def _attribute(self, event):
-        target = self.root / "maintenance" / f"{event['id']}.json"
-        if target.exists():
-            return
-        request_path = self.root / "maintenance" / f"{event['id']}.request.json"
-        if request_path.exists():
-            # A lost reply might already have consumed tokens. Never replay it silently.
-            return
-        state = json.loads(self.state_path.read_text())
-        if state["reserved_calls"] >= self.limit:
-            return
-        remaining = self.limit - state["reserved_calls"]
-        reserved = min(self.config.protocol_attempts, remaining)
+    def _maintenance_payload(self, event):
         payload = {
             "event": {**event, "facts": _brief_facts(event["facts"])},
             "wiki_version": self._wiki()["version"],
@@ -336,16 +327,171 @@ class WikiMaintainer:
             _compress_training_evidence(facts, budget=max(4000, 35000 - rest_chars))
         if len(json.dumps(payload, ensure_ascii=False)) > 35000:
             # Facts remain durable; an oversized attribution is a visible pending task.
-            atomic_json(
-                self.root / "maintenance" / f"{event['id']}.failure.json",
-                {"error": "Maintenance evidence exceeds 35000 characters"},
+            self._maintenance_failure(
+                event["id"], 0, "Maintenance evidence exceeds 35000 characters"
             )
+            return None
+        return payload
+
+    def _maintenance_event(self, event_id):
+        if not isinstance(event_id, str) or not re.fullmatch(r"[0-9a-f]{64}", event_id):
+            raise ValueError("Invalid Wiki maintenance event id")
+        event = json.loads((self.root / "events" / f"{event_id}.json").read_text())
+        if not event.get("infer"):
+            raise ValueError("Event does not request Wiki attribution")
+        return event
+
+    def _maintenance_control(self, event):
+        event_id = event["id"]
+        path = self.root / "maintenance" / f"{event_id}.control.json"
+        if path.exists():
+            return json.loads(path.read_text())
+        request = self.root / "maintenance" / f"{event_id}.request.json"
+        control = {"event_id": event_id, "attempt": 0, "state": "prepared", "history": []}
+        if request.exists():
+            # A legacy request file is not proof that dispatch failed or succeeded.
+            payload = json.loads(request.read_text())
+            request_id = self.service.workspace.prepare_request(
+                {
+                    "role": "wiki_maintainer",
+                    "payload": payload,
+                    "legacy_request_path": str(request),
+                    "event_id": event_id,
+                }
+            )
+            self.service.workspace.set_request_status(request_id, "unknown")
+            control.update(state="unknown", legacy=True, legacy_request_id=request_id)
+        atomic_json(path, control)
+        return control
+
+    def _maintenance_failure(self, event_id, attempt, error, events=()):
+        value = {"error": error, "events": list(events), "attempt": attempt}
+        path = self.root / "maintenance" / event_id / f"attempt-{attempt}.failure.json"
+        # Append separate failure records; the first legacy failure remains unchanged.
+        if path.exists():
+            path = path.parent / (f"attempt-{attempt}.failure-" + digest(value) + ".json")
+        atomic_json(path, value)
+        legacy = self.root / "maintenance" / f"{event_id}.failure.json"
+        if not legacy.exists():
+            atomic_json(legacy, value)
+
+    def retry_maintenance(self, event_id, reason):
+        """Register a new attempt only; explicit resume consumes the prepared task."""
+        if not isinstance(reason, str) or not reason.strip():
+            raise ValueError("Explicit reason required for Wiki maintenance retry")
+        event = self._maintenance_event(event_id)
+        target = self.root / "maintenance" / f"{event_id}.json"
+        if target.exists():
+            self._refresh(event_id)
+            return {"event_id": event_id, "state": "complete"}
+        control = self._maintenance_control(event)
+        previous = {key: value for key, value in control.items() if key != "history"}
+        control["history"].append(previous)
+        control.update(
+            attempt=control["attempt"] + 1,
+            state="prepared",
+            legacy=False,
+            retry_reason=reason.strip(),
+            possible_duplicate_cost=True,
+        )
+        atomic_json(self.root / "maintenance" / f"{event_id}.control.json", control)
+        self.service.workspace.append_event(
+            "wiki_maintenance_retry",
+            {
+                "event_id": event_id,
+                "attempt": control["attempt"],
+                "reason": reason.strip(),
+                "possible_duplicate_cost": True,
+                "previous": previous,
+            },
+        )
+        return control
+
+    async def resume_maintenance(self, event_id=None):
+        """Explicitly resume pending attribution only, independently of completed outboxes."""
+        events = (
+            [self._maintenance_event(event_id)]
+            if event_id is not None
+            else [
+                json.loads(path.read_text())
+                for path in sorted((self.root / "events").glob("*.json"))
+            ]
+        )
+        results = []
+        for event in events:
+            if not event.get("infer"):
+                continue
+            self._consume(event)
+            target = self.root / "maintenance" / f"{event['id']}.json"
+            if not target.exists():
+                await self._attribute(event)
+            self._refresh(event["id"])
+            control = self._maintenance_control(event) if not target.exists() else None
+            results.append(
+                {
+                    "event_id": event["id"],
+                    "state": "complete" if target.exists() else control["state"],
+                    "attempt": None if control is None else control["attempt"],
+                }
+            )
+        return results
+
+    async def _attribute(self, event):
+        event_id = event["id"]
+        target = self.root / "maintenance" / f"{event_id}.json"
+        if target.exists():
+            self._refresh(event_id)
             return
-        atomic_json(request_path, payload)
-        state["reserved_calls"] += reserved
-        atomic_json(self.state_path, state)
+        control = self._maintenance_control(event)
+        if control.get("legacy"):
+            return
+        attempt = control["attempt"]
+        control_path = self.root / "maintenance" / f"{event_id}.control.json"
+        request_path = self.root / "maintenance" / f"{event_id}.request.json"
+        payload = (
+            json.loads(request_path.read_text())
+            if request_path.exists()
+            else self._maintenance_payload(event)
+        )
+        if payload is None or len(json.dumps(payload, ensure_ascii=False)) > 35000:
+            control["state"] = "oversized"
+            atomic_json(control_path, control)
+            return
+        reservation_key = f"{event_id}:{attempt}"
+        with counter_transaction(self.state_path) as state:
+            reservations = state.setdefault("maintenance_reservations", {})
+            allocation = reservations.get(reservation_key)
+            if allocation is None:
+                remaining = self.limit - state["reserved_calls"]
+                if remaining <= 0:
+                    control["state"] = "awaiting_budget"
+                    atomic_json(control_path, control)
+                    return
+                reserved = min(self.config.protocol_attempts, remaining)
+                allocation = {"reserved": reserved, "settled": False}
+                reservations[reservation_key] = allocation
+                state["reserved_calls"] += reserved
+            reserved = allocation["reserved"]
+        if not request_path.exists():
+            atomic_json(request_path, payload)
+        journal = StepJournal(
+            self.root / "maintenance" / event_id / f"attempt-{attempt}.steps",
+            workspace=self.service.workspace,
+            bypass_cache=attempt > 0,
+            provenance={
+                "event_id": event_id,
+                "attempt": attempt,
+                "role": "wiki_maintainer",
+                "producer_identity": event.get("producer_identity"),
+                "evidence_refs": event["facts"].get("evidence_refs", []),
+                "retry_reason": control.get("retry_reason"),
+                "possible_duplicate_cost": control.get("possible_duplicate_cost", False),
+            },
+        )
         client = self.client_factory("optimization")
-        session = ModelSession(client, self.config, "wiki_maintenance", limit=reserved)
+        session = ModelSession(
+            client, self.config, "wiki_maintenance", limit=reserved, journal=journal
+        )
 
         def valid(value):
             if set(value) != {"cause", "action", "training_ids"}:
@@ -375,19 +521,30 @@ class WikiMaintainer:
                 target,
                 {"attribution": response, "raw_outputs": session.raw, "events": session.events},
             )
+            control["state"] = "complete"
         except Exception as exc:
-            atomic_json(
-                self.root / "maintenance" / f"{event['id']}.failure.json",
-                {"error": f"{type(exc).__name__}: {exc}", "events": session.events},
+            control["state"] = (
+                "unknown"
+                if isinstance(exc, UnknownRequest)
+                else "awaiting_budget"
+                if isinstance(exc, AwaitingBudget)
+                else "abandoned"
+                if isinstance(exc, RequestAbandoned)
+                else "failed"
             )
+            control["error"] = f"{type(exc).__name__}: {exc}"
+            self._maintenance_failure(event_id, attempt, control["error"], session.events)
         finally:
             # Requests are reserved before the call. Unused slots return only after
             # an observable completion; a crash leaves the whole reservation charged.
-            state = json.loads(self.state_path.read_text())
-            state["reserved_calls"] -= reserved - session.calls
-            atomic_json(self.state_path, state)
+            with counter_transaction(self.state_path) as state:
+                allocation = state["maintenance_reservations"][reservation_key]
+                if not allocation["settled"] and control["state"] != "awaiting_budget":
+                    state["reserved_calls"] -= max(0, reserved - session.calls)
+                    allocation.update(settled=True, calls=session.calls)
+            atomic_json(control_path, control)
             await client.aclose()
-            self._refresh(event["id"])
+            self._refresh(event_id)
 
     def _refresh(self, event_id):
         target = self.root / "maintenance" / f"{event_id}.json"

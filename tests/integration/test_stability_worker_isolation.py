@@ -35,6 +35,24 @@ from tests.support.preflight import preflight_sync
 class WorkerIsolationTests(unittest.TestCase):
     _preflight_sync = staticmethod(preflight_sync)
 
+    def test_empty_vector_resume_requires_no_embedding_connection(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "vector").mkdir()
+            (root / "vector" / "index.jsonl").write_text("")
+            atomic_json(root / "manifest.json", {"n_vector_records": 0})
+            graph = SimpleNamespace(vector=None)
+            with mock.patch("darwinagent.vector.load_embedder") as factory:
+                attach_vector(graph, root)
+                self.assertEqual(graph.vector.search("无需嵌入", 20), [])
+                factory.assert_not_called()
+            explicit_factory = mock.Mock(side_effect=AssertionError("unexpected embedding"))
+            attach_vector(graph, root, embedder_factory=explicit_factory)
+            explicit_factory.assert_not_called()
+            atomic_json(root / "manifest.json", {"n_vector_records": 1})
+            with self.assertRaisesRegex(ValueError, "记录数不符"):
+                attach_vector(graph, root, embedder_factory=explicit_factory)
+
     def test_timeout_preserves_independent_completed_checks(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)

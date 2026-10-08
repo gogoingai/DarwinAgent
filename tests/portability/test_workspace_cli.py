@@ -1,5 +1,6 @@
 """Offline public workspace commands, without model discovery or invocation."""
 
+import asyncio
 import io
 import json
 import tempfile
@@ -63,6 +64,28 @@ class WorkspaceCLI(unittest.TestCase):
         reply = self.invoke("wiki-query", "check progress")
         self.assertTrue(reply["evidence_refs"])
         self.assertEqual("complete", reply["status"])
+
+    def test_maintenance_retry_preserves_unknown_history_without_dispatch(self):
+        from darwinagent.config import RunConfig
+        from darwinagent.experiments.wiki import WikiMaintainer
+        from darwinagent.llm.recorded import RecordedClient
+
+        class Client(RecordedClient):
+            async def aclose(self):
+                pass
+
+        client = Client({"wiki_maintainer": [RuntimeError("lost response")]})
+        wiki = WikiMaintainer(
+            self.root / "run", "fixture", lambda _: client, RunConfig(protocol_attempts=1)
+        )
+        event_id = asyncio.run(wiki.record("R1", "decision", {}, infer=True))
+        request = wiki.root / "maintenance" / (event_id + ".request.json")
+        before = request.read_bytes()
+        result = self.invoke("wiki-maintenance-retry", event_id, "--reason", "explicit retry")
+        self.assertEqual("prepared", result["state"])
+        self.assertTrue(result["possible_duplicate_cost"])
+        self.assertEqual(request.read_bytes(), before)
+        self.assertEqual(len(client.calls), 1)
         regroup = self.invoke("wiki-query", "check progress", "--view", "regroup")
         self.assertEqual("pending", regroup["status"])
         self.assertTrue(regroup["job_id"])

@@ -9,7 +9,8 @@ from darwinagent.agents.protocol import ProtocolError, parse_json
 from darwinagent.runtime.artifacts import atomic_json, digest
 
 ACTION_GUIDANCE = """输出必须是一个 JSON 对象，必须有 action 字段；不要用 query_wiki 等动作名称作为顶层键。
-合法查询示例：{"action":"query_wiki","query":{"question":"核对原件与反证","scope":{"question_ids":["系统提供的题号"]},"view":"regroup","cursor":null,"max_chars":8000}}
+合法查询示例：{"action":"query_wiki","query":{"question":"核对原件与反证","scope":{"training_ids":["系统提供的 training_id"]},"view":"regroup","cursor":null,"max_chars":8000}}
+题目的 wiki_scope 可直接作为查询 scope；training_ids 使用系统提供的完整组合编号。question_ids 使用局部 question_id，或兼容完整 training_id；跨对话同名题号应优先用 training_ids 精确定位。
 首次查询 cursor 必须为 null；后续 cursor 只能原样使用 Wiki 返回的字符串，不能用数字页码。
 提交示例：{"action":"submit_patch","patches":[...]}
 无修改示例：{"action":"no_change","reason":"当前证据不足","unresolved":["待查问题"]}

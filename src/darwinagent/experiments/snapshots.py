@@ -42,6 +42,15 @@ def attach_vector(graph_result, snapshot_dir, embedder_factory=None):
     store = LocalVectorStore.load(snapshot_dir / "vector" / "index.jsonl")
     if len(store) != manifest.get("n_vector_records", len(store)):
         raise ValueError("向量索引与快照 manifest 记录数不符")
+    if not len(store):
+        # Empty prepared snapshots have no embedding space to query. Keep the
+        # search interface available without constructing a model connection.
+        object.__setattr__(
+            graph_result,
+            "vector",
+            VectorIndex(lambda query, top_k: [], manifest.get("memory_id_field", "编号")),
+        )
+        return graph_result
     if embedder_factory is None:
 
         def embedder_factory():

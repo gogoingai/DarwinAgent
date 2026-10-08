@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from darwinagent.kernel.assets import Asset
-from darwinagent.kernel.revision import AssetPatch, training_id
+from darwinagent.kernel.revision import AssetPatch, parse_training_id, training_id
 
 from .bootstrap import revision_protocol
 from .proposal_session import ProposalSession, decode_action
@@ -39,6 +39,15 @@ class ProposalGenerator:
                 for case in cases
                 for q in case.questions
             ]
+        questions = [dict(question) for question in questions]
+        for question in questions:
+            if question.get("training_id"):
+                case_id, question_id = parse_training_id(question["training_id"])
+                question.update(
+                    case_id=case_id,
+                    question_id=question_id,
+                    wiki_scope={"training_ids": [question["training_id"]]},
+                )
         payload = {
             "base_version": base.version,
             "assets": [dict(a.to_dict(), fingerprint=a.fingerprint) for a in base.assets.assets],
