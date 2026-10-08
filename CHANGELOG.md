@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased — user onboarding
+## 0.1.1 — user onboarding (2026-10-08)
 
 - Put installation and explicit model configuration before framework concepts in both READMEs.
 - Add complete CLI and Python live workflows, result inspection, continuation, and troubleshooting.

@@ -11,7 +11,7 @@
 [![Python 版本](https://img.shields.io/badge/python-%3E%3D3.11-45635c)](pyproject.toml)
 [![MIT 许可证](https://img.shields.io/badge/license-MIT-45635c)](LICENSE)
 
-DarwinAgent 是面向 Agent 递归自改进的开源 Python 框架。它运行任务、提出资产修改、独立评测候选，再保留有效版本和经验记录。名字来自达尔文与进化论。当前 0.1.0 为实验版本，改进要以实际评测为准。
+DarwinAgent 是面向 Agent 递归自改进的开源 Python 框架。它运行任务、提出资产修改、独立评测候选，再保留有效版本和经验记录。名字来自达尔文与进化论。当前 0.1.1 为实验版本，改进要以实际评测为准。
 
 安装一个 `darwinagent` 包，即可使用**命令行工具和 Python 接口**：
 

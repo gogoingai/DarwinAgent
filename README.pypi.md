@@ -2,7 +2,7 @@
 
 **Evolution for the Agent Era**
 
-An open Python framework for experience-driven recursive self-improvement of agents. Run a task, propose changes to its assets, evaluate candidates independently, and retain effective versions and experience. Version 0.1.0 is experimental; improvement must be measured.
+An open Python framework for experience-driven recursive self-improvement of agents. Run a task, propose changes to its assets, evaluate candidates independently, and retain effective versions and experience. Version 0.1.1 is experimental; improvement must be measured.
 
 [中文使用指南](https://github.com/gogoingai/DarwinAgent/blob/main/README.zh-CN.md) · [English guide](https://github.com/gogoingai/DarwinAgent/blob/main/README.md)
 

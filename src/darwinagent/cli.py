@@ -15,7 +15,7 @@ from .config import Config
 
 def _parser():
     parser = argparse.ArgumentParser(prog="darwinagent", description="Evolution for the Agent Era")
-    parser.add_argument("--version", action="version", version="darwinagent 0.1.0")
+    parser.add_argument("--version", action="version", version="darwinagent 0.1.1")
     sub = parser.add_subparsers(dest="command", required=True)
     demo = sub.add_parser(
         "demo", help="Run a tiny maintenance task through Pipeline and Wiki optimization"
@@ -111,7 +111,7 @@ async def _doctor(check_model, output):
     assets = load_assets(TASK_ROOT)
     if not task.name or not assets.assets:
         raise ValueError("Installed demo resources are incomplete; reinstall darwinagent")
-    print("Installation OK: darwinagent 0.1.0; packaged task and assets available.")
+    print("Installation OK: darwinagent 0.1.1; packaged task and assets available.")
     output.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="doctor-write-", dir=output) as probe:
         (Path(probe) / "probe").write_text("ok")
