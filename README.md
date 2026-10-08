@@ -11,7 +11,9 @@ English · [简体中文](README.zh-CN.md)
 [![Python version](https://img.shields.io/badge/python-%3E%3D3.11-45635c)](pyproject.toml)
 [![MIT license](https://img.shields.io/badge/license-MIT-45635c)](LICENSE)
 
-DarwinAgent is an open Python framework for experience-driven recursive self-improvement of agents. It runs tasks, proposes changes to task assets, evaluates candidates independently, and retains effective versions and experience. Its name comes from Charles Darwin and the theory of evolution. Version 0.1.1 is experimental; improvement must be measured.
+**Current release: [0.1.1](https://pypi.org/project/darwinagent/0.1.1/) (experimental).** Improvement must be measured.
+
+DarwinAgent is an open Python framework for experience-driven recursive self-improvement of agents. It runs tasks, proposes changes to task assets, evaluates candidates independently, and retains effective versions and experience. Its name comes from Charles Darwin and the theory of evolution.
 
 One `darwinagent` package provides both a **command-line tool and a Python API**:
 
@@ -28,9 +30,11 @@ One `darwinagent` package provides both a **command-line tool and a Python API**
 Use Python 3.11 or newer. In your Python environment:
 
 ```bash
-python -m pip install darwinagent
+python -m pip install --upgrade darwinagent
 darwinagent --version
 ```
+
+The version check should print `darwinagent 0.1.1`. The command above upgrades an existing installation. If you still see an older version, follow the [cached-index troubleshooting steps](docs/en/quickstart.md#7-troubleshooting).
 
 If you are starting a new Python project, follow the [quickstart](docs/en/quickstart.md#1-install) to create a virtual environment first. Package users do not need to clone the repository or install `uv`.
 

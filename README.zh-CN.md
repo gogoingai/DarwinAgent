@@ -11,7 +11,9 @@
 [![Python 版本](https://img.shields.io/badge/python-%3E%3D3.11-45635c)](pyproject.toml)
 [![MIT 许可证](https://img.shields.io/badge/license-MIT-45635c)](LICENSE)
 
-DarwinAgent 是面向 Agent 递归自改进的开源 Python 框架。它运行任务、提出资产修改、独立评测候选，再保留有效版本和经验记录。名字来自达尔文与进化论。当前 0.1.1 为实验版本，改进要以实际评测为准。
+**当前发行版本：[0.1.1](https://pypi.org/project/darwinagent/0.1.1/)（实验版）。** 改进要以实际评测为准。
+
+DarwinAgent 是面向 Agent 递归自改进的开源 Python 框架。它运行任务、提出资产修改、独立评测候选，再保留有效版本和经验记录。名字来自达尔文与进化论。
 
 安装一个 `darwinagent` 包，即可使用**命令行工具和 Python 接口**：
 
@@ -28,9 +30,11 @@ DarwinAgent 是面向 Agent 递归自改进的开源 Python 框架。它运行�
 需要 Python 3.11 或更新版本，在你的 Python 环境中执行：
 
 ```bash
-python -m pip install darwinagent
+python -m pip install --upgrade darwinagent
 darwinagent --version
 ```
+
+版本检查应输出 `darwinagent 0.1.1`。已安装旧版时，上面的命令会升级；如果仍显示旧版本，按[缓存排查](docs/zh-CN/quickstart.md#7-常见问题)刷新安装源缓存。
 
 第一次使用 Python 项目时，建议先按[快速开始](docs/zh-CN/quickstart.md#1-安装)创建虚拟环境。普通用户无需下载仓库，也无需安装 `uv`。
 
