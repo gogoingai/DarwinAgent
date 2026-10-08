@@ -7,6 +7,7 @@
 [English](README.md) · [简体中文](README.zh-CN.md)
 
 [![Offline framework checks](https://github.com/gogoingai/DarwinAgent/actions/workflows/ci.yml/badge.svg)](https://github.com/gogoingai/DarwinAgent/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/darwinagent)](https://pypi.org/project/darwinagent/)
 [![Version](https://img.shields.io/badge/version-0.1.0%20experimental-45635c)](CHANGELOG.md)
 [![Python](https://img.shields.io/badge/python-%3E%3D3.11-45635c)](pyproject.toml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-45635c)](LICENSE)
@@ -45,14 +46,13 @@ DarwinAgent **0.1.0 是实验版本**。它围绕基于图的共享 Agent 运行
 
 ## 跑通循环
 
-**从当前源码检出目录安装**。DarwinAgent 0.1.0 已作为实验性源码版本合入 `main`，尚未发布到 PyPI 或创建 GitHub Release。
+DarwinAgent **0.1.0 实验版本**已发布到 [PyPI](https://pypi.org/project/darwinagent/)，需要 Python 3.11+：
 
 ```bash
-# 在当前源码检出目录运行，需要 Python 3.11+ 和 uv。
-uv sync --frozen
-uv run darwinagent --version
-uv run darwinagent doctor --output runs/doctor
-uv run darwinagent demo --mode replay --rounds 2 --output runs/demo-replay
+python -m pip install darwinagent
+darwinagent --version
+darwinagent doctor --output runs/doctor
+darwinagent demo --mode replay --rounds 2 --output runs/demo-replay
 ```
 
 回放的预期结果：`status=complete`，第一轮采纳，第二轮因 `primary_not_strictly_improved` 拒绝，`http_attempts=0`。独立评测器在一个微型合成任务中，按维护人员／日期两个字段得到 **0.5 → 1.0 → 1.0**。回放使用脚本模型响应、预置 B0 和 **仅 P 资产**的提案，实际执行控制器与运行时。它验证机制，不证明模型学习或基准提升，也没有留出集评测。
@@ -73,9 +73,8 @@ runs/demo-replay/
 真实模型运行需要配置端点，并使用另一个输出目录：
 
 ```bash
-cp .env.example .env
-# 在 .env 中填写 DARWINAGENT_API_KEY、DARWINAGENT_BASE_URL、DARWINAGENT_MODEL。
-uv run darwinagent demo --mode live --rounds 2 --output runs/demo-live \
+# 创建 .env，填写 DARWINAGENT_API_KEY、DARWINAGENT_BASE_URL、DARWINAGENT_MODEL。
+darwinagent demo --mode live --rounds 2 --output runs/demo-live \
   --max-requests 40 --timeout 1800
 ```
 
@@ -84,7 +83,7 @@ CLI 读取当前目录的 `.env`，不覆盖已有环境变量。真实模式调
 日常续跑保留已有成果，模型和执行控制变化不会清空进度。源码修改在安全重启后生效；需要原冻结条件比较时显式添加 `--strict-comparison`：
 
 ```bash
-uv run darwinagent demo --mode replay --rounds 2 --output runs/demo-replay --resume
+darwinagent demo --mode replay --rounds 2 --output runs/demo-replay --resume
 ```
 
 也可以从 Python 调用：
@@ -96,6 +95,8 @@ from darwinagent.demo import run_demo
 
 asyncio.run(run_demo(Path("runs/python-replay"), mode="replay", rounds=2))
 ```
+
+需要从源码开发时，在检出目录运行 `uv sync --frozen`，并在上述 CLI 命令前加 `uv run`。
 
 [完整快速开始](docs/zh-CN/quickstart.md) · [配置](docs/zh-CN/configuration.md) · [带日期的验收证据](docs/acceptance/2026-10-07.md)
 

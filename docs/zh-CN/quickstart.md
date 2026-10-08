@@ -2,14 +2,14 @@
 
 [English](../en/quickstart.md) · [简体中文](../zh-CN/quickstart.md) · [README](../../README.zh-CN.md)
 
-从当前源码检出目录运行，需要 Python 3.11+ 和 uv。实验性的 0.1.0 源码已合入 `main`，尚未发布到 PyPI。
+0.1.0 实验版本已发布到 [PyPI](https://pypi.org/project/darwinagent/)，在 Python 3.11+ 环境中安装：
 
 ```bash
-uv sync --frozen
-uv run darwinagent --version
-uv run darwinagent doctor --output runs/doctor
-uv run darwinagent demo --mode replay --rounds 2 --output runs/demo-replay
-uv run darwinagent demo --mode replay --rounds 2 --output runs/demo-replay --resume
+python -m pip install darwinagent
+darwinagent --version
+darwinagent doctor --output runs/doctor
+darwinagent demo --mode replay --rounds 2 --output runs/demo-replay
+darwinagent demo --mode replay --rounds 2 --output runs/demo-replay --resume
 ```
 
 `doctor` 默认只检查安装、资源、输出可写性及真实模式配置是否齐全，不发请求。`--check-model` 会额外发起一次真实模型检查，最长 30 秒。`--version` 输出 `darwinagent 0.1.0`。
@@ -19,9 +19,8 @@ uv run darwinagent demo --mode replay --rounds 2 --output runs/demo-replay --res
 真实模式使用另一个输出目录：
 
 ```bash
-cp .env.example .env
-# Edit .env before running live mode.
-uv run darwinagent demo --mode live --rounds 2 --output runs/demo-live \
+# 创建 .env，填写模型配置后再运行真实模式。
+darwinagent demo --mode live --rounds 2 --output runs/demo-live \
   --max-requests 40 --timeout 1800
 ```
 
@@ -43,9 +42,9 @@ asyncio.run(run_demo(Path("runs/sdk-replay"), mode="replay", rounds=2))
 
 继续阅读[配置](configuration.md)、[实验协议](experiments.md)和[验收记录](../acceptance/2026-10-07.md)。
 
-## 使用 pip 安装
+## 从源码安装
 
-在同一个源码检出目录，也可以使用标准 Python 工具：
+需要从源码开发时，在检出目录运行 `uv sync --frozen`，并在 CLI 命令前加 `uv run`。也可以用 pip 安装当前源码：
 
 ```bash
 python3 -m venv .venv-pip
@@ -56,4 +55,4 @@ darwinagent doctor --output runs/pip-doctor
 darwinagent demo --mode replay --rounds 2 --output runs/pip-replay
 ```
 
-这里安装的是当前源码，不依赖已发布的 PyPI 包。
+这里安装的是你的源码检出目录，包含本地修改；直接使用发行版本则运行 `python -m pip install darwinagent`。

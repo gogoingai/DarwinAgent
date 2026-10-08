@@ -7,6 +7,7 @@
 [English](README.md) · [简体中文](README.zh-CN.md)
 
 [![Offline framework checks](https://github.com/gogoingai/DarwinAgent/actions/workflows/ci.yml/badge.svg)](https://github.com/gogoingai/DarwinAgent/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/darwinagent)](https://pypi.org/project/darwinagent/)
 [![Version](https://img.shields.io/badge/version-0.1.0%20experimental-45635c)](CHANGELOG.md)
 [![Python](https://img.shields.io/badge/python-%3E%3D3.11-45635c)](pyproject.toml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-45635c)](LICENSE)
@@ -45,14 +46,13 @@ The kernel, evaluator, permissions, and adoption rules stay outside the proposal
 
 ## Try the loop
 
-Install **from this source checkout**. DarwinAgent 0.1.0 is available on `main` as an experimental source version; it has not been published to PyPI or as a GitHub Release.
+Install the **experimental 0.1.0 release** from [PyPI](https://pypi.org/project/darwinagent/) with Python 3.11+:
 
 ```bash
-# Run from this source checkout; Python 3.11+ and uv are required.
-uv sync --frozen
-uv run darwinagent --version
-uv run darwinagent doctor --output runs/doctor
-uv run darwinagent demo --mode replay --rounds 2 --output runs/demo-replay
+python -m pip install darwinagent
+darwinagent --version
+darwinagent doctor --output runs/doctor
+darwinagent demo --mode replay --rounds 2 --output runs/demo-replay
 ```
 
 Expected replay: `status=complete`, first candidate accepted, second rejected for `primary_not_strictly_improved`, and `http_attempts=0`. The independent evaluator scores requested technician/date fields **0.5 → 1.0 → 1.0** in one tiny synthetic task. Replay uses scripted model responses, a seeded B0, and **P-only** proposals through the real controller and runtime. It demonstrates mechanics, not model learning or benchmark gains; it has no held-out evaluation.
@@ -73,9 +73,8 @@ runs/demo-replay/
 For live execution, configure your endpoint and use a separate output directory:
 
 ```bash
-cp .env.example .env
-# Set DARWINAGENT_API_KEY, DARWINAGENT_BASE_URL, DARWINAGENT_MODEL in .env.
-uv run darwinagent demo --mode live --rounds 2 --output runs/demo-live \
+# Create .env and set DARWINAGENT_API_KEY, DARWINAGENT_BASE_URL, DARWINAGENT_MODEL.
+darwinagent demo --mode live --rounds 2 --output runs/demo-live \
   --max-requests 40 --timeout 1800
 ```
 
@@ -84,7 +83,7 @@ The CLI reads the current directory's `.env` without overriding shell variables.
 Daily continuation retains saved work across changes to models and execution controls. Source changes take effect after a safe restart; use `--strict-comparison` when requiring the original frozen comparison conditions:
 
 ```bash
-uv run darwinagent demo --mode replay --rounds 2 --output runs/demo-replay --resume
+darwinagent demo --mode replay --rounds 2 --output runs/demo-replay --resume
 ```
 
 Or call the demo from Python:
@@ -96,6 +95,8 @@ from darwinagent.demo import run_demo
 
 asyncio.run(run_demo(Path("runs/python-replay"), mode="replay", rounds=2))
 ```
+
+For source development, run `uv sync --frozen` in the checkout and prefix the CLI commands above with `uv run`.
 
 [Full quickstart](docs/en/quickstart.md) · [Configuration](docs/en/configuration.md) · [Dated acceptance evidence](docs/acceptance/2026-10-07.md)
 

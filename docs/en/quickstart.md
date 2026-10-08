@@ -2,14 +2,14 @@
 
 [English](../en/quickstart.md) · [简体中文](../zh-CN/quickstart.md) · [README](../../README.md)
 
-Run from this source checkout with Python 3.11+ and uv. The experimental 0.1.0 source is available on `main`; it has not been published to PyPI.
+The experimental 0.1.0 release is available on [PyPI](https://pypi.org/project/darwinagent/). Install it in a Python 3.11+ environment:
 
 ```bash
-uv sync --frozen
-uv run darwinagent --version
-uv run darwinagent doctor --output runs/doctor
-uv run darwinagent demo --mode replay --rounds 2 --output runs/demo-replay
-uv run darwinagent demo --mode replay --rounds 2 --output runs/demo-replay --resume
+python -m pip install darwinagent
+darwinagent --version
+darwinagent doctor --output runs/doctor
+darwinagent demo --mode replay --rounds 2 --output runs/demo-replay
+darwinagent demo --mode replay --rounds 2 --output runs/demo-replay --resume
 ```
 
 `doctor` checks installation, resources, output writability, and live configuration readiness without making a request. Explicit `--check-model` adds one real model probe with a 30-second limit. `--version` prints `darwinagent 0.1.0`.
@@ -19,9 +19,8 @@ Replay executes the real `Pipeline`, `ExperimentRunner`, Wiki, admission, and pu
 Use another output directory for live mode:
 
 ```bash
-cp .env.example .env
-# Edit .env before running live mode.
-uv run darwinagent demo --mode live --rounds 2 --output runs/demo-live \
+# Create .env with your model configuration before running live mode.
+darwinagent demo --mode live --rounds 2 --output runs/demo-live \
   --max-requests 40 --timeout 1800
 ```
 
@@ -43,9 +42,9 @@ Inspect `experiment.json` for frozen identity; `B0/evaluation/`, `R1/evaluation/
 
 Next: [configuration](configuration.md), [experiment protocols](experiments.md), and [acceptance evidence](../acceptance/2026-10-07.md).
 
-## Install with pip
+## Install from source
 
-From the same source checkout, standard Python tooling is also supported:
+For source development, run `uv sync --frozen` in the checkout and prefix CLI commands with `uv run`. Standard pip installation from that checkout is also supported:
 
 ```bash
 python3 -m venv .venv-pip
@@ -56,4 +55,4 @@ darwinagent doctor --output runs/pip-doctor
 darwinagent demo --mode replay --rounds 2 --output runs/pip-replay
 ```
 
-This installs this checkout, without relying on a published PyPI package.
+This installs your checkout, including local changes, instead of the PyPI release.

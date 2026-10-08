@@ -51,10 +51,15 @@ darwinagent --version
 darwinagent demo --mode replay --rounds 2 --output runs/pypi-replay
 ```
 
-Once publication succeeds, update the installation instructions in both READMEs,
-both quickstarts, and the launch introductions to reflect the published version.
+The first release was published on **2026-10-08 at 07:59 (Asia/Shanghai)** through
+[workflow run 37705060486](https://github.com/gogoingai/DarwinAgent/actions/runs/37705060486),
+from commit `9b45fddda470c9211b27f7833644de334aceba49`. Both the wheel and source
+distribution are available on PyPI. The READMEs, quickstarts, and launch
+introductions now use the published installation path.
 
-发布成功后，更新中英文 README、快速开始和介绍文档中的安装方式与发布状态。
+首个版本于 **2026-10-08 07:59（北京时间）**发布，来源提交为
+`9b45fddda470c9211b27f7833644de334aceba49`，wheel 和源码包均已上传。
+中英文 README、快速开始和介绍文档已更新为 PyPI 安装方式。
 
 References / 参考：
 [PyPI: creating a project through Trusted Publishing](https://docs.pypi.org/trusted-publishers/creating-a-project-through-oidc/)
