@@ -184,6 +184,7 @@ darwinagent demo --mode live --rounds 2 --output runs/demo-live \
 
 | 遇到的问题 | 处理方法 |
 | --- | --- |
+| 安装后仍显示旧版本 | 执行 `python -m pip install --upgrade --no-cache-dir darwinagent`，升级并跳过旧索引缓存 |
 | 找不到 `darwinagent` 命令 | 激活安装时使用的虚拟环境，再执行 `python -m pip show darwinagent` 确认安装位置 |
 | 提示缺少模型配置 | 检查当前目录是否有 `.env`，三个值是否填写；Python 中还需显式加载 |
 | `doctor` 成功，真实运行仍失败 | 默认检查不联网；用 `--check-model` 验证实际连接 |

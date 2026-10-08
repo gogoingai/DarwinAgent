@@ -184,6 +184,7 @@ Start by resuming with the same mode and configuration. Daily continuation can r
 
 | Problem | What to check |
 | --- | --- |
+| Installation still shows an older version | Run `python -m pip install --upgrade --no-cache-dir darwinagent` to upgrade without the old index cache |
 | `darwinagent` command not found | Activate the installation environment and run `python -m pip show darwinagent` |
 | Missing model configuration | Check the current directory's `.env` and all three values; Python must load it explicitly |
 | `doctor` passes but live mode fails | The default check is offline; use `--check-model` to test the connection |
