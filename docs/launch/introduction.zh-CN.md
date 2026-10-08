@@ -6,7 +6,7 @@
 
 DarwinAgent 是一个面向 Agent 经验驱动递归自改进的开源框架。它的名字来自达尔文与进化论，使命是「Agent 时代的进化」。这里的进化有明确的工程含义：产生候选变化，用独立评测筛选，保留有效版本，再让经验影响下一轮变化。
 
-当前版本是实验性的 0.1.0。它提供了一个可以运行、检查和续跑的迭代流程；是否带来质量提升，需要在具体任务和独立评测中验证。
+当前版本是实验性的 0.1.1。它提供了一个可以运行、检查和续跑的迭代流程；是否带来质量提升，需要在具体任务和独立评测中验证。
 
 ## 从一次运行到一轮进化
 
@@ -48,7 +48,7 @@ uv run darwinagent demo --mode replay --rounds 2 --output runs/demo-replay
 
 真实模式使用相同任务与独立评测器，不回退到脚本响应。模型可能在基线就答对，因此保留基线、拒绝两轮同分候选，也可能是正确结果。请求上限包含重试，超时覆盖整个演示。
 
-实验性的 0.1.0 源码已合入项目仓库的 `main` 分支，尚未发布到 PyPI。具体安装、真实模式配置和 Python 接入方式见[中文 README](../../README.zh-CN.md)与[快速开始](../zh-CN/quickstart.md)。[带日期的验收记录](../acceptance/2026-10-07.md)区分本地回归、离线回放和真实模型烟雾验收。
+0.1.1 实验版本已发布到 [PyPI](https://pypi.org/project/darwinagent/)，可通过 `python -m pip install darwinagent` 安装。具体安装、真实模式配置和 Python 接入方式见[中文 README](../../README.zh-CN.md)与[快速开始](../zh-CN/quickstart.md)。[带日期的验收记录](../acceptance/2026-10-07.md)区分本地回归、离线回放和真实模型烟雾验收。
 
 DarwinAgent 希望把 Agent 的适应过程变成有边界、有证据、可积累的实验。后续方向包括更多独立任务、受控留出集研究，以及明确的外部 Agent 接入接口。欢迎通过[项目仓库](https://github.com/gogoingai/DarwinAgent)了解实现，提交可复现的问题与任务示例。
 

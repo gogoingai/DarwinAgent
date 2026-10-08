@@ -24,6 +24,6 @@ This creates a protocol declaration; it makes no requests and supplies no datase
 
 ## What to retain
 
-Preserve asset versions, source/model identity, case sources and answers, scores, proposal inputs, admission/rejection reasons, Wiki, and request counts. Resume only matching frozen identities; never rewrite old locks to admit changed source. Dataset studies require additional data/evaluator dependencies listed through the [history index](../history/README.md); these are not in the core wheel.
+Preserve asset versions, source/model identity, case sources and answers, scores, proposal inputs, admission/rejection reasons, Wiki, and request counts. Strict comparison requires matching frozen conditions. Daily continuation records changed conditions; see [resume](quickstart.md#6-inspect-results-and-resume). Never rewrite old locks to admit changed source. Dataset studies require additional data/evaluator dependencies listed through the [history index](../history/README.md); these are not in the core wheel.
 
 The [2026-10-07 report](../acceptance/2026-10-07.md) separates local regression, offline replay, and the real smoke. Request count and elapsed time are not token usage or monetary cost.

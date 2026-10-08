@@ -1,11 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1600" height="720" viewBox="0 0 1600 720" role="img" aria-labelledby="title desc">
-<title id="title">DarwinAgent — Agent 时代的进化</title><desc id="desc">A branching evolution motif connects variation, selection, retention, and experience. Experimental version 0.1.0.</desc>
+<title id="title">DarwinAgent — Agent 时代的进化</title><desc id="desc">分支进化示意连接提出变化、独立筛选、保留能力与积累经验。当前实验版本为 0.1.1。</desc>
 <rect width="1600" height="720" rx="26" fill="#f4f7f1"/>
 <path d="M0 610 Q650 450 1600 615 L1600 720 L0 720Z" fill="#e4eee4"/>
 <g font-family="Arial, Noto Sans CJK SC, Microsoft YaHei, PingFang SC, sans-serif" fill="#173b31">
 <text x="78" y="109" font-size="35" font-weight="700" letter-spacing="1">DarwinAgent</text>
 <rect x="1320" y="67" width="203" height="48" rx="24" fill="#dfe9df"/>
-<text x="1421" y="98" font-size="19" text-anchor="middle">0.1.0 · experimental</text>
+<text x="1421" y="98" font-size="19" text-anchor="middle">0.1.1 · 实验版</text>
 <text x="78" y="226" font-size="70" font-weight="700">Agent 时代的进化</text>
 <text x="81" y="280" font-size="31" fill="#506f62">面向 Agent 经验驱动递归自改进的开源框架</text>
 <text x="81" y="645" font-size="25" fill="#506f62">S / F / C / P 资产 · 固定运行时 · 持久经验 Wiki</text>

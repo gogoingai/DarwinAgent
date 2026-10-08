@@ -2,177 +2,139 @@
 
 # DarwinAgent
 
-**An Open Framework for Experience-Driven Recursive Self-Improvement**
+**Evolution for the Agent Era: improve through experience and retain effective task capabilities.**
 
-[English](README.md) · [简体中文](README.zh-CN.md)
+English · [简体中文](README.zh-CN.md)
 
-[![Offline framework checks](https://github.com/gogoingai/DarwinAgent/actions/workflows/ci.yml/badge.svg)](https://github.com/gogoingai/DarwinAgent/actions/workflows/ci.yml)
-[![Version](https://img.shields.io/badge/version-0.1.0%20experimental-45635c)](CHANGELOG.md)
-[![Python](https://img.shields.io/badge/python-%3E%3D3.11-45635c)](pyproject.toml)
-[![License: MIT](https://img.shields.io/badge/license-MIT-45635c)](LICENSE)
+[![Offline checks](https://github.com/gogoingai/DarwinAgent/actions/workflows/ci.yml/badge.svg)](https://github.com/gogoingai/DarwinAgent/actions/workflows/ci.yml)
+[![PyPI version](https://img.shields.io/pypi/v/darwinagent?release=0.1.1)](https://pypi.org/project/darwinagent/)
+[![Python version](https://img.shields.io/badge/python-%3E%3D3.11-45635c)](pyproject.toml)
+[![MIT license](https://img.shields.io/badge/license-MIT-45635c)](LICENSE)
 
-DarwinAgent takes its name from Charles Darwin and the theory of evolution. **Evolution for the Agent Era** is its mission: help agents adapt through experience and retain effective capabilities. In this framework, variation comes from proposed task assets, selection comes from independent evaluation and fixed admission rules, and retention comes from versioned assets and a persistent experience Wiki that informs subsequent proposals.
+**Current release: [0.1.1](https://pypi.org/project/darwinagent/0.1.1/) (experimental).** Improvement must be measured.
 
-DarwinAgent **0.1.0 is experimental**. It implements an inspectable improvement loop around a shared graph-based agent runtime. Improvement is an outcome to measure; a candidate can be rejected. The current scope is task assets, with fixed framework execution and evaluation boundaries.
+DarwinAgent takes its name from **Charles Darwin and the theory of evolution**. Its mission is **Evolution for the Agent Era**: help agents adapt through experience and retain effective capabilities. In this framework, asset proposals introduce candidate variations, independent evaluation and fixed admission rules select among them, and versioned assets and a persistent experience Wiki retain results and inform the next proposal.
 
-## Why DarwinAgent
+DarwinAgent is an open Python framework for experience-driven recursive self-improvement of agents. It runs tasks, proposes changes to task assets, evaluates candidates independently, and retains effective versions and experience.
 
-A useful answer is one run. A useful capability should survive the next run. DarwinAgent records what a candidate changed, which sources supported an answer, how it was evaluated, why it was accepted or rejected, and what experience reaches the next proposal. This makes adaptation a reproducible experiment rather than an untracked prompt edit.
+One `darwinagent` package provides both a **command-line tool and a Python API**:
 
-## The evolution loop
-
-![Evolution loop](docs/assets/evolution-loop-en.svg)
-
-1. **Run:** execute a baseline through the common `Pipeline` and score its actual outputs.
-2. **Vary:** propose bounded changes to S/F/C/P assets using training evidence and Wiki feedback.
-3. **Select:** validate contracts and capabilities, run the candidate, and apply the frozen adoption policy.
-4. **Retain:** publish accepted versions atomically; preserve rejection facts and feed experience into the next proposal.
-
-The kernel, evaluator, permissions, and adoption rules stay outside the proposal boundary. DarwinAgent does not train model weights or rewrite its own optimizer. Its name describes the inspiration, not a claim to implement a genetic algorithm.
-
-## What is implemented
-
-| Capability | v0.1.0 behavior |
+| Your goal | Start here |
 | --- | --- |
-| Shared task runtime | `ExtractionAgent` → attributed graph → `AnswerAgent`, through one `Pipeline` |
-| Bounded task assets | **S** schemas, **F** query functions, **C** task checks, **P** role prompts |
-| Experience | Wiki stores observations and accepted/rejected decisions for subsequent proposals |
-| Reproducibility | Content identities, separate provenance, scoped resume and optional strict comparison |
-| Evaluation | Separate `DatasetAdapter` and `Evaluator`; metric names supplied by the task |
-| Experiment control | `ExperimentRunner`; separate `CampaignController` for train/validation/test protocols |
-| Model connection | One explicit OpenAI-compatible Chat Completions endpoint by default; optional tier overrides |
-| Entry points | Installed CLI, Python SDK, offline replay, live mode, maintenance task example |
+| Try the complete loop | Configure a model and run the CLI demo below |
+| Call it from your Python project | [Python example](docs/en/quickstart.md#4-call-it-from-python) |
+| Use your own records and questions | [Custom tasks: complete runnable example](docs/en/custom-tasks.md) |
+| Improve your own task | [Custom experiment](docs/en/custom-experiments.md) |
+| Try it without model credentials | [Offline replay](docs/en/quickstart.md#5-try-offline-replay-without-a-model) |
 
-## Try the loop
+## 1. Install
 
-Install **from this source checkout**. DarwinAgent 0.1.0 is available on `main` as an experimental source version; it has not been published to PyPI or as a GitHub Release.
+Use Python 3.11 or newer. In your Python environment:
 
 ```bash
-# Run from this source checkout; Python 3.11+ and uv are required.
-uv sync --frozen
-uv run darwinagent --version
-uv run darwinagent doctor --output runs/doctor
-uv run darwinagent demo --mode replay --rounds 2 --output runs/demo-replay
+python -m pip install --upgrade darwinagent
+darwinagent --version
 ```
 
-Expected replay: `status=complete`, first candidate accepted, second rejected for `primary_not_strictly_improved`, and `http_attempts=0`. The independent evaluator scores requested technician/date fields **0.5 → 1.0 → 1.0** in one tiny synthetic task. Replay uses scripted model responses, a seeded B0, and **P-only** proposals through the real controller and runtime. It demonstrates mechanics, not model learning or benchmark gains; it has no held-out evaluation.
+The version check should print `darwinagent 0.1.1`. The command above upgrades an existing installation. If you still see an older version, follow the [cached-index troubleshooting steps](docs/en/quickstart.md#7-troubleshooting).
 
-The output directory contains:
+If you are starting a new Python project, follow the [quickstart](docs/en/quickstart.md#1-install) to create a virtual environment first. Package users do not need to clone the repository or install `uv`.
 
-```text
-runs/demo-replay/
-├── experiment.json                           # original experiment declaration
-├── B0/evaluation/maintenance-demo.json         # baseline score
-├── R1/evaluation/maintenance-demo.json         # candidate score (also R2)
-├── R1/optimization/attempt-0/proposal-call.json # proposal input (also R2)
-├── optimization/wiki.json                     # durable experience
-├── published/current.json                     # accepted asset version
-└── demo-summary.json                          # controller summary
+## 2. Configure a model
+
+**Live execution requires an API base URL, a model name, and an API key.** DarwinAgent includes no model and has no default provider or model.
+
+Create a file named `.env` in the directory where you will run the commands:
+
+```dotenv
+DARWINAGENT_BASE_URL=https://your-provider.example/v1
+DARWINAGENT_MODEL=your-model-name
+DARWINAGENT_API_KEY=your-api-key
 ```
 
-For live execution, configure your endpoint and use a separate output directory:
+Replace all three placeholders with your own configuration:
+
+- `DARWINAGENT_BASE_URL`: your provider's OpenAI-compatible API base URL, often ending in `/v1`. Do not include `/chat/completions`.
+- `DARWINAGENT_MODEL`: the exact model name supported by that endpoint.
+- `DARWINAGENT_API_KEY`: credentials for that endpoint.
+
+Start with one model; all roles use it by default. The CLI reads `.env` from the **current directory**, with existing environment variables taking precedence. Keep credentials out of version control. See [configuration and troubleshooting](docs/en/configuration.md).
+
+## 3. Run the live demo
+
+Optionally check the connection first. This sends one model request:
 
 ```bash
-cp .env.example .env
-# Set DARWINAGENT_API_KEY, DARWINAGENT_BASE_URL, DARWINAGENT_MODEL in .env.
-uv run darwinagent demo --mode live --rounds 2 --output runs/demo-live \
+darwinagent doctor --check-model --output runs/doctor
+```
+
+Then run two rounds:
+
+```bash
+darwinagent demo --mode live --rounds 2 --output runs/demo-live \
   --max-requests 40 --timeout 1800
 ```
 
-The CLI reads the current directory's `.env` without overriding shell variables. Live uses the actual model, with no recorded fallback. The cap counts dispatched HTTP attempts, including retries; the timeout covers the whole run. A live baseline may already be correct, so ties are rejected. Success means the stages execute and decisions are recorded, not that the score must improve.
+The demo supplies a maintenance record and asks who maintained a device and when. It generates a baseline answer, proposes a prompt change, reruns the task, scores the answer, and decides whether to retain the candidate. It calls your configured model. `40` limits dispatched HTTP attempts, including retries; `1800` limits the entire run in seconds.
 
-Daily continuation retains saved work across changes to models and execution controls. Source changes take effect after a safe restart; use `--strict-comparison` when requiring the original frozen comparison conditions:
+The terminal reports `status: "complete"` when the loop finishes. Ties and regressions are rejected, so completion does not imply a score increase. Results are saved in `runs/demo-live/`:
 
-```bash
-uv run darwinagent demo --mode replay --rounds 2 --output runs/demo-replay --resume
-```
+| File | Purpose |
+| --- | --- |
+| `demo-summary.json` | Decisions and reasons for each round |
+| `B0/evaluation/maintenance-demo.json` | Baseline score |
+| `R1/evaluation/maintenance-demo.json` | First candidate score |
+| `optimization/wiki.json` | Saved experience |
+| `published/current.json` | Current retained asset version |
+| `http_attempts.json` | Actual model request attempts |
 
-Or call the demo from Python:
+Add `--resume` to reuse that directory. Use a new output directory for a separate experiment. See [results and continuation](docs/en/quickstart.md#6-inspect-results-and-resume).
 
-```python
-import asyncio
-from pathlib import Path
-from darwinagent.demo import run_demo
+## 4. Use it in code
 
-asyncio.run(run_demo(Path("runs/python-replay"), mode="replay", rounds=2))
-```
-
-[Full quickstart](docs/en/quickstart.md) · [Configuration](docs/en/configuration.md) · [Dated acceptance evidence](docs/acceptance/2026-10-07.md)
-
-## Bring your own task
-
-Implement the generation boundary and an independent evaluator, then register task assets in `task.yaml` and `assets/index.yaml`. The generation input carries records, questions, and source references; evaluator references stay in the evaluator.
-
-```python
-from darwinagent import (
-    CaseInput, CorpusBlock, QuestionInput, SourceRef, EvaluationResult,
-)
-
-class Records:
-    def generation_input(self, case_id):
-        return CaseInput(case_id,
-            (CorpusBlock(SourceRef("maintenance_record", case_id, "row-1"),
-                         "设备 D-17 于 2026-09-01 由林维护。"),),
-            (QuestionInput("q1", "谁在什么时候维护了 D-17？",
-                           {"serial": "D-17"}),))
-
-class Score:
-    async def evaluate(self, result):
-        correct = sum(a.status == "answered" and "林" in a.answer
-                      and "2026-09-01" in a.answer for a in result.answers)
-        faults = sum(a.status == "execution_error" for a in result.answers)
-        return EvaluationResult({"correct": correct}, len(result.answers),
-                                len(result.answers) - faults, faults, 0)
-```
-
-Load the actual packaged declaration and asset registry:
-
-```python
-from darwinagent import TaskSpec
-from darwinagent.demo import TASK_ROOT
-from darwinagent.kernel.registration import load_assets
-
-assets = load_assets(TASK_ROOT)  # task.yaml + assets/index.yaml + S/F/C/P files
-spec = TaskSpec.load(TASK_ROOT / "task.yaml")
-```
-
-These classes plug into the common runtime; they do not replace the agent execution flow. The [complete offline example](examples/third_domain.py) runs both interfaces with registered S/F/C/P assets:
+Install the same package with `python -m pip install darwinagent`. Create `main.py` in your project, copy the [complete Python example](docs/en/quickstart.md#4-call-it-from-python), put `.env` beside it, and run:
 
 ```bash
-uv run python examples/third_domain.py
+python main.py
 ```
 
-See the [custom task guide](docs/en/custom-tasks.md) for a complete live `Pipeline` example and asset contracts. Arbitrary external agent plugins are a future extension, not a v0.1 capability.
+The example explicitly loads `.env`, creates the model configuration, and calls `run_demo(..., mode="live", config=config)` to execute the same loop. Importing the package does not load `.env`.
 
-## Architecture and documentation
+The bundled demo helps you learn the workflow. To use your own data, supply records, questions, registered task assets, and an independent evaluator to `Pipeline`. The [custom task guide](docs/en/custom-tasks.md) includes a complete script you can save and run.
 
-![Architecture](docs/assets/architecture-en.svg)
+## How improvement works
 
-| Guide | English | 简体中文 |
-| --- | --- | --- |
-| Quickstart | [Read](docs/en/quickstart.md) | [阅读](docs/zh-CN/quickstart.md) |
-| Architecture | [Read](docs/en/architecture.md) | [阅读](docs/zh-CN/architecture.md) |
-| Configuration | [Read](docs/en/configuration.md) | [阅读](docs/zh-CN/configuration.md) |
-| Custom tasks | [Read](docs/en/custom-tasks.md) | [阅读](docs/zh-CN/custom-tasks.md) |
-| Experiments | [Read](docs/en/experiments.md) | [阅读](docs/zh-CN/experiments.md) |
-| Migration | [Read](docs/en/migration.md) | [阅读](docs/zh-CN/migration.md) |
+![Evolution loop](docs/assets/evolution-loop-en.svg)
 
-[Historical evidence index](docs/history/README.md) · [Editable graphics and PNG exports](docs/assets/README.md) · [Project introduction](docs/launch/introduction.en.md)
+1. Run the task through a common `Pipeline`, generate attributed answers, and score them independently.
+2. Propose asset changes using training evidence and saved experience.
+3. Check contracts and execution capabilities, then run and score the candidate.
+4. Retain effective versions under fixed rules and record accepted or rejected decisions.
 
-## Status and direction
+Task assets are **S: schemas**, **F: query functions**, **C: task checks**, and **P: role prompts**. The bundled demo only changes P. The framework does not train model weights. Its executor, evaluator, permissions, and adoption rules stay fixed.
 
-The local Python 3.11/3.12/3.13 suites and installed-wheel acceptance are documented in the [dated report](docs/acceptance/2026-10-07.md). The workflow badge shows the latest GitHub CI status. Historical dataset scores belong to their original protocols and source revisions.
+## Documentation
 
-Next directions are broader independent task examples, controlled held-out studies, and a carefully specified external agent integration boundary. These are research and engineering plans, not shipped capabilities or promised quality gains.
+| Guide | Contents |
+| --- | --- |
+| [Quickstart](docs/en/quickstart.md) | Installation, CLI, Python, results, and continuation |
+| [Model configuration](docs/en/configuration.md) | Endpoints, credentials, request limits, and troubleshooting |
+| [Custom tasks](docs/en/custom-tasks.md) | Your own records, questions, and evaluator |
+| [Custom experiment](docs/en/custom-experiments.md) | Proposals, evaluation, and adoption for your data |
+| [Architecture](docs/en/architecture.md) | Runtime and module responsibilities |
+| [Experiments](docs/en/experiments.md) | Independent evaluation and train/validation/test protocols |
+| [Durable continuation](docs/workspace-continuation.md) | Execution previews, human changes, and Wiki queries |
+| [Migration](docs/en/migration.md) | Moving from historical projects |
+| [Publishing](docs/en/pypi-publishing.md) | Maintainer release workflow |
 
-## Research provenance and community
+## Status and provenance
 
-The S/F kernel is inspired by [*Toward Effective and Reliable LLM Agents via Dynamic Ontology*](https://arxiv.org/abs/2608.22974) (OaK). C/P assets and the experience Wiki are engineering extensions in this project. Historical reproduction records remain separately indexed; no paper performance numbers are used as current DarwinAgent results.
+Offline replay uses scripted model responses to check the workflow. Scores on its tiny synthetic task do not establish model learning or benchmark gains. Formal studies require independent held-out data and evaluation protocols.
 
-[Contributing](CONTRIBUTING.md) · [中文贡献指南](CONTRIBUTING.zh-CN.md) · [Changelog](CHANGELOG.md) · [Software citation](CITATION.cff)
+Local checks, installed-package acceptance, and historical experiments are recorded in the [dated acceptance report](docs/acceptance/2026-10-07.md) and [user onboarding checks](docs/acceptance/2026-10-08-onboarding.md) and [history index](docs/history/README.md). Future directions include more independent task examples, held-out studies, and external agent integration.
 
-MIT © 2026 DarwinAgent contributors. See [LICENSE](LICENSE); third-party material retains its own license and provenance.
+The S/F kernel is inspired by [*Toward Effective and Reliable LLM Agents via Dynamic Ontology*](https://arxiv.org/abs/2608.22974) (OaK). C/P assets and the experience Wiki are engineering extensions in this project. Paper performance numbers are not presented as current DarwinAgent results.
 
-## Durable continuation and Wiki queries
+[Contributing](CONTRIBUTING.md) · [Changelog](CHANGELOG.md) · [Software citation](CITATION.cff) · [Graphics sources](docs/assets/README.md)
 
-The Workspace APIs and offline CLI retain original evidence, request receipts, human selection history and scoped previews. Wiki queries can return raw evidence or create a resumable regroup task. See [the continuation guide](docs/workspace-continuation.md). Real model smoke remains pending explicit model selection and execution; these interfaces do not establish benchmark gains.
+Distributed under the [MIT license](LICENSE). Third-party material retains its own license and provenance.

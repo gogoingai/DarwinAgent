@@ -2,177 +2,139 @@
 
 # DarwinAgent
 
-**面向 Agent 经验驱动递归自改进的开源框架**
+**Agent 时代的进化：让 Agent 从经验中改进，并保留有效的任务能力。**
 
-[English](README.md) · [简体中文](README.zh-CN.md)
+[English](README.md) · 简体中文
 
-[![Offline framework checks](https://github.com/gogoingai/DarwinAgent/actions/workflows/ci.yml/badge.svg)](https://github.com/gogoingai/DarwinAgent/actions/workflows/ci.yml)
-[![Version](https://img.shields.io/badge/version-0.1.0%20experimental-45635c)](CHANGELOG.md)
-[![Python](https://img.shields.io/badge/python-%3E%3D3.11-45635c)](pyproject.toml)
-[![License: MIT](https://img.shields.io/badge/license-MIT-45635c)](LICENSE)
+[![离线检查](https://github.com/gogoingai/DarwinAgent/actions/workflows/ci.yml/badge.svg)](https://github.com/gogoingai/DarwinAgent/actions/workflows/ci.yml)
+[![PyPI 版本](https://img.shields.io/pypi/v/darwinagent?release=0.1.1)](https://pypi.org/project/darwinagent/)
+[![Python 版本](https://img.shields.io/badge/python-%3E%3D3.11-45635c)](pyproject.toml)
+[![MIT 许可证](https://img.shields.io/badge/license-MIT-45635c)](LICENSE)
 
-DarwinAgent 的名字来自查尔斯·达尔文与进化论。**Agent 时代的进化**是项目的使命：让 Agent 从经验中适应任务，并保留有效的能力。在这个框架里，资产提案产生候选变化，独立评测和固定准入规则负责筛选，版本化资产与持久化经验 Wiki 负责保留结果，并影响下一轮提案。
+**当前发行版本：[0.1.1](https://pypi.org/project/darwinagent/0.1.1/)（实验版）。** 改进要以实际评测为准。
 
-DarwinAgent **0.1.0 是实验版本**。它围绕基于图的共享 Agent 运行时，实现了可检查的迭代流程。改进是否发生需要测量，候选也可能被拒绝。当前优化范围是任务资产，框架的执行流程和评测边界保持固定。
+DarwinAgent 的名字来自**查尔斯·达尔文与进化论**。**Agent 时代的进化**是项目的使命：让 Agent 从经验中适应任务，并保留有效的能力。在这个框架里，资产提案产生候选变化，独立评测和固定准入规则负责筛选，版本化资产与持久化经验 Wiki 负责保留结果，并影响下一轮提案。
 
-## 为什么做 DarwinAgent
+DarwinAgent 是面向 Agent 递归自改进的开源 Python 框架。它运行任务、提出资产修改、独立评测候选，再保留有效版本和经验记录。
 
-一次答对说明这次运行成功，有效的能力还应该在下一次运行中保留下来。DarwinAgent 记录候选改了什么、回答依据哪些来源、评测得到了什么结果、为什么采纳或拒绝，以及哪些经验进入下一轮提案。这样，适应过程就能成为可复查的实验，而不只是一次没有记录的提示词修改。
+安装一个 `darwinagent` 包，即可使用**命令行工具和 Python 接口**：
 
-## 进化循环
-
-![进化循环](docs/assets/evolution-loop-zh-CN.svg)
-
-1. **运行：**通过共同的 `Pipeline` 执行基线，按实际输出评分。
-2. **变化：**结合训练证据与 Wiki 反馈，提出有边界的 S/F/C/P 资产修改。
-3. **筛选：**验证契约与能力边界，运行候选，按冻结的采纳策略决定是否保留。
-4. **积累：**原子发布被采纳的版本；保留拒绝记录，让经验进入下一轮提案。
-
-内核、评测器、权限和采纳规则位于提案边界之外。DarwinAgent 不训练模型权重，也不重写自己的优化器。项目名称表达的是进化论带来的启发，并不表示实现了遗传算法。
-
-## 已实现的能力
-
-| 能力 | v0.1.0 的实际行为 |
+| 你想做什么 | 从这里开始 |
 | --- | --- |
-| 共享任务运行时 | `ExtractionAgent` → 带来源的图 → `AnswerAgent`，由一个 `Pipeline` 执行 |
-| 有边界的任务资产 | **S** 本体／模式、**F** 查询工具函数、**C** 任务检查、**P** 角色提示词 |
-| 经验积累 | Wiki 保存观察和采纳／拒绝决策，供后续提案使用 |
-| 可复查运行 | 内容编号、独立来源、局部续跑与显式严格比较 |
-| 独立评测 | 分开的 `DatasetAdapter` 和 `Evaluator`，任务自行定义指标名称 |
-| 实验控制 | `ExperimentRunner`；另有 `CampaignController` 管理训练／验证／测试协议 |
-| 模型连接 | 默认共用一个显式配置的 OpenAI 兼容 Chat Completions 端点，可按档位覆盖 |
-| 使用入口 | 安装后的 CLI、Python SDK、离线回放、真实模型模式、设备维护示例 |
+| 先体验完整流程 | 按下方步骤配置模型，运行命令行演示 |
+| 在自己的 Python 项目里调用 | [Python 接入示例](docs/zh-CN/quickstart.md#4-在-python-项目中调用) |
+| 使用自己的记录和问题 | [自定义任务：完整可运行样例](docs/zh-CN/custom-tasks.md) |
+| 让自己的任务进入优化循环 | [自定义优化实验](docs/zh-CN/custom-experiments.md) |
+| 暂时没有模型密钥 | [离线回放](docs/zh-CN/quickstart.md#5-没有模型时先做离线回放)，无需配置模型 |
 
-## 跑通循环
+## 1. 安装
 
-**从当前源码检出目录安装**。DarwinAgent 0.1.0 已作为实验性源码版本合入 `main`，尚未发布到 PyPI 或创建 GitHub Release。
+需要 Python 3.11 或更新版本，在你的 Python 环境中执行：
 
 ```bash
-# 在当前源码检出目录运行，需要 Python 3.11+ 和 uv。
-uv sync --frozen
-uv run darwinagent --version
-uv run darwinagent doctor --output runs/doctor
-uv run darwinagent demo --mode replay --rounds 2 --output runs/demo-replay
+python -m pip install --upgrade darwinagent
+darwinagent --version
 ```
 
-回放的预期结果：`status=complete`，第一轮采纳，第二轮因 `primary_not_strictly_improved` 拒绝，`http_attempts=0`。独立评测器在一个微型合成任务中，按维护人员／日期两个字段得到 **0.5 → 1.0 → 1.0**。回放使用脚本模型响应、预置 B0 和 **仅 P 资产**的提案，实际执行控制器与运行时。它验证机制，不证明模型学习或基准提升，也没有留出集评测。
+版本检查应输出 `darwinagent 0.1.1`。已安装旧版时，上面的命令会升级；如果仍显示旧版本，按[缓存排查](docs/zh-CN/quickstart.md#7-常见问题)刷新安装源缓存。
 
-输出目录包括：
+第一次使用 Python 项目时，建议先按[快速开始](docs/zh-CN/quickstart.md#1-安装)创建虚拟环境。普通用户无需下载仓库，也无需安装 `uv`。
 
-```text
-runs/demo-replay/
-├── experiment.json                           # original experiment declaration
-├── B0/evaluation/maintenance-demo.json         # baseline score
-├── R1/evaluation/maintenance-demo.json         # candidate score (also R2)
-├── R1/optimization/attempt-0/proposal-call.json # proposal input (also R2)
-├── optimization/wiki.json                     # durable experience
-├── published/current.json                     # accepted asset version
-└── demo-summary.json                          # controller summary
+## 2. 配置模型
+
+**真实运行需要模型地址、模型名称和密钥。** DarwinAgent 不附带模型，也没有默认厂商或模型。
+
+在准备运行命令的目录中新建一个名为 `.env` 的文件，填入：
+
+```dotenv
+DARWINAGENT_BASE_URL=https://your-provider.example/v1
+DARWINAGENT_MODEL=your-model-name
+DARWINAGENT_API_KEY=your-api-key
 ```
 
-真实模型运行需要配置端点，并使用另一个输出目录：
+上面三个值都是占位符，需要替换为你自己的配置：
+
+- `DARWINAGENT_BASE_URL`：提供商给出的 OpenAI 兼容接口根地址，通常以 `/v1` 结尾；不要填写完整的 `/chat/completions` 地址。
+- `DARWINAGENT_MODEL`：该接口实际支持的模型名称。
+- `DARWINAGENT_API_KEY`：该接口的密钥。
+
+先用一个模型即可，所有角色默认共用它。命令行会读取**当前目录**的 `.env`，已有环境变量优先；不要把密钥提交到仓库。[详细配置与排查](docs/zh-CN/configuration.md)。
+
+## 3. 跑一次真实模型演示
+
+可先检查连接；这一步会发送一次模型请求：
 
 ```bash
-cp .env.example .env
-# 在 .env 中填写 DARWINAGENT_API_KEY、DARWINAGENT_BASE_URL、DARWINAGENT_MODEL。
-uv run darwinagent demo --mode live --rounds 2 --output runs/demo-live \
+darwinagent doctor --check-model --output runs/doctor
+```
+
+然后运行两轮演示：
+
+```bash
+darwinagent demo --mode live --rounds 2 --output runs/demo-live \
   --max-requests 40 --timeout 1800
 ```
 
-CLI 读取当前目录的 `.env`，不覆盖已有环境变量。真实模式调用实际模型，不回退到录制响应。请求上限按实际发出的 HTTP 尝试计数，包括重试；超时限制覆盖整个运行。真实模型可能在 B0 就全部答对，同分候选应当被拒绝。验收成功表示各阶段执行且决策留痕，不要求分数必然上升。
+演示提供一条设备维护记录，询问“谁在什么时候维护了设备”。框架先生成基线答案，再尝试修改提示词，重新运行并评分，决定是否保留候选。它会调用你配置的真实模型。`40` 是最多发出的请求尝试数，包含重试；`1800` 是整次运行的秒数上限。
 
-日常续跑保留已有成果，模型和执行控制变化不会清空进度。源码修改在安全重启后生效；需要原冻结条件比较时显式添加 `--strict-comparison`：
+终端输出 `status: "complete"` 表示流程完成。候选同分或变差会被拒绝，因此完成不意味着分数一定上升。结果写到 `runs/demo-live/`：
 
-```bash
-uv run darwinagent demo --mode replay --rounds 2 --output runs/demo-replay --resume
-```
+| 文件 | 用途 |
+| --- | --- |
+| `demo-summary.json` | 查看每轮是否采纳及原因 |
+| `B0/evaluation/maintenance-demo.json` | 基线评分 |
+| `R1/evaluation/maintenance-demo.json` | 第一轮候选评分 |
+| `optimization/wiki.json` | 保存的经验 |
+| `published/current.json` | 当前保留的资产版本 |
+| `http_attempts.json` | 实际模型请求尝试数 |
 
-也可以从 Python 调用：
+再次使用这个目录时加 `--resume`；重新做一次独立实验时换一个输出目录。详细步骤见[续跑与结果说明](docs/zh-CN/quickstart.md#6-查看结果和续跑)。
 
-```python
-import asyncio
-from pathlib import Path
-from darwinagent.demo import run_demo
+## 4. 在代码里使用
 
-asyncio.run(run_demo(Path("runs/python-replay"), mode="replay", rounds=2))
-```
-
-[完整快速开始](docs/zh-CN/quickstart.md) · [配置](docs/zh-CN/configuration.md) · [带日期的验收证据](docs/acceptance/2026-10-07.md)
-
-## 接入自己的任务
-
-实现生成输入接口和独立评测器，再通过 `task.yaml` 与 `assets/index.yaml` 登记任务资产。生成输入只携带记录、问题和来源；评测参考保留在评测器内部。
-
-```python
-from darwinagent import (
-    CaseInput, CorpusBlock, QuestionInput, SourceRef, EvaluationResult,
-)
-
-class Records:
-    def generation_input(self, case_id):
-        return CaseInput(case_id,
-            (CorpusBlock(SourceRef("maintenance_record", case_id, "row-1"),
-                         "设备 D-17 于 2026-09-01 由林维护。"),),
-            (QuestionInput("q1", "谁在什么时候维护了 D-17？",
-                           {"serial": "D-17"}),))
-
-class Score:
-    async def evaluate(self, result):
-        correct = sum(a.status == "answered" and "林" in a.answer
-                      and "2026-09-01" in a.answer for a in result.answers)
-        faults = sum(a.status == "execution_error" for a in result.answers)
-        return EvaluationResult({"correct": correct}, len(result.answers),
-                                len(result.answers) - faults, faults, 0)
-```
-
-加载实际打包的任务声明与资产登记：
-
-```python
-from darwinagent import TaskSpec
-from darwinagent.demo import TASK_ROOT
-from darwinagent.kernel.registration import load_assets
-
-assets = load_assets(TASK_ROOT)  # task.yaml + assets/index.yaml + S/F/C/P files
-spec = TaskSpec.load(TASK_ROOT / "task.yaml")
-```
-
-这两个类接入共同运行时，不替换 Agent 执行流程。[完整离线示例](examples/third_domain.py) 将这两个接口和已登记的 S/F/C/P 资产一起运行：
+安装方式仍然是 `python -m pip install darwinagent`。在你的项目中新建 `main.py`，复制[完整 Python 示例](docs/zh-CN/quickstart.md#4-在-python-项目中调用)，与 `.env` 放在同一个目录，然后运行：
 
 ```bash
-uv run python examples/third_domain.py
+python main.py
 ```
 
-[自定义任务指南](docs/zh-CN/custom-tasks.md)提供完整的真实模型 `Pipeline` 示例及资产契约。任意外部 Agent 的插件接入是后续方向，不是 v0.1 已有能力。
+该示例会显式加载 `.env`、创建模型配置，并通过 `run_demo(..., mode="live", config=config)` 执行同一套真实模型流程。导入包本身不会加载 `.env`。
 
-## 架构与文档
+内置演示用于了解流程。接入自己的数据时，使用 `Pipeline` 并提供记录、问题、任务资产及独立评测器；[自定义任务指南](docs/zh-CN/custom-tasks.md)给出了可以直接保存运行的完整脚本。
 
-![架构](docs/assets/architecture-zh-CN.svg)
+## 框架如何改进
 
-| 指南 | English | 简体中文 |
-| --- | --- | --- |
-| 快速开始 | [Read](docs/en/quickstart.md) | [阅读](docs/zh-CN/quickstart.md) |
-| 架构 | [Read](docs/en/architecture.md) | [阅读](docs/zh-CN/architecture.md) |
-| 配置 | [Read](docs/en/configuration.md) | [阅读](docs/zh-CN/configuration.md) |
-| 自定义任务 | [Read](docs/en/custom-tasks.md) | [阅读](docs/zh-CN/custom-tasks.md) |
-| 实验 | [Read](docs/en/experiments.md) | [阅读](docs/zh-CN/experiments.md) |
-| 迁移 | [Read](docs/en/migration.md) | [阅读](docs/zh-CN/migration.md) |
+![进化循环](docs/assets/evolution-loop-zh-CN.svg)
 
-[历史证据索引](docs/history/README.md) · [可编辑图源与 PNG](docs/assets/README.md) · [项目介绍稿](docs/launch/introduction.zh-CN.md)
+1. 通过共同的 `Pipeline` 运行任务，生成带来源的答案并独立评分。
+2. 根据训练证据和经验记录提出资产修改。
+3. 检查候选的契约与执行能力，再运行和评分。
+4. 按固定规则保留有效版本，保存采纳或拒绝的记录。
 
-## 状态与后续方向
+可修改的任务资产包括 **S：模式**、**F：查询函数**、**C：任务检查**、**P：角色提示词**。内置演示只修改 P。框架不训练模型权重，执行内核、评测器、权限和采纳规则保持固定。
 
-本地 Python 3.11／3.12／3.13 测试和安装后 wheel 验收记录见[带日期的报告](docs/acceptance/2026-10-07.md)。工作流徽章显示 GitHub CI 的最新状态。历史数据集成绩属于原来的协议和源码版本。
+## 文档
 
-后续计划包括更多独立任务示例、受控留出集实验，以及明确的外部 Agent 接入边界。这些是研究与工程方向，不是已交付能力，也不承诺质量提升。
+| 指南 | 内容 |
+| --- | --- |
+| [快速开始](docs/zh-CN/quickstart.md) | 从安装到命令行、Python、结果与续跑 |
+| [模型配置](docs/zh-CN/configuration.md) | 接口地址、密钥、请求限制及常见错误 |
+| [自定义任务](docs/zh-CN/custom-tasks.md) | 换成自己的记录、问题和评测规则 |
+| [自定义优化实验](docs/zh-CN/custom-experiments.md) | 从自己的数据运行提案、评测与采纳 |
+| [架构](docs/zh-CN/architecture.md) | 运行时与模块职责 |
+| [实验协议](docs/zh-CN/experiments.md) | 独立评测与训练／验证／测试集 |
+| [人工干预与续跑](docs/workspace-continuation.zh-CN.md) | 执行预览、人工修改和经验补查 |
+| [迁移](docs/zh-CN/migration.md) | 从历史项目迁移 |
+| [发布维护](docs/zh-CN/pypi-publishing.md) | 维护者发布流程 |
 
-## 研究来源与社区
+## 状态与来源
 
-S/F 内核受 [*Toward Effective and Reliable LLM Agents via Dynamic Ontology*](https://arxiv.org/abs/2608.22974)（OaK）启发。C/P 资产与经验 Wiki 是本项目的工程扩展。历史复现记录另行索引；论文中的性能数字不作为当前 DarwinAgent 的结果。
+离线回放使用预设模型响应，可以检查流程；其中一个微型合成问题的评分变化不代表真实模型学习或基准提升。正式研究需要独立的留出集和评测协议。
 
-[贡献指南](CONTRIBUTING.zh-CN.md) · [English contribution guide](CONTRIBUTING.md) · [变更记录](CHANGELOG.md) · [软件引用](CITATION.cff)
+本地检查、安装包验收与历史实验记录见[带日期的验收报告](docs/acceptance/2026-10-07.md)、[用户上手验收](docs/acceptance/2026-10-08-onboarding.zh-CN.md)和[历史索引](docs/history/README.md)。后续方向包括更多独立任务样例、留出集实验及外部 Agent 接入。
 
-MIT © 2026 DarwinAgent contributors。见 [LICENSE](LICENSE)，第三方材料保留各自的许可证与来源。
+S/F 内核受 [*Toward Effective and Reliable LLM Agents via Dynamic Ontology*](https://arxiv.org/abs/2608.22974)（OaK）启发。C/P 资产与经验记录是本项目的工程扩展；论文性能数字不作为当前 DarwinAgent 的结果。
 
-## 人工干预、续跑与 Wiki 补查
+[贡献指南](CONTRIBUTING.zh-CN.md) · [变更记录](CHANGELOG.md) · [软件引用](CITATION.cff) · [图源](docs/assets/README.md)
 
-Workspace 将原始内容、执行来源和分支选择分别保存，提供人工登记、执行预览、请求恢复及安全导入导出。Wiki 可以返回原件，并建立可续跑的重新归纳任务。操作说明见[续跑与补查指南](docs/workspace-continuation.zh-CN.md)。真实模型仍需操作者指定并实际执行五题冒烟；离线检查不代表真实冒烟通过或指标提升。
+采用 [MIT 许可证](LICENSE)。第三方材料保留各自的许可证与来源。
