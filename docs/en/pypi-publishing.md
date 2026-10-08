@@ -46,3 +46,9 @@ References: [PyPI Trusted Publishing](https://docs.pypi.org/trusted-publishers/c
 The user onboarding update was published on **2026-10-08 at 08:35 (Asia/Shanghai)** from commit `0383a20d7e82da27e466d6dec67091e03d1eeaad` through [workflow run 37708266973](https://github.com/gogoingai/DarwinAgent/actions/runs/37708266973). The [PyPI page](https://pypi.org/project/darwinagent/0.1.1/) now includes explicit model configuration and Python integration links.
 
 Installation from the production index was verified in a fresh environment outside the checkout: CLI version `0.1.1`, SDK imports, offline replay, and resume passed. The downloaded wheel URL and SHA256 matched PyPI metadata. The release's [CI](https://github.com/gogoingai/DarwinAgent/actions/runs/37708232944) passed on Python 3.11/3.12/3.13 and macOS.
+
+## 0.1.2 publication
+
+Published on **2026-10-08 at 10:21 (Asia/Shanghai)** from `3a5c08fd68947844f36ec741ceb56432de3904bb` through [run 37717230916](https://github.com/gogoingai/DarwinAgent/actions/runs/37717230916), after [CI 37717197440](https://github.com/gogoingai/DarwinAgent/actions/runs/37717197440) passed. The bilingual README and PyPI description include durable continuation and Wiki queries.
+
+A fresh Python 3.13 environment installed `darwinagent==0.1.2` using pip from the production index. CLI version, offline replay and continuation passed; the downloaded URL and SHA256 match PyPI metadata, and all 93 packaged Python source files match the release checkout. The first install saw a stale index immediately after upload; retry after index propagation succeeded. See [verification data](../acceptance/2026-10-08-loop-release.json) and [live-loop evidence](../plans/intervention-wiki-loop-acceptance-20261008.md).

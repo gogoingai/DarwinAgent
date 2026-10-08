@@ -2,6 +2,8 @@
 
 ## 0.1.2 — durable loop and Wiki query recovery (2026-10-08)
 
+Published to [PyPI](https://pypi.org/project/darwinagent/0.1.2/) through [Trusted Publishing](https://github.com/gogoingai/DarwinAgent/actions/runs/37717230916). Production pip installation, source hashes, replay and resume were verified outside the checkout; see the [release verification](docs/acceptance/2026-10-08-loop-release.json).
+
 - Preserve candidate smoke-test progress and native model/tool receipts across continuation.
 - Restore empty vector snapshots without creating an embedding client.
 - Resolve composite training identities consistently and apply Wiki scope filters to the same case/question pair; report empty regroup coverage as partial.

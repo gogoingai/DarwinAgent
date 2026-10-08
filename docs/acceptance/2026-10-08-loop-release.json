@@ -1,0 +1,29 @@
+{
+  "version": "0.1.2",
+  "source_commit": "3a5c08fd68947844f36ec741ceb56432de3904bb",
+  "wheel_url": "https://files.pythonhosted.org/packages/a8/e6/99d0ab59c6fed27af36b956412b25db34f1f5fdc4f930b42b6a8da9e6f0a/darwinagent-0.1.2-py3-none-any.whl",
+  "sha256": "0914be0fa9593c94c34d1e4152eb34d4fd852a76384647e467e92c4f58f078aa",
+  "upload_time": "2026-10-08T02:21:51.443754Z",
+  "production_pip_install": true,
+  "metadata_hash_verified": true,
+  "matching_python_source_files": 93,
+  "offline_replay_and_resume": true,
+  "ci": "https://github.com/gogoingai/DarwinAgent/actions/runs/37717197440",
+  "publishing": "https://github.com/gogoingai/DarwinAgent/actions/runs/37717230916",
+  "real_cases": 12,
+  "real_questions": 28,
+  "independently_passed": 28,
+  "native_loop_completed": true,
+  "dynamic_query_completed": true,
+  "cancelled_expansion": {
+    "cases": 24,
+    "questions": 72,
+    "wiki_sessions": 6,
+    "model_calls": 0
+  },
+  "core_tests": {
+    "total": 561,
+    "passed": 554,
+    "skipped": 7
+  }
+}

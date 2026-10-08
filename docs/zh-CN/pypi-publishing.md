@@ -46,3 +46,9 @@ darwinagent demo --mode replay --rounds 2 --output runs/pypi-replay
 用户上手文档更新于 **2026-10-08 08:35（北京时间）**发布，来源提交为 `0383a20d7e82da27e466d6dec67091e03d1eeaad`，通过[发布运行 37708266973](https://github.com/gogoingai/DarwinAgent/actions/runs/37708266973)上传。[PyPI 说明页](https://pypi.org/project/darwinagent/0.1.1/)已包含明确的模型配置与 Python 接入链接。
 
 已在仓库外的新环境中从正式索引安装，验证命令行版本 `0.1.1`、SDK 导入、离线回放与续跑。下载文件地址及 SHA256 与 PyPI 元数据一致。发行提交的[自动检查](https://github.com/gogoingai/DarwinAgent/actions/runs/37708232944)已通过，包括 Python 3.11／3.12／3.13 与 macOS。
+
+## 0.1.2 发布记录
+
+已于 **2026-10-08 10:21（北京时间）**从 `3a5c08fd68947844f36ec741ceb56432de3904bb` 发布，通过[发布运行 37717230916](https://github.com/gogoingai/DarwinAgent/actions/runs/37717230916)上传；发布前[CI 37717197440](https://github.com/gogoingai/DarwinAgent/actions/runs/37717197440)全部通过。中英文 README 与 PyPI 说明新增持久化续跑和 Wiki 补查入口。
+
+在仓库外的全新 Python 3.13 环境中，使用 pip 从正式索引安装 `darwinagent==0.1.2`，命令行版本、离线回放和续跑均通过。下载地址与 SHA256 匹配 PyPI 元数据，包内93个 Python 源文件与发行源码一致。上传后首次安装遇到索引尚未更新，更新后重试成功。见[验证数据](../acceptance/2026-10-08-loop-release.json)与[真实循环记录](../plans/intervention-wiki-loop-acceptance-20261008.md)。
