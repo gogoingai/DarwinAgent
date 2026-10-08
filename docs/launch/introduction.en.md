@@ -6,7 +6,7 @@ A correct answer shows that an agent succeeded on one run. The more interesting 
 
 DarwinAgent is an open framework for experience-driven recursive self-improvement. Its name comes from Charles Darwin and the theory of evolution. Its mission is **Evolution for the Agent Era**. Evolution has a concrete engineering meaning here: propose variations, select through independent evaluation, retain effective versions, and let experience inform the next proposal.
 
-The current 0.1.0 version is experimental. It provides a runnable, inspectable, resumable loop. Any quality gain still needs to be established in a specific task with an independent evaluation protocol.
+The current 0.1.1 version is experimental. It provides a runnable, inspectable, resumable loop. Any quality gain still needs to be established in a specific task with an independent evaluation protocol.
 
 ## From one run to an evolution loop
 
@@ -48,7 +48,7 @@ Replay uses scripted model responses, a seeded baseline, and P-only proposals th
 
 Live mode uses the same task and independent evaluator without a scripted fallback. A model may answer the baseline correctly, so retaining it and rejecting two tied candidates can be the right result. Request limits count retries and the timeout covers the whole demo.
 
-The experimental 0.1.0 release is available on [PyPI](https://pypi.org/project/darwinagent/); install it with `python -m pip install darwinagent`. See the [README](../../README.md) and [quickstart](../en/quickstart.md) for installation, live configuration, and SDK integration. The [dated acceptance record](../acceptance/2026-10-07.md) separates local regression, replay, and real-model smoke evidence.
+The experimental 0.1.1 release is available on [PyPI](https://pypi.org/project/darwinagent/); install it with `python -m pip install darwinagent`. See the [README](../../README.md) and [quickstart](../en/quickstart.md) for installation, live configuration, and SDK integration. The [dated acceptance record](../acceptance/2026-10-07.md) separates local regression, replay, and real-model smoke evidence.
 
 DarwinAgent aims to make agent adaptation a bounded experiment with evidence that accumulates. Next directions include more independent tasks, controlled held-out studies, and a defined external agent integration boundary. Visit the [repository](https://github.com/gogoingai/DarwinAgent) to inspect the implementation or contribute reproducible issues and task examples.
 

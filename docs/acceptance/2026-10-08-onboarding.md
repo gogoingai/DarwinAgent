@@ -26,3 +26,9 @@ All model requests in these checks went to a local simulated streaming Chat Comp
 Additional checks passed: syntax parsing of 19 Python blocks in current language guides, local Markdown file/heading links, repository Ruff checks, package build, strict Twine metadata checks, and whitespace validation. Context-dependent snippets were syntax-checked in their intended context rather than claimed as standalone programs.
 
 The guides now separate installation, model configuration, live execution, Python integration, offline replay, and result inspection. Maintainer publishing instructions have separate language editions. Historical acceptance reports retain their original dates and scope.
+
+## 0.1.1 publication
+
+The user onboarding update was published on **2026-10-08 at 08:35 (Asia/Shanghai)** from commit `0383a20d7e82da27e466d6dec67091e03d1eeaad` through [workflow run 37708266973](https://github.com/gogoingai/DarwinAgent/actions/runs/37708266973). The [PyPI page](https://pypi.org/project/darwinagent/0.1.1/) now includes explicit model configuration and Python integration links.
+
+Installation from the production index was verified in a fresh environment outside the checkout: CLI version `0.1.1`, SDK imports, offline replay, and resume passed. The downloaded wheel URL and SHA256 matched PyPI metadata. The release's [CI](https://github.com/gogoingai/DarwinAgent/actions/runs/37708232944) passed on Python 3.11/3.12/3.13 and macOS.

@@ -40,3 +40,9 @@ darwinagent demo --mode replay --rounds 2 --output runs/pypi-replay
 待发布授权本身不会保留名称；首次成功上传才创建项目。此项目已经完成首次上传。
 
 参考：[PyPI 可信发布](https://docs.pypi.org/trusted-publishers/creating-a-project-through-oidc/)与 [PyPA 的 GitHub Actions 发布指南](https://packaging.python.org/en/latest/guides/publishing-package-distribution-releases-using-github-actions-ci-cd-workflows/)。
+
+## 0.1.1 发布记录
+
+用户上手文档更新于 **2026-10-08 08:35（北京时间）**发布，来源提交为 `0383a20d7e82da27e466d6dec67091e03d1eeaad`，通过[发布运行 37708266973](https://github.com/gogoingai/DarwinAgent/actions/runs/37708266973)上传。[PyPI 说明页](https://pypi.org/project/darwinagent/0.1.1/)已包含明确的模型配置与 Python 接入链接。
+
+已在仓库外的新环境中从正式索引安装，验证命令行版本 `0.1.1`、SDK 导入、离线回放与续跑。下载文件地址及 SHA256 与 PyPI 元数据一致。发行提交的[自动检查](https://github.com/gogoingai/DarwinAgent/actions/runs/37708232944)已通过，包括 Python 3.11／3.12／3.13 与 macOS。

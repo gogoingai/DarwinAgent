@@ -2,6 +2,8 @@
 
 ## 0.1.1 — user onboarding (2026-10-08)
 
+Published to [PyPI](https://pypi.org/project/darwinagent/0.1.1/) through [Trusted Publishing](https://github.com/gogoingai/DarwinAgent/actions/runs/37708266973). Production installation, replay, and resume were verified outside the checkout.
+
 - Put installation and explicit model configuration before framework concepts in both READMEs.
 - Add complete CLI and Python live workflows, result inspection, continuation, and troubleshooting.
 - Add standalone examples for the bundled loop, user records, and a custom improvement experiment.
