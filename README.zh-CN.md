@@ -7,11 +7,11 @@
 [English](README.md) · 简体中文
 
 [![离线检查](https://github.com/gogoingai/DarwinAgent/actions/workflows/ci.yml/badge.svg)](https://github.com/gogoingai/DarwinAgent/actions/workflows/ci.yml)
-[![PyPI 版本](https://img.shields.io/pypi/v/darwinagent?release=0.1.1)](https://pypi.org/project/darwinagent/)
+[![PyPI 版本](https://img.shields.io/pypi/v/darwinagent?release=0.1.2)](https://pypi.org/project/darwinagent/)
 [![Python 版本](https://img.shields.io/badge/python-%3E%3D3.11-45635c)](pyproject.toml)
 [![MIT 许可证](https://img.shields.io/badge/license-MIT-45635c)](LICENSE)
 
-**当前发行版本：[0.1.1](https://pypi.org/project/darwinagent/0.1.1/)（实验版）。** 改进要以实际评测为准。
+**当前发行版本：[0.1.2](https://pypi.org/project/darwinagent/0.1.2/)（实验版）。** 改进要以实际评测为准。
 
 DarwinAgent 的名字来自**查尔斯·达尔文与进化论**。**Agent 时代的进化**是项目的使命：让 Agent 从经验中适应任务，并保留有效的能力。在这个框架里，资产提案产生候选变化，独立评测和固定准入规则负责筛选，版本化资产与持久化经验 Wiki 负责保留结果，并影响下一轮提案。
 
@@ -27,6 +27,12 @@ DarwinAgent 是面向 Agent 递归自改进的开源 Python 框架。它运行�
 | 让自己的任务进入优化循环 | [自定义优化实验](docs/zh-CN/custom-experiments.md) |
 | 暂时没有模型密钥 | [离线回放](docs/zh-CN/quickstart.md#5-没有模型时先做离线回放)，无需配置模型 |
 
+## 持久化续跑与 Wiki 补查
+
+人工干预保留已有成果，工作候选与正式采纳版本分别记录。模型响应和工具结果持久化，支持安全重启后继续。提案器可以在同一会话中查询训练原件或请求 Wiki 重新归纳，原始证据与人工纠正仍可追溯。已提交但结果未知的请求，需要明确选择恢复或重试。
+
+[工作空间操作](docs/workspace-continuation.zh-CN.md)说明具体入口；[真实循环验收](docs/plans/intervention-wiki-loop-acceptance-20261008.md)记录实际范围、结果与限制。
+
 ## 1. 安装
 
 需要 Python 3.11 或更新版本，在你的 Python 环境中执行：
@@ -36,7 +42,7 @@ python -m pip install --upgrade darwinagent
 darwinagent --version
 ```
 
-版本检查应输出 `darwinagent 0.1.1`。已安装旧版时，上面的命令会升级；如果仍显示旧版本，按[缓存排查](docs/zh-CN/quickstart.md#7-常见问题)刷新安装源缓存。
+版本检查应输出 `darwinagent 0.1.2`。已安装旧版时，上面的命令会升级；如果仍显示旧版本，按[缓存排查](docs/zh-CN/quickstart.md#7-常见问题)刷新安装源缓存。
 
 第一次使用 Python 项目时，建议先按[快速开始](docs/zh-CN/quickstart.md#1-安装)创建虚拟环境。普通用户无需下载仓库，也无需安装 `uv`。
 

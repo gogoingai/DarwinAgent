@@ -2,7 +2,7 @@
 
 **Evolution for the Agent Era**
 
-An open Python framework for experience-driven recursive self-improvement of agents. Run a task, propose changes to its assets, evaluate candidates independently, and retain effective versions and experience. Version 0.1.1 is experimental; improvement must be measured.
+An open Python framework for experience-driven recursive self-improvement of agents. Run a task, propose changes to its assets, evaluate candidates independently, and retain effective versions and experience. Version 0.1.2 is experimental; improvement must be measured.
 
 [中文使用指南](https://github.com/gogoingai/DarwinAgent/blob/main/README.zh-CN.md) · [English guide](https://github.com/gogoingai/DarwinAgent/blob/main/README.md)
 
@@ -11,7 +11,7 @@ An open Python framework for experience-driven recursive self-improvement of age
 Python 3.11 or newer is required. One package provides both the command-line tool and the Python API:
 
 ```bash
-python -m pip install darwinagent
+python -m pip install --upgrade darwinagent
 darwinagent --version
 ```
 
@@ -54,6 +54,10 @@ darwinagent demo --mode replay --rounds 2 --output runs/demo-replay
 ```
 
 Replay uses scripted model responses with no network requests or credentials. Expect completion, a first accepted candidate, and a second rejected on a tie. It demonstrates mechanics, not model learning or benchmark gains.
+
+## Durable continuation and Wiki queries
+
+Keep saved model responses and tool results across safe restarts and human interventions. Working and adopted candidates are separate. A proposer can query training originals and request fresh Wiki regrouping in the same dialogue, with explicit coverage and evidence references. Unknown requests require explicit recovery or retry. See [workspace operations](https://github.com/gogoingai/DarwinAgent/blob/main/docs/workspace-continuation.md) and [live-loop acceptance](https://github.com/gogoingai/DarwinAgent/blob/main/docs/plans/intervention-wiki-loop-acceptance-20261008.md).
 
 ## Documentation
 

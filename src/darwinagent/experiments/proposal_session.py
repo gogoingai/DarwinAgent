@@ -65,6 +65,69 @@ class ProposalSession:
     def save(self):
         atomic_json(self.target, self.state)
 
+    def retry_wiki(self, reason):
+        """Recheck a paused Wiki query after external repair or an explicit Wiki retry.
+
+        This does not reset the dialogue, baseline, or Wiki's own failed job. The caller
+        must repair/retry that job separately. An unchanged reply pauses again before
+        any further proposer request.
+        """
+        if self.state["phase"] != "wiki_paused" or not str(reason).strip():
+            raise ValueError("A paused Wiki query and an explicit recovery reason are required")
+        self.state["events"].append({"status": "human_retry_wiki", "reason": str(reason)})
+        self.state["phase"] = "query"
+        self.target.with_name(self.target.name + ".query-receipt.json").unlink(missing_ok=True)
+        self.save()
+
+    @staticmethod
+    def _wiki_progress(query, reply):
+        identity = digest(
+            {
+                "query": {
+                    "question": query.get("question"),
+                    "scope": query.get("scope", {}),
+                    "view": query.get("view", "raw"),
+                    "cursor": query.get("cursor"),
+                },
+                "evidence_version": reply.get("evidence_version"),
+                "job_id": reply.get("job_id"),
+                "wiki_version": reply.get("wiki_version"),
+            }
+        )
+        # Error wording and retry timestamps are not evidence or completed work.
+        progress = digest(
+            {
+                key: reply.get(key)
+                for key in (
+                    "evidence_refs",
+                    "facts",
+                    "hypotheses",
+                    "support",
+                    "refutation",
+                    "covered",
+                    "uncovered",
+                    "missing",
+                    "matched",
+                    "cursor",
+                    "progress",
+                )
+            }
+        )
+        return identity, progress
+
+    def _raise_wiki_pause(self):
+        from .control import ControlSignal
+
+        raise ControlSignal(
+            {
+                "status": "paused",
+                "requires_restart": False,
+                "reason": "Wiki query repeated without evidence or regroup progress; repair or explicitly retry Wiki before retry_wiki(reason)",
+                "session": str(self.target),
+                "wiki_pause": self.state["wiki_pause"],
+            }
+        )
+
     def feedback(self, error):
         """Retain the rejected draft and continue the same frozen-baseline dialogue."""
         self.state["messages"].append(
@@ -121,6 +184,8 @@ class ProposalSession:
                 )
                 self.state["format_failures"] = 0
                 self.save()
+            if phase == "wiki_paused":
+                self._raise_wiki_pause()
             if phase == "finished":
                 return decoder(self.state["action"])
             if phase == "query":
@@ -161,7 +226,28 @@ class ProposalSession:
                                 }
                                 break
                 atomic_json(query_receipt, {"query_id": query_id, "reply": reply})
+                identity, progress = self._wiki_progress(action["query"], reply)
+                stalled = reply.get("status") in ("pending", "failed") and any(
+                    self._wiki_progress(exchange["query"], exchange["reply"])
+                    == (identity, progress)
+                    and exchange["reply"].get("status") in ("pending", "failed")
+                    for exchange in self.state["exchanges"]
+                )
                 self.state["exchanges"].append({"query": action["query"], "reply": reply})
+                if stalled:
+                    self.state["wiki_pause"] = {
+                        "query": action["query"],
+                        "reply": reply,
+                        "identity": identity,
+                        "progress": progress,
+                        "exchange": len(self.state["exchanges"]) - 1,
+                    }
+                    self.state["events"].append(
+                        {"status": "wiki_no_progress", "identity": identity, "progress": progress}
+                    )
+                    self.state["phase"] = "wiki_paused"
+                    self.save()
+                    self._raise_wiki_pause()
                 context = {"wiki_reply": reply}
                 if reply.get("cursor"):
                     context["continuation_query"] = {**action["query"], "cursor": reply["cursor"]}

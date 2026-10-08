@@ -2,7 +2,7 @@ cff-version: 1.2.0
 message: "If you use DarwinAgent, cite this software and record the commit and experiment protocol used."
 title: "DarwinAgent: Evolution for the Agent Era"
 type: software
-version: "0.1.1"
+version: "0.1.2"
 authors:
   - name: "DarwinAgent contributors"
 repository-code: "https://github.com/gogoingai/DarwinAgent"

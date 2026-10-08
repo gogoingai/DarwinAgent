@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.2 — durable loop and Wiki query recovery (2026-10-08)
+
+- Preserve candidate smoke-test progress and native model/tool receipts across continuation.
+- Restore empty vector snapshots without creating an embedding client.
+- Resolve composite training identities consistently and apply Wiki scope filters to the same case/question pair; report empty regroup coverage as partial.
+- Bound merged Wiki claims while retaining full originals; recover one JSON object followed only by an orphan Markdown closing fence.
+- Pause repeated Wiki queries that make no evidence or regroup progress; resume the same dialogue after an explicit repair/retry.
+- Recover saved Wiki maintenance responses and register explicit retries without deleting failed requests.
+- Record a real GLM loop with human objective intervention, independent candidate scoring and zero-call completed resume; keep live evidence separate from offline regression results.
+- Update bilingual workspace instructions and package documentation while retaining the 0.1.1 onboarding guides.
+
 ## 0.1.1 — user onboarding (2026-10-08)
 
 Published to [PyPI](https://pypi.org/project/darwinagent/0.1.1/) through [Trusted Publishing](https://github.com/gogoingai/DarwinAgent/actions/runs/37708266973). Production installation, replay, and resume were verified outside the checkout.

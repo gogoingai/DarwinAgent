@@ -91,3 +91,5 @@ python -m datasets.travelplanner.run --output runs/travel-small --split train --
 共同参数为 `--execution-mode`、`--execution-stages`、`--execution-question-ids`、`--execution-branch`、`--strict-comparison`、`--preview`。普通执行和训练续跑默认采用 daily 选择。持出集 campaign 保留独立冻结协议；局部优化使用训练路径，不静默改变验证／测试的覆盖范围。
 
 LoCoMo 的评分标准编号依据实际评分锁、受锁源码和判题参考内容；缺失审计参考时不声称可靠复用。TravelPlanner 依据实际官方规则、数据库参考、题目与评测桥。自定义评测器没有显式标准编号时，不能据此宣称评分可可靠复用。仅改 judge 连接不改标准编号；显式只重评分使用新 judge，不生成新答案。
+
+同一待归纳／失败查询的证据和归纳进度没有变化时，提案会话暂停。先修复或显式重试 Wiki 任务，再调用 `session.retry_wiki(reason)` 并继续 `run(...)`；原查询重新检查，已有对话和归纳结果保留。

@@ -620,7 +620,10 @@ class WikiService:
                         "never infer causality from co-occurrence. Every claim must cite evidence.refs. "
                         'Each list item must have "text" and "evidence_refs" fields, for example '
                         '{"text":"Observed relation","evidence_refs":["<one of evidence.refs>"]}. '
-                        "Keep the complete JSON response within 4000 characters; originals remain queryable.",
+                        "Return at most five claims TOTAL across all lists. Each claim text must be at most "
+                        "120 characters and cite at most two relevant evidence refs. Empty lists are valid. "
+                        "Do not repeat every input claim: retained originals and coverage record contain the "
+                        "full findings. Keep the complete JSON response within 4000 characters.",
                         request,
                         lambda value, refs=refs: self._validate(value, refs),
                         max_tokens=getattr(self.config, "wiki_max_tokens", None),

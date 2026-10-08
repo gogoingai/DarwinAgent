@@ -16,6 +16,13 @@ def parse_json(text):
     t = text.strip()
     if t.startswith("```") and t.endswith("```"):
         t = t.split("\n", 1)[1].rsplit("```", 1)[0].strip()
+    elif t.endswith("`"):
+        # Some compatible providers emit an orphan closing Markdown fence.
+        # Accept only one complete JSON value plus this exact wrapper, never
+        # a second value or arbitrary trailing prose; callers retain raw output.
+        _, end = json.JSONDecoder().raw_decode(t)
+        if t[end:].strip() in {"`", "``", "```"}:
+            t = t[:end]
     value = json.loads(t)
     if not isinstance(value, dict):
         raise ValueError("Expected one JSON object")
