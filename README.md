@@ -13,7 +13,9 @@ English · [简体中文](README.zh-CN.md)
 
 **Current release: [0.1.1](https://pypi.org/project/darwinagent/0.1.1/) (experimental).** Improvement must be measured.
 
-DarwinAgent is an open Python framework for experience-driven recursive self-improvement of agents. It runs tasks, proposes changes to task assets, evaluates candidates independently, and retains effective versions and experience. Its name comes from Charles Darwin and the theory of evolution.
+DarwinAgent takes its name from **Charles Darwin and the theory of evolution**. Its mission is **Evolution for the Agent Era**: help agents adapt through experience and retain effective capabilities. In this framework, asset proposals introduce candidate variations, independent evaluation and fixed admission rules select among them, and versioned assets and a persistent experience Wiki retain results and inform the next proposal.
+
+DarwinAgent is an open Python framework for experience-driven recursive self-improvement of agents. It runs tasks, proposes changes to task assets, evaluates candidates independently, and retains effective versions and experience.
 
 One `darwinagent` package provides both a **command-line tool and a Python API**:
 
