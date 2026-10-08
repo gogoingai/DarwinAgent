@@ -1,6 +1,18 @@
 # Changelog
 
-## Unreleased — engineering governance
+## Unreleased — user onboarding
+
+- Put installation and explicit model configuration before framework concepts in both READMEs.
+- Add complete CLI and Python live workflows, result inspection, continuation, and troubleshooting.
+- Add standalone examples for the bundled loop, user records, and a custom improvement experiment.
+- Separate English and Chinese guide bodies and maintainer publishing instructions.
+- Validate copyable scripts against the production PyPI package outside the checkout with local simulated endpoints.
+
+## 0.1.0 — experimental release (2026-10-08)
+
+The source version was introduced on 2026-10-07. Its first PyPI release was published on 2026-10-08 through [Trusted Publishing](https://github.com/gogoingai/DarwinAgent/actions/runs/37705060486).
+
+### Engineering governance
 
 - Pin Ruff 0.16.10, editor conventions and an independent CI quality gate; preserve runtime dependency versions.
 - Extract Wiki evidence/lessons/context and ordered admission trials/reporting.
@@ -9,9 +21,7 @@
 - Share identical calendar primitives while retaining domain resolvers/scoring; preserve the historical evaluation lock and add the governance lock with six source dependencies.
 - Document ownership, source-identity migration and offline acceptance in both languages.
 
-## 0.1.0 — experimental source version (2026-10-07)
-
-This experimental source version is available on `main`. It has not been published to PyPI or as a GitHub Release.
+### Package and runtime
 
 - Introduced the independent `darwinagent` distribution/import namespace, Python 3.11+ support, and packaged maintenance task resources.
 - Added installed `doctor` and `demo` CLI commands, replay/live modes, bounded HTTP attempts/time, and matching-identity resume.

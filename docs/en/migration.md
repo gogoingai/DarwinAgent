@@ -4,7 +4,7 @@
 
 DarwinAgent 0.1.0 has a new package identity; earlier historical framework versions are not directly comparable by version number. Both distribution and import name are `darwinagent`; no old-namespace compatibility shim is provided.
 
-1. Install from the current source checkout and use `from darwinagent import ...`; changing imports alone does not migrate a frozen run.
+1. Install with `python -m pip install darwinagent`, or check out the source for development, and use `from darwinagent import ...`; changing imports alone does not migrate a frozen run.
 2. Generic model connections use `DARWINAGENT_API_KEY`, `DARWINAGENT_BASE_URL`, and `DARWINAGENT_MODEL`. Historical dataset configuration loads explicitly at the dataset boundary.
 3. Create a new output directory and freeze source/assets/model/evaluator identity again. Old runs require their original source and dependencies; do not recompute old locks to bypass identity checks.
 4. Tasks implement `DatasetAdapter` and `Evaluator`, register S/F/C/P, and use the common `Pipeline`. Arbitrary task execution callbacks and external agent plugin entry points are not provided.
@@ -12,10 +12,10 @@ DarwinAgent 0.1.0 has a new package identity; earlier historical framework versi
 
 The [history index](../history/README.md) retains earlier docs and research outputs. Historical scripts remain byte-preserved and may require their original checkout. Start with the current [quickstart](quickstart.md); old docs do not describe the current API.
 
-## Engineering governance source identity
+## Historical migration: engineering governance on 2026-10-07
 
-The package stays at 0.1.0; source identity changes when implementations move or are formatted.
-Use a new output directory for this checkout. Matching new-source checkpoints can resume;
+The package version was 0.1.0 during that migration; moving or formatting implementations changed source identity.
+That migration required a new output directory. Matching new-source checkpoints can resume;
 old-source checkpoints must fail identity validation without rewriting the original declaration.
 
 LoCoMo defaults to `evaluation_lock.governance-20261007.json`, covering its original four files
