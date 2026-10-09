@@ -1,5 +1,6 @@
 """Pinned native LIFT lifecycle with Darwin's reviewed campaign and proposal machinery."""
 
+import asyncio
 import json
 import os
 import time
@@ -12,6 +13,7 @@ from src.lift.adapters.container.session import ContainerSession
 from src.lift.eval.stage import HoldoutLoadState, SuiteRunPhase
 from src.lift.eval.task_exec import execute_task
 from src.lift.eval.worker_judger import WorkerJudgerPair
+from src.models import PhaseRun
 
 from darwinagent.agent import AgentKernelBundle, EpisodeResult, ExecutionBackend
 from darwinagent.config import RunConfig
@@ -20,11 +22,17 @@ from darwinagent.llm.client import BudgetExceeded
 from darwinagent.runtime.artifacts import atomic_json, digest
 from darwinagent.runtime.identity import snapshot_files
 
-from .agents import DarwinChatAgent, NativeReAct, tools_for, worker_profile
+from .agents import DarwinChatAgent, LocalTaskFailure, NativeReAct, tools_for, worker_profile
 from .data import UPSTREAM_REVISION
 from .report import cell, update_cell
 from .state import install, load, snapshot
 from .tools import DockerTools
+
+
+class FailedPhaseRun(PhaseRun):
+    """Internal failure record; upstream tables cannot represent unjudged nulls."""
+
+    content_score: float | None = None
 
 
 class NativeEpisodeBackend(ExecutionBackend):
@@ -132,6 +140,7 @@ class DarwinLiftAdapter(ContainerAgentRuntimeAdapter):
         self.shared.run_id = ctx.run_id
         for task_id, arm, phase in (
             ("q1", "warmup", "warmup"),
+            ("q2", "diagnostic", "validation"),
             ("q5", "A", "holdout"),
             ("q5", "B", "holdout"),
             ("q5", "C", "holdout"),
@@ -140,14 +149,47 @@ class DarwinLiftAdapter(ContainerAgentRuntimeAdapter):
         return await super().create_suite_run_resources(ctx)
 
     async def track(self, task_id, arm, phase, run_id, operation):
-        key = cell(self.root, task_id, arm, phase, run_id, status="running", started=time.time())
+        key = cell(self.root, task_id, arm, phase, run_id)
+        try:
+            self.shared.check()
+        except BudgetExceeded:
+            update_cell(self.root, key, status="blocked", reason="global_gate")
+            raise
+        saved = self.root / "task-receipts" / (key + ".json")
+        if saved.exists():
+            value = json.loads(saved.read_text())
+            return (
+                EpisodeResult(**value["result"])
+                if value["kind"] == "episode"
+                else FailedPhaseRun(**value["result"])
+            )
+        current = json.loads((self.root / "cells" / (key + ".json")).read_text())
+        update_cell(self.root, key, status="running", started=current.get("started", time.time()))
         previous = getattr(self, "active_cell", None)
         self.active_cell = key
         try:
             self.dataset.identity()  # Before native staging or any container/model dispatch.
             value = await operation()
-            update_cell(self.root, key, status="completed", finished=time.time())
+            atomic_json(
+                saved,
+                {
+                    "kind": "episode" if isinstance(value, EpisodeResult) else "native",
+                    "result": value.to_dict()
+                    if isinstance(value, EpisodeResult)
+                    else value.model_dump(),
+                },
+            )
+            current = json.loads((self.root / "cells" / (key + ".json")).read_text())
+            update_cell(
+                self.root,
+                key,
+                status="failed" if current["status"] == "failed" else "completed",
+                finished=time.time(),
+            )
             return value
+        except asyncio.CancelledError:
+            update_cell(self.root, key, status="cancelled", finished=time.time())
+            raise
         except Exception as exc:
             update_cell(
                 self.root,
@@ -161,27 +203,126 @@ class DarwinLiftAdapter(ContainerAgentRuntimeAdapter):
             self.active_cell = previous
 
     async def produce_delta(self, resources, policy, warmup_tasks, ctx):
-        return await self.track(
-            "q1",
-            "warmup",
-            "warmup",
-            ctx.run_id,
-            lambda: super(DarwinLiftAdapter, self).produce_delta(
-                resources, policy, warmup_tasks, ctx
-            ),
-        )
+        # Pinned upstream retries local exceptions, then rethrows task_errors. Keep
+        # its native execute_task/containers/delta, isolate settled task failures here.
+        from src.lift.policies.artifact import WarmupThenUpdatePolicy
+
+        if not isinstance(policy, WarmupThenUpdatePolicy) or not warmup_tasks:
+            raise ValueError("Expected native warmup policy and tasks")
+        workspace = self.warmup_workspace(ctx)
+        self.dataset.identity()
+        for task in warmup_tasks:
+            self.dataset.stage(self.dataset.task(task.name), workspace)
+        env = await self.start_warmup_environment(ctx, resources, workspace)
+        resources.track(env.disposable)
+        try:
+            for task in warmup_tasks:
+
+                async def operation(task=task):
+                    result = await self.execute_native(
+                        task=task,
+                        run_id=ctx.run_id,
+                        workspace_dir=workspace,
+                        factory=self.worker_judger_factory(
+                            env, ctx, run_phase=SuiteRunPhase.warmup(), workspace_dir=workspace
+                        ),
+                        run_phase=SuiteRunPhase.warmup(),
+                        max_conversation_turns=3,
+                    )
+                    await self.evolve_after_task(env, task, result, ctx)
+                    return result
+
+                await self.track(task.name, "warmup", "warmup", ctx.run_id, operation)
+            await self.evolve_after_warmup(env, ctx)
+            delta = await self.materialize_delta(env, ctx)
+            resources.delta = delta
+            return delta
+        finally:
+            await env.disposable.cleanup()
+
+    async def execute_native(self, **kwargs):
+        """Return native failure evidence only for settled execution failures."""
+        captured = {}
+        factory = kwargs["factory"]
+
+        async def capture(task):
+            pair = await factory(task)
+            captured["pair"] = pair
+            return pair
+
+        kwargs["factory"] = capture
+        try:
+            return await execute_task(**kwargs)
+        except (RuntimeError, ValueError) as exc:
+            self.shared.check()
+            if "pair" not in captured:
+                raise
+            pair = captured["pair"]
+            # No judge result is invented. Last valid native score is retained.
+            scores = []
+            for episode in pair.judge_agent.episodes():
+                if episode["status"] == "completed":
+                    try:
+                        from src.lift.eval.run_task import _extract_judge_result
+
+                        scores.append(_extract_judge_result(episode["final_response"]).score)
+                    except ValueError:
+                        pass
+            result = FailedPhaseRun(
+                work_session_id=pair.work_session_id,
+                judge_session_id=pair.judge_session_id,
+                success=False,
+                content_score=scores[-1] if scores else None,
+                turns=len(pair.work_agent.episodes()),
+                workspace_dir=str(kwargs["workspace_dir"]),
+                tool_calls=pair.work_agent.count_tools(),
+            )
+            update_cell(
+                self.root,
+                self.active_cell,
+                status="failed",
+                error_type=type(exc).__name__,
+                content_score_scope="intermediate" if scores else "unjudged",
+                native=result.model_dump(),
+            )
+            atomic_json(pair.work_agent.root / "native-failure.json", result.model_dump())
+            return result
 
     async def _run_holdout(self, *, task, resources, ctx, image, load_state):
         arm = "C" if load_state == HoldoutLoadState.EVOLVED else "B"
-        return await self.track(
-            task.name,
-            arm,
-            "holdout",
-            ctx.run_id,
-            lambda: super(DarwinLiftAdapter, self)._run_holdout(
-                task=task, resources=resources, ctx=ctx, image=image, load_state=load_state
-            ),
-        )
+
+        async def operation():
+            workspace = self.holdout_workspace(ctx, task, load_state)
+            env = await self.start_holdout_environment(
+                ctx,
+                resources,
+                task,
+                workspace,
+                image=image,
+                seed_workspace=True,
+                load_state=load_state,
+            )
+            resources.track(env.disposable)
+            try:
+                result = await self.execute_native(
+                    task=task,
+                    run_id=ctx.run_id,
+                    workspace_dir=workspace,
+                    factory=self.worker_judger_factory(
+                        env,
+                        ctx,
+                        run_phase=SuiteRunPhase.holdout(load_state),
+                        workspace_dir=workspace,
+                    ),
+                    run_phase=SuiteRunPhase.holdout(load_state),
+                    max_conversation_turns=3,
+                )
+                result.tool_calls = await self.count_tool_calls(env, task, result, ctx)
+                return result
+            finally:
+                await env.disposable.cleanup()
+
+        return await self.track(task.name, arm, "holdout", ctx.run_id, operation)
 
     @classmethod
     def resolve_docker_image(cls, *, override=None):
@@ -363,7 +504,26 @@ class DarwinLiftAdapter(ContainerAgentRuntimeAdapter):
                 arm="A",
             )
             atomic_json(receipt, result.to_dict())
-        return await super().run_before_load(task, resources, ctx)
+        result = await super().run_before_load(task, resources, ctx)
+        if (self.root / "sessions" / result.work_session_id / "native-failure.json").exists():
+            # Upstream serial runner aborts evolved after a failed baseline. Finish C
+            # here under the same frozen delta, then let native omit the unsupported
+            # failed pair; plugin all-pairs keeps nullable/intermediate evidence.
+            await self._run_holdout(
+                task=task,
+                resources=resources,
+                ctx=ctx,
+                image=resources.delta.image_tag,
+                load_state=HoldoutLoadState.EVOLVED,
+            )
+            raise LocalTaskFailure("Baseline failed; C independently retained")
+        return result
+
+    async def run_after_load(self, task, resources, delta, ctx):
+        result = await super().run_after_load(task, resources, delta, ctx)
+        if (self.root / "sessions" / result.work_session_id / "native-failure.json").exists():
+            raise LocalTaskFailure("Evolved task failed; evidence retained")
+        return result
 
     async def count_tool_calls(self, env, task, result, ctx):
         count = self.pairs[result.work_session_id].work_agent.count_tools()
@@ -389,10 +549,11 @@ class DarwinLiftAdapter(ContainerAgentRuntimeAdapter):
             for e in events
             if e["kind"] == "model"
         )
+        failed = (pair.work_agent.root / "native-failure.json").exists()
         row = {
             "task_id": task_id,
             "arm": arm,
-            "status": "completed",
+            "status": "failed" if failed else "completed",
             "native": result.model_dump(),
             "worker_usage": usage,
             "worker_tokens": sum(
@@ -421,15 +582,15 @@ class DarwinLiftAdapter(ContainerAgentRuntimeAdapter):
             atomic_json(self.root / "evaluations" / (evaluation_key + ".json"), row)
             usage["native_evaluation"] = evaluation_key
         return EpisodeResult(
-            "completed",
-            episodes[-1]["final_response"],
-            tuple(episodes[-1]["artifacts"]),
+            "failed" if failed else "completed",
+            episodes[-1]["final_response"] if episodes else "",
+            tuple(episodes[-1]["artifacts"]) if episodes else (),
             events,
             usage,
         )
 
     async def execute_episode(self, task, kernel, workspace, run_id, arm="campaign"):
-        phase = "holdout" if arm == "A" else "campaign"
+        phase = "holdout" if arm == "A" else "validation" if arm == "diagnostic" else "campaign"
         ledger = self.root / "campaign" / "episode-ledger.json"
         if arm == "campaign" and ledger.exists():
             phase = json.loads(ledger.read_text())["value"].get(run_id, {}).get("phase", phase)
@@ -469,7 +630,7 @@ class DarwinLiftAdapter(ContainerAgentRuntimeAdapter):
                 env.handle.metadata["kernel_override"] = kernel.content_id
             if arm == "A":
                 env.handle.metadata["arm"] = "A"
-            result = await execute_task(
+            result = await self.execute_native(
                 task=self.dataset.native[task.id],
                 run_id=run_id,
                 workspace_dir=Path(workspace),
@@ -506,6 +667,12 @@ class DarwinLiftAdapter(ContainerAgentRuntimeAdapter):
         return NativeEvaluator(self)
 
     def client_factory(self, stage):
+        self.shared.check()
+        if any(
+            json.loads(p.read_text())["status"] == "failed"
+            for p in (self.root / "cells").glob("*.json")
+        ):
+            raise LocalTaskFailure("Unhealthy episode forbids proposal or Wiki model work")
         return self.shared.scoped("evolution-" + digest(str(stage))[:16], "proposal_wiki")
 
     async def evolve_after_warmup(self, env, ctx):
@@ -530,15 +697,63 @@ class DarwinLiftAdapter(ContainerAgentRuntimeAdapter):
             wiki_call_limit=4,
             backend=NativeEpisodeBackend(self, self.root / "campaign-template"),
         )
-        summary = await controller.run(self.initial, resume=(root / "agent-campaign.json").exists())
+        warmup_failed = any(
+            json.loads(p.read_text())["episode"]["status"] != "completed"
+            for p in (self.root / "hooks").glob("task-*.json")
+        )
+        fallback = self.root / "fallback-selection.json"
+        if fallback.exists():
+            summary = json.loads(fallback.read_text())["campaign"]
+        elif warmup_failed:
+            summary = {"status": "failed_warmup", "healthy": False}
+        else:
+            try:
+                summary = await controller.run(
+                    self.initial, resume=(root / "agent-campaign.json").exists()
+                )
+            except Exception as exc:
+                self.shared.check()
+                summary = {
+                    "status": "failed_campaign",
+                    "healthy": False,
+                    "error_type": type(exc).__name__,
+                }
+        self.shared.check()
         if summary.get("status") != "complete":
             atomic_json(self.root / "partial-campaign.json", summary)
-            raise BudgetExceeded("Campaign incomplete; no delta may be promoted")
-        selected = AgentKernelBundle(root / "selected")
-        wiki_root = root / "optimization"
-        wiki = {
-            str(p.relative_to(wiki_root)): p.read_text() for p in sorted(wiki_root.rglob("*.json"))
-        }
+            if not fallback.exists():
+                q2_done = any(
+                    (value := json.loads(p.read_text()))["task_id"] == "q2"
+                    and value["status"] in {"completed", "failed"}
+                    for p in (self.root / "cells").glob("*.json")
+                )
+                if not q2_done:
+                    await self.execute_episode(
+                        self.dataset.task("q2"),
+                        self.initial,
+                        self.root / "q2-diagnostic",
+                        ctx.run_id,
+                        arm="diagnostic",
+                    )
+                atomic_json(
+                    fallback,
+                    {
+                        "selected": self.initial.content_id,
+                        "accepted": False,
+                        "reason": "unhealthy_campaign",
+                        "campaign": summary,
+                    },
+                )
+            selected, wiki = self.initial, {}
+            selection_path = fallback
+        else:
+            selected = AgentKernelBundle(root / "selected")
+            wiki_root = root / "optimization"
+            wiki = {
+                str(p.relative_to(wiki_root)): p.read_text()
+                for p in sorted(wiki_root.rglob("*.json"))
+            }
+            selection_path = root / "selection.json"
         envelope = snapshot(selected, wiki)
         path = self.root / "selected-state.json"
         if path.exists() and json.loads(path.read_text()) != envelope:
@@ -557,7 +772,7 @@ class DarwinLiftAdapter(ContainerAgentRuntimeAdapter):
             "state_sha256": envelope["sha256"],
             "source": digest(self.source),
             "image": env.handle.image,
-            "selection": digest((root / "selection.json").read_text()),
+            "selection": digest(selection_path.read_text()),
         }
         hook_path = self.root / "hooks" / "warmup.json"
         if hook_path.exists() and json.loads(hook_path.read_text()) != evidence:

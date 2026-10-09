@@ -32,8 +32,13 @@ def main():
     root = Path(args.root).resolve()
     client = get_client()
     checked = []
+    unstarted = []
     for session_root in sorted((root / "sessions").iterdir()):
         sid = session_root.name
+        if not (session_root / "trace-state.json").exists():
+            assert not list((session_root / "turns").glob("*.json")), sid
+            unstarted.append(sid)
+            continue
         saved = json.loads((session_root / "trace-state.json").read_text())
         traces = client.api.trace.list(session_id=sid, name="darwinagent-plugin", limit=100).data
         assert traces, sid
@@ -71,18 +76,44 @@ def main():
     os.chdir(root)
     run_id = "darwin-" + root.name
     report_path = root / "results" / run_id / "report.json"
-    run_post_process_pipeline(run_id, report_path, agent_source="darwinagent")
+    report = json.loads(report_path.read_text())
+    native_pairs = any(
+        suite and suite.get("tasks") for repeat in report["runs"] for suite in repeat["suites"]
+    )
+    native_error = None
+    try:
+        run_post_process_pipeline(run_id, report_path, agent_source="darwinagent")
+    except Exception as exc:
+        # Preserve the actual native failure, never label absent pairs as success.
+        if native_pairs:
+            raise
+        native_error = type(exc).__name__
+        atomic_json(
+            root / "native-postprocess-failure.json",
+            {"error_type": native_error, "reason": "no_native_representable_pairs"},
+        )
     outputs = [
         str(p.relative_to(root))
         for p in (root / "results").rglob("*")
         if p.suffix in {".csv", ".html"}
     ]
-    assert sum(p.endswith(".csv") for p in outputs) >= 2, outputs
-    assert any(p.endswith(".html") for p in outputs), outputs
+    if native_pairs:
+        assert sum(p.endswith(".csv") for p in outputs) >= 2, outputs
+        assert any(p.endswith(".html") for p in outputs), outputs
+    native_status = "completed" if native_pairs else "unavailable_no_pairs"
+    if not native_pairs:
+        assert not outputs
+        atomic_json(
+            root / "native-postprocess-unavailable.json",
+            {"status": native_status, "outputs": outputs, "error_type": native_error},
+        )
     atomic_json(
         root / "trace-acceptance.json",
         {
             "sessions": checked,
+            "unstarted_sessions": unstarted,
+            "native_postprocess_error": native_error,
+            "native_postprocess_status": native_status,
             "native_postprocess": outputs,
             "actual_model_http": 0,
             "trajectory_judge": "not_run",
@@ -90,7 +121,16 @@ def main():
         },
     )
     client.shutdown()
-    print(json.dumps({"status": "PASS", "sessions": len(checked), "outputs": outputs}))
+    print(
+        json.dumps(
+            {
+                "trace_status": "PASS",
+                "sessions": len(checked),
+                "native_postprocess_status": native_status,
+                "outputs": outputs,
+            }
+        )
+    )
 
 
 if __name__ == "__main__":

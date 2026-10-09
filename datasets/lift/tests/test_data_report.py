@@ -181,6 +181,7 @@ class ReportTests(unittest.IsolatedAsyncioTestCase):
         with tempfile.TemporaryDirectory() as directory:
             owner = DarwinLiftAdapter.__new__(DarwinLiftAdapter)
             owner.root = Path(directory)
+            owner.shared = SimpleNamespace(check=lambda: None)
             owner.dataset = SimpleNamespace(
                 identity=lambda: (_ for _ in ()).throw(ValueError("changed"))
             )

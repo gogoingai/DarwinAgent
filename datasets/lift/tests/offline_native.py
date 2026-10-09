@@ -13,6 +13,8 @@ from datasets.lift.register import register, upstream
 class RecordedClient:
     def __init__(self, cfg, initial):
         self.cfg, self.initial, self.calls = cfg, initial, 0
+        self.failure_injection = False
+        self.fail_all_holdout = False
 
     def http_attempts(self):
         return 0
@@ -100,6 +102,25 @@ class RecordedClient:
                 )
         else:
             raise AssertionError("Unexpected offline role: " + role)
+        if (
+            self.failure_injection
+            and role == "worker"
+            and (
+                (task_id == "q1" and correction)
+                or (
+                    task_id == "q5"
+                    and (
+                        self.fail_all_holdout
+                        or not any(t["name"] == "inspect_materials" for t in request["tools"])
+                    )
+                )
+            )
+        ):
+            answer = (
+                {"tool": "write_text", "params": {"path": artifact, "content": "PARTIAL-FAILURE"}}
+                if steps == 0
+                else {"tool": "list_files", "params": {}}
+            )
         return SimpleNamespace(
             content=json.dumps(answer),
             usage={"prompt_tokens": 20, "completion_tokens": 10},
@@ -148,6 +169,8 @@ async def run(args):
         max_http_requests=100,
     )
     client = RecordedClient(cfg, initial)
+    client.failure_injection = args.failure_injection
+    client.fail_all_holdout = args.fail_all_holdout
     cfg.role_tiers.update(worker="strong", judge="strong")
     shared = SharedTransport(client, root / "shared")
     options = RunOptions(
@@ -231,14 +254,23 @@ async def run(args):
     if not (root / "delta-image.json").exists():
         raise AssertionError("Native pipeline did not produce a delta")
     selected = json.loads((root / "selected-state.json").read_text())
-    assert selected["value"]["kernel_id"] != initial.content_id, (
-        "recorded candidate should be accepted"
-    )
     final_rows = [r for r in all_pairs["rows"] if r["task_id"] == "q5"]
     assert {r["arm"] for r in final_rows} == {"A", "B", "C"}
-    assert all(r["native"]["success"] for r in final_rows)
-    assert {r["native"]["turns"] for r in final_rows if r["arm"] in {"A", "B"}} == {2}
-    assert {r["native"]["turns"] for r in final_rows if r["arm"] == "C"} == {1}
+    if args.failure_injection:
+        assert selected["value"]["kernel_id"] == initial.content_id
+        assert json.loads((root / "fallback-selection.json").read_text())["accepted"] is False
+        assert {r["arm"]: r["status"] for r in final_rows} == {
+            "A": "failed",
+            "B": "failed" if args.fail_all_holdout else "completed",
+            "C": "failed" if args.fail_all_holdout else "completed",
+        }
+        assert any(r["task_id"] == "q2" and r["status"] == "completed" for r in all_pairs["rows"])
+        assert next(r for r in final_rows if r["arm"] == "A")["native"]["content_score"] is None
+    else:
+        assert selected["value"]["kernel_id"] != initial.content_id
+        assert all(r["native"]["success"] for r in final_rows)
+        assert {r["native"]["turns"] for r in final_rows if r["arm"] in {"A", "B"}} == {2}
+        assert {r["native"]["turns"] for r in final_rows if r["arm"] == "C"} == {1}
     assert all(r["trajectory_judge"] == "not_run" for r in final_rows)
     counts = json.loads((root / "shared/worker-calls.json").read_text())
     assert max(counts.values()) <= 8
@@ -274,6 +306,8 @@ def main():
     parser.add_argument("--data", required=True)
     parser.add_argument("--output", required=True)
     parser.add_argument("--trace", action="store_true")
+    parser.add_argument("--failure-injection", action="store_true")
+    parser.add_argument("--fail-all-holdout", action="store_true")
     parser.add_argument("--trace-env")
     asyncio.run(run(parser.parse_args()))
 

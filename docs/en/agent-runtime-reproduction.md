@@ -101,3 +101,32 @@ Keep private local `.superpowers/`, dataset materials, credentials and raw judge
 disk. Export only non-secret aggregate facts and hashes to tracked reports. For each defect,
 record reproduction command, original failure, cause, scoped repair and covering retest;
 original artifacts are immutable evidence.
+
+### Settled task failures and the shared request gate
+
+The native LIFT plugin retains a terminal task receipt after a known worker/judge
+failure or the unchanged eight-worker-call session limit. Independent q2 and q5
+A/B/C executions continue with the same three native rounds. A failed warmup skips
+proposal work, runs q2 as an independent diagnostic, explicitly rejects promotion,
+and materializes K0 for C. An unhealthy campaign also falls back to K0; this is not
+evidence of a successful evolution. Partial files, turn receipts, trace increments,
+original durations, and failures remain available; replay sends no model requests.
+
+Submitted unknown requests, uncertain writes, trace failures, and the shared
+100-HTTP-attempt limit still block all independent work. A denied reservation is
+not a submitted unknown request. `all-pair-report.json` distinguishes failed,
+blocked, cancelled, and unstarted cells. Failed final quality is null; a previous
+judge score is labelled intermediate. Pinned native reports cannot represent
+unjudged null scores. The plugin therefore retains failed pairs in its all-pairs
+report and completes C independently even when B fails; it never substitutes zero
+or claims native CSV/HTML acceptance for an omitted pair.
+
+The explicit `SharedTransport.recover_local_cap_pause` API audits only the legacy
+bare `{"status":"budget_exhausted"}` pause. It requires the exact historical worker
+session, expected current HTTP count below 100, complete reconciled request
+receipts, eight worker calls, a matching local-cap journal denial, and no unknown
+write/request or trace failure. It preserves the original pause bytes and counters
+and creates an immutable recovery acknowledgement. It does not recover newer
+explicit global gates. Only the coordinator may apply this audit to the historical
+live ledger. Source changes require a fresh run identity for all comparison arms;
+historical runs remain separate and the shared HTTP ledger continues unchanged.

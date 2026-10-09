@@ -30,6 +30,10 @@ class NativeReAct(ReActAgent):
         }
 
 
+class LocalTaskFailure(RuntimeError):
+    """Settled task-local terminal failure; independent tasks may continue."""
+
+
 class DarwinChatAgent(ChatAgent):
     def __init__(
         self,
@@ -109,12 +113,20 @@ class DarwinChatAgent(ChatAgent):
             if old["message_hash"] != key:
                 raise ValueError("Native replay message changed")
             self.cursor += 1
+            if old["episode"]["status"] != "completed":
+                self.shared.check()
+                raise LocalTaskFailure(old["episode"]["status"])
             return old["episode"]["final_response"]
+        terminal = self.root / "terminal-failure.json"
+        if terminal.exists():
+            self.shared.check()
+            raise LocalTaskFailure(json.loads(terminal.read_text())["status"])
         started = time.time()
         turn_path = self.root / "turns" / (str(len(state["turns"])) + ".json")
         receipt = {"message_hash": key, "status": "running", "started": started, "episode": None}
         if turn_path.exists():
             receipt = json.loads(turn_path.read_text())
+            started = receipt["started"]
         atomic_json(turn_path, receipt)
         try:
             self.shared.check()
@@ -141,13 +153,10 @@ class DarwinChatAgent(ChatAgent):
         )
         atomic_json(turn_path, receipt)
         atomic_json(self.root / "last-episode.json", result.to_dict())
-        if result.status in {"unknown", "budget_exhausted"}:
-            self.shared.pause(result.status)
-            raise BudgetExceeded(
-                "Native session paused: " + result.status, dispatched=result.status == "unknown"
-            )
-        if result.status != "completed":
-            raise RuntimeError("Native worker episode " + result.status)
+        if result.status == "unknown":
+            self.shared.pause("unknown")
+        # A shared global gate always wins over local task termination.
+        self.shared.check()
         state["history"] = history + [{"role": "assistant", "content": result.final_response}]
         state["turns"].append(
             {"message_hash": key, "episode": result.to_dict(), "elapsed_s": time.time() - started}
@@ -172,6 +181,10 @@ class DarwinChatAgent(ChatAgent):
                 {"error_type": type(exc).__name__, "completed_turn": self.cursor},
             )
             self.shared.pause("trace_incomplete")
+        self.shared.check()
+        if result.status != "completed":
+            atomic_json(terminal, {"status": result.status, "turn": self.cursor - 1})
+            raise LocalTaskFailure(result.status)
         return result.final_response
 
     def episodes(self):

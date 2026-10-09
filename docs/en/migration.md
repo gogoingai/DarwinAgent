@@ -55,3 +55,10 @@ Current LoCoMo runs require a commanded HF repository/revision or an explicit lo
 The resolved HF commit and raw-file hashes are recorded independently of cache location.
 The current evaluator interface uses `evaluation_lock.governance-20261009.json`; earlier locks
 remain unchanged. Original QA metrics are the default, and audited references are explicit inputs.
+
+The optional native LIFT plugin now isolates settled task failures. Existing core
+API and receipt formats remain readable. New `task-receipts/`,
+`fallback-selection.json`, and shared `recovery/` audit files are additive; no
+historical request counter is reset. See the scheduling policy in
+[reproduction](agent-runtime-reproduction.md). Live A/B/C acceptance remains pending
+until the coordinator completes the remaining-budget run.

@@ -46,3 +46,8 @@ DarwinAgent 0.1.0 是新的包身份；此前历史框架版本不能按版本�
 ## 2026-10-09 显式 HF 数据源
 
 当前 LoCoMo 运行要求命令指定 HF 仓库与版本，或显式选择本地输入。实际 HF 提交和原始文件校验值独立于缓存位置记录。当前评测接口使用 `evaluation_lock.governance-20261009.json`，此前锁文件保留；默认使用原始 QA，修订参考须显式传入。
+
+可选原生 LIFT 插件现在隔离已确定的单题失败。原有内核 API 和回执仍可读取；新增
+`task-receipts/`、`fallback-selection.json` 与共享 `recovery/` 审计文件，不重置
+历史请求计数。调度政策见[复现说明](agent-runtime-reproduction.md)。真实 A/B/C
+验收仍须由主协调任务使用剩余预算完成后确认。

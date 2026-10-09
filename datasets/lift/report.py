@@ -176,6 +176,11 @@ def cell_rows(root):
             row[role + "_time_s"] = sum(t["time_s"] for t in totals)
             row[role + "_turns"] = sum(t["turns"] for t in totals)
             row[role + "_unfinished_turns"] = sum(t["unfinished_turns"] for t in totals)
+        if row["status"] == "failed":
+            row["final_content_score"] = None
+            row["last_intermediate_content_score"] = (row.get("native") or {}).get("content_score")
+        else:
+            row["final_content_score"] = (row.get("native") or {}).get("content_score")
         row["correction_turns"] = max(0, row["worker_turns"] - 1)
         row["native_tool_calls"] = row["flattened_leaf_calls"] = row["worker_usage"]["leaf_calls"]
         rows.append(row)
@@ -197,6 +202,11 @@ def report(root, shared):
         value = roles.setdefault(
             r["role"], {"requests": 0, "tokens": 0, "unknown_token_requests": 0, "elapsed_s": 0.0}
         )
+        value.setdefault("actual_http_attempts", 0)
+        value["actual_http_attempts"] += r.get("actual_http_attempts", 0)
+        if r["status"] == "budget_exhausted" and r.get("actual_http_attempts") == 0:
+            value["denied_reservations"] = value.get("denied_reservations", 0) + 1
+            continue
         value["requests"] += 1
         usage = r["usage"] or {}
         if not all(type(usage.get(k)) is int for k in ("prompt_tokens", "completion_tokens")):
@@ -208,15 +218,22 @@ def report(root, shared):
         if value["unknown_token_requests"]:
             value["known_tokens_subtotal"] = value.pop("tokens")
             value["tokens"] = None
+    from darwinagent.llm.client import BudgetExceeded
+
+    try:
+        shared.check()
+        paused = False
+    except BudgetExceeded:
+        paused = True
     value = {
         "status": "paused"
-        if (shared.root / "pause.json").exists()
+        if paused
         else (
-            "complete"
+            ("finished_with_failures" if any(r["status"] == "failed" for r in rows) else "complete")
             if {
                 r.get("arm")
                 for r in rows
-                if r.get("task_id") == "q5" and r["status"] == "completed"
+                if r.get("task_id") == "q5" and r["status"] in {"completed", "failed"}
             }
             >= {"A", "B", "C"}
             else "incomplete"
