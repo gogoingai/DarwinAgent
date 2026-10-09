@@ -163,3 +163,22 @@ class ConfiguredGate:
 
     def check(self, stage, candidate):
         return self.allow
+
+
+class RawRecordedClient:
+    """Exact settled protocol replies, including malformed text; never dispatches HTTP."""
+
+    def __init__(self, responses):
+        self.responses = list(responses)
+        self.requests = []
+
+    async def chat(self, **kwargs):
+        self.requests.append(json.loads(json.dumps(kwargs)))
+        response = self.responses[len(self.requests) - 1]
+        if isinstance(response, Exception):
+            raise response
+        return SimpleNamespace(
+            content=response,
+            usage={"prompt_tokens": 10, "completion_tokens": 3},
+            model="offline-recorded",
+        )

@@ -73,6 +73,11 @@ dataclass 默认采用字段，也可以覆盖 identity。临时计数不应混�
 `content`、`usage`、`model`；生产 `LLMClient` 使用 `Config`，需显式注册各角色，
 例如 `cfg.role_tiers['worker'] = 'strong'`。模型、端点、密钥和 HTTP 限额由宿主确定。
 
+ReAct 显式请求 JSON 模式。已结算回复若不是合法 JSON，会在同一个有界循环中收到格式
+反馈；原响应回执保留，每次后续请求仍占原有请求与轮次预算，不执行残缺动作。
+此恢复只捕获响应解析处的 `JSONDecodeError`；未知提交继续隔离，不把不支持的动作、
+资产/schema 或 backend 故障变成格式重试。请求 JSON 模式不保证服务端输出始终合规。
+
 ## v4 内核如何改变执行
 
 | 资产 | 执行效果 | 固定边界 |

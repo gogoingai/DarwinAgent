@@ -75,6 +75,13 @@ Its async `chat(**kwargs)` returns `content`, `usage` and `model`; the productio
 uses `Config`. Register each profile role (e.g. `cfg.role_tiers['worker'] = 'strong'`).
 The host chooses endpoint, model, credentials and HTTP limits. No model is selected by assets.
 
+ReAct explicitly requests JSON mode. A settled reply that is not valid JSON receives
+protocol feedback within the same bounded loop; the original response receipt remains and
+each correction consumes the existing request/turn budget. No partial action is executed.
+Only `JSONDecodeError` at response parsing is recovered this way; unknown submissions remain
+quarantined, and unsupported action/schema/backend failures are not treated as format retries.
+JSON mode is a request to the provider, not a guarantee of valid output.
+
 ## What a v4 kernel changes
 
 | Asset | Execution effect | Fixed boundary |

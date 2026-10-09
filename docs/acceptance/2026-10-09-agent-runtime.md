@@ -1,24 +1,25 @@
 # 通用 Agent 运行时验收 / Generic Agent runtime acceptance
 
-**0.3.0 本地准备，真实模型诊断待执行 / Prepared locally; live diagnosis pending.**
+**0.3.0 本地准备；首次真实诊断失败，修复后效果比较待执行 / Prepared locally; first live diagnostic failed, post-repair comparison pending.**
 
-本报告记录 2026-10-09 隔离分支上的离线验收，未发布、推送、合并或创建标签。
+本报告记录 2026-10-09 隔离分支上的离线验收和一次失败的真实开发诊断，未发布、推送、合并或创建标签。
 [机器可读证据](2026-10-09-agent-runtime.json)包含逐文件源码哈希、日志哈希和全部十个 native
 单元的无秘密汇总；原始回执、失败、材料与私有配置仍保留在忽略的本地证据目录。
 
-This is offline acceptance of prepared 0.3.0. The linked JSON records source/log hashes and
+This records offline acceptance of prepared 0.3.0 and the first failed live development diagnostic. The linked JSON records source/log hashes and
 all ten native cells without task materials, prompts or credentials. Private local evidence
 and original failures remain on disk. No publication, push, merge or tag was performed.
 
 | 检查 / Check | 实际结果 / Observed result |
 | --- | --- |
-| 核心回归 / Framework, Python 3.14.4 | 650 discovered, 642 passed, 8 explicit resource skips; 56.309 s |
+| 此前完整回归 / Pre-repair framework at aadb5b4, Python 3.14.4 | 650 discovered, 642 passed, 8 explicit resource skips; 56.309 s |
 | LoCoMo | 18/18 passed |
 | TravelPlanner | 11/11 passed |
-| 新运行时、实验与原生边界 / Native-focused Python 3.12.13 | 74/74 passed; 11.093 s |
-| 最低版本聚焦回归 / Minimum Python 3.11.15 | 60/60 runtime/episode/ReAct recovery tests passed; 9.471 s (rebuilt wheel) |
+| 当前运行时与协议回归 / Current Python 3.14 covering tests | 68/68 passed; 9.644 s |
+| 当前原生边界 / Current Python 3.12 covering tests | 21/21 passed; 0.418 s |
+| 最低版本聚焦回归 / Minimum Python 3.11.15 | 64/64 runtime/episode/ReAct recovery tests passed (rebuilt wheel) |
 | 干净安装 / Clean Python 3.11.15 wheel outside checkout | Passed: site-packages, own-loop + ReAct, 4 artifacts, replay, old doctor/demo/resume and unchanged Wiki |
-| Ruff / format | Passed; 314 Python files already formatted |
+| Ruff / format | Current 3 touched Python files passed; earlier whole-tree 314-file check retained |
 | 第三领域旧样例 / Legacy third-domain example | Passed |
 | Docker + pinned native LIFT | Passed; 81 recorded responses, 0 model HTTP |
 | Native trace readback + postprocessing | Passed; 20 sessions; HTML and two CSVs generated |
@@ -104,7 +105,52 @@ Fresh-delta load receipts, hook idempotency, source identity and trace evidence 
 New failure fixtures also cover material/symlink rejection before container startup,
 cumulative costs across interrupted turns, judge failure and unstarted arms.
 
-## 真实诊断报告待填项 / Pending live report
+## 首次真实诊断与协议恢复 / First live diagnostic and protocol recovery
+
+已授权 Coding 端点的 `glm-5.3-flash` 可用性检查成功，使用 1 次 HTTP。随后原生
+`live-v030-001` 的 q1 warmup 在 4 次已完成 worker HTTP、3 次已结算工具调用后失败：
+第 4 条回复为“计算已验证。正在写入结果文件。”，不是动作 JSON，原 ReAct 直接抛出
+`JSONDecodeError`。原始请求已包含 `json_mode=True`，问题不是未请求 JSON 模式，
+也不是模型权限或接口不可用。worker 实测 prompt/completion tokens 为 21459/1997。
+
+共享总账共用 5/100 次，5 次均完成，无未知请求或暂停。q2 未运行，q5 A/B/C 均未启动，
+q6 未打开，原生后处理因无配对结果失败。CLI 的退出码 0 不代表实验完成。
+保留原始回执、材料、失败与全部未启动项，不把失败的 q1 当作内容质量比较。
+
+The authorized GLM Coding availability check succeeded with one HTTP attempt. Native run
+`live-v030-001` then failed in q1 warmup after four completed worker responses and three
+settled tool calls: response four was a natural-language status sentence, so ReAct raised
+`JSONDecodeError`. All four original requests already asked for JSON mode; this was a
+settled protocol violation without bounded feedback, not a missing mode or access failure.
+Worker measured prompt/completion tokens were 21459/1997. The shared ledger used **5/100**,
+all five completed, zero unknowns/pause. q2 was unrun, q5 A/B/C unstarted, q6 sealed. Native
+postprocessing failed without pairs; CLI exit zero is not evidence of completion.
+
+修复仅在 ReAct 响应解析处捕获 `JSONDecodeError`，保留原响应并返回格式反馈，
+后续请求计入相同 8 次上限；显式 JSON 参数只是明确已有契约。已完成写入不重复执行，
+未知请求不自动重发，不扩大工具权限、模型范围或预算。独立 Agent 自有循环不变。
+录制反例在旧源码表现为 failed/4 模型/3 leaf，在修复后为 completed/6 模型/4 leaf，
+均为 0 实际模型 HTTP，仅证明恢复机制。修复后的新原生录制验收通过，81 录制响应、
+0 模型 HTTP；没有把这些合成分数和 token 混入真实调用统计。
+
+The narrow repair feeds back only parsing `JSONDecodeError` after a settled reply and keeps
+all follow-up requests inside the unchanged eight-request cap. It preserves response receipts,
+never executes a partial action, leaves unknown submissions quarantined, and leaves independent
+Agent loops unchanged. A recorded counterexample changes failed/4 model/3 leaf to completed/6
+model/4 leaf with zero model HTTP; this proves recovery only. Fresh native recorded acceptance
+also passes with 81 recorded responses and zero model HTTP. Synthetic metrics stay separate
+from the five actual requests.
+
+当前覆盖检查：Python 3.14 运行时/实验/ReAct/未知用量 68 项通过；Python 3.12 原生
+材料/工具/传输/ReAct 21 项通过。先前完整 650 项与数据集检查是修复前证据，继续保留，
+没有为此次局部修复重复无关套件。当前安装包最低版本检查和分发哈希见机器可读记录。
+
+Current covering checks: 68 Python 3.14 runtime/experiment/ReAct/accounting tests and
+21 Python 3.12 native data/tool/transport/ReAct tests pass. The earlier full 650-test and
+dataset runs are retained pre-repair evidence; unrelated suites were not repeated. Current
+minimum-version installed checks and distribution hashes are in the machine-readable records.
+
+## 修复后真实比较待执行 / Post-repair live comparison pending
 
 协调者须在同一全局 100 次 HTTP 总账下记录每个计划单元：阶段、题号、A/B/C、状态、内容
 分数、纠错轮数、展开 leaf、原生工具数、worker/judge tokens、耗时、失败、未知、未启动项，

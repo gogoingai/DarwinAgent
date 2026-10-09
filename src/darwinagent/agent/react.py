@@ -35,9 +35,31 @@ class ReActAgent:
             },
         ]
         for _ in range(self.max_turns):
-            response = await context.model(messages, role=self.role)
-            action = json.loads(response.content)
+            response = await context.model(messages, role=self.role, json_mode=True)
             messages.append({"role": "assistant", "content": response.content})
+            try:
+                action = json.loads(response.content)
+            except json.JSONDecodeError:
+                messages.append(
+                    {
+                        "role": "user",
+                        "content": json.dumps(
+                            {
+                                "observation": {
+                                    "error": {
+                                        "error_type": "JSONDecodeError",
+                                        "message": (
+                                            "Reply was not valid JSON; no action was executed. "
+                                            'Return {"tool": "registered name", "params": {...}} '
+                                            'or {"final_response": "text", "artifacts": []}.'
+                                        ),
+                                    }
+                                }
+                            }
+                        ),
+                    }
+                )
+                continue
             try:
                 if set(action) <= {"final_response", "artifacts"} and isinstance(
                     action.get("final_response"), str

@@ -1,13 +1,18 @@
 {
   "version": "0.3.0",
-  "status": "prepared_local_pending_live",
+  "status": "prepared_local_first_live_failed_comparison_pending",
   "date": "2026-10-09",
-  "fix_scope": "final-review host check identity and incomplete native token accounting",
+  "fix_scope": "Settled malformed ReAct action JSON receives bounded protocol feedback; explicit JSON mode was already requested before failure.",
   "diagnostic_notices": "Passing assertions retain asyncio slow-task and expected legacy diagnostics; logs and thresholds preserved.",
   "distribution_record": "2026-10-09-agent-runtime-distributions.json",
-  "prior_acceptance": "offline-native-task4-v030 retained unchanged in local evidence",
+  "prior_acceptance": {
+    "source_commit": "aadb5b4617b910c697e66a888c638f1b9120c0e2",
+    "directory": "offline-native-final-fix",
+    "integration_identity_sha256": "225ba2130a3055910bece7d6a0ffcc6a757eae272043e621b0985c80f905e37b",
+    "note": "All prior artifacts/distributions retained; full framework/dataset runs are pre-repair coverage."
+  },
   "public_release_verified": "0.2.0",
-  "implementation_base": "15eb3afa56ae16920539cd2502f0807b0da063af",
+  "implementation_base": "aadb5b4617b910c697e66a888c638f1b9120c0e2",
   "environment": {
     "core": "CPython 3.14.4",
     "installed_minimum": "CPython 3.11.15",
@@ -18,7 +23,9 @@
       "ran": 650,
       "passed": 642,
       "skipped": 8,
-      "failed": 0
+      "failed": 0,
+      "source_commit": "aadb5b4",
+      "scope": "pre-repair full suite retained; unrelated suite not rerun"
     },
     "locomo": {
       "ran": 18,
@@ -29,16 +36,23 @@
       "passed": 11
     },
     "native_focused": {
-      "ran": 74,
-      "passed": 74
+      "ran": 21,
+      "passed": 21,
+      "seconds": 0.418
     },
     "minimum_focused": {
-      "ran": 60,
-      "passed": 60
+      "ran": 64,
+      "passed": 64
     },
     "installed_python311": "passed",
     "ruff": "passed",
-    "format_files": 314
+    "format_files": 3,
+    "covering_core": {
+      "ran": 68,
+      "passed": 68,
+      "seconds": 9.644
+    },
+    "format_scope": "three touched Python files; prior 314-file check preserved"
   },
   "native": {
     "mechanism_only": true,
@@ -53,155 +67,29 @@
         "requests": 32,
         "tokens": 960,
         "unknown_token_requests": 0,
-        "elapsed_s": 0.010985612869262695
+        "elapsed_s": 0.007382631301879883
       },
       "worker": {
         "requests": 48,
         "tokens": 1440,
         "unknown_token_requests": 0,
-        "elapsed_s": 0.01121830940246582
+        "elapsed_s": 0.010338068008422852
       },
       "proposal": {
         "requests": 1,
         "tokens": 30,
         "unknown_token_requests": 0,
-        "elapsed_s": 0.00018095970153808594
+        "elapsed_s": 0.00019502639770507812
       }
     },
     "all_cells": [
       {
-        "cell_id": "0a530c604b14e8fffac5e2e6",
-        "task_id": "q5",
-        "arm": "A",
-        "phase": "holdout",
-        "status": "completed",
-        "task_time_s": 1.565124750137329,
-        "worker_usage": {
-          "model_calls": 6,
-          "leaf_calls": 4,
-          "unknown_calls": 0,
-          "pending_calls": 0
-        },
-        "worker_tokens": 180,
-        "worker_known_tokens_subtotal": 180,
-        "worker_unknown_token_requests": 0,
-        "worker_accounting_status": "complete",
-        "worker_time_s": 0.3579750061035156,
-        "worker_turns": 2,
-        "worker_unfinished_turns": 0,
-        "judge_usage": {
-          "model_calls": 4,
-          "leaf_calls": 2,
-          "unknown_calls": 0,
-          "pending_calls": 0
-        },
-        "judge_tokens": 120,
-        "judge_known_tokens_subtotal": 120,
-        "judge_unknown_token_requests": 0,
-        "judge_accounting_status": "complete",
-        "judge_time_s": 0.22911500930786133,
-        "judge_turns": 2,
-        "judge_unfinished_turns": 0,
-        "correction_turns": 1,
-        "native_tool_calls": 4,
-        "flattened_leaf_calls": 4,
-        "synthetic_native": {
-          "success": true,
-          "content_score": 1.0,
-          "turns": 2
-        }
-      },
-      {
-        "cell_id": "1732d48eabb4bcf0333f6cf2",
-        "task_id": "q2",
-        "arm": "campaign",
-        "phase": "validation",
-        "status": "completed",
-        "task_time_s": 1.917518138885498,
-        "worker_usage": {
-          "model_calls": 6,
-          "leaf_calls": 4,
-          "unknown_calls": 0,
-          "pending_calls": 0
-        },
-        "worker_tokens": 180,
-        "worker_known_tokens_subtotal": 180,
-        "worker_unknown_token_requests": 0,
-        "worker_accounting_status": "complete",
-        "worker_time_s": 0.5301661491394043,
-        "worker_turns": 2,
-        "worker_unfinished_turns": 0,
-        "judge_usage": {
-          "model_calls": 4,
-          "leaf_calls": 2,
-          "unknown_calls": 0,
-          "pending_calls": 0
-        },
-        "judge_tokens": 120,
-        "judge_known_tokens_subtotal": 120,
-        "judge_unknown_token_requests": 0,
-        "judge_accounting_status": "complete",
-        "judge_time_s": 0.19453668594360352,
-        "judge_turns": 2,
-        "judge_unfinished_turns": 0,
-        "correction_turns": 1,
-        "native_tool_calls": 4,
-        "flattened_leaf_calls": 4,
-        "synthetic_native": {
-          "success": true,
-          "content_score": 1.0,
-          "turns": 2
-        }
-      },
-      {
-        "cell_id": "1b0e39609e2d2e130da35514",
-        "task_id": "q1",
-        "arm": "warmup",
-        "phase": "warmup",
-        "status": "completed",
-        "task_time_s": 13.877654075622559,
-        "worker_usage": {
-          "model_calls": 6,
-          "leaf_calls": 4,
-          "unknown_calls": 0,
-          "pending_calls": 0
-        },
-        "worker_tokens": 180,
-        "worker_known_tokens_subtotal": 180,
-        "worker_unknown_token_requests": 0,
-        "worker_accounting_status": "complete",
-        "worker_time_s": 0.37421703338623047,
-        "worker_turns": 2,
-        "worker_unfinished_turns": 0,
-        "judge_usage": {
-          "model_calls": 4,
-          "leaf_calls": 2,
-          "unknown_calls": 0,
-          "pending_calls": 0
-        },
-        "judge_tokens": 120,
-        "judge_known_tokens_subtotal": 120,
-        "judge_unknown_token_requests": 0,
-        "judge_accounting_status": "complete",
-        "judge_time_s": 0.26122021675109863,
-        "judge_turns": 2,
-        "judge_unfinished_turns": 0,
-        "correction_turns": 1,
-        "native_tool_calls": 4,
-        "flattened_leaf_calls": 4,
-        "synthetic_native": {
-          "success": true,
-          "content_score": 1.0,
-          "turns": 2
-        }
-      },
-      {
-        "cell_id": "24039a20c8ff1b36d057b2df",
+        "cell_id": "03cd064895c750f6a2c41c36",
         "task_id": "q5",
         "arm": "C",
         "phase": "holdout",
         "status": "completed",
-        "task_time_s": 1.140880823135376,
+        "task_time_s": 1.1691839694976807,
         "worker_usage": {
           "model_calls": 3,
           "leaf_calls": 3,
@@ -212,7 +100,7 @@
         "worker_known_tokens_subtotal": 90,
         "worker_unknown_token_requests": 0,
         "worker_accounting_status": "complete",
-        "worker_time_s": 0.20277190208435059,
+        "worker_time_s": 0.24573493003845215,
         "worker_turns": 1,
         "worker_unfinished_turns": 0,
         "judge_usage": {
@@ -225,7 +113,7 @@
         "judge_known_tokens_subtotal": 60,
         "judge_unknown_token_requests": 0,
         "judge_accounting_status": "complete",
-        "judge_time_s": 0.14756035804748535,
+        "judge_time_s": 0.1782369613647461,
         "judge_turns": 1,
         "judge_unfinished_turns": 0,
         "correction_turns": 0,
@@ -238,54 +126,12 @@
         }
       },
       {
-        "cell_id": "3ab84335b7a64d015db7cae5",
+        "cell_id": "2e277b18572e2b53f9d978a7",
         "task_id": "q1",
         "arm": "campaign",
-        "phase": "train",
+        "phase": "admission",
         "status": "completed",
-        "task_time_s": 1.5324630737304688,
-        "worker_usage": {
-          "model_calls": 6,
-          "leaf_calls": 4,
-          "unknown_calls": 0,
-          "pending_calls": 0
-        },
-        "worker_tokens": 180,
-        "worker_known_tokens_subtotal": 180,
-        "worker_unknown_token_requests": 0,
-        "worker_accounting_status": "complete",
-        "worker_time_s": 0.4138040542602539,
-        "worker_turns": 2,
-        "worker_unfinished_turns": 0,
-        "judge_usage": {
-          "model_calls": 4,
-          "leaf_calls": 2,
-          "unknown_calls": 0,
-          "pending_calls": 0
-        },
-        "judge_tokens": 120,
-        "judge_known_tokens_subtotal": 120,
-        "judge_unknown_token_requests": 0,
-        "judge_accounting_status": "complete",
-        "judge_time_s": 0.19309210777282715,
-        "judge_turns": 2,
-        "judge_unfinished_turns": 0,
-        "correction_turns": 1,
-        "native_tool_calls": 4,
-        "flattened_leaf_calls": 4,
-        "synthetic_native": {
-          "success": true,
-          "content_score": 1.0,
-          "turns": 2
-        }
-      },
-      {
-        "cell_id": "74be86af4bc23b673a3ee91c",
-        "task_id": "q2",
-        "arm": "campaign",
-        "phase": "validation",
-        "status": "completed",
-        "task_time_s": 1.561093807220459,
+        "task_time_s": 1.4268908500671387,
         "worker_usage": {
           "model_calls": 3,
           "leaf_calls": 3,
@@ -296,7 +142,7 @@
         "worker_known_tokens_subtotal": 90,
         "worker_unknown_token_requests": 0,
         "worker_accounting_status": "complete",
-        "worker_time_s": 0.3003270626068115,
+        "worker_time_s": 0.3152749538421631,
         "worker_turns": 1,
         "worker_unfinished_turns": 0,
         "judge_usage": {
@@ -309,7 +155,7 @@
         "judge_known_tokens_subtotal": 60,
         "judge_unknown_token_requests": 0,
         "judge_accounting_status": "complete",
-        "judge_time_s": 0.19946599006652832,
+        "judge_time_s": 0.1376509666442871,
         "judge_turns": 1,
         "judge_unfinished_turns": 0,
         "correction_turns": 0,
@@ -322,12 +168,12 @@
         }
       },
       {
-        "cell_id": "7fcd8876231605d1ba5cb4c5",
+        "cell_id": "6109540acba864a61900b858",
         "task_id": "q5",
         "arm": "B",
         "phase": "holdout",
         "status": "completed",
-        "task_time_s": 1.6326651573181152,
+        "task_time_s": 1.6384670734405518,
         "worker_usage": {
           "model_calls": 6,
           "leaf_calls": 4,
@@ -338,7 +184,7 @@
         "worker_known_tokens_subtotal": 180,
         "worker_unknown_token_requests": 0,
         "worker_accounting_status": "complete",
-        "worker_time_s": 0.3399360179901123,
+        "worker_time_s": 0.3588111400604248,
         "worker_turns": 2,
         "worker_unfinished_turns": 0,
         "judge_usage": {
@@ -351,7 +197,7 @@
         "judge_known_tokens_subtotal": 120,
         "judge_unknown_token_requests": 0,
         "judge_accounting_status": "complete",
-        "judge_time_s": 0.26435327529907227,
+        "judge_time_s": 0.21605610847473145,
         "judge_turns": 2,
         "judge_unfinished_turns": 0,
         "correction_turns": 1,
@@ -364,96 +210,12 @@
         }
       },
       {
-        "cell_id": "a4576e968ac7f6653d8ed5e4",
-        "task_id": "q1",
-        "arm": "campaign",
-        "phase": "train",
+        "cell_id": "82d14eb1485d91a3e07a793b",
+        "task_id": "q5",
+        "arm": "A",
+        "phase": "holdout",
         "status": "completed",
-        "task_time_s": 1.7371692657470703,
-        "worker_usage": {
-          "model_calls": 3,
-          "leaf_calls": 3,
-          "unknown_calls": 0,
-          "pending_calls": 0
-        },
-        "worker_tokens": 90,
-        "worker_known_tokens_subtotal": 90,
-        "worker_unknown_token_requests": 0,
-        "worker_accounting_status": "complete",
-        "worker_time_s": 0.3655359745025635,
-        "worker_turns": 1,
-        "worker_unfinished_turns": 0,
-        "judge_usage": {
-          "model_calls": 2,
-          "leaf_calls": 1,
-          "unknown_calls": 0,
-          "pending_calls": 0
-        },
-        "judge_tokens": 60,
-        "judge_known_tokens_subtotal": 60,
-        "judge_unknown_token_requests": 0,
-        "judge_accounting_status": "complete",
-        "judge_time_s": 0.16920804977416992,
-        "judge_turns": 1,
-        "judge_unfinished_turns": 0,
-        "correction_turns": 0,
-        "native_tool_calls": 3,
-        "flattened_leaf_calls": 3,
-        "synthetic_native": {
-          "success": true,
-          "content_score": 1.0,
-          "turns": 1
-        }
-      },
-      {
-        "cell_id": "a7ba6d0a601b7cefeccfcb31",
-        "task_id": "q1",
-        "arm": "campaign",
-        "phase": "admission",
-        "status": "completed",
-        "task_time_s": 1.4206960201263428,
-        "worker_usage": {
-          "model_calls": 3,
-          "leaf_calls": 3,
-          "unknown_calls": 0,
-          "pending_calls": 0
-        },
-        "worker_tokens": 90,
-        "worker_known_tokens_subtotal": 90,
-        "worker_unknown_token_requests": 0,
-        "worker_accounting_status": "complete",
-        "worker_time_s": 0.271791934967041,
-        "worker_turns": 1,
-        "worker_unfinished_turns": 0,
-        "judge_usage": {
-          "model_calls": 2,
-          "leaf_calls": 1,
-          "unknown_calls": 0,
-          "pending_calls": 0
-        },
-        "judge_tokens": 60,
-        "judge_known_tokens_subtotal": 60,
-        "judge_unknown_token_requests": 0,
-        "judge_accounting_status": "complete",
-        "judge_time_s": 0.19640898704528809,
-        "judge_turns": 1,
-        "judge_unfinished_turns": 0,
-        "correction_turns": 0,
-        "native_tool_calls": 3,
-        "flattened_leaf_calls": 3,
-        "synthetic_native": {
-          "success": true,
-          "content_score": 1.0,
-          "turns": 1
-        }
-      },
-      {
-        "cell_id": "b24c165bee84001e324fcf8e",
-        "task_id": "q1",
-        "arm": "campaign",
-        "phase": "admission",
-        "status": "completed",
-        "task_time_s": 1.6300427913665771,
+        "task_time_s": 1.597398042678833,
         "worker_usage": {
           "model_calls": 6,
           "leaf_calls": 4,
@@ -464,7 +226,7 @@
         "worker_known_tokens_subtotal": 180,
         "worker_unknown_token_requests": 0,
         "worker_accounting_status": "complete",
-        "worker_time_s": 0.35039687156677246,
+        "worker_time_s": 0.3304460048675537,
         "worker_turns": 2,
         "worker_unfinished_turns": 0,
         "judge_usage": {
@@ -477,7 +239,259 @@
         "judge_known_tokens_subtotal": 120,
         "judge_unknown_token_requests": 0,
         "judge_accounting_status": "complete",
-        "judge_time_s": 0.2050788402557373,
+        "judge_time_s": 0.259613037109375,
+        "judge_turns": 2,
+        "judge_unfinished_turns": 0,
+        "correction_turns": 1,
+        "native_tool_calls": 4,
+        "flattened_leaf_calls": 4,
+        "synthetic_native": {
+          "success": true,
+          "content_score": 1.0,
+          "turns": 2
+        }
+      },
+      {
+        "cell_id": "a9300f25835d865e918e73c6",
+        "task_id": "q2",
+        "arm": "campaign",
+        "phase": "validation",
+        "status": "completed",
+        "task_time_s": 1.3950951099395752,
+        "worker_usage": {
+          "model_calls": 3,
+          "leaf_calls": 3,
+          "unknown_calls": 0,
+          "pending_calls": 0
+        },
+        "worker_tokens": 90,
+        "worker_known_tokens_subtotal": 90,
+        "worker_unknown_token_requests": 0,
+        "worker_accounting_status": "complete",
+        "worker_time_s": 0.2519538402557373,
+        "worker_turns": 1,
+        "worker_unfinished_turns": 0,
+        "judge_usage": {
+          "model_calls": 2,
+          "leaf_calls": 1,
+          "unknown_calls": 0,
+          "pending_calls": 0
+        },
+        "judge_tokens": 60,
+        "judge_known_tokens_subtotal": 60,
+        "judge_unknown_token_requests": 0,
+        "judge_accounting_status": "complete",
+        "judge_time_s": 0.2077345848083496,
+        "judge_turns": 1,
+        "judge_unfinished_turns": 0,
+        "correction_turns": 0,
+        "native_tool_calls": 3,
+        "flattened_leaf_calls": 3,
+        "synthetic_native": {
+          "success": true,
+          "content_score": 1.0,
+          "turns": 1
+        }
+      },
+      {
+        "cell_id": "b75ed6f172f9dd53fb41e5b4",
+        "task_id": "q1",
+        "arm": "campaign",
+        "phase": "train",
+        "status": "completed",
+        "task_time_s": 2.040259838104248,
+        "worker_usage": {
+          "model_calls": 6,
+          "leaf_calls": 4,
+          "unknown_calls": 0,
+          "pending_calls": 0
+        },
+        "worker_tokens": 180,
+        "worker_known_tokens_subtotal": 180,
+        "worker_unknown_token_requests": 0,
+        "worker_accounting_status": "complete",
+        "worker_time_s": 0.4281315803527832,
+        "worker_turns": 2,
+        "worker_unfinished_turns": 0,
+        "judge_usage": {
+          "model_calls": 4,
+          "leaf_calls": 2,
+          "unknown_calls": 0,
+          "pending_calls": 0
+        },
+        "judge_tokens": 120,
+        "judge_known_tokens_subtotal": 120,
+        "judge_unknown_token_requests": 0,
+        "judge_accounting_status": "complete",
+        "judge_time_s": 0.34508490562438965,
+        "judge_turns": 2,
+        "judge_unfinished_turns": 0,
+        "correction_turns": 1,
+        "native_tool_calls": 4,
+        "flattened_leaf_calls": 4,
+        "synthetic_native": {
+          "success": true,
+          "content_score": 1.0,
+          "turns": 2
+        }
+      },
+      {
+        "cell_id": "c3596c62b1d9a8c1c24d0b5f",
+        "task_id": "q1",
+        "arm": "warmup",
+        "phase": "warmup",
+        "status": "completed",
+        "task_time_s": 15.646523237228394,
+        "worker_usage": {
+          "model_calls": 6,
+          "leaf_calls": 4,
+          "unknown_calls": 0,
+          "pending_calls": 0
+        },
+        "worker_tokens": 180,
+        "worker_known_tokens_subtotal": 180,
+        "worker_unknown_token_requests": 0,
+        "worker_accounting_status": "complete",
+        "worker_time_s": 0.5870730876922607,
+        "worker_turns": 2,
+        "worker_unfinished_turns": 0,
+        "judge_usage": {
+          "model_calls": 4,
+          "leaf_calls": 2,
+          "unknown_calls": 0,
+          "pending_calls": 0
+        },
+        "judge_tokens": 120,
+        "judge_known_tokens_subtotal": 120,
+        "judge_unknown_token_requests": 0,
+        "judge_accounting_status": "complete",
+        "judge_time_s": 0.303375244140625,
+        "judge_turns": 2,
+        "judge_unfinished_turns": 0,
+        "correction_turns": 1,
+        "native_tool_calls": 4,
+        "flattened_leaf_calls": 4,
+        "synthetic_native": {
+          "success": true,
+          "content_score": 1.0,
+          "turns": 2
+        }
+      },
+      {
+        "cell_id": "dd205bf96728f626b940dee6",
+        "task_id": "q1",
+        "arm": "campaign",
+        "phase": "train",
+        "status": "completed",
+        "task_time_s": 1.5473389625549316,
+        "worker_usage": {
+          "model_calls": 3,
+          "leaf_calls": 3,
+          "unknown_calls": 0,
+          "pending_calls": 0
+        },
+        "worker_tokens": 90,
+        "worker_known_tokens_subtotal": 90,
+        "worker_unknown_token_requests": 0,
+        "worker_accounting_status": "complete",
+        "worker_time_s": 0.2725229263305664,
+        "worker_turns": 1,
+        "worker_unfinished_turns": 0,
+        "judge_usage": {
+          "model_calls": 2,
+          "leaf_calls": 1,
+          "unknown_calls": 0,
+          "pending_calls": 0
+        },
+        "judge_tokens": 60,
+        "judge_known_tokens_subtotal": 60,
+        "judge_unknown_token_requests": 0,
+        "judge_accounting_status": "complete",
+        "judge_time_s": 0.14413094520568848,
+        "judge_turns": 1,
+        "judge_unfinished_turns": 0,
+        "correction_turns": 0,
+        "native_tool_calls": 3,
+        "flattened_leaf_calls": 3,
+        "synthetic_native": {
+          "success": true,
+          "content_score": 1.0,
+          "turns": 1
+        }
+      },
+      {
+        "cell_id": "e6a7be30418d85ab401f0dbd",
+        "task_id": "q1",
+        "arm": "campaign",
+        "phase": "admission",
+        "status": "completed",
+        "task_time_s": 2.7101471424102783,
+        "worker_usage": {
+          "model_calls": 6,
+          "leaf_calls": 4,
+          "unknown_calls": 0,
+          "pending_calls": 0
+        },
+        "worker_tokens": 180,
+        "worker_known_tokens_subtotal": 180,
+        "worker_unknown_token_requests": 0,
+        "worker_accounting_status": "complete",
+        "worker_time_s": 0.4736659526824951,
+        "worker_turns": 2,
+        "worker_unfinished_turns": 0,
+        "judge_usage": {
+          "model_calls": 4,
+          "leaf_calls": 2,
+          "unknown_calls": 0,
+          "pending_calls": 0
+        },
+        "judge_tokens": 120,
+        "judge_known_tokens_subtotal": 120,
+        "judge_unknown_token_requests": 0,
+        "judge_accounting_status": "complete",
+        "judge_time_s": 0.24024343490600586,
+        "judge_turns": 2,
+        "judge_unfinished_turns": 0,
+        "correction_turns": 1,
+        "native_tool_calls": 4,
+        "flattened_leaf_calls": 4,
+        "synthetic_native": {
+          "success": true,
+          "content_score": 1.0,
+          "turns": 2
+        }
+      },
+      {
+        "cell_id": "fda51f3f6683e2821a93b42d",
+        "task_id": "q2",
+        "arm": "campaign",
+        "phase": "validation",
+        "status": "completed",
+        "task_time_s": 1.8671948909759521,
+        "worker_usage": {
+          "model_calls": 6,
+          "leaf_calls": 4,
+          "unknown_calls": 0,
+          "pending_calls": 0
+        },
+        "worker_tokens": 180,
+        "worker_known_tokens_subtotal": 180,
+        "worker_unknown_token_requests": 0,
+        "worker_accounting_status": "complete",
+        "worker_time_s": 0.37477588653564453,
+        "worker_turns": 2,
+        "worker_unfinished_turns": 0,
+        "judge_usage": {
+          "model_calls": 4,
+          "leaf_calls": 2,
+          "unknown_calls": 0,
+          "pending_calls": 0
+        },
+        "judge_tokens": 120,
+        "judge_known_tokens_subtotal": 120,
+        "judge_unknown_token_requests": 0,
+        "judge_accounting_status": "complete",
+        "judge_time_s": 0.2812979221343994,
         "judge_turns": 2,
         "judge_unfinished_turns": 0,
         "correction_turns": 1,
@@ -520,7 +534,7 @@
       "src/darwinagent/agent/graph.py": "76c81966b1611f7190ebbdf93103aa7c19ac7e5655f65229665d0031b44a39a2",
       "src/darwinagent/agent/interpreter.py": "4b9d7e7738096baf904d534b49f5abcf240344b23eb9a9fa308c19e087a4aec0",
       "src/darwinagent/agent/kernel.py": "6284b085376170c2c5140a817a15219f223f3504e7e96e925609085b8514e1eb",
-      "src/darwinagent/agent/react.py": "22547a16ce4c081c2d9ccabb31547d08ae348bb6ae8cc84deeefbbb2d206cc9b",
+      "src/darwinagent/agent/react.py": "d3e956521491613a73bb16c3a1a0168ae268e085af68608a138dbd3b4c866c68",
       "src/darwinagent/agent/tools.py": "205facb2fb694bbc00721e40d0f82f1023f8a558c9f68276159295ea49def298",
       "src/darwinagent/agents/__init__.py": "840875ac9de2301a42f5f3286bd0efc64b23614f74124fe638c8f4a9c502cf49",
       "src/darwinagent/agents/answer.py": "aa86924814bb9bf5673d526090bbef5ebcd6407ae78ca113307a6d59737f45ff",
@@ -625,28 +639,28 @@
     "upstream": "9d282e415c5e3b0f65b82c8758a013b269583d93",
     "evidence_sha256": {
       "acceptance.json": "9f8fd6468025d27d73bfd8155b629efe3d13c08351f3a813860ee579e404102b",
-      "integration-identity.json": "225ba2130a3055910bece7d6a0ffcc6a757eae272043e621b0985c80f905e37b",
-      "all-pair-report.json": "8c2dc5103781462c2a5df514c7df501ccdbaabe4138668530364c2efcc49a442",
-      "trace-acceptance.json": "4c87215f5537ff64cfb48ea80841a0b8d641cfd08e690af4c9869eebd6c6d1c6",
-      "hook-idempotency.json": "5f98bdc7cae4139db1b772a2e6a03248cdaea81c7845ede25c5a3c3316809187",
-      "selected-state.json": "850cd94d1114e050dd265ff9c2ff2e6f471e0681e204b2f948baa040be086bb4",
-      "delta-image.json": "66f6445885b45fa225ff330f5f43082ee51b060e79eea715b8f2e6e3dc7f0032",
-      "loads/53c440684ae21b5f465f3fe3-candidate/load-receipt.json": "a10f053b0c7cd0a7e7134b4e992829ae119c75d50bfd03ba27bf741ee411aca1",
-      "loads/ca180bc9835ec39f56081527/load-receipt.json": "dc85f40816ac546a2f309a446ec4f9f66217cfe3e419a4dabd7aee61d26eba8f",
-      "loads/2e6439a3fad6f3941ea4d0de-candidate/load-receipt.json": "d1e59014b4512bdff229f7d7aa04559b00b13a6fa423b5ef9c7bd49045444cf1",
-      "loads/53c440684ae21b5f465f3fe3/load-receipt.json": "a10f053b0c7cd0a7e7134b4e992829ae119c75d50bfd03ba27bf741ee411aca1",
-      "loads/294439e49c36d210f0ff64e0/load-receipt.json": "37c211bf43c9d94dc88a7b1a1e8667464f4725cc27aea7f715f4335a1b0f5e15",
-      "loads/f9de40cc40d5a7383192e323/load-receipt.json": "ec419491c50dcc9a66f17979f679df47c1d453a0a2d7f6799606731ad498ef1c",
-      "loads/2e6439a3fad6f3941ea4d0de/load-receipt.json": "d1e59014b4512bdff229f7d7aa04559b00b13a6fa423b5ef9c7bd49045444cf1",
-      "loads/00cfbcc1f19399b259e9efa8/load-receipt.json": "a55c942226fbb01f2db2847bdb4ac6e532dd0a2c5bad683cd13d4b48ed6db17a",
-      "loads/80562316280834c00f9b7ecd-candidate/load-receipt.json": "9ac5eb3673c72bd6bc886c9ac5fd217d7bb8f1281553fdf9c4595a9b4bec7115",
-      "loads/f4e23282ba136519938ea37d/load-receipt.json": "440ceea28b8ba1a2bd5ed4ed66abe108a95c825523df8dedd4648bd6af354ffa",
-      "loads/55ec0998590030f99463d929/load-receipt.json": "670ce6e7a83c309f1fcbeab63e0ffb6bc6314ecc89c3fe306c5fa76b52c215f4",
-      "loads/f4e23282ba136519938ea37d-candidate/load-receipt.json": "440ceea28b8ba1a2bd5ed4ed66abe108a95c825523df8dedd4648bd6af354ffa",
-      "loads/f9de40cc40d5a7383192e323-candidate/load-receipt.json": "ec419491c50dcc9a66f17979f679df47c1d453a0a2d7f6799606731ad498ef1c",
-      "loads/4c6e0b6b8781645ee573d6ce/load-receipt.json": "0e0e370b9bb79f9f7c9675f1ba8291cc17664be6cc80986119988c27a29ce171",
-      "loads/80562316280834c00f9b7ecd/load-receipt.json": "9ac5eb3673c72bd6bc886c9ac5fd217d7bb8f1281553fdf9c4595a9b4bec7115",
-      "loads/294439e49c36d210f0ff64e0-candidate/load-receipt.json": "37c211bf43c9d94dc88a7b1a1e8667464f4725cc27aea7f715f4335a1b0f5e15"
+      "integration-identity.json": "869684fcfa24c7e773199896186235c4193ee5e8235ec07edde3322f8079ace0",
+      "all-pair-report.json": "38d05cfb6d332ea074a2eae7d7cd93cbef70a4bc3ba5edcd3af64899e8e5e261",
+      "trace-acceptance.json": "cfef84daa048cf0ec5de0df9cf15e9ac0a43656a85506dcd0a04e7e92b7d085f",
+      "hook-idempotency.json": "15f9895027ba0aef081208dba771c6bdc4c757278a44f064b0bba14c7c97061c",
+      "selected-state.json": "2308fd47304d6231bdd437cf57588fcc28778f63bd21dd706d0a3907f01b85fe",
+      "delta-image.json": "d8667b22b696e91b156526ff90a388234fda4d4d9045e647eb97a2072cd296ee",
+      "loads/6a215ecc816749c4ab030774/load-receipt.json": "1b12b36f0b758ffd2e95d7be8f950ba0d337e20404fb6361de2dc464fc54ad48",
+      "loads/80101a499d334ff31d8a8959-candidate/load-receipt.json": "aaaffc3416364437d091ed1aa3ceda63a5cb3ed33db849c79a286b75e7f58eb0",
+      "loads/6a215ecc816749c4ab030774-candidate/load-receipt.json": "1b12b36f0b758ffd2e95d7be8f950ba0d337e20404fb6361de2dc464fc54ad48",
+      "loads/382efbcd3ad3dcfdc6fbd922/load-receipt.json": "859df1795dace18f677f1baa40c8ff30215475767ca1a917775fce378286eaae",
+      "loads/52fa106dfdd676f49fd16df2/load-receipt.json": "2bff10881e54cc42eb3f17ebbe60bb113c043b734aacb1fa7cb5d556a6c910f5",
+      "loads/6b81581fe0992cf7db976c86-candidate/load-receipt.json": "95b9cfb90bce4dcd4072cf5867b0413d6df0a216a1599f62d0820919d251e16d",
+      "loads/52fa106dfdd676f49fd16df2-candidate/load-receipt.json": "2bff10881e54cc42eb3f17ebbe60bb113c043b734aacb1fa7cb5d556a6c910f5",
+      "loads/0df8c510836ba7ce8a238a22-candidate/load-receipt.json": "f29302ca2b2c5fdd3501e34a2fb13d4565be5efd77eed1f94b3bc13c977625f9",
+      "loads/0df8c510836ba7ce8a238a22/load-receipt.json": "f29302ca2b2c5fdd3501e34a2fb13d4565be5efd77eed1f94b3bc13c977625f9",
+      "loads/f99038b6bdf7674fc8a6c4a2/load-receipt.json": "be3cc21461dc5bf64a19c6e20c92eaa76d298dd3f9f0a66a1d2cf634900043d7",
+      "loads/33e5e9cf138ecf7fd398b783/load-receipt.json": "4ce9661b36444659388c17d441887d60ec461d311b0e650a8d15d53070e70375",
+      "loads/80101a499d334ff31d8a8959/load-receipt.json": "aaaffc3416364437d091ed1aa3ceda63a5cb3ed33db849c79a286b75e7f58eb0",
+      "loads/df0035f662a056f334ca9b52/load-receipt.json": "d26b78c033a3778ed1db5aebf0dbb51f4150a2d3d7f3ea805ac0ddf54aad140c",
+      "loads/345b0cf81a539264f88ad216/load-receipt.json": "07952594c34410c8f1df2daff116fbb2decff177d73ca731653b8f6c383fed03",
+      "loads/df0035f662a056f334ca9b52-candidate/load-receipt.json": "d26b78c033a3778ed1db5aebf0dbb51f4150a2d3d7f3ea805ac0ddf54aad140c",
+      "loads/6b81581fe0992cf7db976c86/load-receipt.json": "95b9cfb90bce4dcd4072cf5867b0413d6df0a216a1599f62d0820919d251e16d"
     }
   },
   "logs_sha256": {
@@ -674,14 +688,72 @@
     "final-fix-minimum-focused.log": "9a263c17ce4c225c8b6d9eba75b53aab391ffcb7c3e5ed21ac228031088163c6",
     "final-fix-installed311-initial.log": "c9097aa1deda34eb4920463848c9934710736ca73201d2e7edcdd0cc72506173",
     "final-fix-ruff.log": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18",
-    "final-fix-format.log": "3ca748021b0159d035c538b546c7beb712f94c0a6f4c9e9ed321069791754334"
+    "final-fix-format.log": "3ca748021b0159d035c538b546c7beb712f94c0a6f4c9e9ed321069791754334",
+    "live-repair-red.log": "1e4536b82fa4b6da37a69f238f8df53cc204b97e7e51b9d5974414e560f878fe",
+    "live-repair-green.log": "3f46aec0c10ec633368f6d57c75152a99e567e343575fe69203d2bba36b505a0",
+    "live-repair-counterexample.log": "54bb66034db0afada29181e28a3f543c2d409ca5838b6b8b1fec4fc1ed1bdb03",
+    "live-repair-focused.log": "cafa74d5d2705db24b5407392220bada89d72239f550c8bdf7ff9bdd1dc63f1e",
+    "live-repair-native-focused.log": "f44ba1a40ee6e38ce0d513114f4fcc8bbae84bb501aa7e64825964f38ba0f6a3",
+    "live-repair-native.log": "7f947c034889cde60f1c9684ca5361d2c9447ecab702360f8232144cd97a2206",
+    "live-repair-trace.log": "fd5318b1fbbf59856e3bb00342ab334285cac03e02f10942c1b1f820a58be98c",
+    "live-repair-minimum-focused.log": "654a8f08ffffe6b6ea2549f7c092a569fc624018773647ed40f7c93fc37023cb",
+    "live-repair-ruff.log": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18",
+    "live-repair-format.log": "eee76f865de5a9f2456950f710ae5d5f9b5bd0ea02aa54f614c5eed6642a0bfd"
   },
   "live_accounting": {
-    "status": "not_run_by_implementer",
-    "failed": null,
-    "unstarted": null,
-    "unknown": null,
-    "actual_http_attempts": null,
-    "note": "Coordinator must populate every planned cell and shared-ledger totals; null is not zero."
+    "status": "first_native_attempt_failed_comparison_unstarted",
+    "source_commit": "aadb5b4617b910c697e66a888c638f1b9120c0e2",
+    "actual_http_attempts_global": 5,
+    "availability_requests": 1,
+    "native_worker_requests": 4,
+    "completed_http_requests": 5,
+    "unknown_requests": 0,
+    "paused": false,
+    "shared_http_cap": 100,
+    "remaining_shared_http_cap": 95,
+    "failure": {
+      "task": "q1",
+      "phase": "warmup",
+      "model_response_kind": "natural_language_status_not_json",
+      "error_type": "JSONDecodeError",
+      "response": "计算已验证。正在写入结果文件。",
+      "settled_leaf_calls": 3,
+      "worker_prompt_tokens": 21459,
+      "worker_completion_tokens": 1997,
+      "json_mode_requested": true,
+      "cause": "settled reply violated JSON action protocol; ReAct lacked bounded parse-error feedback"
+    },
+    "q2": "not_run",
+    "q5_arms": {
+      "A": "unstarted",
+      "B": "unstarted",
+      "C": "unstarted"
+    },
+    "q6": "sealed_not_opened",
+    "native_postprocess": "failed_no_pairs",
+    "cli_exit_zero_is_completion": false,
+    "original_json_mode": true,
+    "quality_claim": false,
+    "requests_by_this_repair": 0,
+    "evidence_sha256": {
+      "infra/live-001-diagnostic.json": "cfe39674d8afc09f84717af644039b34f2e1143ff9adafe969158f861c22f618",
+      "original-mode-receipt-summary": "7b20ff46f1e437641a4e206449003331b72755829dee16080ab3fd6018b71f91"
+    },
+    "note": "5 actual attempts are infrastructure/failed q1 warmup, separate from recorded native metrics. New source requires full fresh pipeline and same non-resetting shared ledger; live-v030-002 is coordinator-only after review."
+  },
+  "protocol_counterexample": {
+    "mechanism_only": true,
+    "before": {
+      "status": "failed",
+      "model_calls": 4,
+      "leaf_calls": 3
+    },
+    "after": {
+      "status": "completed",
+      "model_calls": 6,
+      "leaf_calls": 4
+    },
+    "actual_model_http": 0,
+    "original_response_receipt_preserved": true
   }
 }
