@@ -32,9 +32,14 @@ from .contracts import (
 from .engine import Pipeline
 from .experiments import (
     AdoptionPolicy,
+    AgentDataset,
+    AgentExperimentSpec,
     CampaignController,
+    EpisodeEvaluation,
+    EpisodeEvaluator,
     ExperimentRunner,
     ExperimentSpec,
+    GraphQACompatibilityBackend,
     SelectionPolicy,
 )
 from .kernel import KernelBundle, TaskSpec
@@ -72,4 +77,9 @@ __all__ = [
     "CampaignController",
     "ExperimentSpec",
     "SelectionPolicy",
+    "AgentDataset",
+    "AgentExperimentSpec",
+    "EpisodeEvaluation",
+    "EpisodeEvaluator",
+    "GraphQACompatibilityBackend",
 ]

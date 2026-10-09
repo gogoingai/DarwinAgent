@@ -50,6 +50,7 @@ class ExperimentRunner:
         round_deadline_s=None,
         validation_plan=None,
         seed_assets=None,
+        backend=None,
     ):
         if optimization_mode not in ("legacy", "wiki"):
             raise ValueError("Unknown optimization mode")
@@ -68,6 +69,9 @@ class ExperimentRunner:
         ):
             raise ValueError("round_deadline_s must be positive seconds")
         self.adapter, self.evaluator_factory = adapter, evaluator_factory
+        from .compatibility import GraphQACompatibilityBackend
+
+        self.backend = backend if backend is not None else GraphQACompatibilityBackend()
         self.connection_config, self.config, self.policy = connection_config, run_config, policy
         self.root = Path(work_dir)
         self.frozen = snapshot_files([Path(__file__).resolve().parents[1], *frozen_files])
@@ -345,7 +349,7 @@ class ExperimentRunner:
         return stages._stage_health(root=self.root)
 
     async def _preflight(self, candidate, spec, sample_question=None, cases=None, replay_inputs=()):
-        return await stages._preflight(
+        return await self.backend.admit(
             candidate,
             spec,
             sample_question,
@@ -485,6 +489,49 @@ class ExperimentRunner:
         )
 
     async def run(
+        self,
+        case_ids,
+        spec,
+        rounds=2,
+        resume=False,
+        stop_file=None,
+        b0_gate=None,
+        stage_gate=None,
+        scope=(),
+        execution=None,
+    ):
+        from .compatibility import GraphQACompatibilityBackend
+
+        if isinstance(self.backend, GraphQACompatibilityBackend):
+            return await self.backend.run_experiment(
+                self,
+                case_ids,
+                spec,
+                rounds,
+                resume,
+                stop_file,
+                b0_gate,
+                stage_gate,
+                scope,
+                execution,
+            )
+        from .episode_contracts import AgentExperimentSpec
+        from .episode_experiment import run_episodes
+
+        if not isinstance(self.validation_plan, AgentExperimentSpec):
+            raise ValueError("Generic runner requires validation_plan=AgentExperimentSpec(...)")
+        if (
+            tuple((case_ids,) if isinstance(case_ids, str) else case_ids)
+            != self.validation_plan.train
+        ):
+            raise ValueError("Runner task ids must match the frozen training split")
+        if any(x is not None for x in (stop_file, b0_gate, stage_gate, execution)) or scope:
+            raise ValueError(
+                "Generic execution uses AgentExperimentSpec budgets and full S/F/C/P scope"
+            )
+        return await run_episodes(self, self.validation_plan, spec, rounds=rounds, resume=resume)
+
+    async def _run_graphqa(
         self,
         case_ids,
         spec,

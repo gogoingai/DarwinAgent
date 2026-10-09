@@ -12,7 +12,6 @@ import time
 from pathlib import Path
 
 from darwinagent.contracts import EvaluationResult
-from darwinagent.engine import Pipeline
 from darwinagent.kernel import KernelBundle
 from darwinagent.llm.client import LLMClient
 from darwinagent.runtime.artifacts import atomic_json
@@ -39,8 +38,18 @@ class CampaignController:
         optimization_mode="legacy",
         wiki_call_limit=30,
         graph_builder=None,
+        backend=None,
     ):
-        if not isinstance(spec, ExperimentSpec):
+        from .compatibility import GraphQACompatibilityBackend
+        from .episode_contracts import AgentExperimentSpec
+
+        self.backend = backend if backend is not None else GraphQACompatibilityBackend()
+        expected_spec = (
+            ExperimentSpec
+            if isinstance(self.backend, GraphQACompatibilityBackend)
+            else AgentExperimentSpec
+        )
+        if not isinstance(spec, expected_spec):
             raise ValueError("Campaign requires a frozen ExperimentSpec")
         self.adapter, self.evaluator_factory = adapter, evaluator_factory
         self.connection_config, self.config, self.spec = connection_config, run_config, spec
@@ -170,14 +179,17 @@ class CampaignController:
         client = self._client(stage_dir)
         try:
             case = self.adapter.generation_input(case_id)
-            result = await Pipeline(
-                client,
-                stage_dir / "generation",
+            result = await self.backend.run(
+                case,
+                task_spec,
+                self.config,
+                client=client,
+                work_dir=stage_dir / "generation",
                 frozen_snapshot=None
                 if self.snapshot_root is None
                 else self.snapshot_root / case_id,
                 graph_builder=self.graph_builder,
-            ).run(case, task_spec, self.config)
+            )
             scores_path = stage_dir / "evaluation.json"
             if scores_path.exists():
                 saved = json.loads(scores_path.read_text())
@@ -266,6 +278,17 @@ class CampaignController:
 
     # ---- orchestration ---------------------------------------------------------
     async def run(self, task_spec, resume=False, rounds=None, scope=(), b0_gate=None):
+        from .compatibility import GraphQACompatibilityBackend
+
+        if isinstance(self.backend, GraphQACompatibilityBackend):
+            return await self.backend.run_campaign(self, task_spec, resume, rounds, scope, b0_gate)
+        if scope or b0_gate is not None:
+            raise ValueError("Generic campaigns use fixed paired episode selection")
+        from .episode_experiment import run_episodes
+
+        return await run_episodes(self, self.spec, task_spec, rounds=rounds, resume=resume)
+
+    async def _run_graphqa(self, task_spec, resume=False, rounds=None, scope=(), b0_gate=None):
         self.root.mkdir(parents=True, exist_ok=True)
         declaration = {
             "experiment_spec": self.spec.declaration(),
@@ -347,6 +370,7 @@ class CampaignController:
             optimization_mode=self.optimization_mode,
             wiki_call_limit=self.wiki_call_limit,
             graph_builder=self.graph_builder,
+            backend=self.backend,
         )
         if b0_gate is None:
 
