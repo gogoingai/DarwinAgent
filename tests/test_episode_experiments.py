@@ -18,15 +18,25 @@ from darwinagent.experiments import (
 from darwinagent.experiments.episode_contracts import episode_metrics, select_episode_candidate
 from darwinagent.experiments.episode_experiment import read_record
 from darwinagent.experiments.episode_proposal import decode_candidate
-from tests.support.agent_runtime import ReturnsUnknownAgent, ScriptedAgent, bundle
+from tests.support.agent_runtime import (
+    LostReceiptClient,
+    ModelTwiceAgent,
+    ReturnsUnknownAgent,
+    ScriptedAgent,
+    bundle,
+)
 from tests.support.episode_experiment import (
     ArtifactEvaluator,
     AsyncIsolatedFileBackend,
+    BoundFactories,
+    BoundPrimitiveBackend,
     ChangedProfileBackend,
+    DerivedReceiptBackend,
     IsolatedFileBackend,
     ProposalClient,
     SharedWorkspaceBackend,
     TaskDataset,
+    bound_file_tools,
     candidate_action,
 )
 
@@ -206,6 +216,78 @@ class EpisodeExperimentTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(list((self.root / "experiment/episodes").glob("*/episode.json")))
         self.assertFalse((self.root / "experiment/agent-summary.json").exists())
         self.assertFalse((self.root / "experiment/selection.json").exists())
+
+    async def test_unknown_resume_rejects_host_receipt_relocation_before_second_call(self):
+        lost = LostReceiptClient()
+        self.backend.adapter, self.backend.client = ModelTwiceAgent(), lost
+        controller = self.controller()
+        self.assertEqual((await controller.run(self.kernel))["status"], "unknown")
+        self.assertEqual((await controller.run(self.kernel, resume=True))["status"], "unknown")
+        self.assertEqual(lost.calls, 1)
+        self.backend.run_root = self.root / "relocated-host-store"
+        with self.assertRaisesRegex(ValueError, "identical"):
+            await controller.run(self.kernel, resume=True)
+        self.assertEqual(lost.calls, 1)
+        self.assertFalse(self.backend.run_root.exists())
+
+    async def test_unknown_resume_rejects_derived_receipt_relocation_before_second_call(self):
+        lost = LostReceiptClient()
+        backend = DerivedReceiptBackend(
+            ModelTwiceAgent(), self.tools, self.profile, lost, self.root / "runs"
+        )
+        controller = self.controller(backend=backend)
+        self.assertEqual((await controller.run(self.kernel))["status"], "unknown")
+        pins = list((controller.root / "episodes").glob("*/backend-identity.json"))
+        self.assertEqual(len(pins), 1)
+        self.assertEqual(
+            read_record(pins[0])["receipt_store"], str((backend.run_root / "first").resolve())
+        )
+        self.assertEqual((await controller.run(self.kernel, resume=True))["status"], "unknown")
+        self.assertEqual(lost.calls, 1)
+        before = backend.identity()
+        backend.derived_store = "second"
+        self.assertEqual(before, backend.identity())
+        with self.assertRaisesRegex(ValueError, "receipt store changed"):
+            await controller.run(self.kernel, resume=True)
+        self.assertEqual(lost.calls, 1)
+        self.assertFalse((backend.run_root / "second").exists())
+        self.assertFalse((controller.root / "selection.json").exists())
+
+    async def test_bound_factories_and_primitive_handler_complete_and_resume(self):
+        from darwinagent.experiments.episode_experiment import source_identity
+
+        self.assertIsInstance(source_identity(self.evaluator.declaration), str)
+        factories = BoundFactories(self.evaluator, self.client)
+        self.backend = BoundPrimitiveBackend(
+            ScriptedAgent(),
+            bound_file_tools(self.root / "host"),
+            self.profile,
+            run_root=self.root / "runs",
+        )
+        controller = self.controller()
+        controller.evaluator_factory = factories.evaluator_factory
+        controller._injected_client = factories.client_factory
+        result = await controller.run(self.kernel)
+        self.assertEqual(result["status"], "complete")
+        self.assertNotEqual(result["selected"], self.kernel.content_id)
+        self.assertEqual(await controller.run(self.kernel, resume=True), result)
+        self.assertEqual(self.client.calls, 1)
+        for sentinel in ("BOUND-FACTORY-PRIVATE-GOLD", "BOUND-HANDLER-PRIVATE-CRITERION"):
+            self.assertNotIn(sentinel, json.dumps(self.client.messages))
+            for path in controller.root.rglob("*.json"):
+                self.assertNotIn(sentinel, path.read_text(), str(path))
+        factories.private_reference = "changed-private-reference"
+        with self.assertRaisesRegex(ValueError, "identical"):
+            await controller.run(self.kernel, resume=True)
+        factories.private_reference = "BOUND-FACTORY-PRIVATE-GOLD"
+        factories.revision = "changed-config"
+        with self.assertRaisesRegex(ValueError, "identical"):
+            await controller.run(self.kernel, resume=True)
+        factories.revision = "original"
+        self.backend.tools["write_file"].handler.__self__.mode = "changed"
+        with self.assertRaisesRegex(ValueError, "identical"):
+            await controller.run(self.kernel, resume=True)
+        self.assertEqual(self.client.calls, 1)
 
     async def test_static_admission_never_writes_artifacts(self):
         self.backend.admit(self.kernel)

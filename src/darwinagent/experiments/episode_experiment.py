@@ -24,19 +24,48 @@ from .episode_proposal import WikiBudgetClient, decode_candidate, propose
 from .wiki import WikiMaintainer
 
 
-def source_identity(value):
-    target = value if inspect.isfunction(value) else type(value)
+def source_identity(value, *, location_independent=False):
+    """Hash source and declared bound-owner state without persisting private declarations."""
+    target = (
+        value.__func__
+        if inspect.ismethod(value)
+        else value
+        if inspect.isfunction(value)
+        else type(value)
+    )
     try:
         source = inspect.getsource(target)
     except (OSError, TypeError) as exc:
         raise ValueError("Experiment extensions must have inspectable source") from exc
     source_file = inspect.getsourcefile(target)
-    return digest(
-        {
-            "definition": source,
-            "module": digest(Path(source_file).read_text()) if source_file else None,
-        }
-    )
+    identity = {
+        "definition": source,
+        "module": digest(Path(source_file).read_text()) if source_file else None,
+    }
+    if inspect.ismethod(value) and not inspect.isclass(value.__self__):
+        owner = value.__self__
+        hook = getattr(owner, "identity", None) or getattr(owner, "declaration", None)
+        if hook is not None:
+            declaration = hook()
+            if inspect.isawaitable(declaration):
+                if inspect.iscoroutine(declaration):
+                    declaration.close()
+                raise ValueError("Bound callable owner identity must be synchronous")
+            if not isinstance(declaration, dict):
+                raise ValueError("Bound callable owner identity must be a JSON object")
+            if location_independent:
+                declaration = {
+                    k: v
+                    for k, v in declaration.items()
+                    if k not in {"workspace", "location", "root"}
+                }
+            identity["owner"] = plain(freeze(declaration))
+    return digest(identity)
+
+
+def receipt_store(backend):
+    root = backend.run_root
+    return str(Path(root).resolve()) if root is not None else None
 
 
 def read_record(path):
@@ -99,6 +128,11 @@ class EpisodeExperiment:
                         "declaration": owner.adapter.identity(),
                     },
                     "backend": self.backend.identity(),
+                    "backend_receipt_store": receipt_store(self.backend),
+                    "tool_handlers": {
+                        name: source_identity(tool.handler)
+                        for name, tool in self.backend.tools.items()
+                    },
                     "backend_source": source_identity(self.backend),
                     "evaluator": self.evaluator_id,
                     "evaluator_factory": source_identity(owner.evaluator_factory),
@@ -128,6 +162,19 @@ class EpisodeExperiment:
             raise ValueError("Backend source changed during campaign")
         if self.backend.identity() != self.identity["backend"]:
             raise ValueError("Backend identity changed during campaign")
+        if receipt_store(self.backend) != self.identity["backend_receipt_store"]:
+            raise ValueError("Backend receipt store changed during campaign")
+        if {
+            name: source_identity(tool.handler) for name, tool in self.backend.tools.items()
+        } != self.identity["tool_handlers"]:
+            raise ValueError("Primitive handler identity changed during campaign")
+        if source_identity(self.owner.evaluator_factory) != self.identity["evaluator_factory"]:
+            raise ValueError("Evaluator factory identity changed during campaign")
+        client_source = (
+            source_identity(self.owner._injected_client) if self.owner._injected_client else None
+        )
+        if client_source != self.identity["proposal_client_source"]:
+            raise ValueError("Proposal factory identity changed during campaign")
         if (
             digest(
                 {
@@ -156,6 +203,7 @@ class EpisodeExperiment:
     async def episode_backend(self, key, task):
         factory = getattr(self.backend, "for_episode", None)
         if factory is None:
+            self.pin_episode_backend(key, self.backend)
             return self.backend
         derived = factory(self.root / "episodes" / key / "environment", task)
         if inspect.isawaitable(derived):
@@ -194,11 +242,30 @@ class EpisodeExperiment:
                     for k, v in row["identity"].items()
                     if k not in {"workspace", "location", "root"}
                 }
-            if a != b or source_identity(tool.handler) != source_identity(
-                derived.tools[name].handler
-            ):
+            if a != b or source_identity(
+                tool.handler, location_independent=True
+            ) != source_identity(derived.tools[name].handler, location_independent=True):
                 raise ValueError("Episode factory changed primitive contract/source")
+        self.pin_episode_backend(key, derived)
         return derived
+
+    def pin_episode_backend(self, key, backend):
+        """Pin the actual receipt store before first dispatch, even for unknown results."""
+        path = self.root / "episodes" / key / "backend-identity.json"
+        identity = {
+            "backend": backend.identity(),
+            "receipt_store": receipt_store(backend),
+            "tool_handlers": {
+                name: source_identity(tool.handler) for name, tool in backend.tools.items()
+            },
+        }
+        if path.exists():
+            if read_record(path) != identity:
+                raise ValueError(
+                    "Episode backend/receipt store changed; unresolved requests cannot relocate"
+                )
+        else:
+            save_record(path, identity)
 
     async def episode(self, phase, label, task_id, bundle):
         self.verify()

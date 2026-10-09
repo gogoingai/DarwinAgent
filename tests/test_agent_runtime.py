@@ -53,6 +53,15 @@ class AgentRuntimeTests(unittest.IsolatedAsyncioTestCase):
             agent, tools or self.tools, profile or self.profile, client, self.root / "runs"
         )
 
+    def test_backend_identity_pins_resolved_receipt_store(self):
+        backend = self.backend(ScriptedAgent())
+        original = backend.identity()
+        self.assertEqual(original["receipt_store"], str((self.root / "runs").resolve()))
+        backend.run_root = self.root / "runs" / ".." / "runs"
+        self.assertEqual(backend.identity(), original)
+        backend.run_root = self.root / "other-runs"
+        self.assertNotEqual(backend.identity(), original)
+
     async def test_s_and_f_change_real_artifacts_with_p_fixed(self):
         kernels = [
             bundle(self.root / "k0", self.profile),

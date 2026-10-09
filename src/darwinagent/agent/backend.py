@@ -66,6 +66,7 @@ class ExecutionBackend:
             handlers.append({"tool": spec.declaration(), "source_id": digest(code)})
         return {
             "kind": "agent-v4",
+            "receipt_store": str(self.run_root.resolve()) if self.run_root is not None else None,
             "profile_id": self.profile.fingerprint,
             "adapter_id": digest(
                 {

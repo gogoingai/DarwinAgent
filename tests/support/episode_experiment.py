@@ -1,6 +1,8 @@
 """Offline task, artifact evaluator and isolated backend for generic experiments."""
 
+import hashlib
 import json
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -53,6 +55,74 @@ class ChangedProfileBackend(IsolatedFileBackend):
 class AsyncIsolatedFileBackend(IsolatedFileBackend):
     async def for_episode(self, root, task):
         return super().for_episode(root, task)
+
+
+class DerivedReceiptBackend(IsolatedFileBackend):
+    derived_store = "first"
+
+    def for_episode(self, root, task):
+        backend = super().for_episode(root, task)
+        backend.run_root = self.run_root / self.derived_store
+        return backend
+
+
+class BoundWriter:
+    private_criterion = "BOUND-HANDLER-PRIVATE-CRITERION"
+
+    def __init__(self, root, mode="normal"):
+        self.root, self.mode = Path(root).resolve(), mode
+
+    def identity(self):
+        return {
+            "root": str(self.root),
+            "mode": self.mode,
+            "private_criterion": self.private_criterion,
+        }
+
+    def write(self, params):
+        path = (self.root / params["path"]).resolve()
+        if not path.is_relative_to(self.root):
+            raise ValueError("Outside episode workspace")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(params["content"])
+        return {
+            "path": str(path),
+            "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+            "bytes": path.stat().st_size,
+        }
+
+
+def bound_file_tools(root, mode="normal"):
+    read, write = file_tools(root)
+    return read, replace(write, handler=BoundWriter(root, mode).write)
+
+
+class BoundPrimitiveBackend(IsolatedFileBackend):
+    def for_episode(self, root, task):
+        mode = self.tools["write_file"].handler.__self__.mode
+        return type(self)(
+            self.adapter, bound_file_tools(root, mode), self.profile, self.client, self.run_root
+        )
+
+
+class BoundFactories:
+    revision = "original"
+    private_reference = "BOUND-FACTORY-PRIVATE-GOLD"
+
+    def __init__(self, evaluator, client):
+        self.evaluator, self.client = evaluator, client
+
+    def identity(self):
+        return {
+            "configuration_revision": self.revision,
+            "private_reference": self.private_reference,
+        }
+
+    def evaluator_factory(self, client, path):
+        return self.evaluator
+
+    def client_factory(self, stage):
+        return self.client
 
 
 class ArtifactEvaluator:
