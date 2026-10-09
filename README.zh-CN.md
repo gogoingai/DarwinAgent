@@ -7,11 +7,12 @@
 [English](README.md) · 简体中文
 
 [![离线检查](https://github.com/gogoingai/DarwinAgent/actions/workflows/ci.yml/badge.svg)](https://github.com/gogoingai/DarwinAgent/actions/workflows/ci.yml)
+[![GitHub 发行版本](https://img.shields.io/github/v/release/gogoingai/DarwinAgent)](https://github.com/gogoingai/DarwinAgent/releases/latest)
 [![PyPI 版本](https://img.shields.io/pypi/v/darwinagent)](https://pypi.org/project/darwinagent/)
 [![Python 版本](https://img.shields.io/badge/python-%3E%3D3.11-45635c)](pyproject.toml)
 [![MIT 许可证](https://img.shields.io/badge/license-MIT-45635c)](LICENSE)
 
-**当前发行版本：[0.1.2](https://pypi.org/project/darwinagent/0.1.2/)（实验版）。** 改进要以实际评测为准。
+**当前发行版本：[0.2.0](https://github.com/gogoingai/DarwinAgent/releases/tag/v0.2.0)（实验版）。** 见[更新历史](CHANGELOG.md)与[本次更新说明](docs/releases/0.2.0.md)。改进要以实际评测为准。
 
 DarwinAgent 的名字来自**查尔斯·达尔文与进化论**。**Agent 时代的进化**是项目的使命：让 Agent 从经验中适应任务，并保留有效的能力。在这个框架里，资产提案产生候选变化，独立评测和固定准入规则负责筛选，版本化资产与持久化经验 Wiki 负责保留结果，并影响下一轮提案。
 
@@ -42,7 +43,7 @@ python -m pip install --upgrade darwinagent
 darwinagent --version
 ```
 
-版本检查应输出 `darwinagent 0.1.2`。已安装旧版时，上面的命令会升级；如果仍显示旧版本，按[缓存排查](docs/zh-CN/quickstart.md#7-常见问题)刷新安装源缓存。
+版本检查应输出 `darwinagent 0.2.0`。已安装旧版时，上面的命令会升级；如果仍显示旧版本，按[缓存排查](docs/zh-CN/quickstart.md#7-常见问题)刷新安装源缓存。
 
 第一次使用 Python 项目时，建议先按[快速开始](docs/zh-CN/quickstart.md#1-安装)创建虚拟环境。普通用户无需下载仓库，也无需安装 `uv`。
 

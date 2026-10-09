@@ -21,9 +21,10 @@ Authorization is scoped to this repository, workflow, and environment. The GitHu
 ## Publish a new version
 
 1. Update version declarations, the changelog, and release documentation. Run the relevant checks and push the release commit to `main`.
-2. Run **Publish to PyPI** manually in Actions, choose `main`, and enter the new version matching package metadata.
-3. Approve the `pypi` environment deployment after the build passes.
-4. Verify the [PyPI project page](https://pypi.org/project/darwinagent/), install that version from the production index in a clean environment, and check the CLI and replay.
+2. Wait for CI on that exact commit. Create a `v<version>` tag and GitHub Release from the changelog, targeting the verified commit; attach the checked wheel and source distribution. GitHub releases and PyPI uploads are separate operations.
+3. Run **Publish to PyPI** manually in Actions, choose `main`, and enter the new version matching package metadata.
+4. Approve the `pypi` environment deployment after the build passes.
+5. Verify the [GitHub release](https://github.com/gogoingai/DarwinAgent/releases) and [PyPI project page](https://pypi.org/project/darwinagent/), install that version from the production index in a clean environment, and check the CLI and replay.
 
 For example, the first release can be verified with:
 

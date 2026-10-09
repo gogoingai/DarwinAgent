@@ -7,11 +7,12 @@
 English · [简体中文](README.zh-CN.md)
 
 [![Offline checks](https://github.com/gogoingai/DarwinAgent/actions/workflows/ci.yml/badge.svg)](https://github.com/gogoingai/DarwinAgent/actions/workflows/ci.yml)
+[![GitHub release](https://img.shields.io/github/v/release/gogoingai/DarwinAgent)](https://github.com/gogoingai/DarwinAgent/releases/latest)
 [![PyPI version](https://img.shields.io/pypi/v/darwinagent)](https://pypi.org/project/darwinagent/)
 [![Python version](https://img.shields.io/badge/python-%3E%3D3.11-45635c)](pyproject.toml)
 [![MIT license](https://img.shields.io/badge/license-MIT-45635c)](LICENSE)
 
-**Current release: [0.1.2](https://pypi.org/project/darwinagent/0.1.2/) (experimental).** Improvement must be measured.
+**Current release: [0.2.0](https://github.com/gogoingai/DarwinAgent/releases/tag/v0.2.0) (experimental).** See the [changelog](CHANGELOG.md) and [release notes](docs/releases/0.2.0.md). Improvement must be measured.
 
 DarwinAgent takes its name from **Charles Darwin and the theory of evolution**. Its mission is **Evolution for the Agent Era**: help agents adapt through experience and retain effective capabilities. In this framework, asset proposals introduce candidate variations, independent evaluation and fixed admission rules select among them, and versioned assets and a persistent experience Wiki retain results and inform the next proposal.
 
@@ -42,7 +43,7 @@ python -m pip install --upgrade darwinagent
 darwinagent --version
 ```
 
-The version check should print `darwinagent 0.1.2`. The command above upgrades an existing installation. If you still see an older version, follow the [cached-index troubleshooting steps](docs/en/quickstart.md#7-troubleshooting).
+The version check should print `darwinagent 0.2.0`. The command above upgrades an existing installation. If you still see an older version, follow the [cached-index troubleshooting steps](docs/en/quickstart.md#7-troubleshooting).
 
 If you are starting a new Python project, follow the [quickstart](docs/en/quickstart.md#1-install) to create a virtual environment first. Package users do not need to clone the repository or install `uv`.
 

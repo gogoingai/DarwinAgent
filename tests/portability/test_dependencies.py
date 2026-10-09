@@ -68,7 +68,8 @@ with patch('os.getenv', side_effect=AssertionError('environment read')), \\
      patch.object(openai, 'AsyncOpenAI', side_effect=AssertionError('model client')), \\
      patch.object(openai, 'OpenAI', side_effect=AssertionError('model client')):
     import darwinagent
-    assert darwinagent.__version__ == '0.1.2'
+    from importlib.metadata import version
+    assert darwinagent.__version__ == version('darwinagent')
 """
         with tempfile.TemporaryDirectory() as tmp:
             result = subprocess.run(

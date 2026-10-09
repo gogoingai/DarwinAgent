@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.2.0 — dynamic graphs, explicit datasets and isolated recovery (2026-10-09)
+
+[GitHub release](https://github.com/gogoingai/DarwinAgent/releases/tag/v0.2.0) · [中英文更新说明与迁移提示](docs/releases/0.2.0.md)
+
+- Construct evidence-bound LoCoMo graphs with an LLM under current S and P.extract. Schema or extraction-prompt changes rebuild auxiliary structure while preserving frozen facts and vectors.
+- Expose graph structure, unmaterialized declarations, asset change signals and original evidence to Wiki and the proposer for S/F/C/P diagnosis.
+- Require an explicit HF repository or local dataset source; pin the resolved commit and file hashes per run. Remove raw data and implicit historical snapshot dependencies from Git.
+- Distinguish review exhaustion from tool failures. Give reviewers the preceding revision history and allow one fresh, bounded retry of only settled failed questions; preserve original failures and successful checkpoints.
+- Retain recovery records on resume and disclose incomplete score comparisons rather than treating fault recovery as proof of quality improvement.
+- Support generic adaptive thinking/reasoning settings and focused Wiki evidence queries.
+- Keep README graphics versionless; show GitHub and PyPI release versions with dynamic badges.
+
+**Migration:** New g1 runs default to LLM graphs, Wiki optimization and S/F/C/P scope. Specify `--dataset-repo` or `--data-dir`. Use `--memory-root` explicitly for existing frozen memory; frozen/projection modes and v0 require it. Use a fresh output directory after changing code or construction inputs. No model endpoint is selected automatically.
+
+**Validation:** 590 framework tests (8 resource skips), 18 LoCoMo tests, 11 TravelPlanner tests, Ruff, wheel build and installed-wheel replay/resume passed for the implementation. Release metadata and distribution checks are repeated for 0.2.0. Recorded recovery tests do not establish a model-quality or full-benchmark score gain.
+
 ## 0.1.2 — durable loop and Wiki query recovery (2026-10-08)
 
 Published to [PyPI](https://pypi.org/project/darwinagent/0.1.2/) through [Trusted Publishing](https://github.com/gogoingai/DarwinAgent/actions/runs/37717230916). Production pip installation, source hashes, replay and resume were verified outside the checkout; see the [release verification](docs/acceptance/2026-10-08-loop-release.json).

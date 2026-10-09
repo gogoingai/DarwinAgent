@@ -21,9 +21,10 @@
 ## 发布新版本
 
 1. 更新版本号、变更记录和发行文档，完成相关检查，将发布提交推到 `main`。
-2. 在仓库 Actions 中手动运行 **Publish to PyPI**，选择 `main`，输入与包元数据一致的新版本号。
-3. 构建检查通过后，审核并批准 `pypi` 环境部署。
-4. 核对 [PyPI 项目页](https://pypi.org/project/darwinagent/)，在干净环境从正式索引安装指定版本，再验证命令行与离线演示。
+2. 等待该提交的 CI 通过。为已验证的提交创建 `v<版本号>` 标签与 GitHub Release，说明取自更新记录，并附上已检查的 wheel 和源码包。GitHub 发版与 PyPI 上传分别执行。
+3. 在仓库 Actions 中手动运行 **Publish to PyPI**，选择 `main`，输入与包元数据一致的新版本号。
+4. 构建检查通过后，审核并批准 `pypi` 环境部署。
+5. 核对 [GitHub Release](https://github.com/gogoingai/DarwinAgent/releases) 与 [PyPI 项目页](https://pypi.org/project/darwinagent/)，在干净环境从正式索引安装指定版本，再验证命令行与离线演示。
 
 首次发行版本的安装验证示例：
 

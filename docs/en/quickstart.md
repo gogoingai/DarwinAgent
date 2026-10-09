@@ -34,7 +34,7 @@ python -m pip install darwinagent
 darwinagent --version
 ```
 
-The current release is `0.1.2`. Run the remaining commands from this project directory with the environment activated.
+The current release is `0.2.0`. Run the remaining commands from this project directory with the environment activated.
 
 ## 2. Configure your model
 

@@ -25,7 +25,7 @@ from .experiments import (
 )
 from .kernel import KernelBundle, TaskSpec
 
-__version__ = "0.1.2"
+__version__ = "0.2.0"
 __all__ = [
     "Config",
     "RunConfig",

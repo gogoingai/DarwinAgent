@@ -2,7 +2,7 @@
 
 [English](CONTRIBUTING.md) · [简体中文](CONTRIBUTING.zh-CN.md)
 
-DarwinAgent 0.1.1 是实验版本。欢迎提交可复现的问题、独立任务示例、文档改进和受控评测研究。公开讨论请使用 [GitHub Issues](https://github.com/gogoingai/DarwinAgent/issues)，不要提交凭据或私有输入数据。
+DarwinAgent 是实验版本。欢迎提交可复现的问题、独立任务示例、文档改进和受控评测研究。公开讨论请使用 [GitHub Issues](https://github.com/gogoingai/DarwinAgent/issues)，不要提交凭据或私有输入数据。
 
 ## 准备与验证
 

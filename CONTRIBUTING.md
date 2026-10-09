@@ -2,7 +2,7 @@
 
 [English](CONTRIBUTING.md) · [简体中文](CONTRIBUTING.zh-CN.md)
 
-DarwinAgent 0.1.1 is experimental. Useful contributions include reproducible bug reports, independent task examples, clearer documentation, and controlled evaluation studies. Use [GitHub issues](https://github.com/gogoingai/DarwinAgent/issues) for public discussion; never include credentials or private input data.
+DarwinAgent is experimental. Useful contributions include reproducible bug reports, independent task examples, clearer documentation, and controlled evaluation studies. Use [GitHub issues](https://github.com/gogoingai/DarwinAgent/issues) for public discussion; never include credentials or private input data.
 
 ## Set up and verify
 

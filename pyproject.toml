@@ -1,6 +1,6 @@
 [project]
 name = "darwinagent"
-version = "0.1.2"
+version = "0.2.0"
 description = "Evolution for the Agent Era: experience-driven recursive self-improvement for agents"
 readme = "README.pypi.md"
 license = "MIT"
@@ -93,6 +93,7 @@ include = [
     "/src/darwinagent",
     "/pyproject.toml",
     "/README.pypi.md",
+    "/CHANGELOG.md",
     "/README.md",
     "/README.zh-CN.md",
     "/LICENSE",
