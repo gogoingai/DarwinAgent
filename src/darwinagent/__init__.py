@@ -3,6 +3,19 @@
 Importing the package does not read credentials, create clients, or touch the filesystem.
 """
 
+from .agent import (
+    AgentAdapter,
+    AgentAsset,
+    AgentContext,
+    AgentKernelAssets,
+    AgentKernelBundle,
+    AgentTask,
+    EpisodeResult,
+    ExecutionBackend,
+    ExecutionProfile,
+    ReActAgent,
+    ToolSpec,
+)
 from .config import Config, RunConfig
 from .contracts import (
     AnswerResult,
@@ -27,6 +40,17 @@ from .kernel import KernelBundle, TaskSpec
 
 __version__ = "0.2.0"
 __all__ = [
+    "AgentAdapter",
+    "AgentAsset",
+    "AgentContext",
+    "AgentKernelAssets",
+    "AgentKernelBundle",
+    "AgentTask",
+    "EpisodeResult",
+    "ExecutionBackend",
+    "ExecutionProfile",
+    "ReActAgent",
+    "ToolSpec",
     "Config",
     "RunConfig",
     "CaseInput",

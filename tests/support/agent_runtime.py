@@ -1,0 +1,90 @@
+"""Offline Agent loops, recorded transport and v4 assets shared by runtime tests."""
+
+import asyncio
+import json
+from types import SimpleNamespace
+
+import yaml
+
+from darwinagent.agent import AgentAsset, AgentKernelAssets
+
+
+class ScriptedAgent:
+    async def run(self, task, context):
+        artifact = await context.call("save", {"path": "report.txt"})
+        return context.result("delivered", artifacts=(artifact,))
+
+
+class TwoWritesAgent:
+    interrupt = False
+
+    async def run(self, task, context):
+        first = await context.call("write_file", {"path": "first.txt", "content": "first"})
+        if self.interrupt:
+            raise asyncio.CancelledError
+        second = await context.call("write_file", {"path": "second.txt", "content": "second"})
+        return context.result("done", artifacts=(first, second))
+
+
+class ModelTwiceAgent:
+    interrupt = False
+
+    async def run(self, task, context):
+        first = await context.model([{"role": "user", "content": "first"}])
+        if self.interrupt:
+            raise asyncio.CancelledError
+        second = await context.model([{"role": "user", "content": "second"}])
+        return context.result(first.content + second.content)
+
+
+class RecordedClient:
+    def __init__(self, responses):
+        self.responses = list(responses)
+        self.calls = 0
+
+    async def chat(self, **kwargs):
+        content = self.responses[self.calls]
+        self.calls += 1
+        return SimpleNamespace(
+            content=json.dumps(content),
+            usage={"prompt_tokens": 10, "completion_tokens": 3},
+            model="offline",
+        )
+
+
+def schema(path="content"):
+    return {
+        "nodes": [
+            {
+                "id": "Document",
+                "source": "attachments",
+                "fields": {"text": {"path": path, "type": "string"}},
+                "where": {},
+            }
+        ],
+        "relations": [],
+    }
+
+
+def bundle(root, profile, *, source_path="content", uppercase=False, checks=()):
+    f = 'def run(params):\n    graph = view()\n    text = graph["nodes"][0]["fields"]["text"]\n'
+    if uppercase:
+        f += "    text = text.upper()\n"
+    f += '    return call("write_file", {"path":params["path"],"content":text})\n'
+    assets = [
+        AgentAsset("schema", "S", yaml.safe_dump(schema(source_path))),
+        AgentAsset(
+            "save", "F", f, schema_dependencies=("schema",), trial_inputs=({"path": "report.txt"},)
+        ),
+        AgentAsset("worker", "P", "$instruction", role="worker", schema_dependencies=("schema",)),
+        *checks,
+    ]
+    return AgentKernelAssets(tuple(assets), profile).export(root)
+
+
+class LostReceiptClient:
+    calls = 0
+
+    async def chat(self, **kwargs):
+        self.calls += 1
+        raise ConnectionError("dispatched but receipt lost")

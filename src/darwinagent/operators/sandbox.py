@@ -162,7 +162,7 @@ COMPARE = {
 }
 
 
-def admit(source: str, kind="F", forbidden_questions=()):
+def admit(source: str, kind="F", forbidden_questions=(), *, capability_names=None):
     if kind not in {"F", "C"} or len(source.encode()) > 60000:
         raise SandboxError("Invalid restricted code kind or size")
     try:
@@ -190,7 +190,11 @@ def admit(source: str, kind="F", forbidden_questions=()):
         or a.kwarg
     ):
         raise SandboxError("Fixed one-argument calling contract required")
-    caps = DATA_CAPABILITIES if kind == "F" else frozenset()
+    caps = (
+        (DATA_CAPABILITIES if capability_names is None else frozenset(capability_names))
+        if kind == "F"
+        else frozenset()
+    )
     for n in ast.walk(tree):
         if type(n) not in ALLOWED_NODES:
             raise SandboxError(f"Unsupported syntax: {type(n).__name__}")

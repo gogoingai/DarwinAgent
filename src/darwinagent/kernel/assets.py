@@ -159,6 +159,18 @@ class KernelAssets:
 
 
 class KernelBundle:
+    def __new__(cls, root):
+        import json
+
+        if (
+            cls is KernelBundle
+            and json.loads((Path(root) / "manifest.json").read_text()).get("format_version") == 4
+        ):
+            from darwinagent.agent.kernel import AgentKernelBundle
+
+            return AgentKernelBundle(root)
+        return super().__new__(cls)
+
     def __init__(self, root: Path):
         import json
 
