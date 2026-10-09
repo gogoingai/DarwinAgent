@@ -1,5 +1,7 @@
 # PyPI publishing
 
+0.3.0 is currently prepared locally and unpublished. This task authorizes no publishing workflow, tag, push or merge. See [release preparation](../releases/0.3.0.md). Its architecture version was explicitly approved; routine compatible releases otherwise increment only C in A.B.C.
+
 [简体中文](../zh-CN/pypi-publishing.md) · [English home](../../README.md)
 
 This guide is for maintainers. Package users should start with the [quickstart](quickstart.md).

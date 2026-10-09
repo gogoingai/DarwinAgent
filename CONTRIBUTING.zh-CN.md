@@ -17,7 +17,7 @@ uv run --frozen --group test python examples/third_domain.py
 uv build --wheel
 ```
 
-运行与改动相关的检查，报告实际结果和缺失依赖。涉及安装包时，还应使用 [scripts/check_installed.py](scripts/check_installed.py) 在源码目录外验证 wheel。当前完整测试有七项需要历史／官方／形式验证资源的显式跳过，详见[验收记录](docs/acceptance/2026-10-07.md)。
+运行与改动相关的检查，报告实际结果和缺失依赖。涉及安装包时，还应使用 [scripts/check_installed.py](scripts/check_installed.py) 在源码目录外验证 wheel。当前完整测试有八项需要历史／官方／形式验证资源的显式跳过，详见[验收记录](docs/acceptance/2026-10-09-agent-runtime.md)。
 
 ## 设计边界
 

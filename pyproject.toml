@@ -1,6 +1,6 @@
 [project]
 name = "darwinagent"
-version = "0.2.0"
+version = "0.3.0"
 description = "Evolution for the Agent Era: experience-driven recursive self-improvement for agents"
 readme = "README.pypi.md"
 license = "MIT"
@@ -94,6 +94,17 @@ include = [
     "/pyproject.toml",
     "/README.pypi.md",
     "/CHANGELOG.md",
+    "/examples/agent_runtime.py",
+    "/scripts/check_installed.py",
+    "/docs/en/agent-sdk.md",
+    "/docs/en/agent-runtime-reproduction.md",
+    "/docs/en/migration.md",
+    "/docs/zh-CN/agent-sdk.md",
+    "/docs/zh-CN/agent-runtime-reproduction.md",
+    "/docs/zh-CN/migration.md",
+    "/docs/releases/0.3.0.md",
+    "/docs/acceptance/2026-10-09-agent-runtime.md",
+    "/docs/acceptance/2026-10-09-agent-runtime.json",
     "/README.md",
     "/README.zh-CN.md",
     "/LICENSE",

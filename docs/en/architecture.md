@@ -4,6 +4,21 @@
 
 ![Architecture](../assets/architecture-en.svg)
 
+## Prepared 0.3.0: two execution routes
+
+The new `agent/` runtime accepts external Agent loops through `AgentAdapter.run(task,
+context)`. It executes real task/artifact episodes with durable `ExecutionBackend` receipts,
+a fixed `ExecutionProfile`, and v4 S/F/C/P assets. `experiments/episode_experiment.py` connects
+that backend to existing proposal/Wiki/admission/retention services. The optional source-tree
+`datasets/lift/` adapter integrates native LIFT without adding core imports or dependencies.
+See the [SDK](agent-sdk.md) and [migration](migration.md) for exact contracts and recovery.
+
+The default graph-QA route below remains compatible and retains immutable v3 bundles.
+Its read-only F boundary differs from the registered, explicitly scoped write capabilities
+of the v4 route; neither permits arbitrary host Python. The host fixes permissions in both.
+
+## Existing graph-QA route
+
 DarwinAgent 0.1 uses a common graph-based task runtime. The dataset boundary implements only `DatasetAdapter.generation_input(case_id)` and async `Evaluator.evaluate(result)`, returning `CaseInput` and `EvaluationResult` respectively. Evaluator references do not enter generation inputs.
 
 `Pipeline.run(case, spec, run_config)` freezes identity and records artifacts. `ExtractionAgent` extracts attributed facts and deterministically assembles a typed graph. `AnswerAgent` queries registered functions, answers, and reviews evidence under fixed protocols. Both agents share `KernelRuntime`. Framework code owns fixed validation and publication; task C checks return opinions.
@@ -46,4 +61,4 @@ Proposals can modify S/F/C/P. Framework execution, read-only permissions, fixed 
 
 New LoCoMo g1 runs construct graphs with an LLM under the current S. Wiki and the proposer share evidence from graph construction, tools, checks and answers; see [dynamic graphs and asset change signals](dynamic-graph.md).
 
-Source entry: [`src/darwinagent`](../../src/darwinagent/__init__.py). The core wheel includes only `darwinagent` and demo resources. Root `datasets`, `tasks`, `tests`, independent baselines, and third-party environments are not core distribution contents. Arbitrary external agent plugins are not implemented.
+Source entry: [`src/darwinagent`](../../src/darwinagent/__init__.py). The core wheel includes only `darwinagent` and demo resources. Root `datasets`, `tasks`, `tests`, independent baselines, and third-party environments are not core distribution contents. External Agent adapters use the prepared 0.3.0 SDK above.

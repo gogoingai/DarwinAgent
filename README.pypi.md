@@ -2,11 +2,22 @@
 
 **Evolution for the Agent Era**
 
-An open Python framework for experience-driven recursive self-improvement of agents. Run a task, propose changes to its assets, evaluate candidates independently, and retain effective versions and experience. Version 0.2.0 is experimental; improvement must be measured.
+An open Python framework for experience-driven recursive self-improvement of agents. Run a task, propose changes to its assets, evaluate candidates independently, and retain effective versions and experience. This source prepares unpublished 0.3.0: connect independent Agent loops, execute real file tasks and evolve bounded S/F/C/P assets with durable receipts. The default graph-QA route remains compatible. Improvement must be measured.
 
 [中文使用指南](https://github.com/gogoingai/DarwinAgent/blob/main/README.zh-CN.md) · [English guide](https://github.com/gogoingai/DarwinAgent/blob/main/README.md)
 
-## Install
+## Install the prepared version
+
+0.3.0 is prepared locally, not published to PyPI. In this source checkout run `uv build`, then install `dist/darwinagent-0.3.0-py3-none-any.whl` in your Python environment. The verified public release remains 0.2.0; the index command below retrieves that public version.
+
+```bash
+python -m pip install dist/darwinagent-0.3.0-py3-none-any.whl
+python -m darwinagent.demo.agent_runtime --output runs/agent-offline
+```
+
+The packaged example runs both an independent own-loop Agent and ReAct without credentials, writes real artifacts, and checks F-only changes with P fixed and durable replay. Its recorded responses are mechanism evidence, not live-quality gains. Read the SDK in this checkout at `docs/en/agent-sdk.md` (中文：`docs/zh-CN/agent-sdk.md`). Optional native LIFT needs the separate pinned Python 3.12 environment; it is excluded from the core wheel.
+
+## Install the public release
 
 Python 3.11 or newer is required. One package provides both the command-line tool and the Python API:
 

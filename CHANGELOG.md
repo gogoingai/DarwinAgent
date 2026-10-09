@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.0 — generic Agent runtime (prepared locally; unpublished)
+
+- Add Agent-owned loops, real artifact episodes, immutable v4 S/F/C/P bundles, bounded async F, lifecycle C and source-bound graph projection.
+- Integrate backend-driven episodes with the existing proposal, Wiki, independent evaluation and version-retention flow.
+- Preserve default graph-QA APIs and v3 bundle bytes; unknown submissions stay quarantined and known read failures have replayable structured receipts.
+- Add an optional pinned native LIFT adapter with isolated Docker workspaces, fresh delta loading, trace readback and shared HTTP accounting.
+- Ship a credential-free own-loop/ReAct example, Python 3.11 installed-wheel checks, bilingual SDK and migration instructions.
+
+**Status:** local preparation only; no tag, push or publication. Native recorded-response acceptance is mechanism evidence. Live content scores are pending, trajectory judging is `not_run`, and q6 independent confirmation is unrun. See [release preparation](docs/releases/0.3.0.md) and [dated acceptance](docs/acceptance/2026-10-09-agent-runtime.md).
+
 ## 0.2.0 — dynamic graphs, explicit datasets and isolated recovery (2026-10-09)
 
 [GitHub release](https://github.com/gogoingai/DarwinAgent/releases/tag/v0.2.0) · [中英文更新说明与迁移提示](docs/releases/0.2.0.md)

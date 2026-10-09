@@ -12,16 +12,17 @@
 [![Python 版本](https://img.shields.io/badge/python-%3E%3D3.11-45635c)](pyproject.toml)
 [![MIT 许可证](https://img.shields.io/badge/license-MIT-45635c)](LICENSE)
 
-**当前发行版本：[0.2.0](https://github.com/gogoingai/DarwinAgent/releases/tag/v0.2.0)（实验版）。** 见[更新历史](CHANGELOG.md)与[本次更新说明](docs/releases/0.2.0.md)。改进要以实际评测为准。
+**已核验的最新公开发行版本：[0.2.0](https://github.com/gogoingai/DarwinAgent/releases/tag/v0.2.0)（实验版）。** 见[更新历史](CHANGELOG.md)与[本次更新说明](docs/releases/0.2.0.md)。改进要以实际评测为准。
 
 DarwinAgent 的名字来自**查尔斯·达尔文与进化论**。**Agent 时代的进化**是项目的使命：让 Agent 从经验中适应任务，并保留有效的能力。在这个框架里，资产提案产生候选变化，独立评测和固定准入规则负责筛选，版本化资产与持久化经验 Wiki 负责保留结果，并影响下一轮提案。
 
-DarwinAgent 是面向 Agent 递归自改进的开源 Python 框架。它运行任务、提出资产修改、独立评测候选，再保留有效版本和经验记录。
+**当前源码正在本地准备 0.3.0，尚未发布。** Agent 自己控制执行循环，框架支持真实文件任务，并通过独立评测的 S/F/C/P 候选改进有来源依据的图、受限函数、检查与提示词。原有图问答 API 与 CLI 继续可用。改进效果与泛化能力需要实测，详见 [Agent SDK](docs/zh-CN/agent-sdk.md)、[迁移说明](docs/zh-CN/migration.md)与[发布准备](docs/releases/0.3.0.md)。
 
 安装一个 `darwinagent` 包，即可使用**命令行工具和 Python 接口**：
 
 | 你想做什么 | 从这里开始 |
 | --- | --- |
+| 接入自己的 Agent | [SDK 与独立循环/ReAct 离线示例](docs/zh-CN/agent-sdk.md) |
 | 先体验完整流程 | 按下方步骤配置模型，运行命令行演示 |
 | 在自己的 Python 项目里调用 | [Python 接入示例](docs/zh-CN/quickstart.md#4-在-python-项目中调用) |
 | 使用自己的记录和问题 | [自定义任务：完整可运行样例](docs/zh-CN/custom-tasks.md) |
@@ -36,14 +37,24 @@ DarwinAgent 是面向 Agent 递归自改进的开源 Python 框架。它运行�
 
 ## 1. 安装
 
-需要 Python 3.11 或更新版本，在你的 Python 环境中执行：
+需要 Python 3.11 或更新版本。从当前源码安装准备中的 0.3.0：
+
+```bash
+uv sync --frozen --group test
+uv run --frozen python -m darwinagent.demo.agent_runtime --output runs/agent-offline
+uv build
+# 在其他环境安装本地 wheel：
+python -m pip install dist/darwinagent-0.3.0-py3-none-any.whl
+```
+
+下方公开索引安装命令目前获取已核验的 0.2.0：
 
 ```bash
 python -m pip install --upgrade darwinagent
 darwinagent --version
 ```
 
-版本检查应输出 `darwinagent 0.2.0`。已安装旧版时，上面的命令会升级；如果仍显示旧版本，按[缓存排查](docs/zh-CN/quickstart.md#7-常见问题)刷新安装源缓存。
+公开包的版本检查输出 `darwinagent 0.2.0`，本地准备的 wheel 输出 `darwinagent 0.3.0`。已安装旧版时，上面的命令会升级；如果仍显示旧版本，按[缓存排查](docs/zh-CN/quickstart.md#7-常见问题)刷新安装源缓存。
 
 第一次使用 Python 项目时，建议先按[快速开始](docs/zh-CN/quickstart.md#1-安装)创建虚拟环境。普通用户无需下载仓库，也无需安装 `uv`。
 

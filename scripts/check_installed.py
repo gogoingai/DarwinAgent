@@ -21,6 +21,31 @@ def check():
                 timeout=90,
             )
 
+        import darwinagent
+
+        package_path = Path(darwinagent.__file__).resolve()
+        assert "site-packages" in package_path.parts, package_path
+        assert darwinagent.__version__ == "0.3.0"
+        generic = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "darwinagent.demo.agent_runtime",
+                "--output",
+                str(root / "agent"),
+            ],
+            cwd=root,
+            text=True,
+            capture_output=True,
+            check=True,
+            timeout=90,
+        )
+        summary = json.loads((root / "agent/summary.json").read_text())
+        assert summary["actual_model_http"] == 0
+        assert len(summary["episodes"]) == 4
+        assert all(e["status"] == "completed" for e in summary["episodes"].values())
+        print(generic.stdout)
+        print(f"Verified installed package: {package_path}")
         command("doctor", "--output", str(root / "doctor"))
         first = command("demo", "--mode", "replay", "--rounds", "2", "--output", str(root / "demo"))
         result = json.loads((root / "demo/demo-summary.json").read_text())

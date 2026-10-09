@@ -17,7 +17,7 @@ uv run --frozen --group test python examples/third_domain.py
 uv build --wheel
 ```
 
-Run relevant checks for your change, and report their actual results and skipped dependencies. For installed-package changes, also verify the built wheel outside the checkout using [scripts/check_installed.py](scripts/check_installed.py). Seven full-suite skips currently require archived/official/formal resources; see [acceptance evidence](docs/acceptance/2026-10-07.md).
+Run relevant checks for your change, and report their actual results and skipped dependencies. For installed-package changes, also verify the built wheel outside the checkout using [scripts/check_installed.py](scripts/check_installed.py). Eight full-suite skips currently require archived/official/formal resources; see [acceptance evidence](docs/acceptance/2026-10-09-agent-runtime.md).
 
 ## Design boundaries
 

@@ -44,7 +44,7 @@ from .experiments import (
 )
 from .kernel import KernelBundle, TaskSpec
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 __all__ = [
     "AgentAdapter",
     "AgentAsset",

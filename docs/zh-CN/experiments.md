@@ -1,5 +1,7 @@
 # 实验与证据
 
+本页介绍现有图问答实验路径。准备中的 0.3.0 同时支持 backend 驱动的任务与产物 episode，以及互斥的训练、验证、测试划分，详见 [Agent SDK](agent-sdk.md)。
+
 [English](../en/experiments.md) · [返回中文首页](../../README.zh-CN.md)
 
 ![进化循环](../assets/evolution-loop-zh-CN.svg)

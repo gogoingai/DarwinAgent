@@ -28,3 +28,10 @@ papers/
 .coverage
 .pytest_cache/
 htmlcov/
+
+# Private local task evidence, credentials, benchmark materials and environments
+.superpowers/
+datasets/lift/data/
+datasets/lift/private/
+datasets/lift/.env*
+!datasets/lift/.env.example

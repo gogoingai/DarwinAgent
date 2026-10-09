@@ -1,0 +1,83 @@
+# Reproduce generic Agent acceptance
+
+[简体中文](../zh-CN/agent-runtime-reproduction.md) · [SDK](agent-sdk.md)
+
+This describes prepared, unpublished 0.3.0. All ordinary checks below use recorded/local
+responses. Native LIFT and the separate trajectory judge are different acceptance layers.
+The dated [record](../acceptance/2026-10-09-agent-runtime.md) states actual results and limits.
+
+## Core and installed package
+
+```sh
+uv sync --frozen --group test
+uv run --frozen --group test python -m unittest discover -s tests -v
+uv run --frozen --group test python -m unittest discover -s datasets/locomo/tests -v
+uv run --frozen --group test python -m unittest discover -s datasets/travelplanner/tests -v
+uv run --frozen --group test ruff check .
+uv run --frozen --group test ruff format --check .
+uv run --frozen python examples/agent_runtime.py --output runs/NEW-agent-offline
+uv build
+```
+
+Create a clean Python 3.11 environment, install the local wheel, then run
+`/path/to/clean/python /absolute/checkout/scripts/check_installed.py` from outside the
+checkout. This checks the actual site-packages import, both generic loops, file artifacts,
+settled replay, and legacy doctor/demo/resume with immutable Wiki bytes. Python 3.12 is the
+verified optional native environment; the core does not import its benchmark dependencies.
+Historical external/formal-resource skips are not passed assertions. Preserve full logs;
+do not relax the existing startup-time threshold to obtain a passing label.
+
+## Native recorded-response acceptance
+
+Use the pinned LIFT checkout `9d282e415c5e3b0f65b82c8758a013b269583d93`, the separate
+Python 3.12 environment with `datasets/lift/requirements.lock`, and the exact EALE
+`419789ed1662e7b9ad16aa6620a4b31449612948` q1/q2/q5 material manifest.
+Do not open or stage q6. Provision local trace infrastructure first; keep its credentials
+outside version control. [Adapter instructions](../../datasets/lift/README.md) document
+capabilities, limits and registration. Run with an explicit Docker context:
+
+```sh
+DOCKER_CONTEXT=colima-darwin-lift docker build -t darwinagent-lift-tools:task3 datasets/lift
+DOCKER_CONTEXT=colima-darwin-lift DO_TRAJECTORY_JUDGE=false \
+/path/to/python3.12 -m datasets.lift.tests.offline_native \
+  --upstream /path/to/pinned/LIFT --data /private/pinned-data \
+  --output /private/NEW-native-run --trace --trace-env /private/infra/.env
+/path/to/python3.12 -m datasets.lift.tests.trace_probe \
+  --upstream /path/to/pinned/LIFT --root /private/NEW-native-run --trace-env /private/infra/.env
+```
+
+Do not change the global Docker context. The fixture executes real containers, tools,
+upstream content-evaluation protocol, evolution hooks, fresh delta loading and trace
+readback/postprocessing, using 81 recorded responses and zero model HTTP requests.
+Scores and tokens are synthetic; local wall time is not network latency. Native report
+trajectory placeholders always mean `trajectory_judge=not_run`.
+
+## Bounded live development diagnosis: pending
+
+Only the coordinator runs real model calls after review and a fresh source freeze. The
+approved configuration is `glm-5.3-flash`, temperature 0, Coding endpoint
+`https://open.bigmodel.cn/api/coding/paas/v4`, identically for all roles.
+Use at most 3 interaction turns (2 corrections), 8 worker requests per task/session and one
+candidate/evolution round. All actual HTTP attempts across worker, judge, proposal, Wiki,
+availability probes, processes and fresh run directories share one stable 100-request ledger.
+Keep `budget_root` separate from `run_root`; source changes never reset the budget.
+
+A is plain ReAct, B adds K0, C loads the selected K1 (or retained K0 if rejected). q1 is
+training/admission; q2 validates; q5 is development diagnosis. Freeze code, model, backend,
+kernels, evaluator, data and per-task permissions/budgets before comparison. Any repair after
+q5 preserves old failures, creates a new identity and reruns all A/B/C with remaining budget.
+If that cap prevents completion, report partial. q6 remains sealed and independent quality
+confirmation is unrun. No live quality or generality claim follows from the offline fixture.
+
+The authoritative `all-pair-report.json` includes every planned cell and its arm/phase,
+status, success/content, correction turns, flattened leaf tools, native tool counts, role
+model calls/tokens, measured durations, failures and unknown values. Retain incomplete turns
+and unstarted arms. Report proposal/Wiki overhead and total HTTP separately; missing token
+usage is unknown. A filtered upstream summary cannot replace these rows or hide declines.
+Unknown submitted requests pause all new transport until explicitly resolved; never silently
+retry or clear pause state.
+
+Keep private local `.superpowers/`, dataset materials, credentials and raw judge evidence on
+disk. Export only non-secret aggregate facts and hashes to tracked reports. For each defect,
+record reproduction command, original failure, cause, scoped repair and covering retest;
+original artifacts are immutable evidence.

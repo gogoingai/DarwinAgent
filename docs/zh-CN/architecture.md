@@ -4,6 +4,19 @@
 
 ![架构](../assets/architecture-zh-CN.svg)
 
+## 0.3.0 准备版本：两条执行路径
+
+新的 `agent/` 运行时通过 `AgentAdapter.run(task, context)` 接收外部 Agent 循环，
+用固定 `ExecutionProfile`、v4 S/F/C/P 资产和 `ExecutionBackend` 持久化回执执行真实
+任务与文件 episode。`experiments/episode_experiment.py` 将新 backend 接入现有提案、
+Wiki、准入与版本保留服务。源码目录中的可选 `datasets/lift/` 对接原生 LIFT，
+不增加核心无条件导入或依赖。具体契约与恢复见 [SDK](agent-sdk.md)和[迁移说明](migration.md)。
+
+下方默认图问答路径继续兼容，v3 资产包保持不可变。该路径的 F 只读边界与 v4 显式注册、
+限定工作区的写能力不同；两条路径均由宿主固定权限，都不允许任意宿主 Python。
+
+## 现有图问答路径
+
 DarwinAgent 0.1 使用基于图的共同任务运行时。数据集边界只实现 `DatasetAdapter.generation_input(case_id)` 与异步 `Evaluator.evaluate(result)`；前者返回 `CaseInput`，后者返回 `EvaluationResult`。评测参考不进入生成输入。
 
 `Pipeline.run(case, spec, run_config)` 冻结身份并记录产物。`ExtractionAgent` 抽取带来源的事实，确定性装配类型图；`AnswerAgent` 在登记资产和固定协议下调用查询函数、生成回答并审查来源。两个 Agent 共享 `KernelRuntime`。框架负责固定验证与发布，任务检查 C 提供检查意见。
@@ -44,4 +57,4 @@ DarwinAgent 0.1 使用基于图的共同任务运行时。数据集边界只实�
 
 LoCoMo 的新 g1 运行由 LLM 按当前 S 动态构图；Wiki 与提案器共享图、工具、检查和作答环节的修改线索。见[动态构图与资产修改信号](dynamic-graph.md)。
 
-源码入口：[`src/darwinagent`](../../src/darwinagent/__init__.py)。内核安装包只包含 `darwinagent` 及演示资源；根目录 `datasets`、`tasks`、`tests`、独立基线和第三方环境不随内核分发。任意外部 Agent 插件尚未实现。
+源码入口：[`src/darwinagent`](../../src/darwinagent/__init__.py)。内核安装包只包含 `darwinagent` 及演示资源；根目录 `datasets`、`tasks`、`tests`、独立基线和第三方环境不随内核分发。外部 Agent 适配器使用上方 0.3.0 准备版本 SDK。

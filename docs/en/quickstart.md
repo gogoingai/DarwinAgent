@@ -1,5 +1,7 @@
 # Quickstart
 
+This guide covers the public graph-QA CLI (verified 0.2.0). For this checkout's prepared, unpublished 0.3.0 Agent runtime and local-wheel installation, see the [Agent SDK](agent-sdk.md).
+
 [简体中文](../zh-CN/quickstart.md) · [English home](../../README.md)
 
 Start from an empty directory, configure a real model, and use either the CLI or Python API. Without model credentials, jump to [offline replay](#5-try-offline-replay-without-a-model).

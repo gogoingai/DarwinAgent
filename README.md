@@ -12,16 +12,17 @@ English · [简体中文](README.zh-CN.md)
 [![Python version](https://img.shields.io/badge/python-%3E%3D3.11-45635c)](pyproject.toml)
 [![MIT license](https://img.shields.io/badge/license-MIT-45635c)](LICENSE)
 
-**Current release: [0.2.0](https://github.com/gogoingai/DarwinAgent/releases/tag/v0.2.0) (experimental).** See the [changelog](CHANGELOG.md) and [release notes](docs/releases/0.2.0.md). Improvement must be measured.
+**Latest verified public release: [0.2.0](https://github.com/gogoingai/DarwinAgent/releases/tag/v0.2.0) (experimental).** See the [changelog](CHANGELOG.md) and [release notes](docs/releases/0.2.0.md). Improvement must be measured.
 
 DarwinAgent takes its name from **Charles Darwin and the theory of evolution**. Its mission is **Evolution for the Agent Era**: help agents adapt through experience and retain effective capabilities. In this framework, asset proposals introduce candidate variations, independent evaluation and fixed admission rules select among them, and versioned assets and a persistent experience Wiki retain results and inform the next proposal.
 
-DarwinAgent is an open Python framework for experience-driven recursive self-improvement of agents. It runs tasks, proposes changes to task assets, evaluates candidates independently, and retains effective versions and experience.
+**This checkout prepares 0.3.0 locally; it is not published.** Connect an Agent that owns its loop, execute real file tasks, and evolve source-bound graphs, bounded functions, checks and prompts through independently evaluated S/F/C/P candidates. The existing graph-QA API and CLI remain available. Improvement and generality require measured evidence. See the [Agent SDK](docs/en/agent-sdk.md), [migration](docs/en/migration.md) and [release preparation](docs/releases/0.3.0.md).
 
 One `darwinagent` package provides both a **command-line tool and a Python API**:
 
 | Your goal | Start here |
 | --- | --- |
+| Connect your own Agent | [SDK and offline own-loop/ReAct example](docs/en/agent-sdk.md) |
 | Try the complete loop | Configure a model and run the CLI demo below |
 | Call it from your Python project | [Python example](docs/en/quickstart.md#4-call-it-from-python) |
 | Use your own records and questions | [Custom tasks: complete runnable example](docs/en/custom-tasks.md) |
@@ -36,14 +37,24 @@ See [workspace operations](docs/workspace-continuation.md) and the [dated live-l
 
 ## 1. Install
 
-Use Python 3.11 or newer. In your Python environment:
+Use Python 3.11 or newer. To install this prepared 0.3.0 from its checkout:
+
+```bash
+uv sync --frozen --group test
+uv run --frozen python -m darwinagent.demo.agent_runtime --output runs/agent-offline
+uv build
+# Install the local wheel in another environment:
+python -m pip install dist/darwinagent-0.3.0-py3-none-any.whl
+```
+
+The following public-index installation currently retrieves the verified 0.2.0 release:
 
 ```bash
 python -m pip install --upgrade darwinagent
 darwinagent --version
 ```
 
-The version check should print `darwinagent 0.2.0`. The command above upgrades an existing installation. If you still see an older version, follow the [cached-index troubleshooting steps](docs/en/quickstart.md#7-troubleshooting).
+For that public package, the version check prints `darwinagent 0.2.0`; the local prepared wheel prints `darwinagent 0.3.0`. The command above upgrades an existing installation. If you still see an older version, follow the [cached-index troubleshooting steps](docs/en/quickstart.md#7-troubleshooting).
 
 If you are starting a new Python project, follow the [quickstart](docs/en/quickstart.md#1-install) to create a virtual environment first. Package users do not need to clone the repository or install `uv`.
 

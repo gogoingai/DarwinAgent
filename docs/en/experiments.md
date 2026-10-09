@@ -1,5 +1,7 @@
 # Experiments and evidence
 
+This page describes the existing graph-QA experiment route. Prepared 0.3.0 also supports backend-driven task/artifact episodes with disjoint train/validation/test splits; see the [Agent SDK](agent-sdk.md).
+
 [English](../en/experiments.md) · [简体中文](../zh-CN/experiments.md) · [README](../../README.md)
 
 ![Evolution loop](../assets/evolution-loop-en.svg)
