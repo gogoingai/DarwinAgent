@@ -30,6 +30,29 @@ cells and cumulative costs stay visible. CSV/HTML trajectory placeholders are la
 `not_run` until independently evaluated. Contribution scope should keep this optional,
 avoid core dependency additions, and retain upstream third-party notices/licenses.
 
+## Actual development diagnosis supplied as limited evidence
+
+Three preserved source identities yielded two framework protocol failures and one budget pause:
+`aadb5b4` lacked bounded feedback for a settled non-JSON reply (JSON mode was already enabled);
+`669b94d` did not explain/validate nonempty object-array artifacts; `68a0084` repairs both with
+scoped parse/prevalidation feedback and no repeat of settled writes. Recorded before/after
+counterexamples prove recovery mechanics, not improved model quality.
+
+The third fresh run completed q1 first delivery, received native intermediate false/0.33
+assessment for delivery format, then exhausted the cumulative eight-request worker cap during
+correction. Across all attempts and availability, 26 actual HTTP completed, zero unknown,
+244539 tokens (workers 101410, judge 143064, probe 65). A ninth local worker reservation was
+rejected before HTTP; its native token total is null with known subtotal 47613. q2,
+evolution/candidate and q5 A/B/C never started; K0 remains unchanged, q6 sealed, trajectory
+judge not_run. No final score, actual comparison or live CSV/HTML is supplied.
+
+Trace readback covers completed worker turn 0 (5 generations/4 leaves) and judge
+(8 generations/4 leaves). Three correction requests/three leaves persist in journals but were
+not flushed to trace-state. The retry-overwritten native task_time_s is not task wall time;
+measured LIVE003 request elapsed totals are worker 60.9758 s and judge 391.4317 s.
+The stable budget pause is retained; remaining global budget is not permission to bypass the
+exhausted task cap. All raw failures remain local; only safe facts and hashes accompany this draft.
+
 ## Questions for upstream review when submission is authorized
 
 - Preferred optional runtime registration/distribution convention and pinned compatibility policy.

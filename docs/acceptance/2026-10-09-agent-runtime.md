@@ -1,12 +1,12 @@
 # 通用 Agent 运行时验收 / Generic Agent runtime acceptance
 
-**0.3.0 本地准备；两次真实诊断失败，修复后效果比较待执行 / Prepared locally; two live diagnostics failed, post-repair comparison pending.**
+**0.3.0 本地准备、未发布；真实验收部分执行，现因单题预算暂停 / Prepared, unpublished; partial live acceptance paused at the task cap.**
 
-本报告记录 2026-10-09 隔离分支上的离线验收和两次失败的真实开发诊断，未发布、推送、合并或创建标签。
+本报告记录 2026-10-09—10 隔离分支上的离线验收、两次协议失败与第三次预算暂停，未发布、推送、合并或创建标签。
 [机器可读证据](2026-10-09-agent-runtime.json)包含逐文件源码哈希、日志哈希和全部十个 native
 单元的无秘密汇总；原始回执、失败、材料与私有配置仍保留在忽略的本地证据目录。
 
-This records offline acceptance of prepared 0.3.0 and two failed live development diagnostics. The linked JSON records source/log hashes and
+This records offline acceptance of prepared 0.3.0 and three live development attempts: two protocol failures, then a task-budget pause. The linked JSON records source/log hashes and
 all ten native cells without task materials, prompts or credentials. Private local evidence
 and original failures remain on disk. No publication, push, merge or tag was performed.
 
@@ -23,7 +23,7 @@ and original failures remain on disk. No publication, push, merge or tag was per
 | 此前第三领域样例 / Retained legacy third-domain example | Passed |
 | Docker + pinned native LIFT | Passed; 81 recorded responses, 0 model HTTP |
 | Native trace readback + postprocessing | Passed; 20 sessions; HTML and two CSVs generated |
-| 真实模型内容质量 / Live model content quality | Pending coordinator |
+| 真实开发诊断 / Live development diagnosis | Partial, paused: 26/100 completed HTTP; q1 initial score 0.33 is intermediate only; no final score or A/B/C comparison |
 | 轨迹评判 / Trajectory judge | `not_run`; native numeric placeholders are not quality evidence |
 | 独立确认 / q6 confirmation | Sealed and unrun |
 
@@ -183,18 +183,92 @@ tool contracts, host checks and backend ValueError remain outside that catch. Bu
 model/4 leaf to completed/6 model/4 leaf; both write exactly once and replay without another
 write. This is offline mechanism evidence only, with zero new real model requests.
 
-## 修复后真实比较待执行 / Post-repair live comparison pending
+## 第三次真实诊断与最终暂停 / Third live diagnostic and final pause
 
-协调者须在同一全局 100 次 HTTP 总账下记录每个计划单元：阶段、题号、A/B/C、状态、内容
-分数、纠错轮数、展开 leaf、原生工具数、worker/judge tokens、耗时、失败、未知、未启动项，
-并列出 proposal/Wiki 额外费用和总 HTTP。不能用缺失值替代 0，不能删去下降行。
-q5 是开发诊断；修复后需用新身份重跑全部 A/B/C，预算不足即报告 partial。
-q6 未运行，不能得出泛化或最优结论。
+`live-v030-003` 使用冻结源码 `68a0084`。q1 初次交付完成 5 次 worker 请求、4 次 leaf；
+原生内容评审完成 8 次请求，返回 success=false、score=0.33。这是**初次交付的中间结果**，
+不是最终题目分数。公开反馈指出 CSV 交付格式不符合要求，需改为 Markdown 并在首行标注日期。
+随后纠错完成另 3 次 worker 请求、3 次 leaf，第 9 个本地模型预留在 HTTP 提交前被累计
+8 次 worker/task/session 上限拒绝。暂停原因是 `budget_exhausted`；未清除暂停或提高任何上限。
+不能据此断言算法劣于其他组或框架演化失败：其他组和演化均未启动。
 
-The coordinator must fill all planned cells, failures/unknowns/unstarted work, full role costs,
-evolution overhead and actual shared HTTP attempts. Null means unavailable, never zero.
-Repairs require new identities for all A/B/C while retaining the same remaining budget.
-The q5 development comparison cannot establish independent quality/generalization; q6 is unrun.
+On frozen source `68a0084`, q1 first delivery completed five worker requests and four leaves.
+The native content judge used eight requests and returned success=false, score=0.33 for that
+**intermediate first delivery only**. Public feedback requested Markdown with a first-line date
+instead of the delivered CSV. Correction consumed three more worker requests and three leaves;
+the ninth local reservation was rejected before HTTP by the cumulative eight-request worker cap.
+The stable `budget_exhausted` pause remains. No final task score, algorithm comparison or evolution
+conclusion follows from this unfinished correction.
+
+| 实际 HTTP / Actual HTTP | 请求 / Requests | 实测 tokens / Measured tokens | 请求耗时之和 / Sum of request elapsed seconds |
+| --- | ---: | ---: | ---: |
+| 可用性检查 / Availability | 1 | 65 | 2.1895 |
+| 三次运行 worker 合计 / Workers across three runs | 17 | 101410 | 117.6193 |
+| LIVE003 原生内容评审 / Native content judge | 8 | 143064 | 391.4317 |
+| 总计 / Total | 26 | 244539 | 不作为整题耗时 / Not a task wall-time total |
+
+全部 26 次 HTTP 均完成，未知提交为 0；组成是可用性 1 + LIVE001 4 + LIVE002 5 + LIVE003 16。
+LIVE003 单独为 worker 8 次、47613 tokens、60.9758 秒；judge 8 次、143064 tokens、391.4317 秒。
+proposal/Wiki 均未启动，额外请求/token 为 0。共享 100 次总账尚余 74，不抵消单题额度耗尽，
+也不构成继续调用授权。原始失败、产物、总账和暂停状态保留。
+
+All 26 HTTP requests completed, with zero unknown submissions: availability 1 + LIVE001 4 +
+LIVE002 5 + LIVE003 16. LIVE003 alone used worker 8/47613 tokens/60.9758 s and judge
+8/143064 tokens/391.4317 s. Proposal and Wiki were unstarted, with zero request/token overhead.
+The remaining 74 shared requests do not override the exhausted task cap or authorize continuation.
+Original failures, artifacts, ledger and pause are retained.
+
+原生行记录 worker model_calls=9、pending_calls=1，包含未提交的本地预留；这不是 9 次 HTTP。
+其 worker_tokens 仍为 null，known subtotal=47613；该行的 unknown_token_requests=1 表示
+预留核算未闭合，不是未知 HTTP。实际已完成 HTTP 的全局 token 总计 244539 可独立核对。
+原生 `task_time_s=0.006783962249755859` 被重试覆盖，仅保留为产物字段，不能作为真实整题耗时。
+上表使用模型请求实测耗时；没有可用的整题墙钟耗时值。
+
+The native row counts nine reservations and one pending local reservation, not nine HTTP calls.
+Its worker token total remains null with known subtotal 47613; the single unknown-token entry
+reflects incomplete reservation accounting, not an unknown HTTP submission. Completed HTTP
+usage independently totals 244539 tokens. Native `task_time_s=0.006783962249755859` was overwritten
+by retry and is only an artifact field. Request elapsed durations above are measured; full task
+wall time is unavailable.
+
+| 计划阶段 / Planned stage | 最终状态 / Final status | 最终质量 / Final quality |
+| --- | --- | --- |
+| q1 warmup | paused; correction unfinished | null |
+| q1 K0 admission/train | unstarted | null |
+| q2 K0 validation | unstarted | null |
+| proposal/evolution | unstarted | null |
+| q1 K1 admission/train | unstarted | null |
+| q2 K1 validation | unstarted | null |
+| candidate selection | unstarted; K0 unchanged | null |
+| q5 A | unstarted | null |
+| q5 B | unstarted | null |
+| q5 C | unstarted | null |
+| q6 independent confirmation | sealed, unrun | null |
+| trajectory judge | not_run | null |
+
+上表明确列出逻辑计划阶段，不补造原生单元。JSON 保留实际原生报告的四行（q1 与 q5 A/B/C）。
+没有候选被验证，也没有最终分数、质量提升或全阶段验收完成结论。缺失质量不是 0。
+
+The table lists logical planned stages, not fabricated native cells. JSON retains the four actual
+native report rows (q1 and q5 A/B/C). No candidate was validated, no final score or improvement
+was measured, and all-phase acceptance is incomplete. Missing quality is not zero.
+
+协调者零模型调用回读通过两条已完成 session：judge 8 generations/4 leaf、worker turn 0
+5 generations/4 leaf。未完成 worker turn 1 的 3 次请求/3 leaf 留在本地 journal/总账，
+未 flush 到 trace-state；因此 trace 不覆盖全部 8 次 worker 请求。原生后处理因无配对结果失败，
+异常保留，没有真实 CSV/HTML；CLI 退出 0 不代表实验完成。前文 CSV/HTML 仅来自离线录制夹具。
+
+A zero-model-call readback verified completed judge (8 generations/4 leaves) and worker turn 0
+(5 generations/4 leaves) traces. Unfinished worker turn 1 retains its three requests/three leaves
+in local journals/ledger but has not flushed to trace-state; trace coverage is incomplete.
+Native postprocessing failed without pairs, with its exception preserved and no live CSV/HTML.
+CLI exit zero does not mean completion; the CSV/HTML mentioned earlier belongs only to the fixture.
+
+本次最终交付仅更新文档和 sdist，wheel 字节及 129 个冻结源码文件不变。73/26/69 项覆盖检查
+属于 `68a0084` 协议修复，完整 642 项通过属于此前 `aadb5b4`；没有为文档更新重跑无关套件。
+This final delivery updates documentation and sdist only; wheel bytes and all 129 frozen source
+files remain unchanged. The 73/26/69 covering checks belong to the `68a0084` repair; the full
+642 passes belong to earlier `aadb5b4`. No unrelated suite was repeated for this documentation update.
 
 静态检查初次报告 ReAct 导入区多余空行（I001）；原日志保留，修正后 Ruff 通过。
 源码字节变化后使用 `offline-native-live002-repair-final` 重新执行原生与 trace 验收，并重建安装包。

@@ -52,7 +52,27 @@ readback/postprocessing, using 81 recorded responses and zero model HTTP request
 Scores and tokens are synthetic; local wall time is not network latency. Native report
 trajectory placeholders always mean `trajectory_judge=not_run`.
 
-## Bounded live development diagnosis: pending
+## Bounded live development diagnosis: partial and paused
+
+Current outcome (2026-10-10): LIVE001 on `aadb5b4` failed on a non-JSON settled reply;
+LIVE002 on `669b94d` failed on string-array artifacts. Bounded protocol feedback and explicit
+object-array validation repaired those framework boundaries, with recorded before/after tests.
+Fresh LIVE003 on `68a0084` completed q1 first delivery, whose native intermediate assessment
+was false/0.33, then exhausted the eight-request worker cap during correction. Final task score
+is unavailable. All 26 actual HTTP completed (17 worker, 8 judge, 1 probe), totaling 244539 tokens.
+No unknown submission exists; one ninth local reservation was denied before HTTP. Its native
+worker total remains null, known subtotal 47613. q2, evolution/candidate and q5 A/B/C are
+unstarted; K0 is unchanged, q6 sealed, trajectory judge not_run. No further calls are authorized.
+Keep the stable pause and ledger; remaining global budget does not permit a task-cap bypass.
+
+Only completed worker turn 0 (5 requests) and judge (8 requests) traces were read back;
+three completed correction requests remain in local journals, not flushed trace-state.
+No live native CSV/HTML was produced. The retry-overwritten task_time_s field is not wall time;
+LIVE003 measured request elapsed totals are worker 60.9758 s and judge 391.4317 s.
+See the acceptance record for all failures, unstarted rows and costs. Full 642-pass evidence
+belongs to earlier `aadb5b4`; current source has 73/26/69 covering checks. This docs-only update
+preserves the tested wheel/source and rebuilds sdist without repeating unrelated suites.
+
 
 Only the coordinator runs real model calls after review and a fresh source freeze. The
 approved configuration is `glm-5.3-flash`, temperature 0, Coding endpoint

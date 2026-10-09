@@ -1,6 +1,6 @@
 {
   "version": "0.3.0",
-  "status": "prepared_local_two_live_failures_comparison_pending",
+  "status": "prepared_local_partial_live_paused",
   "date": "2026-10-09",
   "fix_scope": "Validate settled ReAct action/final envelope before dispatch; artifacts remain object mappings, no automatic conversion or universal required metadata.",
   "diagnostic_notices": "Passing assertions retain asyncio slow-task and expected legacy diagnostics; logs and thresholds preserved.",
@@ -720,7 +720,7 @@
     "live002-delivery-minimum-focused.log": "abefbc78bc953de096207b3e7bcdae89a4a7e2d31c974dd29e0c07a8ee47f718"
   },
   "live_accounting": {
-    "status": "two_failed_native_attempts_comparison_unstarted",
+    "status": "partial_live_paused_worker_session_cap",
     "runs": [
       {
         "status": "first_native_attempt_failed_comparison_unstarted",
@@ -830,18 +830,297 @@
           "live-v030-002/sessions/worker-282adffebe72fee06d0f9eb7/episodes/turn-0/events/000003.json": "4779c033c8d172979a034af6094e111db57ce726281b3563b72d922961024afd",
           "live-v030-002/sessions/worker-282adffebe72fee06d0f9eb7/episodes/turn-0/events/000015.json": "503f0b0f61e394827c38f552b9d94a26f0984e3caa2ace484572855864ab3d48"
         }
+      },
+      {
+        "source_commit": "68a00842fe5086c8a32fbdba370939450b7a0585",
+        "status": "paused",
+        "global_actual_http_attempts": 26,
+        "global_request_records": 26,
+        "global_request_statuses": {
+          "completed": 26
+        },
+        "campaign_actual_requests": 16,
+        "roles": {
+          "judge": {
+            "requests": 8,
+            "tokens": 143064,
+            "unknown_token_requests": 0,
+            "elapsed_s": 391.4317367076874
+          },
+          "worker": {
+            "requests": 8,
+            "tokens": 47613,
+            "unknown_token_requests": 0,
+            "elapsed_s": 60.975812911987305
+          }
+        },
+        "rows": [
+          {
+            "cell_id": "013d3abeeea67d7b146a4548",
+            "task_id": "q5",
+            "arm": "C",
+            "phase": "holdout",
+            "run_id": "lift-runid-darwin-live-v030-003",
+            "status": "unstarted",
+            "sessions": [],
+            "native": null,
+            "trajectory_judge": "not_run",
+            "task_time_s": null,
+            "worker_usage": {
+              "model_calls": 0,
+              "leaf_calls": 0,
+              "unknown_calls": 0,
+              "pending_calls": 0
+            },
+            "worker_tokens": 0,
+            "worker_known_tokens_subtotal": 0,
+            "worker_unknown_token_requests": 0,
+            "worker_accounting_status": "unstarted",
+            "worker_time_s": 0,
+            "worker_turns": 0,
+            "worker_unfinished_turns": 0,
+            "judge_usage": {
+              "model_calls": 0,
+              "leaf_calls": 0,
+              "unknown_calls": 0,
+              "pending_calls": 0
+            },
+            "judge_tokens": 0,
+            "judge_known_tokens_subtotal": 0,
+            "judge_unknown_token_requests": 0,
+            "judge_accounting_status": "unstarted",
+            "judge_time_s": 0,
+            "judge_turns": 0,
+            "judge_unfinished_turns": 0,
+            "correction_turns": 0,
+            "native_tool_calls": 0,
+            "flattened_leaf_calls": 0
+          },
+          {
+            "cell_id": "07c447f627a5639d124762fb",
+            "task_id": "q1",
+            "arm": "warmup",
+            "phase": "warmup",
+            "run_id": "lift-runid-darwin-live-v030-003",
+            "status": "paused",
+            "sessions": [
+              "judge-9a1380aea8cfb39f3b7c3cf3",
+              "worker-9a1380aea8cfb39f3b7c3cf3"
+            ],
+            "native": null,
+            "trajectory_judge": "not_run",
+            "started": 1791561640.050179,
+            "error_type": "BudgetExceeded",
+            "finished": 1791561640.056963,
+            "task_time_s": 0.006783962249755859,
+            "worker_usage": {
+              "model_calls": 9,
+              "leaf_calls": 7,
+              "unknown_calls": 0,
+              "pending_calls": 1
+            },
+            "worker_tokens": null,
+            "worker_known_tokens_subtotal": 47613,
+            "worker_unknown_token_requests": 1,
+            "worker_accounting_status": "incomplete",
+            "worker_time_s": 61.80700421333313,
+            "worker_turns": 2,
+            "worker_unfinished_turns": 1,
+            "judge_usage": {
+              "model_calls": 8,
+              "leaf_calls": 4,
+              "unknown_calls": 0,
+              "pending_calls": 0
+            },
+            "judge_tokens": 143064,
+            "judge_known_tokens_subtotal": 143064,
+            "judge_unknown_token_requests": 0,
+            "judge_accounting_status": "complete",
+            "judge_time_s": 392.1727170944214,
+            "judge_turns": 1,
+            "judge_unfinished_turns": 0,
+            "correction_turns": 1,
+            "native_tool_calls": 7,
+            "flattened_leaf_calls": 7
+          },
+          {
+            "cell_id": "45a85cbed3eeedc668b6c8ac",
+            "task_id": "q5",
+            "arm": "B",
+            "phase": "holdout",
+            "run_id": "lift-runid-darwin-live-v030-003",
+            "status": "unstarted",
+            "sessions": [],
+            "native": null,
+            "trajectory_judge": "not_run",
+            "task_time_s": null,
+            "worker_usage": {
+              "model_calls": 0,
+              "leaf_calls": 0,
+              "unknown_calls": 0,
+              "pending_calls": 0
+            },
+            "worker_tokens": 0,
+            "worker_known_tokens_subtotal": 0,
+            "worker_unknown_token_requests": 0,
+            "worker_accounting_status": "unstarted",
+            "worker_time_s": 0,
+            "worker_turns": 0,
+            "worker_unfinished_turns": 0,
+            "judge_usage": {
+              "model_calls": 0,
+              "leaf_calls": 0,
+              "unknown_calls": 0,
+              "pending_calls": 0
+            },
+            "judge_tokens": 0,
+            "judge_known_tokens_subtotal": 0,
+            "judge_unknown_token_requests": 0,
+            "judge_accounting_status": "unstarted",
+            "judge_time_s": 0,
+            "judge_turns": 0,
+            "judge_unfinished_turns": 0,
+            "correction_turns": 0,
+            "native_tool_calls": 0,
+            "flattened_leaf_calls": 0
+          },
+          {
+            "cell_id": "a2b5df09e7bf354179bfa55b",
+            "task_id": "q5",
+            "arm": "A",
+            "phase": "holdout",
+            "run_id": "lift-runid-darwin-live-v030-003",
+            "status": "unstarted",
+            "sessions": [],
+            "native": null,
+            "trajectory_judge": "not_run",
+            "task_time_s": null,
+            "worker_usage": {
+              "model_calls": 0,
+              "leaf_calls": 0,
+              "unknown_calls": 0,
+              "pending_calls": 0
+            },
+            "worker_tokens": 0,
+            "worker_known_tokens_subtotal": 0,
+            "worker_unknown_token_requests": 0,
+            "worker_accounting_status": "unstarted",
+            "worker_time_s": 0,
+            "worker_turns": 0,
+            "worker_unfinished_turns": 0,
+            "judge_usage": {
+              "model_calls": 0,
+              "leaf_calls": 0,
+              "unknown_calls": 0,
+              "pending_calls": 0
+            },
+            "judge_tokens": 0,
+            "judge_known_tokens_subtotal": 0,
+            "judge_unknown_token_requests": 0,
+            "judge_accounting_status": "unstarted",
+            "judge_time_s": 0,
+            "judge_turns": 0,
+            "judge_unfinished_turns": 0,
+            "correction_turns": 0,
+            "native_tool_calls": 0,
+            "flattened_leaf_calls": 0
+          }
+        ],
+        "pause": "per-task worker8-request cap exhausted on q1 correction; shared pausegate retained",
+        "selected": "K0 unchanged; no evolution or candidate validated",
+        "q2": "unstarted",
+        "q5": "A/B/C unstarted",
+        "q6": "sealed_not_opened",
+        "trajectory_judge": "not_run",
+        "native_csv_html": "not produced: no baseline/evolved pairs; original postprocess failure retained",
+        "evidence_sha256": "879f37694cf6a32c3da9948a324fd3e351a05c68de7a9a3380a7894c5c30c91d",
+        "q1_initial_judge_summary": {
+          "success": false,
+          "score": 0.33
+        },
+        "global_cost_breakdown": [
+          {
+            "namespace": "agent_worker",
+            "role": "worker",
+            "requests": 17,
+            "prompt_tokens": 95240,
+            "completion_tokens": 6170,
+            "elapsed_s": 117.6193208694458
+          },
+          {
+            "namespace": "agent_worker",
+            "role": "judge",
+            "requests": 8,
+            "prompt_tokens": 124775,
+            "completion_tokens": 18289,
+            "elapsed_s": 391.4317367076874
+          },
+          {
+            "namespace": "availability-probe",
+            "role": "worker",
+            "requests": 1,
+            "prompt_tokens": 17,
+            "completion_tokens": 48,
+            "elapsed_s": 2.1895079612731934
+          }
+        ],
+        "run": "live-v030-003",
+        "final_task_score": null,
+        "final_task_success": null,
+        "measured_task_wall_time_s": null,
+        "task_time_caveat": "Native task_time_s=0.006783962249755859 was overwritten by the retry; it is only a persisted artifact field, not task wall time.",
+        "reservation_caveat": "9 worker model reservations include 1 pending local reservation denied before HTTP. Actual worker HTTP=8, all completed. Native worker_tokens remains null and known subtotal=47613; worker_unknown_token_requests=1 is incomplete reservation accounting, not unknown HTTP.",
+        "first_delivery": {
+          "worker_http": 5,
+          "leaf_calls": 4,
+          "status": "completed",
+          "judge_http": 8,
+          "judge_success": false,
+          "judge_score": 0.33,
+          "score_scope": "intermediate_first_delivery_only",
+          "public_feedback_summary": "CSV delivery did not meet feedback requesting Markdown with a date on the first line; no hidden judge criteria exported."
+        },
+        "correction": {
+          "worker_http": 3,
+          "leaf_calls": 3,
+          "turns": 1,
+          "status": "unfinished_worker_cap",
+          "next_local_reservation": "denied_pre_http"
+        },
+        "trace_readback": {
+          "status": "PASS",
+          "sessions": [
+            {
+              "session": "judge-9a1380aea8cfb39f3b7c3cf3",
+              "trace_roots": 1,
+              "generations": 8,
+              "leaf_spans": 4
+            },
+            {
+              "session": "worker-9a1380aea8cfb39f3b7c3cf3",
+              "trace_roots": 1,
+              "generations": 5,
+              "leaf_spans": 4
+            }
+          ],
+          "native_postprocess": "incomplete_no_pairs",
+          "new_actual_model_http": 0
+        },
+        "trace_coverage_caveat": "Readback covers completed judge turn (8 generations, 4 leaves) and completed worker turn 0 (5 generations, 4 leaves). Unfinished worker correction turn 1 has 3 completed HTTP and 3 leaves retained in local journals/ledger but not flushed to trace-state; this is not full worker trace coverage.",
+        "cli_exit_zero_is_completion": false,
+        "quality_claim": false
       }
     ],
-    "actual_http_attempts_global": 10,
-    "completed_http_requests": 10,
+    "actual_http_attempts_global": 26,
+    "completed_http_requests": 26,
     "availability_requests": 1,
-    "availability_tokens": null,
-    "native_worker_requests": 9,
+    "availability_tokens": 65,
+    "native_worker_requests": 17,
     "unknown_requests": 0,
     "shared_http_cap": 100,
-    "remaining_shared_http_cap": 90,
+    "remaining_shared_http_cap": 74,
     "failed_native_runs": 2,
-    "q2": "not_run",
+    "q2": "unstarted",
     "q5_arms": {
       "A": "unstarted",
       "B": "unstarted",
@@ -851,9 +1130,131 @@
     "quality_claim": false,
     "requests_by_this_repair": 0,
     "evidence_sha256": {
-      "live002-repair-failure-facts.json": "f4e0e49fdcb7304da29a57e62aaccbe1eb29a804448368152582796deec0eb53"
+      "live002-repair-failure-facts.json": "f4e0e49fdcb7304da29a57e62aaccbe1eb29a804448368152582796deec0eb53",
+      "infra/live-003-diagnostic.json": "59a65c5ec72b0dd378ff1c29e00ad2cc45517a73465cf25053cbb6b338eba748",
+      "infra/live-003-trace-readback.json": "1f3693002a69fc5dab056212c466e40f78ec998a14a496ce544015a03d783331",
+      "live-003-trace-readback.log": "908127b22d43aed7384dee3eb83c75d674a2ba92a8d26bb27205fc2df80feb12"
     },
-    "note": "10 actual attempts include availability and two failed q1 warmups; separate from all recorded mechanism metrics. Fresh entire pipeline on the same non-resetting ledger is coordinator-only after review. Availability token usage was not provided here; null is unavailable, not zero."
+    "note": "All 26 HTTP attempts completed: availability 1 + LIVE001 worker 4 + LIVE002 worker 5 + LIVE003 worker 8 and judge 8. Shared budget remaining 74 does not permit bypassing the exhausted 8-request worker/session cap. Local ninth reservation was denied before HTTP; it is not an unknown submission. Recorded metrics are separate. No further calls authorized.",
+    "judge_requests": 8,
+    "total_actual_http_tokens": 244539,
+    "paused_native_runs": 1,
+    "pause": "budget_exhausted",
+    "worker_session_http_cap": 8,
+    "interaction_turn_cap": 3,
+    "selected": "K0 unchanged; no evolution or candidate validated",
+    "additional_calls_authorized": false,
+    "global_cost_breakdown": [
+      {
+        "namespace": "agent_worker",
+        "role": "worker",
+        "requests": 17,
+        "prompt_tokens": 95240,
+        "completion_tokens": 6170,
+        "elapsed_s": 117.6193208694458
+      },
+      {
+        "namespace": "agent_worker",
+        "role": "judge",
+        "requests": 8,
+        "prompt_tokens": 124775,
+        "completion_tokens": 18289,
+        "elapsed_s": 391.4317367076874
+      },
+      {
+        "namespace": "availability-probe",
+        "role": "worker",
+        "requests": 1,
+        "prompt_tokens": 17,
+        "completion_tokens": 48,
+        "elapsed_s": 2.1895079612731934
+      }
+    ],
+    "planned_stage_statuses": [
+      {
+        "stage": "q1 warmup",
+        "status": "paused",
+        "success": null,
+        "content_score": null
+      },
+      {
+        "stage": "q1 K0 admission/train",
+        "status": "unstarted",
+        "success": null,
+        "content_score": null
+      },
+      {
+        "stage": "q2 K0 validation",
+        "status": "unstarted",
+        "success": null,
+        "content_score": null
+      },
+      {
+        "stage": "proposal/evolution",
+        "status": "unstarted",
+        "success": null,
+        "content_score": null
+      },
+      {
+        "stage": "q1 K1 admission/train",
+        "status": "unstarted",
+        "success": null,
+        "content_score": null
+      },
+      {
+        "stage": "q2 K1 validation",
+        "status": "unstarted",
+        "success": null,
+        "content_score": null
+      },
+      {
+        "stage": "candidate selection",
+        "status": "unstarted",
+        "success": null,
+        "content_score": null
+      },
+      {
+        "stage": "q5 A",
+        "status": "unstarted",
+        "success": null,
+        "content_score": null
+      },
+      {
+        "stage": "q5 B",
+        "status": "unstarted",
+        "success": null,
+        "content_score": null
+      },
+      {
+        "stage": "q5 C",
+        "status": "unstarted",
+        "success": null,
+        "content_score": null
+      },
+      {
+        "stage": "q6 independent confirmation",
+        "status": "sealed_not_opened",
+        "success": null,
+        "content_score": null
+      },
+      {
+        "stage": "trajectory judge",
+        "status": "not_run",
+        "success": null,
+        "content_score": null
+      }
+    ],
+    "planned_stage_statuses_scope": "Logical pipeline status, not invented native cells; raw native rows are retained separately in runs[2].rows.",
+    "proposal_overhead": {
+      "requests": 0,
+      "tokens": 0,
+      "status": "unstarted"
+    },
+    "wiki_overhead": {
+      "requests": 0,
+      "tokens": 0,
+      "status": "unstarted"
+    }
   },
   "protocol_counterexample": {
     "mechanism_only": true,
@@ -894,5 +1295,8 @@
     "final_log": "live002-repair-ruff-final.log",
     "new_native_identity": "offline-native-live002-repair-final",
     "note": "Old preliminary native and archives retained; final artifacts rebuilt after formatting change."
-  }
+  },
+  "updated_at": "2026-10-10",
+  "runtime_source_commit": "68a00842fe5086c8a32fbdba370939450b7a0585",
+  "final_update_scope": "docs_only; no source, budget, pause or model changes"
 }

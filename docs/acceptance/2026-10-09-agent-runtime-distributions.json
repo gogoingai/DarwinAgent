@@ -9,15 +9,15 @@
   "wheel_identical_to_minimum_tested": true,
   "distributions": {
     "darwinagent-0.3.0-py3-none-any.whl": "0af63944e597dbadf06d82b96e9cf5205d902ce721f4aefcb55513e82aa7f910",
-    "darwinagent-0.3.0.tar.gz": "6ee3f7c22acf8431e4b67c93f5069ac91dc32007455a2dcaa4bd09907dd68d2d"
+    "darwinagent-0.3.0.tar.gz": "c1646b9250aca2172069f7cd272465ea4097b96ee06c1d30a00a14aef28bce53"
   },
   "actual_model_http_this_repair": 0,
-  "global_actual_model_http_at_handoff": 10,
+  "global_actual_model_http_at_handoff": 26,
   "q6": "sealed_not_opened",
   "v3_byte_equal_files": 8,
-  "installed_checker": "passed outside checkout on Python 3.11.15",
-  "artifact_directory": ".superpowers/sdd/2026-10-09-agent-runtime/live002-delivery-dist",
-  "acceptance_summary_sha256": "dc11da3a070c11ef8477a5af4d0fad9934d0f687505d67529657194bb577ccc4",
+  "installed_checker": "passed outside checkout on Python 3.11.15; already installed byte-identical wheel; no reinstall or full suite repeated",
+  "artifact_directory": ".superpowers/sdd/2026-10-09-agent-runtime/finalactual-dist",
+  "acceptance_summary_sha256": "eee7aa04e288aef597b376c2da33ce830e3afb27b5a9c26b9889396b437f72ee",
   "evidence_sha256": {
     "live002-delivery-build.log": "39474e09bc112e318aade8278e8fcd0fc29683ce3fcd0f002636051b33893276",
     "live002-delivery-install311.log": "a958ce5886488868c133d75dde4afdfd0a9e19d99dd611f93d0e92e28fb285b2",
@@ -25,14 +25,29 @@
     "live002-delivery-minimum-focused.log": "abefbc78bc953de096207b3e7bcdae89a4a7e2d31c974dd29e0c07a8ee47f718",
     "live002-delivery-distribution.log": "a010d0b21d9ece3b816fc9a07e10496513027ede656bd19b5366f2122e28c999",
     "live002-repair-ruff-final.log": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18",
-    "live002-repair-format-final.log": "3bc53bf3e981a98a34a852e175bf9b77af841edea74fca595d9aedcbaf9a4938"
+    "live002-repair-format-final.log": "3bc53bf3e981a98a34a852e175bf9b77af841edea74fca595d9aedcbaf9a4938",
+    "finalactual-build.log": "03c4de7fd189027376ff65e97464a963e70d1dfac871118ce6e379a33ba280c3",
+    "finalactual-package-check.json": "b2cc9aa3a40096dc58a7aa1063d83a671ab6112f3d8a45f7b2f09caea9cf145f",
+    "finalactual-package-check.log": "b2cc9aa3a40096dc58a7aa1063d83a671ab6112f3d8a45f7b2f09caea9cf145f",
+    "finalactual-installed311.log": "ae745c3d9e4d8b4d6ddc5d22931520aedfb07b573753d7d4d4df8a3eb9de030a"
   },
   "previous_distributions": {
-    "artifact_directory": ".superpowers/sdd/2026-10-09-agent-runtime/live-repair-dist",
+    "artifact_directory": ".superpowers/sdd/2026-10-09-agent-runtime/live002-delivery-dist",
     "distributions": {
-      "darwinagent-0.3.0-py3-none-any.whl": "e3ea918d01c6cfdab68490c168d7dabc1ae239a619c664e6abd839f52815e2a2",
-      "darwinagent-0.3.0.tar.gz": "400de72ce9b0ab879eaa9503b5770e42110684dcc96602ffa54c220a8fe23da3"
+      "darwinagent-0.3.0-py3-none-any.whl": "0af63944e597dbadf06d82b96e9cf5205d902ce721f4aefcb55513e82aa7f910",
+      "darwinagent-0.3.0.tar.gz": "6ee3f7c22acf8431e4b67c93f5069ac91dc32007455a2dcaa4bd09907dd68d2d"
+    },
+    "earlier": {
+      "artifact_directory": ".superpowers/sdd/2026-10-09-agent-runtime/live-repair-dist",
+      "distributions": {
+        "darwinagent-0.3.0-py3-none-any.whl": "e3ea918d01c6cfdab68490c168d7dabc1ae239a619c664e6abd839f52815e2a2",
+        "darwinagent-0.3.0.tar.gz": "400de72ce9b0ab879eaa9503b5770e42110684dcc96602ffa54c220a8fe23da3"
+      }
     }
   },
-  "note": "Unpublished local builds after final Ruff correction and fresh native source freeze. All earlier archives/native evidence and both failed live runs retained. This repair made zero model requests; shared actual ledger remains 10/100 at handoff."
+  "note": "Unpublished docs-only final delivery. Wheel and 129 frozen runtime source files unchanged; sdist contains final actual diagnostic docs. 26 completed actual HTTP, zero unknown submissions; LIVE003 paused at worker/session cap, shared pause retained. Earlier archives and failed/live evidence retained. External manifest excluded from sdist to avoid self-hash.",
+  "scope": "distribution_integrity_only; live_acceptance_partial_paused",
+  "runtime_source_commit": "68a00842fe5086c8a32fbdba370939450b7a0585",
+  "actual_model_http_this_delivery": 0,
+  "wheel_unchanged_after_docs": true
 }

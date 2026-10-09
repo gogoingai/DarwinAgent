@@ -48,7 +48,22 @@ DOCKER_CONTEXT=colima-darwin-lift DO_TRAJECTORY_JUDGE=false \
 分数与 token 为合成数据，本地耗时不代表网络模型延迟。原生报告中的轨迹占位值统一按
 `trajectory_judge=not_run` 理解。
 
-## 有界真实开发诊断：待执行
+## 有界真实开发诊断：部分执行，已暂停
+
+截至 2026-10-10：LIVE001（`aadb5b4`）因已结算回复不是 JSON 失败；LIVE002（`669b94d`）
+因产物数组含字符串失败。有界协议反馈与对象数组预校验修复了这两项框架边界，录制反例保留
+修复前后证据。新身份 LIVE003（`68a0084`）完成 q1 初次交付，原生中间评审为 false/0.33，
+纠错中耗尽累计 8 次 worker 上限，最终题目分数不可用。26 次实际 HTTP 全部完成（worker 17、
+judge 8、probe 1），共 244539 tokens；未知提交为 0。第 9 个本地预留在 HTTP 前拒绝，
+原生 worker 总量仍为 null、已知小计 47613。q2、演化/候选、q5 A/B/C 未启动；K0 不变，
+q6 封存，轨迹评判 not_run。没有进一步调用授权；保留暂停及稳定总账，不能用剩余总额度绕过单题上限。
+
+实际 trace 只回读已完成 worker turn 0（5 请求）和 judge（8 请求）；纠错的 3 次已完成
+请求仍在本地 journal，尚未 flush 到 trace-state。真实 native CSV/HTML 未生成。
+重试覆盖的 task_time_s 不能作整题墙钟耗时；LIVE003 实测请求耗时之和为 worker 60.9758 秒、
+judge 391.4317 秒。全部失败、未启动行和成本见验收记录。完整 642 项通过属于此前 `aadb5b4`，
+当前源码覆盖检查为 73/26/69 项。本次仅更新文档、重建 sdist，保留已测 wheel/源码，不重复无关套件。
+
 
 代码审查与新源码冻结后，由协调者执行真实模型请求。已授权配置是 `glm-5.3-flash`、
 temperature 0、Coding 端点 `https://open.bigmodel.cn/api/coding/paas/v4`，各角色保持一致。
