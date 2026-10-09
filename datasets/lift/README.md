@@ -40,7 +40,8 @@ q1 的相同任务/K0/固定身份收据复用于 warmup、准入和训练；候
 历史歧义暂停仅由协调者调用 `SharedTransport.recover_local_cap_pause` 审计恢复，启动器不会自动恢复。
 
 无需服务器即可生成 `all-pair-report.json`、`.csv`、`.md`，保留失败、未开始、缺失值、
-中间评判以及 worker/judge/proposal/Wiki 各角色的实际费用。`evaluation_healthy` 与任务终态
+中间评判以及 worker/judge/proposal/Wiki 各角色的实际费用。最终内容分数与失败前的中间分数
+分别展示；宏调用数单列，原生工具计数及展开计数均按实际原语 leaf 计数。`evaluation_healthy` 与任务终态
 分开；`acceptance_complete` 只有真实传输、完整有效的 q5 A/B/C 和身份验证通过才可能为真。
 录制机制测试永远不会成为真实验收，回退及 q6 未测范围会写入报告。
 

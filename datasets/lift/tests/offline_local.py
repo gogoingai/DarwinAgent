@@ -105,6 +105,8 @@ async def pilot(upstream, data, output, *, failures=False, all_failed=False):
         assert not selected["fallback"], selected
         assert all(r["native"]["success"] for r in rows)
         assert next(r for r in rows if r["arm"] == "C")["native"]["turns"] == 1
+        assert next(r for r in rows if r["arm"] == "C")["worker_macro_invocations"] == 1
+        assert result["native_tool_count_semantics"] == "worker_primitive_leaf_calls"
     assert not result[
         "acceptance_complete"
     ]  # Synthetic mechanism evidence is never real acceptance.

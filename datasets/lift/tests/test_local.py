@@ -200,6 +200,111 @@ class LocalSchedulingTests(unittest.IsolatedAsyncioTestCase):
             await runner.run()
             self.assertEqual(len(client.calls), before)
 
+    async def test_fresh_roots_share_global_ledger_but_not_worker_caps_and_resume_is_stable(self):
+        from darwinagent.runtime.artifacts import atomic_json
+        from datasets.lift.kernel import initial_kernel
+        from datasets.lift.local import LocalRunner
+        from datasets.lift.tests.offline_local import infrastructure_guard
+
+        with tempfile.TemporaryDirectory() as d, infrastructure_guard():
+            root = Path(d)
+            ledger = root / "budget/http-attempts.json"
+            atomic_json(ledger, {"attempts": 26})
+            original_ledger = ledger.read_bytes()
+            session_sets = []
+            for index in (1, 2):
+                run_root = root / ("comparison-" + str(index))
+                client = LocalClient(run_root)
+                client.cfg.request_budget_path = ledger
+                client.http_attempts = lambda: json.loads(ledger.read_text())["attempts"]
+                shared = SharedTransport(client, root / "budget/shared")
+                runner = LocalRunner(
+                    dataset=TinyDataset(),
+                    shared=shared,
+                    root=run_root,
+                    initial=initial_kernel(run_root / "K0"),
+                    run_id="local-" + str(index),
+                )
+                result = await runner.run()
+                self.assertEqual(sum(t == "q1" and role == "worker" for t, role in client.calls), 8)
+                sessions = {sid for row in result["rows"] for sid in row["sessions"]}
+                session_sets.append(sessions)
+                before_calls = len(client.calls)
+                protected = [
+                    run_root / name for name in ("sessions", "task-receipts", "workspaces", "loads")
+                ]
+                before = {
+                    str(p): (p.read_bytes(), p.stat().st_mtime_ns)
+                    for base in protected
+                    for p in base.rglob("*")
+                    if p.is_file()
+                }
+                resumed = await runner.run()
+                self.assertEqual(
+                    sessions, {sid for row in resumed["rows"] for sid in row["sessions"]}
+                )
+                self.assertEqual(before_calls, len(client.calls))
+                self.assertEqual(
+                    before,
+                    {
+                        str(p): (p.read_bytes(), p.stat().st_mtime_ns)
+                        for base in protected
+                        for p in base.rglob("*")
+                        if p.is_file()
+                    },
+                )
+                self.assertEqual(ledger.read_bytes(), original_ledger)
+            self.assertTrue(session_sets[0].isdisjoint(session_sets[1]))
+            counts = json.loads((root / "budget/shared/worker-calls.json").read_text())
+            self.assertEqual(
+                sum(
+                    counts[sid] == 8
+                    for sessions in session_sets
+                    for sid in sessions
+                    if sid.startswith("worker-")
+                ),
+                4,
+            )
+
+    async def test_failed_intermediate_score_is_scoped_in_markdown_and_csv(self):
+        import csv
+
+        from darwinagent.runtime.artifacts import atomic_json
+        from datasets.lift.report import cell
+        from datasets.lift.tests.offline_local import infrastructure_guard
+
+        with tempfile.TemporaryDirectory() as d, infrastructure_guard():
+            runner, _ = self.runner(Path(d))
+            key = cell(
+                runner.root,
+                "q1",
+                "campaign",
+                "train",
+                runner.run_id,
+                status="failed",
+                healthy=False,
+                content_score_scope="intermediate",
+                native={"success": False, "content_score": 0.5, "turns": 1},
+            )
+            chat = runner.root / "sessions/worker-test/chat.json"
+            atomic_json(chat, {"turns": []})
+            from datasets.lift.report import update_cell
+
+            update_cell(runner.root, key, sessions=["worker-test"])
+            runner.write_reports()
+            markdown = (runner.root / "all-pair-report.md").read_text()
+            self.assertIn("| Final content | Last intermediate content | Score scope |", markdown)
+            self.assertIn(
+                "| q1 | campaign | failed | False | null | 0.5 | intermediate |", markdown
+            )
+            with (runner.root / "all-pair-report.csv").open() as stream:
+                row = next(csv.DictReader(stream))
+            self.assertEqual(row["final_content_score"], "")
+            self.assertEqual(row["last_intermediate_content_score"], "0.5")
+            self.assertEqual(row["content_score_scope"], "intermediate")
+            result = json.loads((runner.root / "all-pair-report.json").read_text())
+            self.assertEqual(result["native_tool_count_semantics"], "worker_primitive_leaf_calls")
+
     async def test_unknown_and_global_stop_before_next_task(self):
         from datasets.lift.tests.offline_local import infrastructure_guard
 
@@ -286,3 +391,62 @@ class LocalBudgetTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(len(requests), 1)
             self.assertEqual(json.loads(ledger.read_text()), {"attempts": 100})
             self.assertFalse((root / "shared/worker-calls.json").exists())
+
+
+class LocalCliTests(unittest.TestCase):
+    def test_cli_closes_on_execution_loop_and_preserves_original_failure(self):
+        from datasets.lift.local import main
+
+        for run_fails, close_fails in ((False, False), (True, False), (True, True)):
+            with (
+                self.subTest(run_fails=run_fails, close_fails=close_fails),
+                tempfile.TemporaryDirectory() as d,
+            ):
+                root = Path(d)
+                config = root / "config.json"
+                config.write_text("{}")
+                loops = []
+                original = BudgetExceeded("original global gate")
+
+                async def run(loops=loops, run_fails=run_fails, original=original):
+                    loops.append(asyncio.get_running_loop())
+                    if run_fails:
+                        raise original
+                    return "complete"
+
+                async def close(loops=loops, close_fails=close_fails):
+                    loops.append(asyncio.get_running_loop())
+                    self.assertFalse(loops[0].is_closed())
+                    if close_fails:
+                        raise RuntimeError("cleanup failed")
+
+                runner = SimpleNamespace(
+                    run=run, shared=SimpleNamespace(client=SimpleNamespace(aclose=close))
+                )
+                argv = [
+                    "local",
+                    "--upstream",
+                    "unused",
+                    "--config",
+                    str(config),
+                    "--run-id",
+                    "cli-test",
+                ]
+                with (
+                    patch("sys.argv", argv),
+                    patch("datasets.lift.local.configure_native"),
+                    patch("datasets.lift.local.build_runner", return_value=runner),
+                    patch("datasets.lift.local.asyncio.run", wraps=asyncio.run) as run_loop,
+                ):
+                    if run_fails:
+                        with self.assertRaises(BudgetExceeded) as caught:
+                            main()
+                        self.assertIs(caught.exception, original)
+                    else:
+                        main()
+                    self.assertEqual(run_loop.call_count, 1)
+                self.assertEqual(len(loops), 2)
+                self.assertIs(loops[0], loops[1])
+                self.assertTrue(loops[0].is_closed())
+                if close_fails:
+                    self.assertEqual(original.__notes__, ["Client cleanup failed: RuntimeError"])

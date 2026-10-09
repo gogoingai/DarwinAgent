@@ -210,7 +210,9 @@ class LocalRunner:
         # cannot address loads, private criteria, transport or accepted state.
         if kernel is not None:
             kernel = self.load_kernel(kernel, evidence_key)
-        sid = evidence_key
+        sid = digest({"run_id": self.run_id, "run_root": str(self.root), "evidence": evidence_key})[
+            :24
+        ]
         worker_sid, judge_sid = "worker-" + sid, "judge-" + sid
         update_cell(self.root, cell_key, sessions=[worker_sid, judge_sid])
         worker = DarwinChatAgent(
@@ -503,6 +505,25 @@ class LocalRunner:
         for row in value["rows"]:
             native = row.get("native")
             row["correction_turns"] = max(0, native["turns"] - 1) if native else None
+            worker_chats = [
+                self.root / "sessions" / sid / "chat.json"
+                for sid in row["sessions"]
+                if sid.startswith("worker-")
+            ]
+            row["worker_macro_invocations"] = (
+                sum(
+                    event["kind"] == "macro"
+                    for path in worker_chats
+                    for turn in json.loads(path.read_text())["turns"]
+                    for event in turn["episode"]["events"]
+                )
+                if worker_chats and all(p.exists() for p in worker_chats)
+                else None
+            )
+        value["native_tool_count_semantics"] = "worker_primitive_leaf_calls"
+        value["macro_count_semantics"] = (
+            "completed_worker_F_invocations_in_receipted_episode_events"
+        )
         holdout = [r for r in value["rows"] if r["task_id"] == "q5"]
         value["evaluation_healthy"] = (
             bool(holdout) and len(holdout) == 3 and all(r.get("healthy") for r in holdout)
@@ -528,6 +549,9 @@ class LocalRunner:
             "healthy",
             "success",
             "content_score",
+            "final_content_score",
+            "last_intermediate_content_score",
+            "worker_macro_invocations",
             "turns",
             "correction_turns",
             "worker_tokens",
@@ -556,13 +580,26 @@ class LocalRunner:
             else "Scores use the authorized host model and unchanged native content judge.",
             f"Evolution complete: {value['evolution_complete']}; candidate adopted: {value['evolution_adopted']}",
             "",
-            "| Task | Arm | Status | Success | Content |",
-            "|---|---|---|---|---|",
+            "Native/flattened tool counts both count primitive leaves. Macro invocations count completed F compositions separately.",
+            "| Task | Arm | Status | Success | Final content | Last intermediate content | Score scope | Macro invocations |",
+            "|---|---|---|---|---|---|---|---|",
         ]
         for row in value["rows"]:
             native = row.get("native") or {}
             lines.append(
-                f"| {row['task_id']} | {row['arm']} | {row['status']} | {native.get('success')} | {native.get('content_score')} |"
+                f"| {row['task_id']} | {row['arm']} | {row['status']} | {native.get('success')} | "
+                + (
+                    str(row["final_content_score"])
+                    if row.get("final_content_score") is not None
+                    else "null"
+                )
+                + " | "
+                + (
+                    str(row["last_intermediate_content_score"])
+                    if row.get("last_intermediate_content_score") is not None
+                    else "null"
+                )
+                + f" | {row.get('content_score_scope', 'unjudged')} | {row.get('worker_macro_invocations')} |"
             )
         lines.extend(
             [
@@ -634,6 +671,23 @@ def build_runner(config, run_id):
     )
 
 
+async def run_and_close(runner):
+    """Own execution and HTTP connection cleanup on one still-running loop."""
+    failure = None
+    try:
+        return await runner.run()
+    except BaseException as exc:
+        failure = exc
+        raise
+    finally:
+        try:
+            await runner.shared.client.aclose()
+        except Exception as exc:
+            if failure is None:
+                raise
+            failure.add_note("Client cleanup failed: " + type(exc).__name__)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--upstream", required=True)
@@ -644,10 +698,7 @@ def main():
         parser.error("--config or DARWIN_LIFT_CONFIG is required")
     configure_native(args.upstream)
     runner = build_runner(json.loads(Path(args.config).read_text()), args.run_id)
-    try:
-        asyncio.run(runner.run())
-    finally:
-        asyncio.run(runner.shared.client.aclose())
+    asyncio.run(run_and_close(runner))
 
 
 if __name__ == "__main__":
