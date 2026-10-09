@@ -4,6 +4,17 @@
 
 DarwinAgent is experimental. Useful contributions include reproducible bug reports, independent task examples, clearer documentation, and controlled evaluation studies. Use [GitHub issues](https://github.com/gogoingai/DarwinAgent/issues) for public discussion; never include credentials or private input data.
 
+## Versioning and compatibility
+
+Versions use `A.B.C`. Except for major architectural changes, routine releases increment only the final component `C` and remain backward compatible, including releases that add features. The published `0.2.0` stays in place; the next routine release is `0.2.1`.
+
+- Fixes, new features, performance improvements, changes to defaults or configuration, and changes to data input methods do not by themselves justify incrementing `A` or `B`. The number of changes does not determine the version increment either.
+- Preserve compatibility for public Python APIs, the CLI, configuration, and persisted artifacts, including continuation of existing runs. Supply compatible defaults for new fields, support older formats or provide migration tools, and verify existing usage.
+- Before implementing or releasing a major architectural change or an incompatible change, explain its impact, migration plan, and version choice, and obtain explicit confirmation from the project maintainer. Use compatibility layers and a deprecation period where needed.
+- Ordinary commits do not automatically create a release. When preparing one, synchronize package metadata, the CLI, the [changelog](CHANGELOG.md), and current documentation. Keep version numbers out of README images and use dynamic version badges.
+
+Automated contributors also follow the root [AGENTS.md](AGENTS.md). See the [PyPI publishing guide](docs/en/pypi-publishing.md) for release steps.
+
 ## Set up and verify
 
 ```bash

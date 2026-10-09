@@ -20,7 +20,7 @@ Authorization is scoped to this repository, workflow, and environment. The GitHu
 
 ## Publish a new version
 
-1. Update version declarations, the changelog, and release documentation. Run the relevant checks and push the release commit to `main`.
+1. Choose the version using the [versioning and compatibility policy](../../CONTRIBUTING.md#versioning-and-compatibility): routine compatible releases increment only the final component; major architectural changes require explicit prior confirmation from the maintainer. Update version declarations, the changelog, and release documentation. Run the relevant checks and push the release commit to `main`.
 2. Wait for CI on that exact commit. Create a `v<version>` tag and GitHub Release from the changelog, targeting the verified commit; attach the checked wheel and source distribution. GitHub releases and PyPI uploads are separate operations.
 3. Run **Publish to PyPI** manually in Actions, choose `main`, and enter the new version matching package metadata.
 4. Approve the `pypi` environment deployment after the build passes.
