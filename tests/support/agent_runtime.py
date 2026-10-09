@@ -6,16 +6,22 @@ from types import SimpleNamespace
 
 import yaml
 
-from darwinagent.agent import AgentAsset, AgentKernelAssets
+from darwinagent.agent import AgentAsset, AgentKernelAssets, ToolFailure
 
 
 class ScriptedAgent:
+    def identity(self):
+        return {}
+
     async def run(self, task, context):
         artifact = await context.call("save", {"path": "report.txt"})
         return context.result("delivered", artifacts=(artifact,))
 
 
 class TwoWritesAgent:
+    def identity(self):
+        return {}
+
     interrupt = False
 
     async def run(self, task, context):
@@ -27,6 +33,9 @@ class TwoWritesAgent:
 
 
 class ModelTwiceAgent:
+    def identity(self):
+        return {}
+
     interrupt = False
 
     async def run(self, task, context):
@@ -88,3 +97,58 @@ class LostReceiptClient:
     async def chat(self, **kwargs):
         self.calls += 1
         raise ConnectionError("dispatched but receipt lost")
+
+
+class CatchesUnknownAgent:
+    def identity(self):
+        return {}
+
+    async def run(self, task, context):
+        try:
+            await context.call("write_file", {"path": "caught.txt", "content": "written"})
+        except Exception:
+            pass
+        return context.result("claims success")
+
+
+class ReturnsUnknownAgent:
+    def identity(self):
+        return {}
+
+    async def run(self, task, context):
+        return context.result(status="unknown")
+
+
+class ConfiguredAgent:
+    def __init__(self, response):
+        self.response = response
+
+    def identity(self):
+        return {"response": self.response}
+
+    async def run(self, task, context):
+        return context.result(self.response)
+
+
+class RecoveringReadAgent:
+    interrupt = False
+
+    def __init__(self):
+        self.failures = []
+
+    def identity(self):
+        return {"source_path": "missing.txt", "fallback": "recovered.txt"}
+
+    async def run(self, task, context):
+        try:
+            await context.call("read_file", {"path": "missing.txt"})
+        except ToolFailure as error:
+            if error.error_type != "FileNotFoundError":
+                raise
+            self.failures.append(error.to_dict())
+        if self.interrupt:
+            raise asyncio.CancelledError
+        artifact = await context.call(
+            "write_file", {"path": "recovered.txt", "content": "fallback evidence"}
+        )
+        return context.result("recovered", artifacts=(artifact,))

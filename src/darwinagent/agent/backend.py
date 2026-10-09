@@ -5,9 +5,11 @@ from __future__ import annotations
 import inspect
 import json
 import re
+from collections.abc import Mapping
 from dataclasses import asdict, is_dataclass
 from pathlib import Path
 
+from darwinagent.contracts import freeze, plain
 from darwinagent.runtime.artifacts import atomic_json, digest
 from darwinagent.runtime.identity import transport_identity
 from darwinagent.runtime.leases import execution_lease
@@ -25,6 +27,29 @@ class ExecutionBackend:
         self.tools = {spec.name: spec for spec in specs}
         if len(specs) != len(self.tools) or set(profile.capabilities) != set(self.tools):
             raise ValueError("Profile must expose exactly the registered primitives")
+
+    def _adapter_configuration(self):
+        hook = getattr(self.adapter, "identity", None)
+        try:
+            if hook is not None:
+                if not callable(hook):
+                    raise ValueError("Adapter identity must be callable")
+                configuration = hook()
+            elif is_dataclass(self.adapter):
+                configuration = asdict(self.adapter)
+            else:
+                raise ValueError("Ordinary adapters must declare identity() -> JSON object")
+            if inspect.isawaitable(configuration):
+                if inspect.iscoroutine(configuration):
+                    configuration.close()
+                raise ValueError("Adapter identity must be synchronous")
+            if not isinstance(configuration, Mapping):
+                raise ValueError("Adapter identity must be a JSON object")
+            return plain(freeze(configuration))
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                "Adapter identity must explicitly freeze its stable configuration as a JSON object"
+            ) from exc
 
     def identity(self):
         adapter_type = type(self.adapter)
@@ -45,7 +70,7 @@ class ExecutionBackend:
             "adapter_id": digest(
                 {
                     "source": source,
-                    "config": asdict(self.adapter) if is_dataclass(self.adapter) else {},
+                    "config": self._adapter_configuration(),
                 }
             ),
             "tools_id": digest(handlers),
@@ -103,6 +128,9 @@ class ExecutionBackend:
                 result = await self.adapter.run(task, context)
                 if not isinstance(result, EpisodeResult):
                     raise TypeError("AgentAdapter.run must return EpisodeResult")
+                uncertainty = self._unsettled_result(context, result)
+                if uncertainty is not None:
+                    return uncertainty
                 context.check(
                     "final_delivery",
                     {
@@ -127,7 +155,21 @@ class ExecutionBackend:
                 context.restore_events()
                 context._event("failure", error_type=type(exc).__name__)
                 result = context.result(status="failed")
+            uncertainty = self._unsettled_result(context, result)
+            if uncertainty is not None:
+                return uncertainty
             atomic_json(
                 result_path, {"result": result.to_dict(), "digest": digest(result.to_dict())}
             )
             return result
+
+    @staticmethod
+    def _unsettled_result(context, result):
+        usage = context.usage()
+        if result.status == "unknown" or usage["unknown_calls"]:
+            return context.result(status="unknown")
+        if usage["pending_calls"]:
+            # Locally prepared/awaiting-budget calls have not dispatched, but their
+            # unresolved journal positions cannot justify a final delivery either.
+            return context.result(status="budget_exhausted")
+        return None

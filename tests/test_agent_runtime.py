@@ -21,9 +21,13 @@ from darwinagent.kernel import KernelBundle
 from darwinagent.operators.sandbox import Limits, SandboxError, admit
 from darwinagent.runtime.artifacts import digest
 from tests.support.agent_runtime import (
+    CatchesUnknownAgent,
+    ConfiguredAgent,
     LostReceiptClient,
     ModelTwiceAgent,
     RecordedClient,
+    RecoveringReadAgent,
+    ReturnsUnknownAgent,
     ScriptedAgent,
     TwoWritesAgent,
     bundle,
@@ -315,3 +319,147 @@ class AgentRuntimeTests(unittest.IsolatedAsyncioTestCase):
         await backend.run(self.task, run_id="identity")
         with self.assertRaisesRegex(ValueError, "identity"):
             await backend.run(replace(self.task, instruction="Changed"), run_id="identity")
+
+    async def test_adapter_cannot_finalize_a_caught_unknown_write(self):
+        writes = []
+        original = self.tools[1]
+
+        def uncertain(params):
+            writes.append(params["path"])
+            original.handler(params)
+            raise ConnectionError("receipt lost")
+
+        tools = (self.tools[0], replace(original, handler=uncertain))
+        backend = self.backend(CatchesUnknownAgent(), tools=tools)
+        for _ in range(2):
+            result = await backend.run(self.task, run_id="caught-unknown")
+            self.assertEqual(result.status, "unknown")
+            self.assertEqual(result.final_response, "")
+            self.assertEqual(result.usage["unknown_calls"], 1)
+            self.assertFalse((self.root / "runs/caught-unknown/result.json").exists())
+        self.assertEqual(writes, ["caught.txt"])
+        self.assertEqual((self.root / "files/caught.txt").read_text(), "written")
+
+    async def test_adapter_returned_unknown_is_nonterminal(self):
+        result = await self.backend(ReturnsUnknownAgent()).run(self.task, run_id="returned-unknown")
+        self.assertEqual(result.status, "unknown")
+        self.assertEqual(result.usage["unknown_calls"], 0)
+        self.assertFalse((self.root / "runs/returned-unknown/result.json").exists())
+
+    async def test_comprehension_guards_short_circuit_before_real_write(self):
+        writes = []
+
+        async def write(name, params):
+            writes.append(name)
+            (self.root / "guard.txt").write_text("side effect")
+            return True
+
+        expressions = [
+            '[x for x in [1] if False if call("write", {})]',
+            'list({x for x in [1] if False if call("write", {})})',
+            '{x:x for x in [1] if False if call("write", {})}',
+            'list(x for x in [1] if False if call("write", {}))',
+        ]
+        for expression in expressions:
+            fn = admit(
+                "def run(params):\n    return " + expression + "\n", capability_names={"call"}
+            )
+            await AsyncInterpreter(fn, {"call": write}).execute({})
+            self.assertEqual(writes, [])
+            self.assertFalse((self.root / "guard.txt").exists())
+
+    async def test_ordinary_adapter_configuration_changes_invalidate_completed_run(self):
+        old = self.backend(ConfiguredAgent("old"))
+        result = await old.run(self.task, run_id="configured")
+        self.assertEqual(result.final_response, "old")
+        new = self.backend(ConfiguredAgent("new"))
+        with self.assertRaisesRegex(ValueError, "identity"):
+            await new.run(self.task, run_id="configured")
+        self.assertNotEqual(old.identity()["adapter_id"], new.identity()["adapter_id"])
+
+    def test_ordinary_adapter_requires_a_json_identity_declaration(self):
+        class Undeclared:
+            def __init__(self):
+                self.config = "mutable"
+
+            async def run(self, task, context):
+                return context.result(self.config)
+
+        class Unfreezable(Undeclared):
+            def identity(self):
+                return {"config": object()}
+
+        for adapter in (Undeclared(), Unfreezable()):
+            with self.assertRaisesRegex(ValueError, "identity"):
+                self.backend(adapter).identity()
+
+    async def test_failed_read_has_identical_recovery_semantics_on_restart(self):
+        reads = []
+        original = self.tools[0]
+
+        def counted(params):
+            reads.append(params["path"])
+            return original.handler(params)
+
+        tools = (replace(original, handler=counted), self.tools[1])
+        agent = RecoveringReadAgent()
+        agent.interrupt = True
+        backend = self.backend(agent, tools=tools)
+        with self.assertRaises(asyncio.CancelledError):
+            await backend.run(self.task, run_id="read-recovery")
+        receipt = self.root / "runs/read-recovery/steps/000000.json"
+        before = receipt.read_bytes()
+        agent.interrupt = False
+        (self.root / "files/missing.txt").write_text("arrived after original failure")
+        result = await backend.run(self.task, run_id="read-recovery")
+        self.assertEqual(result.status, "completed")
+        self.assertEqual((self.root / "files/recovered.txt").read_text(), "fallback evidence")
+        self.assertEqual(reads, ["missing.txt"])
+        self.assertEqual(len(agent.failures), 2)
+        self.assertEqual(agent.failures[0], agent.failures[1])
+        self.assertEqual(agent.failures[0]["error_type"], "FileNotFoundError")
+        self.assertEqual(receipt.read_bytes(), before)
+        self.assertEqual(result.usage["leaf_calls"], 2)
+        self.assertEqual(result.usage["failed_leaf_calls"], 1)
+        self.assertEqual(result.usage["pending_calls"], 0)
+
+    async def test_authoritative_receipt_recovers_a_caught_unknown_write(self):
+        from darwinagent.runtime.steps import StepJournal
+
+        external_receipts = []
+        original = self.tools[1]
+
+        def uncertain(params):
+            external_receipts.append(original.handler(params))
+            raise ConnectionError("completed externally but local receipt lost")
+
+        tools = (self.tools[0], replace(original, handler=uncertain))
+        backend = self.backend(CatchesUnknownAgent(), tools=tools)
+        result = await backend.run(self.task, run_id="receipt-recovery")
+        self.assertEqual(result.status, "unknown")
+        steps = self.root / "runs/receipt-recovery/steps"
+        StepJournal(steps).respond(steps / "000000.json", {"output": external_receipts[0]})
+        result = await backend.run(self.task, run_id="receipt-recovery")
+        self.assertEqual(result.status, "completed")
+        self.assertEqual(result.usage["unknown_calls"], 0)
+        self.assertEqual(len(external_receipts), 1)
+        self.assertEqual((self.root / "files/caught.txt").read_text(), "written")
+        self.assertTrue((self.root / "runs/receipt-recovery/result.json").exists())
+
+    async def test_known_failure_receipts_persist_only_safe_public_messages(self):
+        from darwinagent.agent import ToolFailure
+
+        secret = "private-token-never-persist"
+
+        def broken(params):
+            raise FileNotFoundError(secret)
+
+        tools = (replace(self.tools[0], handler=broken), self.tools[1])
+        agent = RecoveringReadAgent()
+        result = await self.backend(agent, tools=tools).run(self.task, run_id="safe-failure")
+        self.assertEqual(result.status, "completed")
+        failure = ToolFailure(**agent.failures[0])
+        self.assertEqual(failure.error_type, "FileNotFoundError")
+        self.assertEqual(failure.message, "read_file failed (FileNotFoundError)")
+        for path in (self.root / "runs/safe-failure").rglob("*.json"):
+            self.assertNotIn(secret, path.read_text())

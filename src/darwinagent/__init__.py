@@ -14,6 +14,7 @@ from .agent import (
     ExecutionBackend,
     ExecutionProfile,
     ReActAgent,
+    ToolFailure,
     ToolSpec,
 )
 from .config import Config, RunConfig
@@ -51,6 +52,7 @@ __all__ = [
     "ExecutionProfile",
     "ReActAgent",
     "ToolSpec",
+    "ToolFailure",
     "Config",
     "RunConfig",
     "CaseInput",

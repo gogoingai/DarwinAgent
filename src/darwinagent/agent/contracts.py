@@ -71,6 +71,13 @@ class EpisodeResult:
 
 
 class AgentAdapter(Protocol):
+    """Adapters own their loop. Ordinary classes also declare identity() -> JSON object.
+
+    Dataclass fields are the default configuration identity; an explicit synchronous
+    identity hook can instead name stable operating/external configuration while
+    excluding transient loop state. Configurations must contain only JSON values.
+    """
+
     async def run(self, task: AgentTask, context: AgentContext) -> EpisodeResult: ...
 
 

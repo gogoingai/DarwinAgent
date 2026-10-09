@@ -169,7 +169,12 @@ class AsyncInterpreter(Interpreter):
                 for v in await self.expr(g.iter, scope):
                     child = dict(scope)
                     await self.target(g.target, v, child)
-                    if all([await self.expr(x, child) for x in g.ifs]):
+                    accepted = True
+                    for guard in g.ifs:
+                        if not await self.expr(guard, child):
+                            accepted = False
+                            break
+                    if accepted:
                         await visit(depth + 1, child)
 
             await visit(0, dict(env))

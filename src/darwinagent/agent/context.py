@@ -17,6 +17,7 @@ from darwinagent.runtime.journal_client import JournalClient
 from darwinagent.runtime.steps import UnknownRequest
 
 from .contracts import EpisodeResult
+from .failures import ToolFailure
 from .graph import project
 from .interpreter import AsyncInterpreter
 
@@ -254,8 +255,16 @@ class AgentContext:
                     raise UnknownRequest(
                         f"Write has no receipt at {path}: {type(exc).__name__}"
                     ) from None
-                self.journal.fail(path, RuntimeError(type(exc).__name__))
-                raise
+                failure = ToolFailure.from_exception(name, exc)
+                saved = {"failure": failure.to_dict()}
+                self.journal.respond(path, saved)
+        if "failure" in saved:
+            failure = ToolFailure(**saved["failure"])
+            if failure.tool_name != name:
+                raise ValueError("Tool failure receipt belongs to another primitive")
+            self._event("tool_failure", name=name, failure=failure.to_dict(), receipt=path.name)
+            self.check("after_action", {**candidate, "failure": failure.to_dict()})
+            raise failure
         result = saved["output"]
         self._event(
             "tool",
@@ -276,6 +285,8 @@ class AgentContext:
             "model_calls": len(models),
             "leaf_calls": len(tools),
             "unknown_calls": sum(r["state"] == "submitted" for r in rows),
+            "pending_calls": sum(r["state"] in {"prepared", "submitted"} for r in rows),
+            "failed_leaf_calls": sum("failure" in r.get("response", {}) for r in tools),
             "prompt_tokens": sum(
                 r.get("response", {}).get("usage", {}).get("prompt_tokens", 0) for r in models
             ),

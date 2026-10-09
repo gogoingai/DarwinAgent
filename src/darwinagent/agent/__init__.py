@@ -3,6 +3,7 @@
 from .backend import ExecutionBackend
 from .context import AgentContext, CheckRejected, EpisodeBudgetExceeded
 from .contracts import AgentAdapter, AgentTask, EpisodeResult, ExecutionProfile, ToolSpec
+from .failures import ToolFailure
 from .kernel import AgentAsset, AgentKernelAssets, AgentKernelBundle
 from .react import ReActAgent
 from .tools import file_tools
@@ -22,4 +23,5 @@ __all__ = [
     "AgentKernelBundle",
     "ReActAgent",
     "file_tools",
+    "ToolFailure",
 ]
