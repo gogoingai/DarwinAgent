@@ -7,6 +7,7 @@ import json
 import sqlite3
 import sys
 import zipfile
+from contextlib import closing
 from pathlib import Path
 from xml.etree import ElementTree
 
@@ -79,7 +80,7 @@ def execute(name, params):
         rows = table(params["path"])
         return {"rows": rows, "row_count": len(rows), "sheet": "first"}
     if name == "transform_tables":
-        with sqlite3.connect(":memory:") as db:
+        with closing(sqlite3.connect(":memory:")) as db:
             for alias, filename in params["tables"].items():
                 rows = table(filename)
                 if not rows:

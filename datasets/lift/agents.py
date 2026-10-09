@@ -32,7 +32,20 @@ class NativeReAct(ReActAgent):
 
 class DarwinChatAgent(ChatAgent):
     def __init__(
-        self, public_task, tools, shared, root, kernel, *, role, run_id, session, trace=True
+        self,
+        public_task,
+        tools,
+        shared,
+        root,
+        kernel,
+        *,
+        role,
+        run_id,
+        session,
+        trace=True,
+        cell_id=None,
+        arm=None,
+        phase=None,
     ):
         self.task, self.shared, self.root, self.kernel = public_task, shared, Path(root), kernel
         self.role, self.run_id, self.session, self.trace = role, run_id, session, trace
@@ -42,6 +55,9 @@ class DarwinChatAgent(ChatAgent):
             self.root / "session-identity.json",
             {
                 "task_id": public_task.id,
+                "cell_id": cell_id,
+                "arm": arm,
+                "phase": phase,
                 "session": session,
                 "run_id": run_id,
                 "role": role,
@@ -94,15 +110,36 @@ class DarwinChatAgent(ChatAgent):
                 raise ValueError("Native replay message changed")
             self.cursor += 1
             return old["episode"]["final_response"]
-        self.shared.check()
-        history = state["history"] + [{"role": "user", "content": message}]
-        task = AgentTask(
-            self.task.id, self.task.instruction, self.task.attachments, {"native_messages": history}
-        )
         started = time.time()
-        result = await self.backend.run(
-            task, self.kernel, run_id="turn-" + str(len(state["turns"]))
+        turn_path = self.root / "turns" / (str(len(state["turns"])) + ".json")
+        receipt = {"message_hash": key, "status": "running", "started": started, "episode": None}
+        if turn_path.exists():
+            receipt = json.loads(turn_path.read_text())
+        atomic_json(turn_path, receipt)
+        try:
+            self.shared.check()
+            history = state["history"] + [{"role": "user", "content": message}]
+            task = AgentTask(
+                self.task.id,
+                self.task.instruction,
+                self.task.attachments,
+                {"native_messages": history},
+            )
+            result = await self.backend.run(
+                task, self.kernel, run_id="turn-" + str(len(state["turns"]))
+            )
+        except Exception as exc:
+            receipt.update(
+                status="paused" if isinstance(exc, BudgetExceeded) else "failed",
+                error_type=type(exc).__name__,
+                elapsed_s=time.time() - started,
+            )
+            atomic_json(turn_path, receipt)
+            raise
+        receipt.update(
+            status=result.status, episode=result.to_dict(), elapsed_s=time.time() - started
         )
+        atomic_json(turn_path, receipt)
         atomic_json(self.root / "last-episode.json", result.to_dict())
         if result.status in {"unknown", "budget_exhausted"}:
             self.shared.pause(result.status)

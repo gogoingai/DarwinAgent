@@ -22,6 +22,7 @@ from darwinagent.runtime.identity import snapshot_files
 
 from .agents import DarwinChatAgent, NativeReAct, tools_for, worker_profile
 from .data import UPSTREAM_REVISION
+from .report import cell, update_cell
 from .state import install, load, snapshot
 from .tools import DockerTools
 
@@ -38,7 +39,6 @@ class NativeEpisodeBackend(ExecutionBackend):
         )
 
     def for_episode(self, episode_root, task):
-        self.owner.dataset.stage(task, episode_root)
         return type(self)(self.owner, episode_root)
 
     async def run(self, task, kernel=None, *, run_id):
@@ -130,7 +130,58 @@ class DarwinLiftAdapter(ContainerAgentRuntimeAdapter):
 
     async def create_suite_run_resources(self, ctx):
         self.shared.run_id = ctx.run_id
+        for task_id, arm, phase in (
+            ("q1", "warmup", "warmup"),
+            ("q5", "A", "holdout"),
+            ("q5", "B", "holdout"),
+            ("q5", "C", "holdout"),
+        ):
+            cell(self.root, task_id, arm, phase, ctx.run_id)
         return await super().create_suite_run_resources(ctx)
+
+    async def track(self, task_id, arm, phase, run_id, operation):
+        key = cell(self.root, task_id, arm, phase, run_id, status="running", started=time.time())
+        previous = getattr(self, "active_cell", None)
+        self.active_cell = key
+        try:
+            self.dataset.identity()  # Before native staging or any container/model dispatch.
+            value = await operation()
+            update_cell(self.root, key, status="completed", finished=time.time())
+            return value
+        except Exception as exc:
+            update_cell(
+                self.root,
+                key,
+                status="paused" if isinstance(exc, BudgetExceeded) else "failed",
+                error_type=type(exc).__name__,
+                finished=time.time(),
+            )
+            raise
+        finally:
+            self.active_cell = previous
+
+    async def produce_delta(self, resources, policy, warmup_tasks, ctx):
+        return await self.track(
+            "q1",
+            "warmup",
+            "warmup",
+            ctx.run_id,
+            lambda: super(DarwinLiftAdapter, self).produce_delta(
+                resources, policy, warmup_tasks, ctx
+            ),
+        )
+
+    async def _run_holdout(self, *, task, resources, ctx, image, load_state):
+        arm = "C" if load_state == HoldoutLoadState.EVOLVED else "B"
+        return await self.track(
+            task.name,
+            arm,
+            "holdout",
+            ctx.run_id,
+            lambda: super(DarwinLiftAdapter, self)._run_holdout(
+                task=task, resources=resources, ctx=ctx, image=image, load_state=load_state
+            ),
+        )
 
     @classmethod
     def resolve_docker_image(cls, *, override=None):
@@ -257,6 +308,13 @@ class DarwinLiftAdapter(ContainerAgentRuntimeAdapter):
                     env.handle, self.root / "loads" / (key + "-candidate")
                 )
             worker_sid, judge_sid = "worker-" + key, "judge-" + key
+            cell_id = self.active_cell
+            cell_value = json.loads((self.root / "cells" / (cell_id + ".json")).read_text())
+            update_cell(
+                self.root,
+                cell_id,
+                sessions=sorted(set(cell_value["sessions"]) | {worker_sid, judge_sid}),
+            )
             worker = DarwinChatAgent(
                 public,
                 tools_for(env.handle, workspace_dir),
@@ -266,6 +324,9 @@ class DarwinLiftAdapter(ContainerAgentRuntimeAdapter):
                 role="worker",
                 run_id=ctx.run_id,
                 session=worker_sid,
+                cell_id=cell_id,
+                arm=cell_value["arm"],
+                phase=cell_value["phase"],
                 trace=self.trace,
             )
             judge = DarwinChatAgent(
@@ -277,6 +338,9 @@ class DarwinLiftAdapter(ContainerAgentRuntimeAdapter):
                 role="judge",
                 run_id=ctx.run_id,
                 session=judge_sid,
+                cell_id=cell_id,
+                arm=cell_value["arm"],
+                phase=cell_value["phase"],
                 trace=self.trace,
             )
             pair = WorkerJudgerPair(worker, judge, worker_sid, judge_sid)
@@ -310,6 +374,8 @@ class DarwinLiftAdapter(ContainerAgentRuntimeAdapter):
 
     def record_native(self, result, task_id, arm, *, evaluation_key=None, elapsed=None):
         pair = self.pairs[result.work_session_id]
+        identity = json.loads((pair.work_agent.root / "session-identity.json").read_text())
+        update_cell(self.root, identity["cell_id"], native=result.model_dump())
         episodes = pair.work_agent.episodes()
         usage = {
             "model_calls": sum(e["usage"]["model_calls"] for e in episodes),
@@ -363,6 +429,20 @@ class DarwinLiftAdapter(ContainerAgentRuntimeAdapter):
         )
 
     async def execute_episode(self, task, kernel, workspace, run_id, arm="campaign"):
+        phase = "holdout" if arm == "A" else "campaign"
+        ledger = self.root / "campaign" / "episode-ledger.json"
+        if arm == "campaign" and ledger.exists():
+            phase = json.loads(ledger.read_text())["value"].get(run_id, {}).get("phase", phase)
+        report_run_id = run_id.removesuffix("-A") if arm == "A" else run_id
+        return await self.track(
+            task.id,
+            arm,
+            phase,
+            report_run_id,
+            lambda: self._execute_episode(task, kernel, workspace, run_id, arm),
+        )
+
+    async def _execute_episode(self, task, kernel, workspace, run_id, arm):
         self.shared.check()
         self.dataset.stage(task, workspace)
         ctx = SuiteRunContext(

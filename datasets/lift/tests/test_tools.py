@@ -1,5 +1,6 @@
 """Local boundary tests for the exact container toolbox implementation."""
 
+import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
@@ -38,6 +39,34 @@ class ToolboxTests(unittest.TestCase):
             (Path(temporary) / "link").symlink_to(outside)
             with self.assertRaises(ValueError):
                 toolbox.execute("write_text", {"path": "link", "content": "blocked"})
+
+    def test_connections_close_on_success_and_denied_sql(self):
+        closed = []
+        original = sqlite3.connect
+
+        class Connection(sqlite3.Connection):
+            def close(self):
+                closed.append(True)
+                super().close()
+
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            patch.object(toolbox, "ROOT", Path(directory)),
+        ):
+            (Path(directory) / "data.csv").write_text("name,amount\na,2\n")
+            with patch.object(
+                toolbox.sqlite3, "connect", side_effect=lambda *a: original(*a, factory=Connection)
+            ):
+                toolbox.execute(
+                    "transform_tables",
+                    {"tables": {"sales": "data.csv"}, "sql": "SELECT * FROM sales"},
+                )
+                with self.assertRaises(sqlite3.DatabaseError):
+                    toolbox.execute(
+                        "transform_tables",
+                        {"tables": {"sales": "data.csv"}, "sql": "DELETE FROM sales"},
+                    )
+            self.assertEqual(len(closed), 2)
 
     def test_unknown_capability_is_rejected(self):
         with self.assertRaises(ValueError):

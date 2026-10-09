@@ -27,16 +27,23 @@ class LiftDataset:
         if manifest["revision"] != EALE_REVISION or manifest.get("q6") != "not_downloaded":
             raise ValueError("Unexpected EALE revision or sealed task state")
         self.files = manifest["files"]
+        if len({r["path"] for r in self.files}) != len(self.files):
+            raise ValueError("Duplicate manifest path")
         self.native = {}
         for row in self.files:
             path = self.root / row["path"]
-            if not path.resolve().is_relative_to(self.root) or path.is_symlink():
+            if (
+                Path(row["path"]).is_absolute()
+                or ".." in Path(row["path"]).parts
+                or not path.resolve().is_relative_to(self.root)
+                or any(p.is_symlink() for p in (path, *path.parents) if p != self.root)
+            ):
                 raise ValueError("Dataset file escapes its root")
             if not re.search(r"/q[125]_[^/]+/", row["path"]):
                 raise ValueError("Only q1/q2/q5 may be opened")
             if sha(path) != row["sha256"]:
                 raise ValueError("Dataset material changed")
-            if path.suffix == ".md":
+            if path.suffix == ".md" and not any(p.endswith("_materials") for p in path.parts):
                 parts = re.split(r"^### (query|要求|轨迹要求)\s*$", path.read_text(), flags=re.M)
                 sections = dict(zip(parts[1::2], (v.strip() for v in parts[2::2])))
                 task_id = path.stem.split("_")[0]
@@ -54,10 +61,44 @@ class LiftDataset:
         if set(self.native) != set(IDS):
             raise ValueError("Development dataset must contain exactly q1/q2/q5")
 
+        self.materials = {}
+        for task_id, native in self.native.items():
+            material = Path(native.requirements.material_dir)
+            self.materials[task_id] = {
+                str((self.root / r["path"]).relative_to(material)): r["sha256"]
+                for r in self.files
+                if (self.root / r["path"]).is_relative_to(material)
+            }
+        self.identity()
+
+    @staticmethod
+    def verify_tree(material, expected, *, partial=False):
+        material = Path(material)
+        if any(p.is_symlink() for p in (material, *material.parents)):
+            raise ValueError("Material symlink rejected")
+        actual = {}
+        for path in material.rglob("*"):
+            if path.is_symlink():
+                raise ValueError("Material symlink rejected")
+            if path.is_file():
+                relative = str(path.relative_to(material))
+                if relative not in expected:
+                    raise ValueError("Unlisted material file")
+                actual[relative] = sha(path)
+            elif not path.is_dir():
+                raise ValueError("Unsupported material entry")
+        if (not partial and set(actual) != set(expected)) or any(
+            value != expected[key] for key, value in actual.items()
+        ):
+            raise ValueError("Pinned material set or bytes changed")
+
     def identity(self):
         for row in self.files:
-            if sha(self.root / row["path"]) != row["sha256"]:
+            path = self.root / row["path"]
+            if any(p.is_symlink() for p in (path, *path.parents)) or sha(path) != row["sha256"]:
                 raise ValueError("Pinned dataset changed")
+        for task_id, native in self.native.items():
+            self.verify_tree(native.requirements.material_dir, self.materials[task_id])
         return {
             "revision": EALE_REVISION,
             "manifest": digest(self.files),
@@ -69,31 +110,32 @@ class LiftDataset:
             raise ValueError("Task outside authorized development split")
         native = self.native[task_id]
         material = Path(native.requirements.material_dir)
+        self.verify_tree(material, self.materials[task_id])
         attachments = tuple(
-            {"path": material.name + "/" + str(p.relative_to(material)), "sha256": sha(p)}
-            for p in sorted(material.rglob("*"))
-            if p.is_file()
+            {"path": material.name + "/" + relative, "sha256": checksum}
+            for relative, checksum in sorted(self.materials[task_id].items())
         )
         return AgentTask(task_id, native.query, attachments)
 
     def stage(self, task, workspace):
+        self.identity()
         if task.to_dict() != self.task(task.id).to_dict():
             raise ValueError("Public task or attachments changed")
         root = Path(workspace).resolve()
-        root.mkdir(parents=True, exist_ok=True)
         material = Path(self.native[task.id].requirements.material_dir)
+        target = root / material.name
+        self.verify_tree(target, self.materials[task.id], partial=True)
+        root.mkdir(parents=True, exist_ok=True)
         for item in task.attachments:
             relative = Path(item["path"])
             destination = root / relative
             source = material / relative.relative_to(material.name)
             if not destination.resolve().is_relative_to(root) or sha(source) != item["sha256"]:
                 raise ValueError("Attachment boundary or hash mismatch")
-            if destination.exists():
-                if sha(destination) != item["sha256"]:
-                    raise ValueError("Existing staged attachment changed")
-            else:
+            if not destination.exists():
                 destination.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copyfile(source, destination)
+        self.verify_tree(target, self.materials[task.id])
 
     def write_suite(self, path):
         from src.models import Suite

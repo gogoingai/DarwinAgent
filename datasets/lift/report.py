@@ -1,31 +1,113 @@
 """All-pair reporting retains regressions and unknown values instead of success filtering."""
 
 import json
+import time
 from pathlib import Path
 
-from darwinagent.runtime.artifacts import atomic_json
+from darwinagent.runtime.artifacts import atomic_json, digest
+
+
+def cell(root, task_id, arm, phase, run_id, **updates):
+    key = digest({"task_id": task_id, "arm": arm, "phase": phase, "run_id": run_id})[:24]
+    path = Path(root) / "cells" / (key + ".json")
+    value = (
+        json.loads(path.read_text())
+        if path.exists()
+        else {
+            "cell_id": key,
+            "task_id": task_id,
+            "arm": arm,
+            "phase": phase,
+            "run_id": run_id,
+            "status": "unstarted",
+            "sessions": [],
+            "native": None,
+            "trajectory_judge": "not_run",
+        }
+    )
+    value.update(updates)
+    atomic_json(path, value)
+    return key
+
+
+def update_cell(root, key, **updates):
+    path = Path(root) / "cells" / (key + ".json")
+    value = json.loads(path.read_text())
+    value.update(updates)
+    atomic_json(path, value)
+
+
+def session_totals(root):
+    root = Path(root)
+    # Each native turn has one durable slot, including the currently unfinished turn.
+    turns = [json.loads(p.read_text()) for p in sorted((root / "turns").glob("*.json"))]
+    if not turns and (root / "chat.json").exists():
+        turns = json.loads((root / "chat.json").read_text())["turns"]
+    episodes = [t["episode"] for t in turns if t.get("episode") is not None]
+    usage = {
+        k: sum(e["usage"].get(k, 0) for e in episodes)
+        for k in ("model_calls", "leaf_calls", "unknown_calls", "pending_calls")
+    }
+    events = [v for e in episodes for v in e["events"] if v["kind"] == "model"]
+    known = all(
+        all(type(e.get("usage", {}).get(k)) is int for k in ("prompt_tokens", "completion_tokens"))
+        for e in events
+    )
+    return {
+        "usage": usage,
+        "tokens": sum(
+            sum(e["usage"][k] for k in ("prompt_tokens", "completion_tokens")) for e in events
+        )
+        if known
+        else None,
+        "time_s": sum(t.get("elapsed_s", 0) for t in turns),
+        "turns": len(turns),
+        "completed_turns": sum(e["status"] == "completed" for e in episodes),
+        "unfinished_turns": sum(t.get("status") != "completed" for t in turns),
+    }
+
+
+def cell_rows(root):
+    rows = []
+    for path in sorted((root / "cells").glob("*.json")):
+        row = json.loads(path.read_text())
+        if row["status"] == "running":
+            row["status"] = "paused"
+        row["task_time_s"] = (
+            row.get("finished", time.time()) - row["started"] if "started" in row else None
+        )
+        for role in ("worker", "judge"):
+            totals = [
+                session_totals(root / "sessions" / sid)
+                for sid in row["sessions"]
+                if sid.startswith(role + "-")
+            ]
+            row[role + "_usage"] = {
+                k: sum(t["usage"][k] for t in totals)
+                for k in ("model_calls", "leaf_calls", "unknown_calls", "pending_calls")
+            }
+            row[role + "_tokens"] = (
+                sum(t["tokens"] for t in totals)
+                if all(t["tokens"] is not None for t in totals)
+                else None
+            )
+            row[role + "_time_s"] = sum(t["time_s"] for t in totals)
+            row[role + "_turns"] = sum(t["turns"] for t in totals)
+            row[role + "_unfinished_turns"] = sum(t["unfinished_turns"] for t in totals)
+        row["correction_turns"] = max(0, row["worker_turns"] - 1)
+        row["native_tool_calls"] = row["flattened_leaf_calls"] = row["worker_usage"]["leaf_calls"]
+        rows.append(row)
+    return rows
 
 
 def report(root, shared):
     root = Path(root)
-    rows = [json.loads(p.read_text()) for p in sorted((root / "rows").glob("*.json"))]
+    rows = cell_rows(root)
+    if not rows:
+        rows = [json.loads(p.read_text()) for p in sorted((root / "rows").glob("*.json"))]
     requests = [
         json.loads(p.read_text()) for p in sorted((shared.root / "requests").glob("*.json"))
     ]
-    for path in sorted((root / "sessions").glob("*/last-episode.json")):
-        episode = json.loads(path.read_text())
-        if episode["status"] != "completed":
-            identity = json.loads((path.parent / "session-identity.json").read_text())
-            rows.append(
-                {
-                    **identity,
-                    "status": episode["status"],
-                    "native": None,
-                    "worker_tokens": None,
-                    "worker_usage": episode["usage"],
-                    "trajectory_judge": "not_run",
-                }
-            )
     global_request_count = len(requests)
     requests = [r for r in requests if r.get("run_id") == shared.run_id]
     roles = {}
@@ -49,7 +131,12 @@ def report(root, shared):
         if (shared.root / "pause.json").exists()
         else (
             "complete"
-            if {r.get("arm") for r in rows if r.get("task_id") == "q5"} >= {"A", "B", "C"}
+            if {
+                r.get("arm")
+                for r in rows
+                if r.get("task_id") == "q5" and r["status"] == "completed"
+            }
+            >= {"A", "B", "C"}
             else "incomplete"
         ),
         "rows": rows,
