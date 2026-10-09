@@ -2,6 +2,6 @@
   "name": "darwinagent-documentation-assets",
   "private": true,
   "type": "module",
-  "scripts": {"build": "node build.mjs"},
+  "scripts": {"build": "node build.mjs", "verify": "node build.mjs --verify-only"},
   "devDependencies": {"@mermaid-js/mermaid-cli": "12.0.0", "sharp": "0.34.5"}
 }

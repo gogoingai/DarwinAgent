@@ -3,6 +3,7 @@
 [English](README.md)
 
 - [中文介绍稿](introduction.zh-CN.md)
+- [中英文项目配图](../assets/README.md#preview--图片预览)
 
 这里保存可复用的文章草稿与本地 PNG 配图。文章发布与软件包发行分别记录；实验版本 `darwinagent==0.1.1` 已在 [PyPI](https://pypi.org/project/darwinagent/)发行。
 

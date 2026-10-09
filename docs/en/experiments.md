@@ -2,7 +2,7 @@
 
 [English](../en/experiments.md) · [简体中文](../zh-CN/experiments.md) · [README](../../README.md)
 
-![Evolution loop](../assets/evolution-loop-en.svg)
+![Evolution loop](../assets/evolution-loop-en.png)
 
 `ExperimentRunner` freezes identity and executes B0 → proposal → admission → candidate generation/evaluation → adoption → Wiki. The independent evaluator supplies metrics. `AdoptionPolicy(primary, non_decreasing)` requires strict primary improvement, no decline in named guard metrics, and checks completeness/faults. External transport faults are disclosed separately from deterministic generation faults; evaluation faults still block adoption. Inspect the actual decision reasons.
 

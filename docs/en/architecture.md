@@ -2,7 +2,7 @@
 
 [English](../en/architecture.md) · [简体中文](../zh-CN/architecture.md) · [README](../../README.md)
 
-![Architecture](../assets/architecture-en.svg)
+![Architecture](../assets/architecture-en.png)
 
 DarwinAgent 0.1 uses a common graph-based task runtime. The dataset boundary implements only `DatasetAdapter.generation_input(case_id)` and async `Evaluator.evaluate(result)`, returning `CaseInput` and `EvaluationResult` respectively. Evaluator references do not enter generation inputs.
 
@@ -40,7 +40,7 @@ independent of TestCase/scenario files. See the [governance report](engineering-
 
 ## Asset boundary
 
-![Asset boundary](../assets/asset-boundary-en.svg)
+![Asset boundary](../assets/asset-boundary-en.png)
 
 Proposals can modify S/F/C/P. Framework execution, read-only permissions, fixed source/status checks, `RunConfig`, evaluator, and adoption rules sit outside that boundary. C cannot replace fixed checks; P cannot add unregistered slots; F cannot gain arbitrary Python access.
 

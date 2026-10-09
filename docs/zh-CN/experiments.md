@@ -2,7 +2,7 @@
 
 [English](../en/experiments.md) · [返回中文首页](../../README.zh-CN.md)
 
-![进化循环](../assets/evolution-loop-zh-CN.svg)
+![进化循环](../assets/evolution-loop-zh-CN.png)
 
 `ExperimentRunner` 冻结运行身份并执行 B0 → 提案 → 准入 → 候选生成／评测 → 采纳 → Wiki。独立评测器返回指标；`AdoptionPolicy(primary, non_decreasing)` 要求主指标严格提升、指定指标不下降，并检查评测完整性与故障。外部传输故障与确定性生成故障分别披露；评测故障仍会阻止采纳。以实际决策中的 `reasons`（原因列表）为准。
 

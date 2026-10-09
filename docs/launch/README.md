@@ -3,6 +3,7 @@
 [简体中文](README.zh-CN.md)
 
 - [English introduction draft](introduction.en.md)
+- [Bilingual project graphics](../assets/README.md#preview--图片预览)
 
 These are reusable article drafts with local PNG graphics. Their publication as articles is separate from the package release. The experimental `darwinagent==0.1.1` package is available on [PyPI](https://pypi.org/project/darwinagent/).
 

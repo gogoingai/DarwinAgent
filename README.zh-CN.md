@@ -1,4 +1,4 @@
-<p align="center"><img src="docs/assets/hero-zh-CN.svg" alt="DarwinAgent — Agent 时代的进化" width="100%"></p>
+![DarwinAgent — Agent 时代的进化](docs/assets/hero-zh-CN.png)
 
 # DarwinAgent
 
@@ -111,7 +111,7 @@ python main.py
 
 ## 框架如何改进
 
-![进化循环](docs/assets/evolution-loop-zh-CN.svg)
+![进化循环](docs/assets/evolution-loop-zh-CN.png)
 
 1. 通过共同的 `Pipeline` 运行任务，生成带来源的答案并独立评分。
 2. 根据训练证据和经验记录提出资产修改。

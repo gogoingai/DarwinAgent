@@ -1,0 +1,157 @@
+{
+  "style": "手绘插画",
+  "reference": "https://img-1302474103.cos.ap-nanjing.myqcloud.com/article-img-16d576643bb37af9.png",
+  "assets": [
+    {
+      "file": "hero-zh-CN.png",
+      "locale": "zh-CN",
+      "group": "hero",
+      "width": 1672,
+      "height": 941,
+      "sha256": "dde4b975fbb9111d4db4996ef683c845408197216eee4f07543c81374793b432",
+      "creation": {
+        "method": "image-gen-built-in",
+        "provider": "codex",
+        "model": "codex-image-gen",
+        "reference": "https://img-1302474103.cos.ap-nanjing.myqcloud.com/article-img-16d576643bb37af9.png"
+      },
+      "editable_prompt": "prompts.md#hero-zh-cn",
+      "structural_sources": [
+        "hero-zh-CN.svg"
+      ]
+    },
+    {
+      "file": "hero-en.png",
+      "locale": "en",
+      "group": "hero",
+      "width": 1672,
+      "height": 941,
+      "sha256": "5b32448cf8100099cf9de3176d6b44f61af40bcd88ef5024413dc177d5ffa787",
+      "creation": {
+        "method": "image-gen-built-in",
+        "provider": "codex",
+        "model": "codex-image-gen",
+        "reference": "https://img-1302474103.cos.ap-nanjing.myqcloud.com/article-img-16d576643bb37af9.png",
+        "supporting_reference": "hero-zh-CN.png"
+      },
+      "editable_prompt": "prompts.md#hero-en",
+      "structural_sources": [
+        "hero-en.svg"
+      ]
+    },
+    {
+      "file": "evolution-loop-zh-CN.png",
+      "locale": "zh-CN",
+      "group": "evolution-loop",
+      "width": 1672,
+      "height": 941,
+      "sha256": "0695f130e408098437b799f9708e39dd36d1407c5611507ec8f263da8e65a49e",
+      "creation": {
+        "method": "direct-reuse",
+        "source": "https://img-1302474103.cos.ap-nanjing.myqcloud.com/article-img-16d576643bb37af9.png"
+      },
+      "editable_prompt": "prompts.md#evolution-loop-zh-cn",
+      "structural_sources": [
+        "evolution-loop-zh-CN.mmd",
+        "evolution-loop-zh-CN.svg"
+      ]
+    },
+    {
+      "file": "evolution-loop-en.png",
+      "locale": "en",
+      "group": "evolution-loop",
+      "width": 1672,
+      "height": 941,
+      "sha256": "f0289913fdc22ce01300efe6dc6c452353f70e81e8c5bb2dda3f9e474ac63427",
+      "creation": {
+        "method": "image-gen-built-in",
+        "provider": "codex",
+        "model": "codex-image-gen",
+        "reference": "https://img-1302474103.cos.ap-nanjing.myqcloud.com/article-img-16d576643bb37af9.png"
+      },
+      "editable_prompt": "prompts.md#evolution-loop-en",
+      "structural_sources": [
+        "evolution-loop-en.mmd",
+        "evolution-loop-en.svg"
+      ]
+    },
+    {
+      "file": "architecture-zh-CN.png",
+      "locale": "zh-CN",
+      "group": "architecture",
+      "width": 1672,
+      "height": 941,
+      "sha256": "b629f0c045986e1a7f9fb00f83eeb20e43bbfab491e7eb0d2b812461e815b3f1",
+      "creation": {
+        "method": "image-gen-built-in",
+        "provider": "codex",
+        "model": "codex-image-gen",
+        "reference": "https://img-1302474103.cos.ap-nanjing.myqcloud.com/article-img-16d576643bb37af9.png"
+      },
+      "editable_prompt": "prompts.md#architecture-zh-cn",
+      "structural_sources": [
+        "architecture-zh-CN.mmd",
+        "architecture-zh-CN.svg"
+      ]
+    },
+    {
+      "file": "architecture-en.png",
+      "locale": "en",
+      "group": "architecture",
+      "width": 1672,
+      "height": 941,
+      "sha256": "15d840adfeb423003bcb03f0c007eb55d60b384dae00b72c83a58dc561293a60",
+      "creation": {
+        "method": "image-gen-built-in",
+        "provider": "codex",
+        "model": "codex-image-gen",
+        "reference": "https://img-1302474103.cos.ap-nanjing.myqcloud.com/article-img-16d576643bb37af9.png",
+        "supporting_reference": "architecture-zh-CN.png"
+      },
+      "editable_prompt": "prompts.md#architecture-en",
+      "structural_sources": [
+        "architecture-en.mmd",
+        "architecture-en.svg"
+      ]
+    },
+    {
+      "file": "asset-boundary-zh-CN.png",
+      "locale": "zh-CN",
+      "group": "asset-boundary",
+      "width": 1672,
+      "height": 941,
+      "sha256": "7697e50c3f19c616c74286354d814296c518acd88ba7c2b6ce0a447bb9b00b14",
+      "creation": {
+        "method": "image-gen-built-in",
+        "provider": "codex",
+        "model": "codex-image-gen",
+        "reference": "https://img-1302474103.cos.ap-nanjing.myqcloud.com/article-img-16d576643bb37af9.png"
+      },
+      "editable_prompt": "prompts.md#asset-boundary-zh-cn",
+      "structural_sources": [
+        "asset-boundary-zh-CN.mmd",
+        "asset-boundary-zh-CN.svg"
+      ]
+    },
+    {
+      "file": "asset-boundary-en.png",
+      "locale": "en",
+      "group": "asset-boundary",
+      "width": 1672,
+      "height": 941,
+      "sha256": "3d806a03042353f40998003ef63583e46b5fb7f8523fb5b96ee9feaac7a90a2a",
+      "creation": {
+        "method": "image-gen-built-in",
+        "provider": "codex",
+        "model": "codex-image-gen",
+        "reference": "https://img-1302474103.cos.ap-nanjing.myqcloud.com/article-img-16d576643bb37af9.png",
+        "supporting_reference": "asset-boundary-zh-CN.png"
+      },
+      "editable_prompt": "prompts.md#asset-boundary-en",
+      "structural_sources": [
+        "asset-boundary-en.mmd",
+        "asset-boundary-en.svg"
+      ]
+    }
+  ]
+}

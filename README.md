@@ -1,4 +1,4 @@
-<p align="center"><img src="docs/assets/hero-en.svg" alt="DarwinAgent — Evolution for the Agent Era" width="100%"></p>
+![DarwinAgent — Evolution for the Agent Era](docs/assets/hero-en.png)
 
 # DarwinAgent
 
@@ -111,7 +111,7 @@ The bundled demo helps you learn the workflow. To use your own data, supply reco
 
 ## How improvement works
 
-![Evolution loop](docs/assets/evolution-loop-en.svg)
+![Evolution loop](docs/assets/evolution-loop-en.png)
 
 1. Run the task through a common `Pipeline`, generate attributed answers, and score them independently.
 2. Propose asset changes using training evidence and saved experience.

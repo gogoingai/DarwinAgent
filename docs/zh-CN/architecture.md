@@ -2,7 +2,7 @@
 
 [English](../en/architecture.md) · [返回中文首页](../../README.zh-CN.md)
 
-![架构](../assets/architecture-zh-CN.svg)
+![架构](../assets/architecture-zh-CN.png)
 
 DarwinAgent 0.1 使用基于图的共同任务运行时。数据集边界只实现 `DatasetAdapter.generation_input(case_id)` 与异步 `Evaluator.evaluate(result)`；前者返回 `CaseInput`，后者返回 `EvaluationResult`。评测参考不进入生成输入。
 
@@ -38,7 +38,7 @@ DarwinAgent 0.1 使用基于图的共同任务运行时。数据集边界只实�
 
 ## 资产边界
 
-![资产边界](../assets/asset-boundary-zh-CN.svg)
+![资产边界](../assets/asset-boundary-zh-CN.png)
 
 允许提案修改 S/F/C/P；框架执行器、只读权限、固定来源／状态检查、`RunConfig`、评测器和采纳规则位于边界外。C 不能替换固定检查，P 不能引入未登记槽位，F 不能获得任意 Python 权限。
 
