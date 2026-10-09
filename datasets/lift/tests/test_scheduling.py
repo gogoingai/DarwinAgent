@@ -185,7 +185,7 @@ class ReplayTests(unittest.IsolatedAsyncioTestCase):
                     await agent.chat("query", session_id="one")
                 self.assertEqual((agent.root / "turns/0.json").read_bytes(), old)
                 self.assertEqual(agent.backend.run.await_count, 1)
-                self.assertEqual(trace.call_count, 1)
+                self.assertEqual(trace.call_count, 0)
 
     async def test_trace_failure_quarantines_after_local_episode(self):
         from datasets.lift.agents import DarwinChatAgent

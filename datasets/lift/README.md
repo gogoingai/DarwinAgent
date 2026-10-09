@@ -9,7 +9,59 @@
 - 每题最多 3 次原生 worker↔judge 回合，即最多 2 次原生纠错；整个 worker session 累计最多 8 次模型请求。共同的实际 HTTP attempt 上限为 100，SDK retries=0、传输最大尝试次数为 1。
 - `budget_root` 必须独立于每次比较的 `run_root`。框架修复后新建比较目录，但复用预算目录、HTTP 总账和未知请求暂停状态。`submitted` 未收据请求在恢复时全局隔离；禁止自动清除暂停文件或重发未知请求。
 
-## 运行与边界
+## 本地执行 / Local execution
+
+当前推荐直接本地运行：不启动 Docker、Langfuse、容器、后台服务，也不下载依赖或创建新环境。
+它复用固定上游的 `execute_task`、`run_task`、内容评判提示与解析协议；这是本地执行适配，
+不等同于完整原生容器生命周期复现。下面保留的容器路线仅作为历史记录。
+
+使用现有 Python 3.12 环境、已有固定上游与 16 文件数据清单，沿用 `pilot.example.json`。
+`run_root` 采用新目录；`budget_root` 指向原始独立的 100 请求账本，不能重置。
+凭据只从宿主 `DARWINAGENT_API_KEY` 获取；模型、端点环境变量必须与 JSON 完全一致。
+当前授权模型为 `glm-5.3-flash`，所有角色温度为 0，8/3/100 三项限制不可提高。
+以下真实运行命令仅供获得模型调用授权的协调者使用：
+
+```sh
+DARWINAGENT_MODEL=glm-5.3-flash DARWINAGENT_BASE_URL=AUTHORIZED_CODING_ENDPOINT \
+/path/to/existing/python3.12 -m datasets.lift.local \
+  --upstream /path/to/pinned/LIFT --config /private/local-pilot.json --run-id UNIQUE_LOCAL_RUN_ID
+```
+
+本地工具沿用五项原语及其输入输出；每个实例拥有独立工作区根路径，不启动子进程，
+不提供任意宿主代码执行。judge 只注册读工具，直接调用写入也会拒绝。私有评判、已选资产、
+传输凭据与账本不在工具可访问工作区内。启动时关闭 dotenv 自动读取和原生 pre-chat 上报。
+每次执行前验证工程源码、数据及传输身份，源码变化必须另建 A/B/C 比较目录。
+
+q1 的相同任务/K0/固定身份收据复用于 warmup、准入和训练；候选 q1 的准入/训练也复用同一
+公开证据。q2 仍独立验证，最多提交一个联合 S/F/C/P 候选，并沿用核心严格选择。
+训练失败时跳过 proposal/Wiki，仍诊断 q2；进化不可用时显式选择 K0。
+冻结选择后，q5 A/B/C 各自独立执行，C=K0 也不会复用 B 的运行。
+单题已知失败或 8 次 worker 上限产生可重放终态，继续下一题；未知请求/写入或全局 100 上限暂停。
+历史歧义暂停仅由协调者调用 `SharedTransport.recover_local_cap_pause` 审计恢复，启动器不会自动恢复。
+
+无需服务器即可生成 `all-pair-report.json`、`.csv`、`.md`，保留失败、未开始、缺失值、
+中间评判以及 worker/judge/proposal/Wiki 各角色的实际费用。`evaluation_healthy` 与任务终态
+分开；`acceptance_complete` 只有真实传输、完整有效的 q5 A/B/C 和身份验证通过才可能为真。
+录制机制测试永远不会成为真实验收，回退及 q6 未测范围会写入报告。
+
+离线录制试跑（不连接基础设施、不调用真实模型）：
+
+```sh
+/path/to/existing/python3.12 -m datasets.lift.tests.offline_local \
+  --upstream /path/to/pinned/LIFT --data /private/pinned-data --output /private/NEW_local_pilot
+# 失败继续与 K0 回退：在新目录运行相同命令，并加 --failures；全失败加 --all-failed。
+```
+
+Local mode uses existing dependencies and the pinned native worker/judge protocol, without containers,
+Langfuse, service calls, dotenv discovery or child tool processes. Use the module command above with a
+fresh run directory and the original independent budget directory. Identical public q1 evidence may
+be reused across warmup/admission/training; q2 remains private validation, and q5 A/B/C always execute
+independently after selection freezes. Known local failures continue; unknown effects and the global
+100-attempt gate pause. Reports disclose fallback, null/intermediate scores, all role costs and the
+unopened q6 scope. This is a local adaptation, not full native container reproduction; recorded tests
+do not establish real model quality or complete real acceptance.
+
+## 历史容器运行与边界 / Historical container route
 
 使用独立 3.12 环境安装本目录 `requirements.lock` 与当前核心源码；不修改核心 `uv.lock`。锁文件是实际验收环境的已解析版本清单，非跨平台 wheel 哈希锁。Docker 镜像仅包含固定 Python 基础镜像与标准库工具：
 

@@ -1,0 +1,654 @@
+"""Small local LIFT coordinator. Import and --help never dispatch models or services."""
+
+import argparse
+import asyncio
+import csv
+import json
+import os
+import time
+from pathlib import Path
+
+from darwinagent.agent import AgentKernelBundle, EpisodeResult, ExecutionBackend
+from darwinagent.config import RunConfig
+from darwinagent.experiments import AgentExperimentSpec, CampaignController, EpisodeEvaluation
+from darwinagent.llm.client import BudgetExceeded
+from darwinagent.runtime.artifacts import atomic_json, digest
+from darwinagent.runtime.identity import assert_files, snapshot_files
+from darwinagent.runtime.leases import execution_lease
+
+from .data import UPSTREAM_REVISION, LiftDataset, sha
+from .local_tools import LocalTools
+from .report import available_sum, cell, report, token_count, update_cell
+
+
+def configure_native(path):
+    """Disable dotenv discovery and native reporting before importing upstream."""
+    os.environ["PYTHON_DOTENV_DISABLED"] = "1"
+    os.environ["EVAL_LANGFUSE_PRE_CHAT"] = "0"
+    os.environ["DO_TRAJECTORY_JUDGE"] = "false"
+    from .register import upstream
+
+    upstream(path)
+    from src.config import CONFIG
+
+    if CONFIG.langfuse_pre_chat:
+        raise ValueError("Native reporting already imported with tracing enabled")
+
+
+class LocalEpisodeBackend(ExecutionBackend):
+    def __init__(self, owner, workspace):
+        from .agents import NativeReAct, worker_profile
+
+        self.owner, self.workspace = owner, Path(workspace).resolve()
+        super().__init__(
+            NativeReAct(),
+            LocalTools(self.workspace).specs(),
+            worker_profile(),
+            owner.shared.scoped("campaign-worker", "worker"),
+            owner.root / "campaign-receipts",
+        )
+
+    def for_episode(self, episode_root, task):
+        return type(self)(self.owner, episode_root)
+
+    async def run(self, task, kernel=None, *, run_id):
+        # Admission and training share public execution evidence for the exact
+        # same task/K0 identity. Candidate q1 may similarly reuse admission.
+        # Private q2 judgments never become training evidence.
+        return await self.owner.execute(task, kernel, "campaign", "campaign", run_id)
+
+
+class LocalEvaluator:
+    def __init__(self, owner):
+        self.owner = owner
+
+    def declaration(self):
+        return {
+            "kind": "native-lift-content",
+            "revision": UPSTREAM_REVISION,
+            "references": digest(
+                {k: v.expected_result.model_dump() for k, v in self.owner.dataset.native.items()}
+            ),
+            "model": self.owner.shared.identity(),
+            "criterion_scale": [0, 1],
+            "max_turns": 3,
+        }
+
+    async def evaluate(self, task, episode):
+        row = json.loads(
+            (
+                self.owner.root / "evaluations" / (episode.usage["native_evaluation"] + ".json")
+            ).read_text()
+        )
+        native = row["native"]
+        # EpisodeEvaluation requires numbers; failed missing scores remain null in
+        # all-pair evidence, while the internal unhealthy sentinel cannot be adopted.
+        return EpisodeEvaluation(
+            float(native["success"]),
+            native["content_score"] if native["content_score"] is not None else 0,
+            healthy=row["healthy"] and episode.status == "completed",
+            public_feedback=tuple(row["public_feedback"]) if task.id == "q1" else (),
+            correction_turns=max(0, native["turns"] - 1),
+        )
+
+
+class LocalRunner:
+    def __init__(self, *, dataset, shared, root, initial, run_id):
+        from src.lift.eval import task_exec
+
+        self.dataset, self.shared, self.root = dataset, shared, Path(root).resolve()
+        if isinstance(dataset, LiftDataset) and len(dataset.files) != 16:
+            raise ValueError("Local pilot requires the existing exact 16-file manifest")
+        self.initial, self.run_id = initial, run_id
+        if shared.trace or shared.worker_limit != 8 or shared.cfg.max_http_requests != 100:
+            raise ValueError("Local runner requires trace=False and fixed 8/100 caps")
+        if shared.root.resolve().is_relative_to(self.root) or self.root.is_relative_to(
+            shared.root.resolve()
+        ):
+            raise ValueError("Run and shared budget directories must be independent")
+        self.shared.trace = False
+        self.shared.run_id = run_id
+        self.root.mkdir(parents=True, exist_ok=True)
+        self.source = snapshot_files(
+            [
+                Path(__file__).parent,
+                Path(__file__).parents[2] / "src/darwinagent",
+                Path(task_exec.__file__).parents[2],
+            ]
+        )
+        identity = {
+            "mode": "local-native-task-adaptation-v1",
+            "run_id": run_id,
+            "source": self.source,
+            "upstream": UPSTREAM_REVISION,
+            "dataset": self.dataset.identity(),
+            "initial": self.initial.content_id,
+            "transport": shared.identity(),
+            "worker_limit": 8,
+            "correction_rounds": 3,
+            "trace": False,
+        }
+        path = self.root / "integration-identity.json"
+        if path.exists() and json.loads(path.read_text()) != identity:
+            raise ValueError("Frozen source/data/config changed; use a fresh A/B/C directory")
+        if not path.exists():
+            atomic_json(path, identity)
+        self.frozen_identity = identity
+
+    def identity(self):
+        return self.frozen_identity
+
+    def verify(self):
+        assert_files(self.source)
+        if self.dataset.identity() != self.frozen_identity["dataset"]:
+            raise ValueError("Frozen dataset identity changed")
+        self.initial.verify()
+        if self.shared.identity() != self.frozen_identity["transport"] or self.shared.trace:
+            raise ValueError("Frozen transport identity changed")
+
+    def evaluator_factory(self, client, path):
+        return LocalEvaluator(self)
+
+    def client_factory(self, stage):
+        self.verify()
+        self.shared.check()
+        if any(
+            json.loads(p.read_text())["status"] == "failed"
+            for p in (self.root / "cells").glob("*.json")
+        ):
+            raise RuntimeError("Unhealthy task forbids proposal/Wiki calls")
+        return self.shared.scoped("evolution-" + digest(str(stage))[:16], "proposal_wiki")
+
+    async def execute(self, task, kernel, arm, phase, evaluation_key):
+        from src.lift.eval.run_task import _extract_judge_result
+        from src.lift.eval.stage import HoldoutLoadState, SuiteRunPhase
+        from src.lift.eval.task_exec import execute_task
+        from src.lift.eval.worker_judger import WorkerJudgerPair
+
+        from .agents import DarwinChatAgent
+
+        self.verify()
+        key = digest({"task": task.id, "kernel": kernel.content_id if kernel else None})[:24]
+        # Only training/admission evidence can be shared; independent q5 A/B/C
+        # always get separate workspaces, histories and worker caps, including C=K0.
+        evidence_key = key if arm == "campaign" else arm + "-" + key
+        receipt = self.root / "task-receipts" / (evidence_key + ".json")
+        evaluation = self.root / "evaluations" / (evaluation_key + ".json")
+        if receipt.exists():
+            saved = json.loads(receipt.read_text())
+            if (
+                digest(
+                    {
+                        "episode": saved["episode"],
+                        "row": saved["row"],
+                        "workspace": saved["workspace"],
+                    }
+                )
+                != saved["sha256"]
+            ):
+                raise ValueError("Settled local task receipt changed")
+            workspace = self.root / "workspaces" / evidence_key
+            current = {
+                str(p.relative_to(workspace)): sha(p) for p in workspace.rglob("*") if p.is_file()
+            }
+            if current != saved["workspace"] or any(p.is_symlink() for p in workspace.rglob("*")):
+                raise ValueError("Settled local task artifacts changed")
+            if not evaluation.exists():
+                atomic_json(evaluation, saved["row"])
+            return EpisodeResult(**saved["episode"])
+        self.shared.check()
+        if arm == "campaign":
+            phase = "train" if task.id == "q1" else "validation"
+            cell_arm = "campaign" if kernel.content_id == self.initial.content_id else "candidate"
+        else:
+            cell_arm = arm
+        cell_key = cell(self.root, task.id, cell_arm, phase, self.run_id)
+        update_cell(self.root, cell_key, status="running", started=time.time())
+        workspace = self.root / "workspaces" / evidence_key
+        self.dataset.stage(task, workspace)
+        # Reload every selected asset into a separate host-only location; tools
+        # cannot address loads, private criteria, transport or accepted state.
+        if kernel is not None:
+            kernel = self.load_kernel(kernel, evidence_key)
+        sid = evidence_key
+        worker_sid, judge_sid = "worker-" + sid, "judge-" + sid
+        update_cell(self.root, cell_key, sessions=[worker_sid, judge_sid])
+        worker = DarwinChatAgent(
+            task,
+            LocalTools(workspace).specs(),
+            self.shared,
+            self.root / "sessions" / worker_sid,
+            kernel,
+            role="worker",
+            run_id=self.run_id,
+            session=worker_sid,
+            trace=False,
+            cell_id=cell_key,
+            arm=arm,
+            phase=phase,
+        )
+        judge = DarwinChatAgent(
+            task,
+            LocalTools(workspace, readonly=True).specs(),
+            self.shared,
+            self.root / "sessions" / judge_sid,
+            None,
+            role="judge",
+            run_id=self.run_id,
+            session=judge_sid,
+            trace=False,
+            cell_id=cell_key,
+            arm=arm,
+            phase=phase,
+        )
+        pair = WorkerJudgerPair(worker, judge, worker_sid, judge_sid)
+
+        async def factory(native):
+            return pair
+
+        scores = []
+
+        def on_turn(index, prompt, result, scored):
+            scores.append(scored.model_dump())
+            atomic_json(
+                self.root / "native-turns" / evidence_key / (str(index) + ".json"),
+                scored.model_dump(),
+            )
+
+        failure = None
+        try:
+            native = (
+                await execute_task(
+                    task=self.dataset.native[task.id],
+                    run_id=self.run_id,
+                    workspace_dir=workspace,
+                    factory=factory,
+                    run_phase=SuiteRunPhase.holdout(HoldoutLoadState.BASELINE),
+                    max_conversation_turns=3,
+                    on_turn=on_turn,
+                )
+            ).model_dump()
+        except Exception as exc:
+            self.shared.check()  # Unknown/HTTP/global gate must escape, never settle as local.
+            failure = type(exc).__name__
+            for episode in judge.episodes():
+                if episode["status"] == "completed":
+                    try:
+                        scores.append(_extract_judge_result(episode["final_response"]).model_dump())
+                    except ValueError:
+                        pass
+            native = {
+                "work_session_id": worker_sid,
+                "judge_session_id": judge_sid,
+                "success": False,
+                "content_score": scores[-1]["score"] if scores else None,
+                "turns": len(worker.episodes()),
+                "workspace_dir": str(workspace),
+            }
+        finally:
+            # A global interruption keeps running receipts and durable journals for resume.
+            if failure is None and (self.shared.root / "pause.json").exists():
+                try:
+                    self.shared.check()
+                except BudgetExceeded:
+                    update_cell(self.root, cell_key, status="paused", finished=time.time())
+        episodes = worker.episodes()
+        usage = {
+            "model_calls": sum(e["usage"]["model_calls"] for e in episodes),
+            "leaf_calls": sum(e["usage"]["leaf_calls"] for e in episodes),
+            "unknown_calls": 0,
+            "pending_calls": 0,
+            "native_evaluation": evaluation_key,
+        }
+        native["tool_calls"] = worker.count_tools()
+        row = {
+            "native": native,
+            "healthy": failure is None,
+            "error_type": failure,
+            "content_score_scope": "final"
+            if failure is None
+            else "intermediate"
+            if scores
+            else "unjudged",
+            "public_feedback": [
+                m["content"]
+                for m in json.loads((worker.root / "chat.json").read_text())["history"][2:]
+                if m["role"] == "user"
+            ]
+            if (worker.root / "chat.json").exists()
+            else [],
+            "intermediate_judges": scores,
+            "evidence_key": evidence_key,
+            "kernel_id": kernel.content_id if kernel else None,
+        }
+        episode = EpisodeResult(
+            "completed" if failure is None else "failed",
+            episodes[-1]["final_response"] if episodes else "",
+            tuple(episodes[-1]["artifacts"]) if episodes else (),
+            tuple(e for ep in episodes for e in ep["events"]),
+            usage,
+        )
+        update_cell(
+            self.root,
+            cell_key,
+            status="completed" if failure is None else "failed",
+            finished=time.time(),
+            native=native,
+            healthy=row["healthy"],
+            error_type=failure,
+            content_score_scope=row["content_score_scope"],
+            intermediate_judges=scores,
+        )
+        atomic_json(evaluation, row)
+        saved = {
+            "episode": episode.to_dict(),
+            "row": row,
+            "workspace": {
+                str(p.relative_to(workspace)): sha(p) for p in workspace.rglob("*") if p.is_file()
+            },
+        }
+        atomic_json(receipt, dict(saved, sha256=digest(saved)))
+        return episode
+
+    def load_kernel(self, kernel, evidence_key):
+        kernel.verify()
+        root = self.root / "loads" / evidence_key / "bundle"
+        for source in sorted(kernel.root.rglob("*")):
+            if source.is_file():
+                target = root / source.relative_to(kernel.root)
+                if target.exists() and target.read_bytes() != source.read_bytes():
+                    raise ValueError("Previously loaded assets changed")
+                if not target.exists():
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    target.write_bytes(source.read_bytes())
+        loaded = AgentKernelBundle(root)
+        if loaded.content_id != kernel.content_id:
+            raise ValueError("Fresh selected asset identity differs")
+        receipt = root.parent / "load-receipt.json"
+        if not receipt.exists():
+            atomic_json(
+                receipt,
+                {
+                    "kernel_id": loaded.content_id,
+                    "source": str(kernel.root),
+                    "source_sha256": digest(self.source),
+                },
+            )
+        return loaded
+
+    async def evolve(self):
+        selected_path = self.root / "selected-state.json"
+        if selected_path.exists():
+            state = json.loads(selected_path.read_text())
+            selected = AgentKernelBundle(state["bundle_root"])
+            selected.verify()
+            if selected.content_id != state["kernel_id"] or state["source_sha256"] != digest(
+                self.source
+            ):
+                raise ValueError("Frozen selected assets or source identity changed")
+            return selected
+        warmup = await self.execute(
+            self.dataset.task("q1"), self.initial, "campaign", "train", "warmup-q1"
+        )
+        summary = {"status": "failed_training", "healthy": False}
+        selected = self.initial
+        if warmup.status == "completed":
+            controller = CampaignController(
+                self.dataset,
+                self.evaluator_factory,
+                self.shared.cfg,
+                RunConfig(temperature=0, concurrency=1),
+                AgentExperimentSpec(
+                    train=("q1",),
+                    validation=("q2",),
+                    admission=("q1",),
+                    rounds=1,
+                    max_episode_runs=6,
+                    proposal_call_limit=1,
+                ),
+                self.root / "campaign",
+                frozen_files=[Path(__file__).parent],
+                client_factory=self.client_factory,
+                wiki_call_limit=4,
+                backend=LocalEpisodeBackend(self, self.root / "campaign-template"),
+            )
+            try:
+                summary = await controller.run(
+                    self.initial, resume=(self.root / "campaign/agent-campaign.json").exists()
+                )
+                if summary.get("status") == "complete":
+                    selected = AgentKernelBundle(self.root / "campaign/selected")
+            except Exception as exc:
+                self.shared.check()
+                summary = {
+                    "status": "failed_campaign",
+                    "healthy": False,
+                    "error_type": type(exc).__name__,
+                }
+        self.shared.check()
+        # q2 is always diagnosed, even when training/proposal is unavailable. Reuse
+        # completed K0 validation, without exposing its private criteria to optimizer.
+        await self.execute(
+            self.dataset.task("q2"), self.initial, "campaign", "validation", "diagnostic-q2"
+        )
+        state = {
+            "kernel_id": selected.content_id,
+            "bundle_root": str(selected.root),
+            "fallback": selected.content_id == self.initial.content_id,
+            "campaign": summary,
+            "source_sha256": digest(self.source),
+        }
+        atomic_json(selected_path, state)
+        return selected
+
+    async def run(self):
+        self.verify()
+        for task_id, arm, phase in (
+            ("q1", "campaign", "train"),
+            ("q2", "campaign", "validation"),
+            ("q5", "A", "holdout"),
+            ("q5", "B", "holdout"),
+            ("q5", "C", "holdout"),
+        ):
+            path_key = digest(
+                {"task_id": task_id, "arm": arm, "phase": phase, "run_id": self.run_id}
+            )[:24]
+            if not (self.root / "cells" / (path_key + ".json")).exists():
+                cell(self.root, task_id, arm, phase, self.run_id)
+        with execution_lease(self.root / "local-run.lock"):
+            try:
+                selected = await self.evolve()
+                for arm, kernel in (("A", None), ("B", self.initial), ("C", selected)):
+                    await self.execute(self.dataset.task("q5"), kernel, arm, "holdout", "q5-" + arm)
+            finally:
+                self.write_reports()
+        return json.loads((self.root / "all-pair-report.json").read_text())
+
+    def write_reports(self):
+        value = report(self.root, self.shared)
+        self.verify()
+        state_path = self.root / "selected-state.json"
+        value["selected"] = json.loads(state_path.read_text()) if state_path.exists() else None
+        value["execution_mode"] = "local-native-task-adaptation-v1"
+        histories = {}
+        for path in sorted((self.shared.root / "requests").glob("*.json")):
+            request = json.loads(path.read_text())
+            histories.setdefault(request.get("run_id", "unidentified"), []).append(request)
+        value["global_request_histories"] = {}
+        for run_id, requests in histories.items():
+            roles = {}
+            for role in sorted({r.get("role", "unidentified") for r in requests}):
+                records = [r for r in requests if r.get("role", "unidentified") == role]
+                counts = [token_count(r.get("usage") or {}) for r in records]
+                roles[role] = {
+                    "requests": len(records),
+                    "actual_http_attempts": available_sum(
+                        r.get("actual_http_attempts") for r in records
+                    ),
+                    "tokens": available_sum(counts),
+                    "known_tokens_subtotal": sum(c for c in counts if c is not None),
+                    "unknown_token_requests": sum(c is None for c in counts),
+                    "elapsed_s": available_sum(
+                        r["finished"] - r["started"] if "finished" in r else None for r in records
+                    ),
+                }
+            value["global_request_histories"][run_id] = {
+                "requests": len(requests),
+                "roles": roles,
+                "statuses": {
+                    status: sum(r["status"] == status for r in requests)
+                    for status in sorted({r["status"] for r in requests})
+                },
+            }
+        for row in value["rows"]:
+            native = row.get("native")
+            row["correction_turns"] = max(0, native["turns"] - 1) if native else None
+        holdout = [r for r in value["rows"] if r["task_id"] == "q5"]
+        value["evaluation_healthy"] = (
+            bool(holdout) and len(holdout) == 3 and all(r.get("healthy") for r in holdout)
+        )
+        value["q5_verification_complete"] = (
+            value["status"] in {"complete", "finished_with_failures"}
+            and value["evaluation_healthy"]
+            and value["model_evidence"] == "host_transport"
+        )
+        value["acceptance_complete"] = value["q5_verification_complete"]
+        value["acceptance_scope"] = "local_q5_A_B_C_execution_verification_only"
+        value["quality_improvement_claim"] = False
+        value["evolution_complete"] = (
+            bool(value["selected"]) and value["selected"]["campaign"].get("status") == "complete"
+        )
+        value["evolution_adopted"] = bool(value["selected"]) and not value["selected"]["fallback"]
+        value["source_sha256"] = digest(self.source)
+        atomic_json(self.root / "all-pair-report.json", value)
+        fields = [
+            "task_id",
+            "arm",
+            "status",
+            "healthy",
+            "success",
+            "content_score",
+            "turns",
+            "correction_turns",
+            "worker_tokens",
+            "judge_tokens",
+            "worker_time_s",
+            "judge_time_s",
+            "task_time_s",
+            "native_tool_calls",
+            "flattened_leaf_calls",
+            "content_score_scope",
+        ]
+        with (self.root / "all-pair-report.csv").open("w", newline="") as stream:
+            writer = csv.DictWriter(stream, fieldnames=fields)
+            writer.writeheader()
+            for row in value["rows"]:
+                writer.writerow({k: row.get(k, (row.get("native") or {}).get(k)) for k in fields})
+        lines = [
+            "# Local LIFT all-pair evidence",
+            "",
+            f"Status: {value['status']}; acceptance complete: {value['acceptance_complete']}",
+            f"HTTP attempts: {value['actual_http_attempts']}/100; evaluation healthy: {value['evaluation_healthy']}",
+            "q6: sealed, no independent generalization or measured improvement claim.",
+            "Acceptance scope: local q5 A/B/C execution verification only; release acceptance remains separate.",
+            "Recorded scores are synthetic."
+            if value["model_evidence"] == "recorded_offline"
+            else "Scores use the authorized host model and unchanged native content judge.",
+            f"Evolution complete: {value['evolution_complete']}; candidate adopted: {value['evolution_adopted']}",
+            "",
+            "| Task | Arm | Status | Success | Content |",
+            "|---|---|---|---|---|",
+        ]
+        for row in value["rows"]:
+            native = row.get("native") or {}
+            lines.append(
+                f"| {row['task_id']} | {row['arm']} | {row['status']} | {native.get('success')} | {native.get('content_score')} |"
+            )
+        lines.extend(
+            [
+                "",
+                "Selected state and fallback:",
+                "```json",
+                json.dumps(value["selected"], indent=2),
+                "```",
+                "",
+                "All roles and actual measured costs:",
+                "```json",
+                json.dumps(value["roles"], indent=2),
+                "```",
+                "",
+                "Global request histories (including prior preserved runs):",
+                "```json",
+                json.dumps(value["global_request_histories"], indent=2),
+                "```",
+            ]
+        )
+        (self.root / "all-pair-report.md").write_text("\n".join(lines) + "\n")
+
+
+def build_runner(config, run_id):
+    from darwinagent.config import Config
+    from darwinagent.llm.client import LLMClient
+
+    from .kernel import initial_kernel
+    from .transport import SharedTransport
+
+    for key, default in (
+        ("http_cap", 100),
+        ("worker_limit", 8),
+        ("correction_rounds", 3),
+        ("temperature", 0),
+    ):
+        if config.get(key, default) != default:
+            raise ValueError("Local pilot requires fixed " + key)
+    model, endpoint = os.environ["DARWINAGENT_MODEL"], os.environ["DARWINAGENT_BASE_URL"]
+    if model != "glm-5.3-flash" or model != config["model"] or endpoint != config["base_url"]:
+        raise ValueError("Model/endpoint differs from the authorized frozen config")
+    root, budget = Path(config["run_root"]).resolve(), Path(config["budget_root"]).resolve()
+    if root.is_relative_to(budget) or budget.is_relative_to(root):
+        raise ValueError("budget_root must be independent of run_root")
+    cfg = Config(
+        api_base_url=endpoint,
+        api_key=os.environ["DARWINAGENT_API_KEY"],
+        model_strong=model,
+        model_middle=model,
+        model_fast=model,
+        max_retries=1,
+        max_concurrency=1,
+        max_http_requests=100,
+        request_budget_path=budget / "http-attempts.json",
+        work_dir=root / "transport",
+        model_profiles=False,
+    )
+    cfg.role_tiers.update(worker="strong", judge="strong")
+    shared = SharedTransport(LLMClient(cfg), budget / "shared", worker_limit=8)
+    initial = (
+        AgentKernelBundle(root / "K0") if (root / "K0").exists() else initial_kernel(root / "K0")
+    )
+    return LocalRunner(
+        dataset=LiftDataset(config["data_root"]),
+        shared=shared,
+        root=root,
+        initial=initial,
+        run_id=run_id,
+    )
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--upstream", required=True)
+    parser.add_argument("--config", default=os.environ.get("DARWIN_LIFT_CONFIG"))
+    parser.add_argument("--run-id", required=True)
+    args = parser.parse_args()
+    if not args.config:
+        parser.error("--config or DARWIN_LIFT_CONFIG is required")
+    configure_native(args.upstream)
+    runner = build_runner(json.loads(Path(args.config).read_text()), args.run_id)
+    try:
+        asyncio.run(runner.run())
+    finally:
+        asyncio.run(runner.shared.client.aclose())
+
+
+if __name__ == "__main__":
+    main()

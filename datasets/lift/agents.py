@@ -164,17 +164,18 @@ class DarwinChatAgent(ChatAgent):
         atomic_json(path, state)
         self.cursor += 1
         try:
-            tracing.emit(
-                self.root,
-                self.session,
-                self.run_id,
-                self.role,
-                state["history"],
-                [r["episode"] for r in state["turns"]],
-                self.shared,
-                self.trace,
-                started,
-            )
+            if self.trace:
+                tracing.emit(
+                    self.root,
+                    self.session,
+                    self.run_id,
+                    self.role,
+                    state["history"],
+                    [r["episode"] for r in state["turns"]],
+                    self.shared,
+                    self.trace,
+                    started,
+                )
         except Exception as exc:
             atomic_json(
                 self.root / "trace-errors" / (str(self.cursor) + ".json"),
