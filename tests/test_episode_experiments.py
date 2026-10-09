@@ -19,6 +19,7 @@ from darwinagent.experiments.episode_contracts import episode_metrics, select_ep
 from darwinagent.experiments.episode_experiment import read_record
 from darwinagent.experiments.episode_proposal import decode_candidate
 from tests.support.agent_runtime import (
+    ConfiguredGate,
     LostReceiptClient,
     ModelTwiceAgent,
     ReturnsUnknownAgent,
@@ -412,6 +413,21 @@ class EpisodeExperimentTests(unittest.IsolatedAsyncioTestCase):
         resumed = await controller.run(self.kernel, resume=True)
         self.assertEqual(result, resumed)
         self.assertEqual(self.client.calls, 3)
+
+    def test_bound_host_policy_changes_campaign_identity(self):
+        from darwinagent.experiments.episode_experiment import EpisodeExperiment
+
+        def experiment(allow):
+            self.backend.profile = replace(self.profile, host_checks=(ConfiguredGate(allow).check,))
+            return EpisodeExperiment(self.controller(), self.spec, self.kernel, 1)
+
+        original = experiment(True)
+        self.assertEqual(original.campaign_id, experiment(True).campaign_id)
+        changed = experiment(False)
+        self.assertNotEqual(original.campaign_id, changed.campaign_id)
+        with self.assertRaisesRegex(ValueError, "identity"):
+            original.verify()
+        self.assertNotIn("private-policy-marker", json.dumps(changed.identity))
 
 
 class EpisodeSelectionTests(unittest.TestCase):

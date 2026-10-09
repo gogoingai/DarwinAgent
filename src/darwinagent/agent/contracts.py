@@ -117,6 +117,13 @@ class ToolSpec:
 
 @dataclass(frozen=True)
 class ExecutionProfile:
+    """Fixed host policy. Stateful checks declare identity()/declaration() -> JSON.
+
+    Declarations include all stable policy configuration (also external state),
+    exclude transient counters, and are hashed rather than persisted in plaintext.
+    Plain functions without captured/default/global data need no declaration.
+    """
+
     id: str
     capabilities: tuple[str, ...]
     prompt_roles: Mapping = field(
@@ -162,12 +169,67 @@ class ExecutionProfile:
     def _check_identity(check):
         import inspect
 
-        name = f"{check.__module__}.{check.__qualname__}"
+        # A callback's source does not describe its bound policy configuration.
+        # Stateful checks must declare stable JSON state; only its digest is public.
+        owner = check.__self__ if inspect.ismethod(check) else check
+        target = check.__func__ if inspect.ismethod(check) else check
+        if not inspect.isfunction(target):
+            target = type(check)
+        name = f"{target.__module__}.{target.__qualname__}"
+        hook = getattr(owner, "identity", None)
+        if hook is None:
+            hook = getattr(owner, "declaration", None)
+        global_state = (
+            any(
+                not (inspect.ismodule(v) or inspect.isroutine(v) or inspect.isclass(v))
+                for v in inspect.getclosurevars(check).globals.values()
+            )
+            if inspect.isfunction(check)
+            else False
+        )
+        stateful = not inspect.isfunction(check) or bool(
+            check.__closure__
+            or check.__defaults__
+            or check.__kwdefaults__
+            or check.__dict__
+            or global_state
+        )
+        configuration = None
+        if hook is not None or stateful:
+            try:
+                if not callable(hook):
+                    raise ValueError("Stateful host checks require identity() or declaration()")
+                configuration = hook()
+                if inspect.isawaitable(configuration):
+                    if inspect.iscoroutine(configuration):
+                        configuration.close()
+                    raise ValueError("Host check identity must be synchronous")
+                if not isinstance(configuration, Mapping):
+                    raise ValueError("Host check identity must be a JSON object")
+                configuration = plain(freeze(configuration))
+            except (TypeError, ValueError) as exc:
+                raise ValueError(
+                    "Host check identity must declare stable JSON configuration"
+                ) from exc
         try:
-            source = inspect.getsource(check)
-        except (OSError, TypeError):
+            source = inspect.getsource(target)
+            if inspect.ismethod(check):
+                owner_type = owner if inspect.isclass(owner) else type(owner)
+                source += inspect.getsource(owner_type)
+        except (OSError, TypeError) as exc:
+            if stateful:
+                raise ValueError(
+                    "Stateful host check identity requires inspectable source"
+                ) from exc
             source = name
-        return name + ":" + digest(source)
+        # Preserve the existing fingerprint for ordinary stateless functions.
+        return (
+            name
+            + ":"
+            + digest(
+                source if configuration is None else {"source": source, "config": configuration}
+            )
+        )
 
     @property
     def fingerprint(self):

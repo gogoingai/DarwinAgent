@@ -152,3 +152,14 @@ class RecoveringReadAgent:
             "write_file", {"path": "recovered.txt", "content": "fallback evidence"}
         )
         return context.result("recovered", artifacts=(artifact,))
+
+
+class ConfiguredGate:
+    def __init__(self, allow, private="private-policy-marker"):
+        self.allow, self.private = allow, private
+
+    def identity(self):
+        return {"allow": self.allow, "private": self.private}
+
+    def check(self, stage, candidate):
+        return self.allow

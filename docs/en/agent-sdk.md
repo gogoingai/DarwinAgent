@@ -95,6 +95,14 @@ a complete S/F/C/P bundle and demonstrates an actual F-only output change.
 assets. Each C must return literal `True`. A rejected post-action check cannot undo a write
 that already happened; retain that artifact and receipt while withholding successful delivery.
 
+A bound host check must expose synchronous `identity()` or `declaration()` on its owner,
+returning a stable JSON object that includes all policy configuration. Callable objects use
+the same declaration contract. Functions with captured values, defaults or global data also
+need an explicit declaration; ordinary stateless functions remain supported directly.
+Declarations are hashed, so private configuration does not appear in profile or run receipts.
+A changed declaration invalidates completed replay and campaign identity; use fresh run IDs.
+
+
 ## Recovery and isolation
 
 Every durable run requires an explicit safe `run_id` and `run_root`. The same identity

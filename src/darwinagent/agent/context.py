@@ -131,7 +131,11 @@ class AgentContext:
             if inspect.isawaitable(result):
                 raise ValueError("Host checks must be synchronous and side-effect-free")
             outcomes.append(
-                {"id": f"fixed.{check.__module__}.{check.__qualname__}", "accepted": result is True}
+                {
+                    "id": f"fixed.{check.__module__}."
+                    + getattr(check, "__qualname__", type(check).__qualname__),
+                    "accepted": result is True,
+                }
             )
         for a, fn in self.checks:
             if a.stage == stage:

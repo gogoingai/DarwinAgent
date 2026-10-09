@@ -78,7 +78,7 @@ def episode(status, models, leaves):
         status,
         "answer",
         (),
-        ({"kind": "model", "usage": {"prompt_tokens": 10, "completion_tokens": 2}},),
+        ({"kind": "model", "usage": {"prompt_tokens": 10, "completion_tokens": 2}},) * models,
         {"model_calls": models, "leaf_calls": leaves, "unknown_calls": 0, "pending_calls": 0},
     )
 
@@ -131,11 +131,11 @@ class ReportTests(unittest.IsolatedAsyncioTestCase):
                 )
                 self.assertEqual(
                     row["worker_usage"]["leaf_calls"],
-                    5 if isinstance(failure, EpisodeResult) else 4,
+                    5 if isinstance(failure, EpisodeResult) else None,
                 )
                 self.assertEqual(
                     row["worker_usage"]["model_calls"],
-                    6 if isinstance(failure, EpisodeResult) else 4,
+                    6 if isinstance(failure, EpisodeResult) else None,
                 )
                 self.assertEqual(row["correction_turns"], 1)
                 self.assertEqual(row["worker_unfinished_turns"], 1)
@@ -169,8 +169,8 @@ class ReportTests(unittest.IsolatedAsyncioTestCase):
             rows = {r["arm"]: r for r in cell_rows(root)}
             self.assertEqual(rows["B"]["worker_usage"]["leaf_calls"], 4)
             self.assertEqual(rows["B"]["judge_usage"]["leaf_calls"], 1)
-            self.assertEqual(rows["B"]["worker_tokens"], 12)
-            self.assertEqual(rows["B"]["judge_tokens"], 12)
+            self.assertEqual(rows["B"]["worker_tokens"], 48)
+            self.assertEqual(rows["B"]["judge_tokens"], 24)
             self.assertEqual(rows["C"]["status"], "unstarted")
             self.assertEqual(rows["C"]["worker_turns"], 0)
             self.assertIsNone(rows["C"]["task_time_s"])
@@ -190,3 +190,143 @@ class ReportTests(unittest.IsolatedAsyncioTestCase):
             operation.assert_not_awaited()
             row = cell_rows(owner.root)[0]
             self.assertEqual((row["arm"], row["status"], row["worker_turns"]), ("A", "failed", 0))
+
+
+class TokenCompletenessTests(unittest.TestCase):
+    def test_unknown_first_and_second_requests_for_each_role(self):
+        for role in ("worker", "judge"):
+            for completed in (0, 1):
+                with (
+                    self.subTest(role=role, completed=completed),
+                    tempfile.TemporaryDirectory() as d,
+                ):
+                    root = Path(d)
+                    session = role + "-session"
+                    cell(root, "q5", "B", "holdout", "run", status="paused", sessions=[session])
+                    events = [
+                        {"kind": "model", "usage": {"prompt_tokens": 10, "completion_tokens": 3}}
+                    ] * completed
+                    result = EpisodeResult(
+                        "unknown",
+                        events=tuple(events),
+                        usage={
+                            "model_calls": completed + 1,
+                            "leaf_calls": 0,
+                            "unknown_calls": 1,
+                            "pending_calls": 1,
+                        },
+                    )
+                    atomic_json(
+                        root / "sessions" / session / "turns/0.json",
+                        {"status": "unknown", "episode": result.to_dict()},
+                    )
+                    row = cell_rows(root)[0]
+                    self.assertIsNone(row[role + "_tokens"])
+                    self.assertEqual(row[role + "_known_tokens_subtotal"], 13 * completed)
+                    self.assertEqual(row[role + "_unknown_token_requests"], 1)
+                    self.assertEqual(row[role + "_usage"]["model_calls"], completed + 1)
+                    self.assertEqual(row[role + "_accounting_status"], "incomplete")
+
+    def test_unfinished_without_result_reads_durable_steps_for_each_role(self):
+        for role in ("worker", "judge"):
+            for completed in (0, 1):
+                with (
+                    self.subTest(role=role, completed=completed),
+                    tempfile.TemporaryDirectory() as d,
+                ):
+                    root = Path(d)
+                    session = role + "-session"
+                    cell(root, "q5", "B", "holdout", "run", status="running", sessions=[session])
+                    directory = root / "sessions" / session
+                    atomic_json(directory / "turns/0.json", {"status": "running", "episode": None})
+                    if completed:
+                        atomic_json(
+                            directory / "episodes/turn-0/steps/000000.json",
+                            {
+                                "kind": "model",
+                                "state": "responded",
+                                "response": {
+                                    "content": "ok",
+                                    "usage": {"prompt_tokens": 10, "completion_tokens": 3},
+                                },
+                            },
+                        )
+                    atomic_json(
+                        directory / f"episodes/turn-0/steps/{completed:06d}.json",
+                        {"kind": "model", "state": "submitted"},
+                    )
+                    before = {p: p.read_bytes() for p in directory.rglob("*.json")}
+                    row = cell_rows(root)[0]
+                    self.assertEqual(row[role + "_usage"]["model_calls"], completed + 1)
+                    self.assertEqual(row[role + "_usage"]["unknown_calls"], 1)
+                    self.assertIsNone(row[role + "_tokens"])
+                    self.assertEqual(row[role + "_known_tokens_subtotal"], completed * 13)
+                    self.assertEqual(row[role + "_unknown_token_requests"], 1)
+                    self.assertEqual(before, {p: p.read_bytes() for p in directory.rglob("*.json")})
+
+    def test_missing_result_and_receipts_are_unavailable_not_unstarted(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            sessions = [role + "-session" for role in ("worker", "judge")]
+            cell(root, "q5", "B", "holdout", "run", status="paused", sessions=sessions)
+            cell(root, "q5", "C", "holdout", "run")
+            for session in sessions:
+                atomic_json(
+                    root / "sessions" / session / "turns/0.json",
+                    {"status": "running", "episode": None},
+                )
+            rows = {r["arm"]: r for r in cell_rows(root)}
+            for role in ("worker", "judge"):
+                self.assertIsNone(rows["B"][role + "_usage"]["model_calls"])
+                self.assertIsNone(rows["B"][role + "_tokens"])
+                self.assertEqual(rows["B"][role + "_accounting_status"], "incomplete")
+                self.assertEqual(rows["C"][role + "_usage"]["model_calls"], 0)
+                self.assertEqual(rows["C"][role + "_tokens"], 0)
+                self.assertEqual(rows["C"][role + "_accounting_status"], "unstarted")
+
+    def test_reservation_response_event_correspondence(self):
+        from darwinagent.runtime.artifacts import digest
+
+        for role in ("worker", "judge"):
+            for variant in ("complete", "missing_usage", "missing_response", "mismatched_event"):
+                with self.subTest(role=role, variant=variant), tempfile.TemporaryDirectory() as d:
+                    root = Path(d)
+                    session = role + "-session"
+                    cell(root, "q5", "B", "holdout", "run", status="completed", sessions=[session])
+                    directory = root / "sessions" / session
+                    usage = (
+                        {}
+                        if variant == "missing_usage"
+                        else {"prompt_tokens": 10, "completion_tokens": 3}
+                    )
+                    event = {
+                        "kind": "model",
+                        "usage": usage,
+                        "response_digest": digest(
+                            "other" if variant == "mismatched_event" else "ok"
+                        ),
+                    }
+                    result = EpisodeResult(
+                        "completed",
+                        events=(event,),
+                        usage={
+                            "model_calls": 1,
+                            "leaf_calls": 0,
+                            "unknown_calls": 0,
+                            "pending_calls": 0,
+                        },
+                    )
+                    atomic_json(
+                        directory / "turns/0.json",
+                        {"status": "completed", "episode": result.to_dict()},
+                    )
+                    atomic_json(
+                        directory / "episodes/turn-0/steps/000000.json",
+                        {
+                            "kind": "model",
+                            "state": "submitted" if variant == "missing_response" else "responded",
+                            "response": {"content": "ok", "usage": usage},
+                        },
+                    )
+                    row = cell_rows(root)[0]
+                    self.assertEqual(row[role + "_tokens"], 13 if variant == "complete" else None)

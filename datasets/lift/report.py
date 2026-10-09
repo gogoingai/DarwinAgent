@@ -37,33 +37,108 @@ def update_cell(root, key, **updates):
     atomic_json(path, value)
 
 
-def session_totals(root):
-    root = Path(root)
-    # Each native turn has one durable slot, including the currently unfinished turn.
-    turns = [json.loads(p.read_text()) for p in sorted((root / "turns").glob("*.json"))]
-    if not turns and (root / "chat.json").exists():
-        turns = json.loads((root / "chat.json").read_text())["turns"]
-    episodes = [t["episode"] for t in turns if t.get("episode") is not None]
-    usage = {
-        k: sum(e["usage"].get(k, 0) for e in episodes)
-        for k in ("model_calls", "leaf_calls", "unknown_calls", "pending_calls")
-    }
-    events = [v for e in episodes for v in e["events"] if v["kind"] == "model"]
-    known = all(
-        all(type(e.get("usage", {}).get(k)) is int for k in ("prompt_tokens", "completion_tokens"))
-        for e in events
+USAGE_KEYS = ("model_calls", "leaf_calls", "unknown_calls", "pending_calls")
+
+
+def available_sum(values):
+    values = list(values)
+    return sum(values) if all(v is not None for v in values) else None
+
+
+def token_count(usage):
+    keys = ("prompt_tokens", "completion_tokens")
+    return (
+        sum(usage[k] for k in keys)
+        if all(type(usage.get(k)) is int and usage[k] >= 0 for k in keys)
+        else None
     )
+
+
+def turn_totals(root, index, turn):
+    episode = turn.get("episode")
+    steps = [
+        json.loads(p.read_text())
+        for p in sorted((root / "episodes" / ("turn-" + str(index)) / "steps").glob("[0-9]*.json"))
+    ]
+    models = [s for s in steps if s["kind"] == "model"]
+    events = [e for e in episode["events"] if e["kind"] == "model"] if episode else []
+    if steps:
+        usage = {
+            "model_calls": len(models),
+            "leaf_calls": sum(s["kind"] == "tool" for s in steps),
+            "unknown_calls": sum(s["state"] == "submitted" for s in steps),
+            "pending_calls": sum(s["state"] in {"prepared", "submitted"} for s in steps),
+        }
+        counts = [
+            token_count(s.get("response", {}).get("usage", {}))
+            if s["state"] == "responded"
+            else None
+            for s in models
+        ]
+        # A response may be durable before the Agent emits its model event. Keep
+        # its measured subtotal, but do not call that an event-complete total.
+        correspondence = len(models) == len(events) and all(
+            s["state"] == "responded"
+            and e.get("usage") == s.get("response", {}).get("usage")
+            and e.get("response_digest") == digest(s.get("response", {}).get("content"))
+            for s, e in zip(models, events)
+        )
+        if episode:
+            correspondence = correspondence and episode["usage"].get("model_calls") == len(models)
+    elif episode:
+        usage = {k: episode["usage"].get(k) for k in USAGE_KEYS}
+        counts = [token_count(e.get("usage", {})) for e in events]
+        correspondence = usage["model_calls"] == len(events)
+    else:
+        # A turn was entered but neither result nor durable reservations exist.
+        # Missing accounting is not evidence of zero dispatches.
+        return {
+            "usage": dict.fromkeys(USAGE_KEYS),
+            "tokens": None,
+            "known_tokens_subtotal": 0,
+            "unknown_token_requests": None,
+        }
+    subtotal = sum(c for c in counts if c is not None)
+    unknown = (
+        max(0, usage["model_calls"] - sum(c is not None for c in counts))
+        if usage["model_calls"] is not None
+        else None
+    )
+    complete = episode is not None and correspondence and unknown == 0
     return {
         "usage": usage,
-        "tokens": sum(
-            sum(e["usage"][k] for k in ("prompt_tokens", "completion_tokens")) for e in events
-        )
-        if known
-        else None,
-        "time_s": sum(t.get("elapsed_s", 0) for t in turns),
+        "tokens": subtotal if complete else None,
+        "known_tokens_subtotal": subtotal,
+        "unknown_token_requests": unknown,
+    }
+
+
+def session_totals(root):
+    root = Path(root)
+    # Keep the durable index: lexicographic ordering must not remap turn 10 to 2.
+    turns = [(p.stem, json.loads(p.read_text())) for p in sorted((root / "turns").glob("*.json"))]
+    if not turns and (root / "chat.json").exists():
+        turns = list(enumerate(json.loads((root / "chat.json").read_text())["turns"]))
+    totals = [turn_totals(root, index, t) for index, t in turns]
+    tokens = available_sum(t["tokens"] for t in totals)
+    return {
+        "usage": {k: available_sum(t["usage"][k] for t in totals) for k in USAGE_KEYS},
+        "tokens": tokens,
+        "known_tokens_subtotal": sum(t["known_tokens_subtotal"] for t in totals),
+        "unknown_token_requests": available_sum(t["unknown_token_requests"] for t in totals),
+        "accounting_status": "unstarted"
+        if not turns
+        else "complete"
+        if tokens is not None
+        else "incomplete",
+        "time_s": sum(t.get("elapsed_s", 0) for _, t in turns),
         "turns": len(turns),
-        "completed_turns": sum(e["status"] == "completed" for e in episodes),
-        "unfinished_turns": sum(t.get("status") != "completed" for t in turns),
+        "completed_turns": sum(
+            t.get("episode", {}).get("status") == "completed" for _, t in turns if t.get("episode")
+        ),
+        "unfinished_turns": sum(
+            t.get("status", (t.get("episode") or {}).get("status")) != "completed" for _, t in turns
+        ),
     }
 
 
@@ -83,13 +158,20 @@ def cell_rows(root):
                 if sid.startswith(role + "-")
             ]
             row[role + "_usage"] = {
-                k: sum(t["usage"][k] for t in totals)
+                k: available_sum(t["usage"][k] for t in totals)
                 for k in ("model_calls", "leaf_calls", "unknown_calls", "pending_calls")
             }
-            row[role + "_tokens"] = (
-                sum(t["tokens"] for t in totals)
-                if all(t["tokens"] is not None for t in totals)
-                else None
+            row[role + "_tokens"] = available_sum(t["tokens"] for t in totals)
+            row[role + "_known_tokens_subtotal"] = sum(t["known_tokens_subtotal"] for t in totals)
+            row[role + "_unknown_token_requests"] = available_sum(
+                t["unknown_token_requests"] for t in totals
+            )
+            row[role + "_accounting_status"] = (
+                "unstarted"
+                if not totals or all(t["accounting_status"] == "unstarted" for t in totals)
+                else "incomplete"
+                if any(t["accounting_status"] == "incomplete" for t in totals)
+                else "complete"
             )
             row[role + "_time_s"] = sum(t["time_s"] for t in totals)
             row[role + "_turns"] = sum(t["turns"] for t in totals)

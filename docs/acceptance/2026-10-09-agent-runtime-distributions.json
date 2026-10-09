@@ -1,0 +1,28 @@
+{
+  "status": "PASS",
+  "prepared_version": "0.3.0",
+  "source_files_verified": 129,
+  "integration_identity_sha256": "225ba2130a3055910bece7d6a0ffcc6a757eae272043e621b0985c80f905e37b",
+  "source_map_sha256": "935b792a77e884879cbd1db5e69ad3440ee4220c9cc7599b476e1adfbe688544",
+  "v3_content_id": "28958cf5fa8347dcde49dfcc9a1b881dd6857de725b249c615495facf03b415b",
+  "v3_version": "9349f1a5b3f8c5a6fd47f09507c25c552a1c9b389021376bc0908efe036f73c4",
+  "wheel_identical_to_minimum_tested": true,
+  "distributions": {
+    "darwinagent-0.3.0-py3-none-any.whl": "518ac2534213e9ead5cfe502ad7ff76e72045b799cec1cb823bfc1aa69545b7b",
+    "darwinagent-0.3.0.tar.gz": "f092d2a68c016eccf698a6004c12a8f7be4bbed76391d5631bfa72160c91ab44"
+  },
+  "actual_model_http": 0,
+  "q6": "sealed_not_opened",
+  "v3_byte_equal_files": 8,
+  "installed_checker": "passed outside checkout on Python 3.11.15",
+  "evidence_sha256": {
+    "final-fix-build.log": "de743e7ecdabb6ad2a18b216dcaf2c4a91ed7b43b60dea429112a4d9a1b45153",
+    "final-fix-install311.log": "d8898f2ff219550a0cc816f296f72222d883f187be2cdc6a3fca81968696cf89",
+    "final-fix-installed311.log": "9527e83807f8282dd7b08229686c5f2312c246e490927567c698abd493818e3c",
+    "final-fix-minimum-focused.log": "9a263c17ce4c225c8b6d9eba75b53aab391ffcb7c3e5ed21ac228031088163c6",
+    "final-fix-distribution.log": "597311a7ed9ba75bcd9e816fc4923068991f1aeafd9fd365158b20b8e2b15b6f"
+  },
+  "acceptance_summary_sha256": "3fc0e2b193ca7f7771e94f0d1b009e6d8a0faa13a58cd165840dbe3543ea087d",
+  "artifact_directory": ".superpowers/sdd/2026-10-09-agent-runtime/final-fix-dist",
+  "note": "Local unpublished builds; external manifest avoids circular archive self-hashes. All original distributions/evidence retained."
+}

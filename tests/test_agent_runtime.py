@@ -23,6 +23,7 @@ from darwinagent.runtime.artifacts import digest
 from tests.support.agent_runtime import (
     CatchesUnknownAgent,
     ConfiguredAgent,
+    ConfiguredGate,
     LostReceiptClient,
     ModelTwiceAgent,
     RecordedClient,
@@ -472,3 +473,82 @@ class AgentRuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(failure.message, "read_file failed (FileNotFoundError)")
         for path in (self.root / "runs/safe-failure").rglob("*.json"):
             self.assertNotIn(secret, path.read_text())
+
+    async def test_bound_host_policy_identity_controls_completed_replay(self):
+        allowed = replace(self.profile, host_checks=(ConfiguredGate(True).check,))
+        denied = replace(self.profile, host_checks=(ConfiguredGate(False).check,))
+        original = self.backend(ConfiguredAgent("done"), profile=allowed)
+        result = await original.run(self.task, run_id="host-policy")
+        same = self.backend(
+            ConfiguredAgent("done"),
+            profile=replace(self.profile, host_checks=(ConfiguredGate(True).check,)),
+        )
+        self.assertEqual((await same.run(self.task, run_id="host-policy")), result)
+        changed = self.backend(ConfiguredAgent("done"), profile=denied)
+        with self.assertRaisesRegex(ValueError, "identity"):
+            await changed.run(self.task, run_id="host-policy")
+        self.assertEqual((await changed.run(self.task, run_id="fresh-deny")).status, "rejected")
+        self.assertNotEqual(allowed.fingerprint, denied.fingerprint)
+        bundle(self.root / "private-profile", allowed)
+        persisted = "".join(p.read_text() for p in self.root.rglob("*.json"))
+        self.assertNotIn("private-policy-marker", persisted)
+        self.assertNotIn("private-policy-marker", json.dumps(allowed.declaration()))
+
+    def test_host_check_requires_declared_stable_json_state(self):
+        class Undeclared:
+            def check(self, stage, candidate):
+                return True
+
+        class Invalid(ConfiguredGate):
+            def identity(self):
+                return {"private": object()}
+
+        class AsyncIdentity(ConfiguredGate):
+            async def identity(self):
+                return {}
+
+        allow = True
+
+        def closure(stage, candidate):
+            return allow
+
+        def default(stage, candidate, allow=True):
+            return allow
+
+        for check in (
+            Undeclared().check,
+            Invalid(True).check,
+            AsyncIdentity(True).check,
+            closure,
+            default,
+        ):
+            with self.subTest(check=check), self.assertRaisesRegex(ValueError, "identity"):
+                replace(self.profile, host_checks=(check,)).declaration()
+
+    def test_bound_host_declaration_hook_is_hashed(self):
+        class Declared:
+            def __init__(self, allow):
+                self.allow = allow
+
+            def declaration(self):
+                return {"allow": self.allow}
+
+            def check(self, stage, candidate):
+                return self.allow
+
+        def profile(allow):
+            return replace(self.profile, host_checks=(Declared(allow).check,))
+
+        self.assertEqual(profile(True).fingerprint, profile(True).fingerprint)
+        self.assertNotEqual(profile(True).fingerprint, profile(False).fingerprint)
+
+    async def test_callable_host_policy_requires_and_uses_identity(self):
+        class CallableGate(ConfiguredGate):
+            def __call__(self, stage, candidate):
+                return self.allow
+
+        profile = replace(self.profile, host_checks=(CallableGate(False),))
+        result = await self.backend(ConfiguredAgent("done"), profile=profile).run(
+            self.task, run_id="callable-policy"
+        )
+        self.assertEqual(result.status, "rejected")

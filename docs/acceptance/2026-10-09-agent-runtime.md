@@ -12,11 +12,11 @@ and original failures remain on disk. No publication, push, merge or tag was per
 
 | 检查 / Check | 实际结果 / Observed result |
 | --- | --- |
-| 核心回归 / Framework, Python 3.14.4 | 645 discovered, 637 passed, 8 explicit resource skips; 55.381 s |
+| 核心回归 / Framework, Python 3.14.4 | 650 discovered, 642 passed, 8 explicit resource skips; 56.309 s |
 | LoCoMo | 18/18 passed |
 | TravelPlanner | 11/11 passed |
-| 新运行时、实验与原生边界 / Native-focused Python 3.12.13 | 65/65 passed; 10.998 s |
-| 最低版本聚焦回归 / Minimum Python 3.11.15 | 55/55 runtime/episode/ReAct recovery tests passed; 9.244 s |
+| 新运行时、实验与原生边界 / Native-focused Python 3.12.13 | 74/74 passed; 11.093 s |
+| 最低版本聚焦回归 / Minimum Python 3.11.15 | 60/60 runtime/episode/ReAct recovery tests passed; 9.471 s (rebuilt wheel) |
 | 干净安装 / Clean Python 3.11.15 wheel outside checkout | Passed: site-packages, own-loop + ReAct, 4 artifacts, replay, old doctor/demo/resume and unchanged Wiki |
 | Ruff / format | Passed; 314 Python files already formatted |
 | 第三领域旧样例 / Legacy third-domain example | Passed |
@@ -25,6 +25,19 @@ and original failures remain on disk. No publication, push, merge or tag was per
 | 真实模型内容质量 / Live model content quality | Pending coordinator |
 | 轨迹评判 / Trajectory judge | `not_run`; native numeric placeholders are not quality evidence |
 | 独立确认 / q6 confirmation | Sealed and unrun |
+
+以上通过项包含提示输出：asyncio 慢任务诊断及预期的旧兼容路径诊断仍保留在日志中。
+这些提示不代表断言失败，也不证明实时性能退化；没有修改阈值或为清理输出重跑无关套件。
+本轮因宿主身份契约变化执行一次完整框架回归，并重跑受影响的原生、恢复和安装包验收。
+
+Passing checks retain notices, including asyncio slow-task diagnostics and expected legacy
+compatibility diagnostics. Logs and thresholds are preserved; no broad suite was repeated
+merely to silence output. This fix required one framework regression and refreshed affected
+native, recovery and installed-package acceptance.
+
+最终 wheel / sdist 摘要见[构建产物记录](2026-10-09-agent-runtime-distributions.json)。
+The [distribution record](2026-10-09-agent-runtime-distributions.json) identifies the rebuilt
+wheel and sdist; it is recorded separately to avoid embedding an archive's own hash inside it.
 
 具体复现命令见[中文](../zh-CN/agent-runtime-reproduction.md)与[English](../en/agent-runtime-reproduction.md)。
 
@@ -55,9 +68,24 @@ the passing full rerun. A focused-test command initially misspelled the episode 
 correcting the invocation produced 65 passing tests. Both failed logs remain hashed evidence.
 Neither was a reason to relax checks or modify legacy behavior.
 
+## 最终审查修复 / Final review fixes
+
+宿主检查现在将所属对象声明的配置纳入身份摘要。相同配置继续回放；允许策略改为拒绝策略后，
+旧运行报身份变化，新运行被拒绝；对应实验身份也变化。私有配置不会以明文进入持久化记录。
+原生单元报告核对模型预留、响应和事件。首个请求未知及完成 13 tokens 后下个请求未知时，
+worker/judge 总量均为 `null`，已知小计分别为 0 / 13。尚无 EpisodeResult 的轮次读取现存
+回执；缺少回执时计数不可用。真正未启动的单元仍显式保留零请求和 `unstarted` 状态。
+
+Host-check owner declarations now bind policy configuration to replay and campaign identity,
+using digests only. Native worker/judge totals require matching model reservations, responses
+and events. Unknown requests yield null totals and separate known-token subtotals. Unfinished
+turns use existing durable steps, with unavailable counts when receipts are missing; genuinely
+unstarted cells remain explicit zero-request records. No request is redispatched by reporting.
+Before/after counterexamples and original failures remain in the local evidence directory.
+
 ## Native 机制结果 / Native mechanism results
 
-本次新身份为 `offline-native-task4-v030`，固定 0.3.0 源码后重新运行真实容器、原生评判协议、
+本次修复后新身份为 `offline-native-final-fix`（保留 `offline-native-task4-v030` 原证据），固定 0.3.0 源码后重新运行真实容器、原生评判协议、
 演化、delta 载入、trace 回读。81 条录制响应由 worker 48、judge 32、proposal 1 构成；
 无 Wiki 模型请求，没有实际模型 HTTP。所有十个计划单元均完成，未知/待定调用为 0。
 完整十行、各角色用量和耗时见 JSON，不仅保留 q5 成功摘要。
