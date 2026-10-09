@@ -5,6 +5,9 @@ from dataclasses import dataclass
 
 from darwinagent.contracts import plain
 
+from .context import CheckRejected
+from .failures import ToolFailure
+
 
 @dataclass(frozen=True)
 class ReActAgent:
@@ -35,15 +38,29 @@ class ReActAgent:
             response = await context.model(messages, role=self.role)
             action = json.loads(response.content)
             messages.append({"role": "assistant", "content": response.content})
-            if set(action) <= {"final_response", "artifacts"} and isinstance(
-                action.get("final_response"), str
-            ):
-                return context.result(
-                    action["final_response"], artifacts=action.get("artifacts", ())
-                )
-            if set(action) != {"tool", "params"}:
-                raise ValueError("Invalid ReAct action")
-            output = await context.call(action["tool"], action["params"])
+            try:
+                if set(action) <= {"final_response", "artifacts"} and isinstance(
+                    action.get("final_response"), str
+                ):
+                    result = context.result(
+                        action["final_response"], artifacts=action.get("artifacts", ())
+                    )
+                    context.check(
+                        "final_delivery",
+                        {
+                            "status": result.status,
+                            "final_response": result.final_response,
+                            "artifacts": result.to_dict()["artifacts"],
+                        },
+                    )
+                    return result
+                if set(action) != {"tool", "params"}:
+                    raise ValueError("Invalid ReAct action")
+                output = await context.call(action["tool"], action["params"])
+            except ToolFailure as exc:
+                output = {"error": exc.to_dict()}
+            except CheckRejected as exc:
+                output = {"error": {"error_type": "CheckRejected", "message": str(exc)}}
             messages.append(
                 {
                     "role": "user",

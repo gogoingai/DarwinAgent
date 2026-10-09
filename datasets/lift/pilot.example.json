@@ -1,0 +1,22 @@
+{
+  "run_root": "/absolute/private/fresh-run-directory",
+  "data_root": "/absolute/private/pinned-q1-q2-q5-data",
+  "model": "USER_SUPPLIED_MODEL",
+  "base_url": "USER_SUPPLIED_CODING_BASE_URL",
+  "http_cap": 100,
+  "worker_limit": 8,
+  "temperature": 0,
+  "correction_rounds": 3,
+  "train": [
+    "q1"
+  ],
+  "validation": [
+    "q2"
+  ],
+  "development_comparison": [
+    "q5"
+  ],
+  "q6": "sealed_not_opened",
+  "trajectory_judge": "not_run",
+  "budget_root": "/absolute/private/shared-first-live-100-budget"
+}
