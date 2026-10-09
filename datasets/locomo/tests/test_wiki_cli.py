@@ -5,7 +5,9 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
 
+from datasets.locomo import run
 from datasets.locomo.run import main, run_arm
+from tests.support.locomo import fixture_dataset
 
 
 def arguments(root, **overrides):
@@ -33,7 +35,10 @@ class WikiCliBoundary(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "requires --arm g1 --scope sfcp"):
                 asyncio.run(run_arm(arguments(tmp, scope="p")))
             with self.assertRaisesRegex(ValueError, "requires --arm g1"):
-                asyncio.run(main(arguments(tmp, arm=None)))
+                with mock.patch.object(
+                    run, "resolve_dataset", return_value=fixture_dataset(Path(tmp) / "input")
+                ):
+                    asyncio.run(main(arguments(tmp, arm=None)))
 
     def test_requires_passing_precheck_for_new_identity(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -60,9 +65,21 @@ class WikiCliBoundary(unittest.TestCase):
                 side_effect=AssertionError("probe identity"),
             ),
             mock.patch("datasets.locomo.run.memory_structure_sample", return_value={}),
+            mock.patch("datasets.locomo.run.DATA_DIR", Path("explicit-input")),
+            mock.patch("datasets.locomo.run.LocomoAdapter"),
             mock.patch("datasets.locomo.run.bootstrap_trial_graph", return_value=None),
             mock.patch("datasets.locomo.run.ExperimentRunner", return_value=runner),
         ):
-            asyncio.run(run_arm(arguments(tmp, strict_comparison=False, scope="p")))
+            asyncio.run(
+                run_arm(
+                    arguments(
+                        tmp,
+                        strict_comparison=False,
+                        scope="p",
+                        graph_mode="frozen",
+                        memory_root="tests/fixtures/locomo_snapshot",
+                    )
+                )
+            )
         self.assertFalse(runner.run.call_args.kwargs["execution"].strict)
         self.assertEqual(("P",), runner.run.call_args.kwargs["scope"])

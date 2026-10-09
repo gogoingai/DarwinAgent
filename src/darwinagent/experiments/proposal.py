@@ -64,6 +64,21 @@ class ProposalGenerator:
             payload["previous_admission_error"] = admission_error
         # output format; it is recorded for audit alongside the payload.
         protocol = revision_protocol(base, allowed_kinds)
+        from .graph_evidence import ASSET_DIAGNOSIS_PROTOCOL, asset_change_signals
+
+        protocol += "\n" + ASSET_DIAGNOSIS_PROTOCOL
+        payload["asset_change_signals"] = (feedback or {}).get(
+            "asset_change_signals"
+        ) or asset_change_signals(feedback or {})
+        if wiki_context is not None and not payload["asset_change_signals"]:
+            payload["asset_change_signals"] = next(
+                (
+                    entry.get("facts", {}).get("asset_change_signals", [])
+                    for entry in reversed(wiki_context.get("entries", []))
+                    if entry.get("facts", {}).get("asset_change_signals")
+                ),
+                [],
+            )
         if wiki_context is not None:
             for asset in payload["assets"]:
                 asset["current_ref"] = "current:" + asset["id"]

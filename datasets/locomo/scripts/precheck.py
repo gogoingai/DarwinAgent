@@ -73,12 +73,14 @@ def verify_offsets(memory):
 
 
 async def main(args):
+    from datasets.locomo.inputs import resolve_dataset
     out = Path(args.output).resolve()
     out.mkdir(parents=True, exist_ok=True)
     connection = load_connection(ROOT, out / 'runtime', 'LOCOMO')
     connection.role_tiers['locomo_judge'] = 'strong'
     connection.empty_response_passthrough_roles.add('locomo_judge')
     schema = Schema.from_yaml(SEED.read_text())
+    data_dir = resolve_dataset(args, out)
     checks = {}
     started = time.time()
     async with LLMClient(connection) as client:
@@ -115,7 +117,7 @@ async def main(args):
 
         # A real training-conversation slice through the same fixed protocol.
         try:
-            case = LocomoAdapter(ROOT / 'datasets/locomo/data/locomo10_zh.json').generation_input('conv-26')
+            case = LocomoAdapter(data_dir / 'locomo10_zh.json').generation_input('conv-26')
             corpus = case.corpus[:7]
             memory = await ExtractionAgent(runtime, client, config, 'precheck_slice').extract(corpus)
             problem = verify_offsets(memory)
@@ -139,6 +141,8 @@ async def main(args):
 
 
 if __name__ == '__main__':
+    from datasets.locomo.inputs import add_dataset_arguments
     parser = argparse.ArgumentParser()
+    add_dataset_arguments(parser)
     parser.add_argument('--output', required=True, help='campaign root (precheck.json written there)')
     asyncio.run(main(parser.parse_args()))

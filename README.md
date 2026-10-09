@@ -7,7 +7,7 @@
 English · [简体中文](README.zh-CN.md)
 
 [![Offline checks](https://github.com/gogoingai/DarwinAgent/actions/workflows/ci.yml/badge.svg)](https://github.com/gogoingai/DarwinAgent/actions/workflows/ci.yml)
-[![PyPI version](https://img.shields.io/pypi/v/darwinagent?release=0.1.2)](https://pypi.org/project/darwinagent/)
+[![PyPI version](https://img.shields.io/pypi/v/darwinagent)](https://pypi.org/project/darwinagent/)
 [![Python version](https://img.shields.io/badge/python-%3E%3D3.11-45635c)](pyproject.toml)
 [![MIT license](https://img.shields.io/badge/license-MIT-45635c)](LICENSE)
 

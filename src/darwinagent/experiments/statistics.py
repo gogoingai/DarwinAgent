@@ -44,6 +44,10 @@ def stability_metrics(root):
             3,
         ),
         "retry_reserved": len(retry_rows),
+        "recovered_question_faults": sum(
+            x.get("state") == "done" and x.get("final_error_type", "missing") is None
+            for x in retry_rows
+        ),
         "retry_same_class_failures": sum(
             x.get("final_error_type") == x.get("initial_error_type")
             for x in retry_rows

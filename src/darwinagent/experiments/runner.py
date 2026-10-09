@@ -361,13 +361,16 @@ class ExperimentRunner:
             snapshot_root=self.snapshot_root,
         )
 
-    def _rebuild_graph_cached(self, bundle, case):
-        return graph_trials._rebuild_graph_cached(
+    async def _rebuild_graph_cached(self, bundle, case):
+        return await graph_trials._rebuild_graph_cached(
             bundle,
             case,
             rebuild_cache=self._rebuild_cache,
             graph_builder=self.graph_builder,
             snapshot_root=self.snapshot_root,
+            client_factory=self._client,
+            config=self.config,
+            connection_config=self.connection_config,
         )
 
     async def _rebuild_trial_supply(self, bundle, cases):

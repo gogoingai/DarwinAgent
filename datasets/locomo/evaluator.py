@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 from dataclasses import replace
 from pathlib import Path
@@ -15,8 +16,7 @@ from .pipeline.experiment import transcript
 from .pipeline.protocol import aggregate, dual_grade_batch
 
 ROOT = Path(__file__).resolve().parents[2]
-LOCK_PATH = ROOT / "datasets/locomo/evaluation_lock.governance-20261007.json"
-AUDITED = ROOT / "datasets/locomo/runs/experiments/conv26_dual_v4/gold_audited.json"
+LOCK_PATH = ROOT / "datasets/locomo/evaluation_lock.governance-20261009.json"
 
 
 class LocomoEvaluator:
@@ -25,22 +25,54 @@ class LocomoEvaluator:
         client,
         work_dir,
         dataset_path=None,
-        audited_path=AUDITED,
+        audited_path=None,
         concurrency=4,
         lock_path=None,
+        original_only=False,
+        english_dataset_path=None,
+        dataset_hashes=None,
+        audited_digest=None,
     ):
         self.client, self.work_dir = client, Path(work_dir)
         self.lock_path = Path(lock_path) if lock_path is not None else LOCK_PATH
-        self.dataset_path = Path(dataset_path or ROOT / "datasets/locomo/data/locomo10_zh.json")
-        self.audited_path, self.concurrency = Path(audited_path), concurrency
+        if dataset_path is None:
+            raise ValueError("Evaluator requires an explicit dataset_path")
+        self.dataset_path = Path(dataset_path)
+        self.audited_path = Path(audited_path) if audited_path is not None else None
+        self.concurrency = concurrency
+        self.original_only = original_only
+        self.dataset_hashes = dataset_hashes
+        self.audited_digest = audited_digest
+        self.english_dataset_path = Path(
+            english_dataset_path or self.dataset_path.with_name("locomo10.json")
+        )
+
+    def _verify_inputs(self):
+        if self.dataset_hashes is not None:
+            paths = {
+                "locomo10_zh.json": self.dataset_path,
+                "locomo10.json": self.english_dataset_path,
+            }
+            if set(self.dataset_hashes) != set(paths):
+                raise ValueError("Raw dataset lock requires both Chinese and English files")
+            for name, path in paths.items():
+                if hashlib.sha256(path.read_bytes()).hexdigest() != self.dataset_hashes[name]:
+                    raise ValueError(f"Frozen dataset contents changed: {name}")
+        if self.audited_digest is not None:
+            if (
+                self.audited_path is None
+                or hashlib.sha256(self.audited_path.read_bytes()).hexdigest() != self.audited_digest
+            ):
+                raise ValueError("Frozen audited reference changed")
 
     async def evaluate(self, result, asked=None):
         """asked＝本轮实际出题的 question idx 集合（允许非连续题号子集）。
         None＝按全会话完整性要求（历史行为，验证/测试/外测全量路径不变）。
         判题上下文永远是全量转写，评分原语不变。"""
         verify_files(ROOT, json.loads(self.lock_path.read_text()))
+        self._verify_inputs()
         conv = load_conversation(self.dataset_path, result.case_id)
-        en = load_conversation(ROOT / "datasets/locomo/data/locomo10.json", result.case_id)
+        en = load_conversation(self.english_dataset_path, result.case_id)
         context = transcript(conv) + "\n【英文原句对照】\n" + transcript(en)
         predictions = {int(a.question_id): a for a in result.answers}
         asked_ids = None if asked is None else {int(x) for x in asked}
@@ -51,8 +83,8 @@ class LocomoEvaluator:
         # 修订 gold 只在 conv-26 存在（审计参考按会话登记）；其余会话按原始 gold 两口径评分。
         audited = None
         disputed = set()
-        if result.case_id == "conv-26":
-            if not self.audited_path.is_file():
+        if result.case_id == "conv-26" and not self.original_only:
+            if self.audited_path is None or not self.audited_path.is_file():
                 raise FileNotFoundError(
                     f"Audited conv-26 reference missing: {self.audited_path}; pass audited_path explicitly. Audited gold is external evidence and is never fabricated."
                 )
@@ -126,6 +158,7 @@ class LocomoEvaluator:
             all(grades_by_idx[g][idx]["status"] == "ok" for g in reports) for idx in predictions
         )
         verify_files(ROOT, json.loads(self.lock_path.read_text()))
+        self._verify_inputs()
         return EvaluationResult(
             metrics, len(predictions), completed, gen_faults, eval_faults, tuple(diagnostics)
         )

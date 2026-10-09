@@ -37,12 +37,14 @@ class WikiQuery:
             raise ValueError("Wiki question and at least 512 characters required")
         if not isinstance(self.scope, dict):
             raise ValueError("Wiki scope must be an object")
-        for key in ("training_ids", "question_ids"):
+        for key in ("training_ids", "question_ids", "evidence_refs"):
             values = self.scope.get(key, [])
             values = values if isinstance(values, list) else [values]
             for value in values:
                 if not isinstance(value, str):
                     raise ValueError(f"Wiki {key} must contain string identifiers")
+                if key == "evidence_refs" and not re.fullmatch(r"[0-9a-f]{64}", value):
+                    raise ValueError("Wiki evidence_refs must contain complete evidence hashes")
                 if key == "training_ids" or re.match(r"[0-9]+:", value):
                     parse_training_id(value)
 
@@ -173,7 +175,10 @@ class WikiService:
             return value if isinstance(value, list) else [value]
 
         original = row["scope"]
-        identity_keys = {"training_ids", "case_ids", "question_ids"}
+        requested_refs = values(scope, "evidence_refs")
+        if requested_refs and row["ref"] not in requested_refs:
+            return False
+        identity_keys = {"training_ids", "case_ids", "question_ids", "evidence_refs"}
         for key, value in scope.items():
             if key not in identity_keys and value:
                 if not set(values(scope, key)) & set(values(original, key)):

@@ -3,7 +3,7 @@
 Agentic round (0.5.0-dev): two arms over ONE frozen memory snapshot per conversation.
   v0 = pure-vector single-shot baseline (deterministic top-K, K tuned on train, rounds=0)
   g1 = agentic graph+vector, cold-start bootstrap from the minimal atomic-memory schema,
-       unbounded auto-iteration (operator --stop locks candidates), scope opens P→F→S.
+       unbounded auto-iteration (operator --stop locks candidates), all S/F/C/P assets can evolve.
 Legacy single-run paths (--assets/--experiment/--campaign without --arm) stay untouched."""
 
 import argparse
@@ -23,7 +23,7 @@ from darwinagent.experiments import (
 from darwinagent.experiments.spec import precheck_identity
 from darwinagent.kernel import KernelBundle, TaskSpec
 from darwinagent.llm.client import LLMClient
-from darwinagent.llm.settings import load_legacy_connection as load_connection
+from darwinagent.llm.settings import load_connection
 from darwinagent.runtime.execution_cli import (
     add_execution_arguments,
     has_scoped_flags,
@@ -31,17 +31,34 @@ from darwinagent.runtime.execution_cli import (
 )
 
 from .adapter import LocomoAdapter
-from .evaluator import AUDITED, LOCK_PATH, LocomoEvaluator
+from .evaluator import LOCK_PATH, LocomoEvaluator
 from .exports import write
+from .inputs import add_dataset_arguments, prepare_memory, resolve_dataset
 
 ROOT = Path(__file__).resolve().parents[2]
-SNAPSHOTS = ROOT / "datasets/locomo/snapshots/gvtest_v1"
+# Only explicit historical inputs use snapshots. Fresh runs prepare memory under output/.
+DATA_DIR = None
+DATASET_SOURCE_PATH = None
+DATA_HASHES = None
+AUDITED_DIGEST = None
+ORIGINAL_ONLY = True
+AUDITED = None
+RUN_LOCK_PATH = LOCK_PATH
 TASK_DIR = ROOT / "tasks/conversation_memory"
 SCOPE = {"p": ("P",), "pf": ("P", "F"), "sfcp": ("S", "F", "C", "P")}
 
 
 def evaluator_factory(client, path):
-    return LocomoEvaluator(client, path)
+    return LocomoEvaluator(
+        client,
+        path,
+        dataset_path=DATA_DIR / "locomo10_zh.json",
+        original_only=ORIGINAL_ONLY,
+        audited_path=AUDITED,
+        dataset_hashes=DATA_HASHES,
+        audited_digest=AUDITED_DIGEST,
+        lock_path=RUN_LOCK_PATH,
+    )
 
 
 def _criterion_id():
@@ -51,20 +68,14 @@ def _criterion_id():
     from darwinagent.runtime.artifacts import digest
 
     try:
-        lock = json.loads(LOCK_PATH.read_text())
+        lock = json.loads(RUN_LOCK_PATH.read_text())
         files = [
-            LOCK_PATH,
+            RUN_LOCK_PATH,
             *(ROOT / name for name in lock),
-            ROOT / "datasets/locomo/data/locomo10_zh.json",
-            ROOT / "datasets/locomo/data/locomo10.json",
-            AUDITED,
+            DATASET_SOURCE_PATH,
+            *([] if ORIGINAL_ONLY else [AUDITED]),
         ]
-        return digest(
-            {
-                str(path.relative_to(ROOT)): hashlib.sha256(path.read_bytes()).hexdigest()
-                for path in files
-            }
-        )
+        return digest({str(path): hashlib.sha256(path.read_bytes()).hexdigest() for path in files})
     except (OSError, ValueError):
         return None
 
@@ -82,7 +93,7 @@ async def smoke_judge(client, case, answers):
 
     result = SimpleNamespace(case_id=case.id, answers=tuple(answers))
     with tempfile.TemporaryDirectory() as td:
-        scores = await LocomoEvaluator(client, Path(td)).evaluate(
+        scores = await evaluator_factory(client, Path(td)).evaluate(
             result, asked=tuple(int(a.question_id) for a in answers)
         )
     return {
@@ -102,8 +113,10 @@ def arm_config(arm, vector_k=None):
             function_timeout_s=15.0,
             protocol_attempts=5,
         )
-    # 并发只改调度不改答案（温度/提示词/判题不变）；glm 池 6 仍低于历史 429 线 8
-    return RunConfig(function_timeout_s=15.0, protocol_attempts=5, concurrency=8)
+    # 并发由本次运行明确设置；传输层仍遵循连接配置的并发上限。
+    return RunConfig(
+        function_timeout_s=15.0, protocol_attempts=5, concurrency=8, extraction_batch_chars=6000
+    )
 
 
 def memory_structure_sample(snapshot_dir, max_facts=30):
@@ -178,49 +191,33 @@ def frozen_files():
         ROOT / "datasets/locomo/evaluator.py",
         ROOT / "datasets/locomo/exports.py",
         ROOT / "datasets/locomo/run.py",
+        ROOT / "datasets/locomo/graph_rules.py",
+        ROOT / "datasets/locomo/llm_graph.py",
+        ROOT / "datasets/locomo/inputs.py",
         ROOT / "datasets/locomo/pipeline",
-        ROOT / "datasets/locomo/data/locomo10_zh.json",
-        ROOT / "datasets/locomo/data/locomo10.json",
-        ROOT / "datasets/locomo/data/gold_repairs.jsonl",
-        AUDITED,
-        LOCK_PATH,
+        DATASET_SOURCE_PATH,
+        *([] if ORIGINAL_ONLY else [AUDITED]),
+        RUN_LOCK_PATH,
         TASK_DIR,
     ]
 
 
-_TRIAL_GRAPH = None
-
-
-def bootstrap_trial_graph(adapter):
+def bootstrap_trial_graph(adapter, snapshot_root):
     """冻结 conv-26 快照图（挂向量索引）：冷启动 bootstrap 的反馈环内真图试跑用。
     两臂共用——V0 虽不走工具循环，其 bundle 的 F 仍要在同一记忆面上通过试跑与探针。"""
-    global _TRIAL_GRAPH
-    if _TRIAL_GRAPH is None:
-        from darwinagent.experiments.snapshots import attach_vector, load_frozen_graph
+    from darwinagent.experiments.snapshots import attach_vector, load_frozen_graph
 
-        corpus = adapter.generation_input("conv-26").corpus
-        graph = load_frozen_graph(SNAPSHOTS / "conv-26", corpus)
-        attach_vector(graph, SNAPSHOTS / "conv-26")
-        _TRIAL_GRAPH = graph
-    return _TRIAL_GRAPH
+    corpus = adapter.generation_input("conv-26").corpus
+    memory_root = Path(snapshot_root)
+    graph = load_frozen_graph(memory_root / "conv-26", corpus)
+    attach_vector(graph, memory_root / "conv-26")
+    return graph
 
 
 def connection(root):
     conn = load_connection(ROOT, root / "runtime", "LOCOMO")
     conn.role_tiers["locomo_judge"] = "strong"
-    # 用户指令（2026-10-07「我要用 deepseek」）：tools/抽取改走 fast 档 DeepSeek
-    # （commandcode 网关）——原 middle 档 MiniMax Token Plan 额度耗尽卡死正式运行。
-    # 作答/审查/判题/引导/提案仍为 strong=glm 不变；MiniMax 档保留但本路径不再承载角色。
-    conn.role_tiers["tools"] = "fast"
-    conn.role_tiers["extraction"] = "fast"
     conn.empty_response_passthrough_roles.add("locomo_judge")
-    # 用户决策：全角色关闭深度思考（EmptyCompletion 突发的根因是推理链吃光补全预算）。
-    # 「怎么关」按模型走注册表（glm/deepseek 发 thinking:disabled，MiniMax 发
-    # reasoning_effort=low，关不掉的模型缓冲兜底）；这里只声明「哪些角色关思考」。
-    conn.thinking_disabled_roles.update({"answer", "review", "locomo_judge", "wiki_maintainer"})
-    conn.reasoning_effort = "low"
-    conn.max_concurrency = 6
-    conn.fast_max_concurrency = 8
     return conn
 
 
@@ -259,10 +256,55 @@ async def run_arm(args):
         record = json.loads(precheck.read_text())
         if not record.get("passed") or record.get("identity") != expected:
             raise ValueError("Wiki precheck identity mismatch or failed precheck")
-    adapter = LocomoAdapter(ROOT / "datasets/locomo/data/locomo10_zh.json")
+    adapter = LocomoAdapter(DATA_DIR / "locomo10_zh.json")
     task = TaskSpec.load(TASK_DIR / "task.yaml")
     config = arm_config(args.arm, args.vector_k)
     spec = arm_spec(args.arm, args.rounds)
+    if ORIGINAL_ONLY:
+        from dataclasses import replace
+
+        spec = replace(spec, adoption=AdoptionPolicy("original_precise", ("original_lenient",)))
+    mode = "frozen" if args.arm == "v0" else getattr(args, "graph_mode", "llm")
+    if getattr(args, "graph_rebuild", False) and args.arm == "g1":
+        mode = "llm"
+    graph_builder, bootstrap_ctx = None, None
+    if mode != "llm" and not getattr(args, "memory_root", None):
+        raise ValueError("Frozen/projection modes require --memory-root")
+    memory_root = Path(getattr(args, "memory_root", None) or root / "memory").resolve()
+    case_ids = (
+        tuple(c.strip() for c in args.cases.split(","))
+        if getattr(args, "cases", None)
+        else spec.train
+    )
+    if not args.train_only:
+        case_ids = tuple(dict.fromkeys((*spec.train, *spec.validation, *spec.test)))
+    if mode == "llm":
+        missing = [cid for cid in case_ids if not (memory_root / cid / "manifest.json").exists()]
+        if missing:
+            client = LLMClient(connection(root))
+            try:
+                for cid in missing:
+                    await prepare_memory(adapter.generation_input(cid), memory_root, client, config)
+            finally:
+                await client.aclose()
+        if all(
+            json.loads((memory_root / cid / "manifest.json").read_text()).get("vector_mode")
+            == "none"
+            for cid in case_ids
+        ):
+            from dataclasses import replace
+
+            task = replace(task, retrieval_floor={"traversal": True})
+    if mode == "llm":
+        from .llm_graph import LLMSnapshotGraphBuilder, llm_structure_sample
+
+        graph_builder = LLMSnapshotGraphBuilder(root / "train" / "graph-cache")
+        bootstrap_ctx = llm_structure_sample(memory_root / case_ids[0])
+    elif mode == "projection":
+        from .graph_rules import projection_structure_sample, rebuild_snapshot_graph
+
+        graph_builder = rebuild_snapshot_graph
+        bootstrap_ctx = projection_structure_sample(memory_root / case_ids[0])
     if args.train_only:
         cases = tuple(c.strip() for c in args.cases.split(",")) if args.cases else spec.train
         selected = getattr(args, "train_question_ids", None)
@@ -275,29 +317,16 @@ async def run_arm(args):
                 args.train_questions,
                 tuple(q.strip() for q in selected.split(",")) if selected else None,
             )
-        # 新模式（recheck4「冻结记忆/向量、图可重建」）：graph_builder 注入后记忆/向量
-        # 仍取快照，图按当前 S 从固定事实重建（准入/冒烟/正式同派生规则）；轮预算
-        # 与同对话验证选版按参数接入。旧模式（默认）逐字节不变。
-        graph_builder = None
+        # 图按当前 S 构建，准入/冒烟/正式共享同一派生路径；记忆/向量仍取快照。
+        # 同对话按题划分的验证计划仅在操作者显式指定时启用。
         validation_plan = None
-        bootstrap_ctx = None
-        if getattr(args, "graph_rebuild", False):
-            from datasets.locomo.graph_rules import (
-                projection_structure_sample,
-                rebuild_snapshot_graph,
-            )
-
-            graph_builder = rebuild_snapshot_graph
-            # bootstrap 样本用投影词汇（可建图的真实关系集）——冻结图样本会引导
-            # 草案写 涉及* 等投影能力边界外的遍历，在重建图高压场景被拦。
-            bootstrap_ctx = projection_structure_sample(SNAPSHOTS / "conv-26")
-            if not selected or not getattr(args, "validation_question_ids", None):
+        if getattr(args, "validation_question_ids", None):
+            if not selected:
                 raise ValueError(
-                    "--graph-rebuild requires --train-question-ids and "
-                    "--validation-question-ids (同对话按题划分)"
+                    "--validation-question-ids requires --train-question-ids (同对话按题划分)"
                 )
             val_ids = tuple(q.strip() for q in args.validation_question_ids.split(","))
-            full = LocomoAdapter(ROOT / "datasets/locomo/data/locomo10_zh.json")
+            full = LocomoAdapter(DATA_DIR / "locomo10_zh.json")
             by_id = {q.id: q for q in full.generation_input(cases[0]).questions}
             missing = [i for i in val_ids if i not in by_id]
             if missing:
@@ -322,13 +351,15 @@ async def run_arm(args):
             spec.adoption,
             root / "train",
             frozen_files(),
-            snapshot_root=SNAPSHOTS,
+            snapshot_root=memory_root,
             bootstrap_context=(
                 bootstrap_ctx
                 if graph_builder is not None
-                else memory_structure_sample(SNAPSHOTS / "conv-26")
+                else memory_structure_sample(memory_root / case_ids[0])
             ),
-            bootstrap_trial_graph=bootstrap_trial_graph(adapter),
+            bootstrap_trial_graph=None
+            if graph_builder is not None
+            else bootstrap_trial_graph(adapter, memory_root),
             smoke_judge=smoke_judge,
             optimization_mode=args.optimization_mode,
             graph_builder=graph_builder,
@@ -359,12 +390,14 @@ async def run_arm(args):
         spec,
         root,
         frozen_files(),
-        snapshot_root=SNAPSHOTS,
-        bootstrap_context=memory_structure_sample(SNAPSHOTS / "conv-26"),
+        snapshot_root=memory_root,
+        bootstrap_context=bootstrap_ctx or memory_structure_sample(memory_root / case_ids[0]),
         smoke_judge=smoke_judge,
         optimization_mode=args.optimization_mode,
+        graph_builder=graph_builder,
     )
-    controller.bootstrap_trial_graph = bootstrap_trial_graph(adapter)
+    if graph_builder is None:
+        controller.bootstrap_trial_graph = bootstrap_trial_graph(adapter, memory_root)
 
     # 冷启动轮 B0 门＝「可评分基线」：完成度≥90% 即锚定迭代起点（v10：93/100 被旧 95% 门
     # 拦出冷启动死锁——7 题确定性 F 契约故障只有 R1 修资产才能清，而 R1 要 B0 过门才开）。
@@ -380,12 +413,47 @@ async def run_arm(args):
 
 
 async def main(args):
+    global \
+        DATA_DIR, \
+        ORIGINAL_ONLY, \
+        RUN_LOCK_PATH, \
+        AUDITED, \
+        DATA_HASHES, \
+        DATASET_SOURCE_PATH, \
+        AUDITED_DIGEST
+    if getattr(args, "optimization_mode", None) == "wiki" and getattr(args, "arm", None) != "g1":
+        raise ValueError("Wiki mode requires --arm g1")
+    DATA_DIR = resolve_dataset(args, Path(args.output).resolve())
+    AUDITED = (
+        Path(args.audited_reference).resolve() if getattr(args, "audited_reference", None) else None
+    )
+    if AUDITED is not None and getattr(args, "original_only", False):
+        raise ValueError("--original-only and --audited-reference are mutually exclusive")
+    ORIGINAL_ONLY = AUDITED is None
+    DATASET_SOURCE_PATH = Path(args.output).resolve() / "dataset-source.json"
+    DATA_HASHES = json.loads(DATASET_SOURCE_PATH.read_text())["files"]
+    if getattr(args, "optimization_mode", None) is None:
+        args.optimization_mode = "wiki" if getattr(args, "arm", None) == "g1" else "legacy"
     root = Path(args.output).resolve()
+    RUN_LOCK_PATH = LOCK_PATH
+    import hashlib
+
+    from darwinagent.runtime.artifacts import atomic_json
+
+    RUN_LOCK_PATH = root / "evaluation-lock.json"
+    lock = {
+        name: hashlib.sha256((ROOT / name).read_bytes()).hexdigest()
+        for name in json.loads(LOCK_PATH.read_text())
+    }
+    AUDITED_DIGEST = hashlib.sha256(AUDITED.read_bytes()).hexdigest() if AUDITED else None
+    if RUN_LOCK_PATH.exists() and json.loads(RUN_LOCK_PATH.read_text()) != lock:
+        raise ValueError("Run evaluation lock changed")
+    atomic_json(RUN_LOCK_PATH, lock)
     selection = selection_from_args(args)
     if getattr(args, "preview", False):
         from darwinagent.experiments.control import preview
 
-        adapter = LocomoAdapter(ROOT / "datasets/locomo/data/locomo10_zh.json")
+        adapter = LocomoAdapter(DATA_DIR / "locomo10_zh.json")
         case_ids = (
             tuple(c.strip() for c in args.cases.split(","))
             if getattr(args, "cases", None)
@@ -427,7 +495,7 @@ async def main(args):
         return
     if args.optimization_mode == "wiki":
         raise ValueError("Wiki mode requires --arm g1")
-    adapter = LocomoAdapter(ROOT / "datasets/locomo/data/locomo10_zh.json")
+    adapter = LocomoAdapter(DATA_DIR / "locomo10_zh.json")
     spec = TaskSpec.load(TASK_DIR / "task.yaml")
     config = RunConfig()
     if args.campaign:
@@ -468,7 +536,7 @@ async def main(args):
             policy,
             root,
             frozen_files(),
-            snapshot_root=SNAPSHOTS if (SNAPSHOTS / args.case / "manifest.json").exists() else None,
+            snapshot_root=Path(args.memory_root) if getattr(args, "memory_root", None) else None,
         )
         summary = await runner.run(
             args.case,
@@ -506,6 +574,12 @@ if __name__ == "__main__":
     p = argparse.ArgumentParser()
     p.add_argument("--case", default="conv-26")
     p.add_argument("--output", required=True)
+    add_dataset_arguments(p)
+    p.add_argument("--memory-root", help="显式复用已保存事实；新运行默认 output/memory")
+    p.add_argument(
+        "--original-only", action="store_true", help="只用原始 QA 评测；不依赖历史修订 gold"
+    )
+    p.add_argument("--audited-reference", help="显式增加修订 gold 评测；默认只评原始 QA")
     p.add_argument("--assets")
     p.add_argument("--experiment", action="store_true")
     p.add_argument("--campaign", action="store_true")
@@ -531,14 +605,14 @@ if __name__ == "__main__":
     p.add_argument(
         "--scope",
         choices=SCOPE.keys(),
-        default="p",
+        default="sfcp",
         help="迭代开放范围：p 只 P / pf 加 F / sfcp 全开（按失败归因推进）",
     )
     p.add_argument(
         "--optimization-mode",
         choices=("legacy", "wiki"),
-        default="legacy",
-        help="训练优化经验模式（默认 legacy，不影响已有运行）",
+        default=None,
+        help="训练优化经验模式（g1 默认 wiki，其他入口默认 legacy）",
     )
     p.add_argument(
         "--train-questions",
@@ -552,8 +626,13 @@ if __name__ == "__main__":
     p.add_argument(
         "--graph-rebuild",
         action="store_true",
-        help="新模式（recheck4 快速循环）：冻结记忆/向量、图按当前 S 从固定事实重建；"
-        "需配合 --train-question-ids 与 --validation-question-ids",
+        help="兼容参数：选择 LLM 根据当前 S 动态构图（等同 --graph-mode llm）",
+    )
+    p.add_argument(
+        "--graph-mode",
+        choices=("llm", "frozen", "projection"),
+        default="llm",
+        help="g1 默认 llm 动态构图；frozen/projection 仅用于显式复现历史路径；v0 始终冻结",
     )
     p.add_argument(
         "--seed-assets",

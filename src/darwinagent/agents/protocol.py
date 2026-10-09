@@ -12,6 +12,10 @@ class ProtocolError(RuntimeError):
         self.raw_outputs = tuple(raw_outputs)
 
 
+class FeedbackExhausted(ProtocolError):
+    """Valid model replies exhausted the bounded candidate feedback loop."""
+
+
 def parse_json(text):
     t = text.strip()
     if t.startswith("```") and t.endswith("```"):
@@ -30,10 +34,11 @@ def parse_json(text):
 
 
 class ModelSession:
-    def __init__(self, client, config, namespace, limit=None, journal=None):
+    def __init__(self, client, config, namespace, limit=None, journal=None, bypass_cache=False):
         self.client, self.config, self.namespace = client, config, namespace
         self.limit = limit
         self.journal = journal
+        self.bypass_cache = bypass_cache
         self.calls = 0
         self.raw = []
         self.events = []
@@ -79,7 +84,9 @@ class ModelSession:
                         json_mode=True,
                         namespace=self.namespace,
                         use_cache=(
-                            attempt == 0 and not (self.journal and self.journal.bypass_cache)
+                            attempt == 0
+                            and not self.bypass_cache
+                            and not (self.journal and self.journal.bypass_cache)
                         ),
                         **({"durable": True} if self.journal is not None else {}),
                     )
@@ -177,6 +184,8 @@ answered 必须有可见证据，不能猜测未支持的细节；abstained 表�
 反馈失败时重新生成完整候选，不要复述错误候选。不得用语义拒答掩饰执行失败。"""
 REVIEW_PROTOCOL = """你是固定语义审查 Agent。检查候选中每个内容是否得到来源支持，主体、否定、日期精度、完整性和请求约束是否正确。
 来源存在并不证明语义支持。任务 C 通过也不证明语义支持。仅根据本次提供的候选、证据及来源原文判断。
+revision_history 是此前候选及审查意见，供核对修订是否解决问题；它不是事实证据。
+不得要求补回此前因缺乏证据而删除的内容。若改变此前判断，必须指出当前来源中的具体依据；证据不足时允许如实拒答。
 对 abstained 必须检查可见证据是否实际能回答；能够回答时 rejected，并给出反馈，不能把它原样发布。
 只返回 {"accepted":布尔,"supported":布尔,"subject_correct":布尔,"consistent":布尔,"complete":布尔,"abstention_valid":布尔,"feedback":"非空检查理由"}。
 answered 的 accepted 必须等于 supported && subject_correct && consistent && complete。

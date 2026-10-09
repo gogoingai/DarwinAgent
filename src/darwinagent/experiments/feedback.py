@@ -11,6 +11,7 @@ from darwinagent.kernel.revision import training_id
 
 from .constants import _DIAG_ROW_CHARS, _TRACE_CHARS
 from .constants import FEEDBACK_BUDGET_CHARS as FEEDBACK_BUDGET_CHARS
+from .recovery import answer_fault_category
 from .wiki_evidence import bounded_trace, pagination_metadata
 
 
@@ -265,19 +266,37 @@ def training_feedback(
     failures = []
     for case, result in zip(cases, results):
         failures += [
-            {"case_id": case.id, "question_id": a.question_id, "error": a.error}
+            {
+                "case_id": case.id,
+                "question_id": a.question_id,
+                "error": a.error,
+                "fault_category": answer_fault_category(a),
+            }
             for a in result.answers
             if a.status == "execution_error"
         ]
     graph_rows = []
     for result in results:
-        graph_rows += list(plain(result.graph_diagnostics))
+        graph_rows += [
+            {"case_id": result.case_id, **row} for row in plain(result.graph_diagnostics)
+        ]
+    graph_rows.sort(
+        key=lambda row: (
+            row.get("stage") != "graph_evidence" and row.get("status") != "execution_error"
+        )
+    )
+    if any(row.get("graph_mode") == "llm" for row in graph_rows):
+        active_stages = {
+            **(active_stages or {}),
+            "S": "执行中：当前 S 驱动 LLM 构图，修改后重新构图",
+            "P.extract": "执行中：指导 LLM 从冻结事实和来源生成节点与关系",
+        }
     score_data = baseline.to_dict()
     score_data.pop("diagnostics", None)  # 诊断单独装订，载荷不重复计费
 
     def payload(case_counts, fail_count, graph_count):
         diagnostics = [row for rows, take in zip(per_case_rows, case_counts) for row in rows[:take]]
-        return {
+        result = {
             "scores": score_data,
             "pipeline_active_stages": active_stages,
             "previous_round": previous_round,
@@ -288,8 +307,25 @@ def training_feedback(
             "generation_failures_total": len(failures),
             "generation_failures_truncated": fail_count != len(failures),
             "graph_diagnostics": graph_rows[:graph_count],
+            "graphs": [
+                r
+                for r in graph_rows[:graph_count]
+                if r.get("stage") == "graph_evidence" or r.get("status") == "execution_error"
+            ],
             "feedback_budget_chars": budget,
         }
+        from .graph_evidence import asset_change_signals
+
+        result["asset_change_signals"] = asset_change_signals(result)
+        if budget < 4000:
+            result["asset_change_signals"] = [
+                {
+                    k: signal[k]
+                    for k in ("asset_kinds", "observation", "case_id", "question_id", "confidence")
+                }
+                for signal in result["asset_change_signals"]
+            ]
+        return result
 
     def fits(case_counts, fail_count, graph_count):
         return (
@@ -308,6 +344,15 @@ def training_feedback(
             f"反馈骨架（scores+统计字段）序列化后 {skeleton} 字符，超过预算 "
             f"{budget}：评分载荷本身超限，拒绝生成提案"
         )
+    # Reserve graph observations before long answer traces can consume the whole budget.
+    graph_count = 0
+    while graph_count < len(graph_rows) and fits(zero_counts, 0, graph_count + 1):
+        size = len(
+            json.dumps(payload(zero_counts, 0, graph_count + 1), ensure_ascii=False, default=str)
+        )
+        if graph_count and size - skeleton > budget // 3:
+            break
+        graph_count += 1
     # 轮转准入：每步从已入载行数最少的对话取一行——多对话均分预算，谁也不能先占满。
     case_counts = [0] * len(per_case_rows)
     progress = True
@@ -318,14 +363,13 @@ def training_feedback(
                 continue
             trial = list(case_counts)
             trial[i] += 1
-            if fits(tuple(trial), 0, 0):
+            if fits(tuple(trial), 0, graph_count):
                 case_counts = trial
                 progress = True
                 break
     fail_count = 0
-    while fail_count < len(failures) and fits(tuple(case_counts), fail_count + 1, 0):
+    while fail_count < len(failures) and fits(tuple(case_counts), fail_count + 1, graph_count):
         fail_count += 1
-    graph_count = 0
     while graph_count < len(graph_rows) and fits(tuple(case_counts), fail_count, graph_count + 1):
         graph_count += 1
     return payload(tuple(case_counts), fail_count, graph_count)

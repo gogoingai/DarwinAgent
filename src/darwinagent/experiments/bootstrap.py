@@ -406,7 +406,7 @@ class AssetBootstrapper:
                 if known_types:
                     declared = {e.name for e in schema.entities}
                     unknown = sorted(declared - known_types)
-                    if unknown:
+                    if unknown and structure_sample.get("graph_mode") != "llm":
                         raise ValueError(
                             f"S 声明了快照图中不存在的节点类型 {unknown}；"
                             f"必须沿用 memory_structure.node_types 的既有名称"
@@ -438,12 +438,18 @@ class AssetBootstrapper:
                                 try:
                                     graphs = await trial_supply(trial_bundle, cases[:1])
                                 except Exception as exc:
+                                    from .control import ControlSignal
+
+                                    if isinstance(exc, ControlSignal):
+                                        raise
+                                    detail = str(exc)
+                                    if len(detail) > 1200:
+                                        detail = detail[:400] + " ... " + detail[-800:]
                                     raise ValueError(
-                                        f"动态试验图构建失败（草案 S 声明与事实投影词汇"
-                                        f"不兼容或草案过重；按结构样本声明 原子事实(键=编号)"
-                                        f" 与 归属于(原子事实→人物)/属于主题/记录于 的 "
-                                        f"domain/range，或简化类型与提示）: "
-                                        f"{type(exc).__name__}: {str(exc)[:400]}"
+                                        "动态试验图构建失败：按当前 S 核对类型、字段、关系端点与来源证据；"
+                                        "保留原子事实及编号，派生结构由 S 自由声明。"
+                                        "先修复以下实际错误，不要仅根据图缺失猜测原因："
+                                        f"{type(exc).__name__}: {detail}"
                                     ) from None
                                 admit_candidate(
                                     trial_bundle,
@@ -522,6 +528,27 @@ class AssetBootstrapper:
                 + _C_DISCIPLINE_CLAUSE
             )
         )
+        if structure_sample and structure_sample.get("graph_mode") == "llm":
+            protocol = protocol.replace(
+                "The frozen memory graph already exists: its node type names are the exact keys of memory_structure.node_types\n"
+                "and its relation names the keys of memory_structure.relations. S MUST declare those same names verbatim\n"
+                "(including meta.atomic_memory_type being one of them); inventing synonyms makes every query miss.\n",
+                "",
+            ).replace(_RETRIEVAL_FLOOR_CLAUSE, "")
+            protocol += (
+                "\nDynamic graph mode overrides frozen-graph vocabulary restrictions: "
+                "the sample contains immutable fact anchors, not a closed type whitelist. "
+                "Preserve the sample's atomic fact type and its key 编号. Design additional "
+                "entity types, attributes and relations from the source facts and task needs. "
+                "An LLM will materialize them under current S and P.extract with source evidence. "
+                "P.extract is guidance for auxiliary entities/relations over existing atomic facts; "
+                "it must not ask the graph model to output new atomic facts or prescribe a conflicting JSON format."
+            )
+            protocol += (
+                "\nRequired retrieval capabilities are exactly: "
+                + str(sorted(capability_names(getattr(spec, "retrieval_floor", {}) or {})))
+                + ". This explicit list overrides the generic retrieval-floor paragraph."
+            )
         try:
             assets = await session.request(
                 config.bootstrap_role, protocol, payload, valid, max_tokens=14000

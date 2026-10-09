@@ -131,6 +131,7 @@ class Config:
     empty_response_passthrough_roles: set[str] = field(default_factory=lambda: {"judicator"})
     # 思考深度的全局旋钮（effort 型模型生效；条目缺省见 darwinagent/llm/registry.py）
     reasoning_effort: str = ""
+    thinking_type: str = ""
     # Provider-specific routing is an explicit compatibility preset.
     model_profiles: bool = False
     request_timeout_s: float = 120.0
@@ -149,6 +150,9 @@ class Config:
             model_strong=model,
             model_middle=model,
             model_fast=model,
+            reasoning_effort=os.environ.get("DARWINAGENT_REASONING_EFFORT", ""),
+            thinking_type=os.environ.get("DARWINAGENT_THINKING_TYPE", ""),
+            max_concurrency=int(os.environ.get("DARWINAGENT_MAX_CONCURRENCY", "4")),
             work_dir=Path(work_dir) if work_dir is not None else Path.cwd() / "runs",
         )
 

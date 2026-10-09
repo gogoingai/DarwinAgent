@@ -16,21 +16,24 @@ from darwinagent.kernel import TaskSpec
 from darwinagent.llm.client import LLMClient
 
 from datasets.locomo.adapter import LocomoAdapter
-from datasets.locomo.run import ROOT, SNAPSHOTS, TASK_DIR, arm_config, connection, memory_structure_sample
+from datasets.locomo.inputs import add_dataset_arguments, resolve_dataset
+from datasets.locomo.run import ROOT, TASK_DIR, arm_config, connection, memory_structure_sample
 
 
 async def main(args):
     out = Path(args.output).resolve()
     out.mkdir(parents=True, exist_ok=True)
+    data_dir = resolve_dataset(args, out)
+    memory_root = Path(args.memory_root).resolve()
     task = TaskSpec.load(TASK_DIR / 'task.yaml')
-    adapter = LocomoAdapter(ROOT / 'datasets/locomo/data/locomo10_zh.json')
+    adapter = LocomoAdapter(data_dir / 'locomo10_zh.json')
     case_full = adapter.generation_input('conv-26')
     case = CaseInput(case_full.id, case_full.corpus, case_full.questions[:args.questions])
     conn = connection(out)
 
     async with LLMClient(conn) as client:
         # 1) 真实冷启动 bootstrap：S 从零生成（唯一硬约束＝原子记忆内核）
-        structure = memory_structure_sample(SNAPSHOTS / 'conv-26')
+        structure = memory_structure_sample(memory_root / 'conv-26')
         bundle = await AssetBootstrapper().initialize(case, task, client, RunConfig(function_timeout_s=15.0),
                                                       out / 'assets', structure_sample=structure)
         schema_yaml = next(a.content for a in bundle.assets.assets if a.kind == 'S')
@@ -43,7 +46,7 @@ async def main(args):
         for arm in ('g1', 'v0'):
             config = arm_config(arm, args.vector_k)
             result = await Pipeline(client, out / arm / 'generation',
-                                    frozen_snapshot=SNAPSHOTS / 'conv-26').run(
+                                    frozen_snapshot=memory_root / 'conv-26').run(
                 case, task.with_bundle(bundle), config)
             statuses = [a.status for a in result.answers]
             print(json.dumps({'stage': 'smoke', 'arm': arm,
@@ -57,6 +60,8 @@ async def main(args):
 if __name__ == '__main__':
     p = argparse.ArgumentParser()
     p.add_argument('--output', required=True)
+    p.add_argument('--memory-root', required=True)
+    add_dataset_arguments(p)
     p.add_argument('--questions', type=int, default=5)
     p.add_argument('--vector-k', type=int, default=30)
     asyncio.run(main(p.parse_args()))

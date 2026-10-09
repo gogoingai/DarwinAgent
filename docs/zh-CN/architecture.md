@@ -42,4 +42,6 @@ DarwinAgent 0.1 使用基于图的共同任务运行时。数据集边界只实�
 
 允许提案修改 S/F/C/P；框架执行器、只读权限、固定来源／状态检查、`RunConfig`、评测器和采纳规则位于边界外。C 不能替换固定检查，P 不能引入未登记槽位，F 不能获得任意 Python 权限。
 
+LoCoMo 的新 g1 运行由 LLM 按当前 S 动态构图；Wiki 与提案器共享图、工具、检查和作答环节的修改线索。见[动态构图与资产修改信号](dynamic-graph.md)。
+
 源码入口：[`src/darwinagent`](../../src/darwinagent/__init__.py)。内核安装包只包含 `darwinagent` 及演示资源；根目录 `datasets`、`tasks`、`tests`、独立基线和第三方环境不随内核分发。任意外部 Agent 插件尚未实现。

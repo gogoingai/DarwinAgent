@@ -265,7 +265,11 @@ class TrimmedEvaluateTests(unittest.TestCase):
                     )
                 )
             evaluator = ev.LocomoEvaluator(
-                None, tdp / "work", audited_path=aud or tdp / "x.json", lock_path=lock
+                None,
+                tdp / "work",
+                dataset_path="explicit.json",
+                audited_path=aud or tdp / "x.json",
+                lock_path=lock,
             )
 
             def fake_aggregate(rows, disputed):

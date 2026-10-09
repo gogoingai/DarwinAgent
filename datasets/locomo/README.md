@@ -1,60 +1,39 @@
-# datasets/locomo —— 中文 LoCoMo 本体问答（OaK，零向量）
+# 中文 LoCoMo 接入
 
-> 当前入口使用 Oak 0.4.0 的共同 Pipeline（原子事实两阶段 + 事实锚定图）。LoCoMo 只实现输入适配和独立评测；生成只使用原始对话文本、说话人与会话日期。三集合协议：训练 conv-26（199 题，四口径，修订 gold 严格为主指标）、验证 conv-47（190 题，原始 gold 严格+宽松）、测试 conv-49（196 题，同验证口径）。流程：真实模型预检 → B0 门（全完+零故障）→ Rn 无限训练迭代（操作者叫停）→ 候选锁定 → 统一验证选版 → 测试一次性揭盲；题次逐题记账。实验根 `runs/atomic_v8+`，历史成绩保留、不作新框架基线。
+原始数据从 [justis-xu/memory-eval-zh](https://huggingface.co/datasets/justis-xu/memory-eval-zh/tree/main/locomo) 加载。命令指定 HF 仓库和版本，程序自动下载所需的中文、英文两个原始文件，并在输出目录的 `dataset-source.json` 中记录实际提交与文件校验值。继续运行使用已锁定的提交；HF 缓存目录可以更换。数据文件、事实、图、模型回执和实验结果不纳入 Git。
 
-**口径披露**：生成输入只含原始对话文本/说话人/会话日期；冻结判分 V1 的上下文按其历史实现包含整段对话转写（含 observation/event_summary 派生标注与图片机器说明），即判分可见范围宽于生成输入。判分实现与 11 文件锁未改动，此差异作为评测口径如实披露。
+## 运行
 
-框架目录、类图和资产能力边界见 [架构说明](../../docs/ARCHITECTURE.md)，冷启动与恢复方法见 [使用说明](../../docs/PORTABLE-USAGE.md)。
-
-## 目录结构
-
-```
-datasets/locomo/
-├── REPORT.md          # 报告（论文模板：摘要/本体/实验/归因/结论）——先看这个
-├── data/              # 数据集
-│   ├── locomo10_zh.json     # 中文版主数据集（10 段对话 / 5,882 条消息 / 1,986 题）
-│   ├── locomo10.json        # 英文原版
-│   ├── gold_repairs.jsonl   # gold 修复表（18 条，逐题判据 + 原文引证，判分双口径）
-│   └── DATASET_CARD.md      # 数据集卡片（翻译口径说明）
-├── adapter.py         # LocomoAdapter：三层语料、日期、说话人、问题与来源转换
-├── evaluator.py       # LocomoEvaluator：独立参考与冻结四口径评测
-├── exports.py         # 纯格式转换
-├── run.py             # 装配共同 ExperimentRunner/Pipeline
-├── pipeline/          # 保留的冻结评测实现与历史说明；不实现新生成流程
-│   ├── judge.py / protocol.py / prompts/
-│   ├── analyze.py / closeout.py / lenient_report.py
-│   └── OPTIMIZATION_LOG.md / ARCHIVE.md / PLAN-90.md
-└── runs/              # 复现产物（图 / 答案 / 报告 / 失败归因 / LLM 缓存 / 台账）
-    └── frozen/              # 冻结版：schema + 主题词表 + 最优轮报告（iter22）
-```
-
-## 作答与评测修复
-
-旧固定图审计记录见 [pipeline/EVALUATION_V1.md](pipeline/EVALUATION_V1.md)。新实验独立生成并使用同一冻结评分口径；生成接口不提供参考答案。此前宽松结果混用了修复与原始 gold，不能作为新口径基线或官方评测复现。
-
-## 快速开始
+先安装基准接入依赖，并设置操作者提供的 `DARWINAGENT_BASE_URL`、`DARWINAGENT_MODEL`、`DARWINAGENT_API_KEY`。
 
 ```bash
-# 冷启动 B0 + 两轮资产提案，完整 conv-26；使用一个新的输出目录
-uv run python -m datasets.locomo.run --experiment --output datasets/locomo/runs/my_cold_start
+uv sync --extra benchmarks
 
-# 同阶段、同资产、同模型配置和同代码身份的断点恢复
-uv run python -m datasets.locomo.run --experiment --resume --output datasets/locomo/runs/my_cold_start
+# 从 HF 原始对话冷启动，按当前 S 动态构图，开放 S/F/C/P 两轮提案
+uv run python -m datasets.locomo.run \
+  --dataset-repo justis-xu/memory-eval-zh --dataset-revision main \
+  --arm g1 --train-only --cases conv-26 --rounds 2 \
+  --output runs/locomo-example
 
-# 历史结果的独立复评入口仍保留
-uv run python -m datasets.locomo.pipeline.lenient_report conv-26 iter22
+# 复用同一输出目录中锁定的数据提交、事实和成功回执
+uv run python -m datasets.locomo.run \
+  --dataset-repo justis-xu/memory-eval-zh --dataset-revision main \
+  --arm g1 --train-only --cases conv-26 --rounds 2 --resume \
+  --output runs/locomo-example
 ```
 
-## 三份核心文档
+`--dataset-revision` 可指定完整提交以便复现。`--dataset-cache` 可指定缓存位置；已有运行记录或完整提交配合 `--dataset-offline` 可仅使用缓存。`--data-dir` 是显式本地输入选项，与 `--dataset-repo` 互斥。没有数据源参数时直接报错。
 
-| 想了解 | 看 |
-|---|---|
-| 成绩、本体定义、失败归因 | [REPORT.md](REPORT.md) |
-| 23 轮迭代怎么爬到 79.9%（每轮改了什么、负结果） | [pipeline/OPTIMIZATION_LOG.md](pipeline/OPTIMIZATION_LOG.md) |
-| 为什么 90% 不可达（数据噪声证据链） | [pipeline/PLAN-90.md](pipeline/PLAN-90.md) |
+## 事实与图
 
-## 注意
+新 g1 运行只从消息正文、说话人与会话日期抽取事实，保存到 `--output` 下的 `memory/`，供之后的 S/P 修改复用。程序按当前 S 与 P.extract 用 LLM 生成实体、属性和关系，校验每个节点和边的来源证据。Wiki 与提案器共同查询事实、图、工具和作答轨迹，判断应修改 S/F/C/P 中的哪些资产。见[动态构图与资产修改信号](../../docs/zh-CN/dynamic-graph.md)。
 
-- 数据纪律（评测有效性前提）：当前固定图包含 observation/event_summary 标注层，需披露；作答只见问题与图；判分盲判——详见 [pipeline/README.md](pipeline/README.md)。
-- 中文数据集 QA 与对话分开翻译，存在系统性噪声（图片-only 细节 / gold-语料矛盾 / 术语漂移），天花板审计与 18 条修复见 `pipeline/OPTIMIZATION_LOG.md`。
-- 完整产物（含 LLM 请求缓存，可零 API 费用复现全部轨迹）：<https://huggingface.co/datasets/justis-xu/oak-locomo>
+仅提供对话模型时，新记忆包声明 `vector_mode: none`，运行图检索。需要已有事实或向量索引时，通过 `--memory-root` 显式传入记忆包目录；固定图重放 `--graph-mode frozen`、固定投影 `--graph-mode projection` 和 v0 臂均要求该参数。没有默认历史快照，也不会自动寻找别的实验目录。
+
+## 独立评测
+
+默认使用原始 QA 的精准、宽松两项指标。`--audited-reference` 可显式加入外部修订参考；修订参考缺失会报错。生成和构图不读取答案、证据题号、题型、摘要标注或 QA 派生槽位数据。
+
+判题继承原评分原语：上下文包含原始对话中可用的派生标注和图片说明，范围宽于生成输入；仍以当前 gold 判分，来源冲突单独披露。当前接口锁为 `evaluation_lock.governance-20261009.json`，旧锁及历史结果保留。新运行的数据校验值和评测实现锁保存在输出目录，历史成绩不能直接作为新路径的基线。
+
+旧实验报告见 [REPORT.md](REPORT.md)，历史产物索引见 [ARCHIVE.md](ARCHIVE.md)。历史实验产物与本次原始数据源分别管理；旧本体、图和答案不会成为新运行的隐式输入。

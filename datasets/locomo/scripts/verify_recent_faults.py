@@ -5,6 +5,7 @@ to a new, empty directory in the isolated worktree. No original run is modified.
 """
 from __future__ import annotations
 
+import argparse
 import json
 import os
 import shutil
@@ -112,16 +113,21 @@ def verify_round(source, destination, case, graph, snapshot_root):
 
 
 def main():
-    history = Path(os.environ['OAK_HISTORY_ROOT']).resolve()
+    from datasets.locomo.inputs import add_dataset_arguments, resolve_dataset
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--memory-root", required=True)
+    add_dataset_arguments(parser)
+    args = parser.parse_args()
+    history = Path(os.environ["OAK_HISTORY_ROOT"]).resolve()
     output = Path(os.environ['OAK_RECENT_VERIFY_ROOT']).resolve()
     if output.exists():
         raise ValueError(f'Validation output must be new: {output}')
     if not output.parent.is_dir():
         raise ValueError(f'Validation parent does not exist: {output.parent}')
     output.mkdir()
-    dataset = history.parent
-    snapshot_root = dataset / 'snapshots' / 'gvtest_v1'
-    case = LocomoAdapter(dataset / 'data' / 'locomo10_zh.json').generation_input('conv-26')
+    data_dir = resolve_dataset(args, output)
+    snapshot_root = Path(args.memory_root).resolve()
+    case = LocomoAdapter(data_dir / 'locomo10_zh.json').generation_input('conv-26')
     graph = load_frozen_graph(snapshot_root / case.id, case.corpus)
     summary = {'schema_version':1, 'history_root':str(history),
                'snapshot_root':str(snapshot_root), 'rounds':[],

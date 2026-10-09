@@ -18,7 +18,8 @@ from darwinagent.experiments.spec import precheck_identity
 from darwinagent.llm.client import LLMClient
 from darwinagent.llm.settings import load_legacy_connection as load_connection
 
-from datasets.locomo.run import ROOT, SNAPSHOTS, arm_config, connection
+from datasets.locomo.inputs import add_dataset_arguments, resolve_dataset
+from datasets.locomo.run import ROOT, arm_config, connection
 
 CONVS = ('conv-26', 'conv-30', 'conv-41', 'conv-42', 'conv-43', 'conv-47', 'conv-48')
 
@@ -34,7 +35,7 @@ async def probe_tier(client, role):
         return {'ok': False, 'error': repr(exc)[:200]}
 
 
-def check_snapshots(convs):
+def check_snapshots(convs, memory_root):
     from types import SimpleNamespace
 
     from darwinagent.kg.graph import load_graph
@@ -42,7 +43,7 @@ def check_snapshots(convs):
     from darwinagent.vector import LocalVectorStore
     rows = {}
     for conv in convs:
-        snap = SNAPSHOTS / conv
+        snap = memory_root / conv
         if not (snap / 'manifest.json').exists():
             rows[conv] = {'ok': False, 'error': f'快照缺失：{snap}'}
             continue
@@ -70,12 +71,16 @@ def main():
     parser.add_argument('--arm', choices=('v0', 'g1'), default='g1')
     parser.add_argument('--vector-k', type=int, default=30)
     parser.add_argument('--convs', default=','.join(CONVS))
+    parser.add_argument('--memory-root', required=True)
+    add_dataset_arguments(parser)
     args = parser.parse_args()
     out = Path(args.output).resolve()
     out.mkdir(parents=True, exist_ok=True)
+    data_dir = resolve_dataset(args, out)
+    memory_root = Path(args.memory_root).resolve()
     conn = connection(out)
     config = arm_config(args.arm, args.vector_k)
-    checks = {'snapshots': check_snapshots(tuple(c.strip() for c in args.convs.split(',')))}
+    checks = {'snapshots': check_snapshots(tuple(c.strip() for c in args.convs.split(',')), memory_root)}
     started = time.time()
 
     async def live():
@@ -84,7 +89,7 @@ def main():
             checks['fast_tier_json'] = await probe_tier(client, 'tools')
             try:
                 from darwinagent.vector import load_embedder
-                emb = load_embedder(cache_path=SNAPSHOTS / 'conv-26' / 'vector' / 'embed_cache.json')
+                emb = load_embedder(cache_path=memory_root / 'conv-26' / 'vector' / 'embed_cache.json')
                 vec = emb.embed('连通性测试：谁修了打印机')
                 checks['embedding_endpoint'] = {'ok': len(vec) >= 256, 'dim': len(vec), 'model': emb.model}
             except Exception as exc:  # noqa: BLE001
@@ -94,9 +99,9 @@ def main():
                 from datasets.locomo.adapter import LocomoAdapter
                 from darwinagent.experiments.snapshots import attach_vector, load_frozen_graph
                 from darwinagent.operators.data import DataCapabilities
-                corpus = LocomoAdapter(ROOT / 'datasets/locomo/data/locomo10_zh.json').generation_input('conv-26').corpus
-                gr = load_frozen_graph(SNAPSHOTS / 'conv-26', corpus)
-                attach_vector(gr, SNAPSHOTS / 'conv-26')
+                corpus = LocomoAdapter(data_dir / 'locomo10_zh.json').generation_input('conv-26').corpus
+                gr = load_frozen_graph(memory_root / 'conv-26', corpus)
+                attach_vector(gr, memory_root / 'conv-26')
                 caps = DataCapabilities(gr)
                 hits = await asyncio.to_thread(caps.semantic_search, '跑步减压', limit=5)
                 rel = caps.relative_date('2024-05-08', '上周日')

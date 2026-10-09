@@ -407,7 +407,10 @@ class SmokeJudgeContractTests(unittest.TestCase):
             return EvaluationResult({"original_precise": 2}, 3, 2, 0, 1)
 
         answers = (AnswerResult("0", "abstained", "x", ()),) * 3
-        with mock.patch.object(EV.LocomoEvaluator, "evaluate", fake_evaluate):
+        with (
+            mock.patch.object(EV.LocomoEvaluator, "evaluate", fake_evaluate),
+            mock.patch.object(R, "DATA_DIR", Path("explicit-input")),
+        ):
             verdict = asyncio.run(R.smoke_judge(None, SimpleNamespace(id="conv-26"), answers))
         self.assertEqual(verdict, {"precise": 2, "completed": 2, "total": 3})
 

@@ -48,6 +48,7 @@ def transport_identity(client):
         "fast_max_concurrency",
         "max_retries",
         "reasoning_effort",
+        "thinking_type",
         "model_profiles",
         "request_timeout_s",
     )

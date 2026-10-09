@@ -44,4 +44,6 @@ independent of TestCase/scenario files. See the [governance report](engineering-
 
 Proposals can modify S/F/C/P. Framework execution, read-only permissions, fixed source/status checks, `RunConfig`, evaluator, and adoption rules sit outside that boundary. C cannot replace fixed checks; P cannot add unregistered slots; F cannot gain arbitrary Python access.
 
+New LoCoMo g1 runs construct graphs with an LLM under the current S. Wiki and the proposer share evidence from graph construction, tools, checks and answers; see [dynamic graphs and asset change signals](dynamic-graph.md).
+
 Source entry: [`src/darwinagent`](../../src/darwinagent/__init__.py). The core wheel includes only `darwinagent` and demo resources. Root `datasets`, `tasks`, `tests`, independent baselines, and third-party environments are not core distribution contents. Arbitrary external agent plugins are not implemented.

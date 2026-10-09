@@ -80,7 +80,7 @@ class RecoveryTests(unittest.TestCase):
             def __init__(self, *_args, **_kwargs):
                 pass
 
-            async def run(self, *_args):
+            async def run(self, *_args, **_kwargs):
                 type(self).calls += 1
                 if type(self).calls == 1:
                     return initial

@@ -12,9 +12,9 @@
 
 from __future__ import annotations
 
+import argparse
 import asyncio
 import json
-import sys
 
 from darwinagent.llm.client import LLMClient
 
@@ -145,8 +145,8 @@ async def classify_one(client: LLMClient, conv, f: dict, ns: str) -> dict:
     }
 
 
-async def run(conv_id: str, tag: str) -> dict:
-    lc = load_locomo_config()
+async def run(conv_id: str, tag: str, *, dataset_path) -> dict:
+    lc = load_locomo_config(dataset_path=dataset_path)
     conv = load_conversation(lc.dataset_path, conv_id)
     out_dir = lc.runs_dir / conv_id / tag
     failures = [
@@ -216,9 +216,16 @@ def _count_by(items: list[dict]) -> dict:
 
 
 def main() -> None:
-    conv_id = sys.argv[1] if len(sys.argv) > 1 else "conv-44"
-    tag = sys.argv[2] if len(sys.argv) > 2 else "full"
-    asyncio.run(run(conv_id, tag))
+    from datasets.locomo.inputs import add_dataset_arguments, resolve_dataset
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("conv")
+    parser.add_argument("tag")
+    parser.add_argument("--output", required=True)
+    add_dataset_arguments(parser)
+    args = parser.parse_args()
+    data_dir = resolve_dataset(args, args.output)
+    asyncio.run(run(args.conv, args.tag, dataset_path=data_dir / "locomo10_zh.json"))
 
 
 if __name__ == "__main__":

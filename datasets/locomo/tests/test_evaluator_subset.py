@@ -13,8 +13,10 @@ class SubsetEvaluation(unittest.IsolatedAsyncioTestCase):
         import json
 
         from datasets.locomo.pipeline.data import load_conversation
+        from tests.support.locomo import fixture_dataset
 
-        conv = load_conversation(Path("datasets/locomo/data/locomo10_zh.json"), "conv-26")
+        data_path = fixture_dataset(root / "input") / "locomo10_zh.json"
+        conv = load_conversation(data_path, "conv-26")
         audited = root / "synthetic-test-reference.json"
         audited.write_text(
             json.dumps(
@@ -30,7 +32,12 @@ class SubsetEvaluation(unittest.IsolatedAsyncioTestCase):
                 ensure_ascii=False,
             )
         )
-        return LocomoEvaluator(None, root, audited_path=audited)
+        return LocomoEvaluator(
+            None,
+            root,
+            dataset_path=data_path,
+            audited_path=audited,
+        )
 
     async def test_sparse_ids_and_shuffled_grades(self):
         async def grade(items, *args, **kwargs):
@@ -74,7 +81,15 @@ class SubsetEvaluation(unittest.IsolatedAsyncioTestCase):
     async def test_missing_audited_reference_explains_external_requirement(self):
         a = SimpleNamespace(question_id="32", status="answered", answer="fixture", error=None)
         with tempfile.TemporaryDirectory() as td:
-            evaluator = LocomoEvaluator(None, Path(td), audited_path=Path(td) / "missing.json")
+            from tests.support.locomo import fixture_dataset
+
+            data_path = fixture_dataset(Path(td) / "input") / "locomo10_zh.json"
+            evaluator = LocomoEvaluator(
+                None,
+                Path(td),
+                dataset_path=data_path,
+                audited_path=Path(td) / "missing.json",
+            )
             with self.assertRaisesRegex(FileNotFoundError, "pass audited_path explicitly"):
                 await evaluator.evaluate(
                     SimpleNamespace(case_id="conv-26", answers=(a,)), asked=(32,)

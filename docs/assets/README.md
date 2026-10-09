@@ -4,6 +4,10 @@ The four visual groups are bilingual. Technical diagrams are rendered from their
 
 四组图均有中英文版本。技术图由对应 Mermaid 图源实际导出；头图以可编辑 SVG 为图源。不嵌入字体，不上传外部图床。
 
+Keep release numbers out of the graphics and their descriptions. The README's PyPI badge reads the current release automatically.
+
+配图及其描述不写发行版本号；README 的 PyPI 徽章自动读取当前发行版本。
+
 | Visual group | English source / exports | 中文图源／导出 |
 | --- | --- | --- |
 | Hero | [SVG source](hero-en.svg) · [PNG](hero-en.png) | [SVG 图源](hero-zh-CN.svg) · [PNG](hero-zh-CN.png) |

@@ -5,6 +5,7 @@ import json
 import tempfile
 import unittest
 from contextlib import redirect_stdout
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -51,6 +52,7 @@ class ScopedCLI(unittest.TestCase):
 
     def test_locomo_preview_is_question_scoped_and_offline(self):
         from datasets.locomo import run
+        from tests.support.locomo import fixture_dataset
 
         with (
             tempfile.TemporaryDirectory() as tmp,
@@ -61,6 +63,7 @@ class ScopedCLI(unittest.TestCase):
                 run.main(
                     SimpleNamespace(
                         output=tmp,
+                        data_dir=str(fixture_dataset(Path(tmp) / "input")),
                         preview=True,
                         case="conv-26",
                         execution_question_ids="15,23",

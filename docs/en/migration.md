@@ -18,9 +18,17 @@ The package version was 0.1.0 during that migration; moving or formatting implem
 That migration required a new output directory. Matching new-source checkpoints can resume;
 old-source checkpoints must fail identity validation without rewriting the original declaration.
 
-LoCoMo defaults to `evaluation_lock.governance-20261007.json`, covering its original four files
+That migration used `evaluation_lock.governance-20261007.json`, covering its original four files
 plus `pipeline/dates.py` and the shared `operators/calendar.py`. The historical
 `evaluation_lock.json` remains byte-for-byte intact and intentionally rejects current source.
 The evaluator's explicit `lock_path` remains available for runs with their corresponding source.
 The new lock records source identity, not a new benchmark result or a changed scoring policy.
 See [provenance and acceptance](engineering-governance.md).
+
+
+## Explicit HF input on 2026-10-09
+
+Current LoCoMo runs require a commanded HF repository/revision or an explicit local source.
+The resolved HF commit and raw-file hashes are recorded independently of cache location.
+The current evaluator interface uses `evaluation_lock.governance-20261009.json`; earlier locks
+remain unchanged. Original QA metrics are the default, and audited references are explicit inputs.

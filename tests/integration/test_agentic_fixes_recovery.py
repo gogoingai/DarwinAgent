@@ -32,7 +32,7 @@ class BatchedFaultRetryTests(unittest.TestCase):
         calls = []
 
         class FakePipeline:
-            async def run(self, case, spec, config):
+            async def run(self, case, spec, config, **kwargs):
                 calls.append(1)
                 return script.pop(0)
 
@@ -162,7 +162,7 @@ class FaultRetryInvalidatesEvaluationTests(unittest.TestCase):
             def __init__(self, client, work_dir, frozen_snapshot=None, graph_builder=None):
                 pass
 
-            async def run(self, case, spec, config):
+            async def run(self, case, spec, config, **kwargs):
                 return scripted.pop(0)
 
         evaluated = []
@@ -251,7 +251,7 @@ class DeterministicFaultTests(unittest.TestCase):
             def __init__(self, client, work_dir, frozen_snapshot=None, graph_builder=None):
                 pass
 
-            async def run(self, case, spec, config):
+            async def run(self, case, spec, config, **kwargs):
                 calls.append(1)
                 return scripted[0]
 

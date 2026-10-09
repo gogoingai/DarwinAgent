@@ -23,10 +23,11 @@ from pathlib import Path
 from darwinagent.kg.graph import load_graph, save_graph
 from darwinagent.runtime.artifacts import digest
 
+from datasets.locomo.inputs import add_dataset_arguments, resolve_dataset
 from datasets.locomo.adapter import LocomoAdapter
 
 ROOT = Path(__file__).resolve().parents[3]
-DEFAULT_OUT = ROOT / 'datasets/locomo/snapshots/gvtest_v1'
+
 
 
 def graph_dir_for(source: Path, conv: str, pinned: dict) -> Path:
@@ -135,15 +136,16 @@ def import_conv(source: Path, out_root: Path, conv: str, adapter: LocomoAdapter,
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--source', default='/Users/xu/git/memory-schema-rsi/g_v_test')
+    parser.add_argument('--source', required=True)
     parser.add_argument('--convs', required=True, help='逗号分隔，如 conv-26,conv-30')
-    parser.add_argument('--output', default=str(DEFAULT_OUT))
+    parser.add_argument('--output', required=True)
+    add_dataset_arguments(parser)
     parser.add_argument('--graph-dir', default='',
                         help='逗号分隔 conv=dir 覆盖（多图目录会话钉死指定图，如 conv-26=graph_d0953122）')
     args = parser.parse_args()
     source = Path(args.source).resolve()
     out_root = Path(args.output).resolve()
-    adapter = LocomoAdapter(ROOT / 'datasets/locomo/data/locomo10_zh.json')
+    adapter = LocomoAdapter(resolve_dataset(args, out_root) / 'locomo10_zh.json')
     out_root.mkdir(parents=True, exist_ok=True)
     pinned = dict(item.split('=', 1) for item in args.graph_dir.split(',') if '=' in item)
     results = {}

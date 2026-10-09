@@ -8,10 +8,12 @@ third_party/
 .jdk/
 .env.bak*
 
-# ---- 框架净化（2026-10-07，操作者拍板）：仓库只保留框架代码/文档/任务适配与基准数据 ----
+# ---- 框架代码、文档、任务适配；数据和实验产物由 HF 承载 ----
 # 一切实验运行产物与快照种子不入库（磁盘保留＋HF 归档承载）
 datasets/*/runs/
 datasets/locomo/snapshots/
+datasets/locomo/data/*.json
+datasets/locomo/data/*.jsonl
 datasets/loomo_runs_typo_check/
 runs/
 embed_cache.json

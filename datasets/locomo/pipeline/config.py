@@ -49,7 +49,7 @@ class LocomoConfig:
         return self.runs_dir / "model_probe.json"
 
 
-def load_locomo_config() -> LocomoConfig:
+def load_locomo_config(*, dataset_path) -> LocomoConfig:
     load_dotenv(PROJECT_ROOT / ".env")
     cfg = legacy_benchmark_config()
     cfg.role_tiers.update(
@@ -93,9 +93,7 @@ def load_locomo_config() -> LocomoConfig:
     # locomo 产物全部隔离在 locomo/runs 下（缓存/台账/重试日志随 work_dir 派生）
     cfg.work_dir = LOCOMO_TASK_DIR / "runs"
 
-    dataset_path = Path(
-        os.environ.get("LOCOMO_DATA", str(LOCOMO_TASK_DIR / "data" / "locomo10_zh.json"))
-    )
+    dataset_path = Path(dataset_path)
     lc = LocomoConfig(cfg=cfg, dataset_path=dataset_path)
 
     for d in (cfg.work_dir, cfg.cache_dir, cfg.ledger_path.parent, cfg.work_dir / "logs"):

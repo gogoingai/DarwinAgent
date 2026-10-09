@@ -491,6 +491,7 @@ dependencies = [
 benchmarks = [
     { name = "datasets" },
     { name = "gradio" },
+    { name = "huggingface-hub" },
     { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
     { name = "numpy", version = "2.5.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
     { name = "pandas" },
@@ -521,6 +522,7 @@ requires-dist = [
     { name = "datasets", marker = "extra == 'benchmarks'", specifier = ">=2.20" },
     { name = "gradio", marker = "extra == 'benchmarks'", specifier = ">=6.0.0" },
     { name = "httpx", specifier = ">=0.27" },
+    { name = "huggingface-hub", marker = "extra == 'benchmarks'", specifier = ">=0.24" },
     { name = "networkx", specifier = ">=3.6.1" },
     { name = "numpy", marker = "extra == 'benchmarks'", specifier = ">=1.26" },
     { name = "numpy", marker = "extra == 'vector'", specifier = ">=1.26" },

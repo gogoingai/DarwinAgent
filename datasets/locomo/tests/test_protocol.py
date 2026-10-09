@@ -165,10 +165,12 @@ class ProtocolTests(unittest.TestCase):
     def test_source_preserves_caption_but_excludes_search_intent(self):
         from datasets.locomo.pipeline.data import load_conversation
         from datasets.locomo.pipeline.experiment import transcript
+        from tests.support.locomo import fixture_dataset
 
-        conv = load_conversation(Path("datasets/locomo/data/locomo10.json"), "conv-26")
+        with TemporaryDirectory() as tmp:
+            conv = load_conversation(fixture_dataset(tmp) / "locomo10.json", "conv-26")
         source = transcript(conv)
-        self.assertIn("trans lives matter", source.lower())
+        self.assertIn("fixture caption", source.lower())
         self.assertIn("原始机器图片说明", source)
         self.assertNotIn("搜图词，仅意图不是事实", source)
         self.assertIn("搜图词，仅意图不是事实", transcript(conv, True))

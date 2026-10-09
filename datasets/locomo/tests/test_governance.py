@@ -23,8 +23,15 @@ class GovernanceEvaluation(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Frozen files changed"):
             verify_files(ROOT, json.loads(original.read_text()))
         with tempfile.TemporaryDirectory() as tmp:
-            self.assertEqual(LocomoEvaluator(None, tmp).lock_path, LOCK_PATH)
-            self.assertEqual(LocomoEvaluator(None, tmp, lock_path=original).lock_path, original)
+            self.assertEqual(
+                LocomoEvaluator(None, tmp, dataset_path="explicit.json").lock_path, LOCK_PATH
+            )
+            self.assertEqual(
+                LocomoEvaluator(
+                    None, tmp, dataset_path="explicit.json", lock_path=original
+                ).lock_path,
+                original,
+            )
 
     def test_calendar_edges_and_domain_scoring_difference(self):
         self.assertEqual(calendar._shift_month(date(2024, 1, 31), 1), date(2024, 2, 29))

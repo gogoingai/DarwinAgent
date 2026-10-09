@@ -4,6 +4,7 @@
 投影词汇的 S 在 build_graph 被拒）、向量命中校验、缓存键不含题目/资产版本。
 """
 
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -16,45 +17,9 @@ from datasets.locomo.graph_rules import (
     rebuild_graph,
     vector_hit_check,
 )
+from tests.support.locomo import MINIMAL_S
 
 SNAPSHOTS = Path("tests/fixtures/locomo_snapshot")
-
-MINIMAL_S = """\
-meta:
-  task: conversation_memory
-entity_types:
-  原子事实:
-    primary_key: [编号]
-    attributes:
-      - {name: 编号, dtype: string}
-      - {name: 陈述, dtype: string}
-      - {name: 主体, dtype: string}
-      - {name: 类型, dtype: string}
-      - {name: 日期, dtype: string}
-      - {name: 日期粒度, dtype: string}
-      - {name: 日期原文, dtype: string}
-      - {name: 数值, dtype: string}
-      - {name: 主题, dtype: string}
-      - {name: 出处, dtype: string}
-  人物:
-    primary_key: [姓名]
-    attributes:
-      - {name: 姓名, dtype: string}
-  主题:
-    primary_key: [名称]
-    attributes:
-      - {name: 名称, dtype: string}
-  会话:
-    primary_key: [序号]
-    attributes:
-      - {name: 序号, dtype: int}
-      - {name: 日期, dtype: string}
-      - {name: 星期, dtype: string}
-relation_types:
-  归属于: {domain: 原子事实, range: 人物}
-  属于主题: {domain: 原子事实, range: 主题}
-  记录于: {domain: 原子事实, range: 会话}
-"""
 
 
 class FactProjectionTests(unittest.TestCase):
@@ -110,14 +75,14 @@ class FactProjectionTests(unittest.TestCase):
         """出处映射：corpus 给定时，事实行节点 __sources__ 是真实语料块 id，
         `graph.sources[s]` 逐个可解析（答题/审查证据解析契约）；派生节点来源＝
         关联事实来源并集；未登记出处＝拒绝。"""
-        from pathlib import Path as _P
-
         from datasets.locomo.adapter import LocomoAdapter
         from datasets.locomo.graph_rules import project_candidates, rebuild_graph
+        from tests.support.locomo import fixture_dataset
 
-        case = LocomoAdapter(_P("datasets/locomo/data/locomo10_zh.json")).generation_input(
-            "conv-26"
-        )
+        with tempfile.TemporaryDirectory() as tmp:
+            case = LocomoAdapter(fixture_dataset(tmp) / "locomo10_zh.json").generation_input(
+                "conv-26"
+            )
         corpus_map = {b.source.id: b for b in case.corpus}
         g = rebuild_graph(self.facts, self.schema, case.corpus)
         fact_nodes = [nd for _, nd in g.nodes(data=True) if nd.get("etype") == FACT_TYPE]

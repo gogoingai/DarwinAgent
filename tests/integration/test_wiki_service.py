@@ -11,6 +11,26 @@ from darwinagent.experiments.wiki_service import WikiQuery, WikiService
 
 
 class WikiServiceTests(unittest.IsolatedAsyncioTestCase):
+    async def test_exact_evidence_reference_keeps_scope_and_linked_corrections(self):
+        with tempfile.TemporaryDirectory() as root:
+            service = WikiService(root)
+            scope = {"training_ids": ["6:case-a::q1"]}
+            wanted = service.register({"text": "目标图原件"}, scope=scope)
+            unrelated = service.register({"text": "另一份长轨迹"}, scope=scope)
+            correction = service.correct(wanted, "核对修订说明")
+            reply = await service.query(
+                WikiQuery("核对图", {"evidence_refs": [wanted], **scope}, view="raw")
+            )
+            self.assertEqual(set(reply.evidence_refs), {wanted, correction})
+            self.assertNotIn(unrelated, reply.matched)
+            self.assertIn("目标图原件", json.dumps(reply.to_dict(), ensure_ascii=False))
+            wrong_scope = await service.query(
+                WikiQuery("核对图", {"evidence_refs": [wanted], "training_ids": ["6:case-a::q2"]})
+            )
+            self.assertFalse(wrong_scope.matched)
+            with self.assertRaisesRegex(ValueError, "evidence_refs"):
+                WikiQuery("核对图", {"evidence_refs": ["../../foreign"]})
+
     async def test_large_regroup_first_page_exposes_complete_cross_chunk_conclusion(self):
         from darwinagent.config import RunConfig
 

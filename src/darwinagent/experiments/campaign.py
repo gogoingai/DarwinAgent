@@ -38,6 +38,7 @@ class CampaignController:
         smoke_judge=None,
         optimization_mode="legacy",
         wiki_call_limit=30,
+        graph_builder=None,
     ):
         if not isinstance(spec, ExperimentSpec):
             raise ValueError("Campaign requires a frozen ExperimentSpec")
@@ -57,6 +58,7 @@ class CampaignController:
             raise ValueError("Unknown optimization mode")
         self.optimization_mode = optimization_mode
         self.wiki_call_limit = wiki_call_limit
+        self.graph_builder = graph_builder
 
     def verify(self):
         assert_files(self.frozen)
@@ -174,6 +176,7 @@ class CampaignController:
                 frozen_snapshot=None
                 if self.snapshot_root is None
                 else self.snapshot_root / case_id,
+                graph_builder=self.graph_builder,
             ).run(case, task_spec, self.config)
             scores_path = stage_dir / "evaluation.json"
             if scores_path.exists():
@@ -273,6 +276,10 @@ class CampaignController:
             ),
             "frozen_files": self.frozen,
         }
+        if self.graph_builder is not None:
+            from darwinagent.kg.builders import builder_identity
+
+            declaration.update(builder_identity(self.graph_builder))
         if self.optimization_mode == "wiki":
             declaration["optimization"] = {
                 "mode": "wiki",
@@ -339,6 +346,7 @@ class CampaignController:
             smoke_judge=self.smoke_judge,
             optimization_mode=self.optimization_mode,
             wiki_call_limit=self.wiki_call_limit,
+            graph_builder=self.graph_builder,
         )
         if b0_gate is None:
 

@@ -222,6 +222,10 @@ class LLMClient:
         resolved = resolve(model, self.cfg)
         thinking_off = role in THINKING_OFF_ROLES or role in self.cfg.thinking_disabled_roles
         extra_body, buffer = request_policy(resolved, thinking_off, self.cfg.reasoning_effort)
+        if not self.cfg.model_profiles and self.cfg.reasoning_effort:
+            extra_body["reasoning_effort"] = self.cfg.reasoning_effort
+        if self.cfg.thinking_type:
+            extra_body["thinking"] = {"type": self.cfg.thinking_type}
         key = self._cache_key(
             model,
             messages,

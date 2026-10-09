@@ -5,6 +5,7 @@ from __future__ import annotations
 import inspect
 import json
 import time
+from collections import Counter
 from collections.abc import Mapping
 from pathlib import Path
 
@@ -21,6 +22,7 @@ from .recovery import (
     _retry_journal,
     _retryable_answer,
     _settle_reservations,
+    answer_fault_category,
     batched_fault_retry,
 )
 from .spec import aggregate_scores
@@ -153,8 +155,14 @@ async def _preflight(
         # AdmissionError——不放宽、不崩溃（B0/候选轮一致）。
         try:
             for case in cases:
-                graphs[case.id] = rebuild_graph_cached_hook(candidate, case)
+                graphs[case.id] = await rebuild_graph_cached_hook(candidate, case)
         except Exception as exc:
+            from darwinagent.runtime.steps import AwaitingBudget, RequestAbandoned, UnknownRequest
+
+            if getattr(exc, "continuation_signal", False) or isinstance(
+                exc, (UnknownRequest, AwaitingBudget, RequestAbandoned)
+            ):
+                raise
             from .admission import AdmissionError
 
             report = {
@@ -235,6 +243,11 @@ async def _stage(
         scores = []
         identities = []
         retries = {}
+        previous_stage = (
+            json.loads((stage / "stage.json").read_text())
+            if (stage / "stage.json").exists()
+            else {}
+        )
         for case in cases:
             pipeline = Pipeline(
                 client,
@@ -243,9 +256,17 @@ async def _stage(
                 graph_builder=graph_builder,
             )
             result = await pipeline.run(case, spec, config)
+            retried_now = False
+            if (
+                result.identity in previous_stage.get("run_identities", ())
+                and previous_stage.get("asset_version") == spec.bundle.version
+                and case.id in previous_stage.get("fault_retries", {})
+            ):
+                retries[case.id] = previous_stage["fault_retries"][case.id]
             journal_path = stage / "fault-retry" / f"{case.id}.json"
             _settle_reservations(journal_path, result, client.ledger_summary())
             faulted = [a for a in result.answers if a.status == "execution_error"]
+            categories = dict(Counter(answer_fault_category(a) for a in faulted))
             graph_failure = [
                 d
                 for d in (result.graph_diagnostics or ())
@@ -269,13 +290,16 @@ async def _stage(
                     flush=True,
                 )
             elif faulted and not any(_retryable_answer(a) for a in faulted):
-                # 确定性工具错误（评审：接口/参数错误重试不会变好）：不整题重检索，
-                # 如实入统计与反馈，由资产修订解决（scope F）。
+                # Contract/check/protocol failures need repair; a rejected review is
+                # classified separately and gets one fresh, history-aware retry below.
                 retries[case.id] = {
                     "questions": len(faulted),
                     "recovered": 0,
                     "still_faulted": sorted(a.question_id for a in faulted),
-                    "skipped_retry": "deterministic_tool_error",
+                    "skipped_retry": next(iter(categories))
+                    if len(categories) == 1
+                    else "mixed_unrecoverable_faults",
+                    "fault_categories": categories,
                     "sample_errors": [str(a.error)[:150] for a in faulted[:3]],
                 }
                 print(
@@ -299,12 +323,14 @@ async def _stage(
                         "attempts": 1,
                         "initial_digest": digest(answer.to_dict()),
                         "initial_error_type": str(answer.error).split(":", 1)[0],
+                        "fault_category": answer_fault_category(answer),
                         "consumed_before": client.ledger_summary(),
                     }
                     eligible.append(answer)
                     atomic_json(journal_path, journal)
                 if not eligible:
                     retries[case.id] = {
+                        **retries.get(case.id, {}),
                         "questions": len(faulted),
                         "recovered": 0,
                         "still_faulted": sorted(a.question_id for a in faulted),
@@ -314,6 +340,7 @@ async def _stage(
                     # 先歇再重试：EmptyCompletion 类故障多为瞬时突发，隔窗后分批小跑；
                     # 统计口径见 batched_fault_retry（末份答案集重算，不做批次并集）。
                     retry_started = time.monotonic()
+                    retried_now = True
                     result, still_faulted = await batched_fault_retry(
                         pipeline,
                         case,
@@ -321,6 +348,11 @@ async def _stage(
                         config,
                         stage / "generation" / case.id / "answers",
                         eligible,
+                        **(
+                            {"lead_s": 0, "gap_s": 0}
+                            if all(answer_fault_category(a) == "review_exhausted" for a in eligible)
+                            else {}
+                        ),
                     )
                     latest = {a.question_id: a for a in result.answers}
                     for answer in eligible:
@@ -340,6 +372,7 @@ async def _stage(
                         "elapsed_s": round(time.monotonic() - retry_started, 3),
                         "skipped_deterministic": len(faulted) - len(eligible),
                     }
+                retries[case.id]["fault_categories"] = categories
                 print(
                     json.dumps(
                         {"stage": name, "case": case.id, "fault_retry": retries[case.id]},
@@ -348,7 +381,7 @@ async def _stage(
                     flush=True,
                 )
             scores_path = stage / "evaluation" / f"{case.id}.json"
-            if case.id in retries:
+            if retried_now:
                 scores_path.unlink(
                     missing_ok=True
                 )  # 重试跑过＝答案集可能已变：旧评测检查点一律作废重评
@@ -381,7 +414,9 @@ async def _stage(
             "stage": name,
             "cases": [c.id for c in cases],
             "status": "complete"
-            if aggregated.completed == aggregated.total and not aggregated.evaluation_faults
+            if aggregated.completed == aggregated.total
+            and not aggregated.generation_faults
+            and not aggregated.evaluation_faults
             else "failed",
             "run_identities": identities,
             "asset_version": spec.bundle.version,
@@ -504,6 +539,13 @@ async def _smoke_gate(
                         config,
                         Path(td) / case.id / "answers",
                         recoverable,
+                        **(
+                            {"lead_s": 0, "gap_s": 0}
+                            if all(
+                                answer_fault_category(a) == "review_exhausted" for a in recoverable
+                            )
+                            else {}
+                        ),
                     )
             faults = [a for a in result.answers if a.status == "execution_error"]
             if candidate and faults:

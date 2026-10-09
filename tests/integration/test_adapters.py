@@ -22,11 +22,11 @@ class DatasetBoundary(unittest.TestCase):
         self.assertTrue(hasattr(TravelPlannerEvaluator, "evaluate"))
 
     def test_locomo_reference_change_cannot_change_generation_input(self):
-        path = ROOT / "datasets/locomo/data/locomo10_zh.json"
-        raw = next(c for c in json.loads(path.read_text()) if c["sample_id"] == "conv-26")
         with tempfile.TemporaryDirectory() as td:
-            p = Path(td) / "data.json"
-            p.write_text(json.dumps([raw], ensure_ascii=False))
+            from tests.support.locomo import fixture_dataset
+
+            p = fixture_dataset(Path(td)) / "locomo10_zh.json"
+            raw = json.loads(p.read_text())[0]
             adapter = LocomoAdapter(p)
             before = adapter.generation_input("conv-26")
             for q in raw["qa"]:

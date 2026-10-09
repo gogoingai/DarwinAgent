@@ -101,6 +101,22 @@ class WikiMaintainer:
                     "scores": entry["facts"].get("scores"),
                     "anomaly_index": entry["facts"].get("anomaly_index", [])[:4],
                     "anomaly_total": len(entry["facts"].get("anomaly_index", [])),
+                    "pipeline_active_stages": entry["facts"].get("pipeline_active_stages"),
+                    "asset_change_signals": [
+                        {
+                            **{
+                                k: signal.get(k)
+                                for k in ("asset_kinds", "case_id", "question_id", "confidence")
+                            },
+                            "observation": signal.get("observation", "")[:240],
+                            "next_check": signal.get("next_check", "")[:300],
+                            "evidence_view": "query evidence_refs or case scope for originals",
+                        }
+                        for signal in entry["facts"].get("asset_change_signals", [])[:4]
+                    ],
+                    "asset_change_signals_total": len(
+                        entry["facts"].get("asset_change_signals", [])
+                    ),
                     "view_truncated": True,
                 }
                 selected = [(index, compact)]
@@ -163,6 +179,47 @@ class WikiMaintainer:
         infer=False,
     ):
         facts = json.loads(json.dumps(facts, ensure_ascii=False))
+        # Graph evidence is training-only and carries the exact saved artifacts. Keep
+        # the full originals queryable while the proposer receives bounded summaries.
+        previous = {}
+        if kind == "formal":
+            for entry in self._wiki()["entries"]:
+                if entry["kind"] == "formal" and entry["stage"] != stage:
+                    previous.update({g.get("case_id"): g for g in entry["facts"].get("graphs", [])})
+        graph_refs = []
+        for graph in facts.get("graphs", []):
+            from darwinagent.kernel.revision import parse_training_id
+
+            graph_training_ids = []
+            for tid in training_ids:
+                try:
+                    if parse_training_id(tid)[0] == graph.get("case_id"):
+                        graph_training_ids.append(tid)
+                except ValueError:
+                    continue
+            before = previous.get(graph.get("case_id"))
+            if before and "graph_digest" in graph and "graph_digest" in before:
+                graph["previous_graph_digest"] = before["graph_digest"]
+                graph["delta"] = {key: graph[key] - before[key] for key in ("nodes", "edges")}
+            artifacts = graph.pop("artifacts", {})
+            for label, filename in artifacts.items():
+                path = Path(filename)
+                if path.is_file():
+                    data = (
+                        [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
+                        if label == "facts"
+                        else json.loads(path.read_text())
+                    )
+                    graph_refs.append(
+                        self.service.register(
+                            {"case_id": graph.get("case_id"), "stage": stage, label: data},
+                            scope={
+                                "case_ids": [graph.get("case_id")],
+                                "stage_ids": [stage],
+                                "training_ids": graph_training_ids,
+                            },
+                        )
+                    )
         originals = facts.pop("_original_training_evidence", [])
         facts.pop("evidence_refs", None)
         stable_facts = json.loads(json.dumps(facts, ensure_ascii=False))
@@ -194,9 +251,9 @@ class WikiMaintainer:
                 if facts.get("candidate_version")
                 else [],
             },
-            source_refs=original_refs,
+            source_refs=[*original_refs, *graph_refs],
         )
-        facts["evidence_refs"] = [raw_ref, *original_refs]
+        facts["evidence_refs"] = [raw_ref, *original_refs, *graph_refs]
         anomaly_index = []
         for original, ref in zip(originals, original_refs):
             for position, trace_event in enumerate(original.get("trace", [])):
@@ -249,7 +306,10 @@ class WikiMaintainer:
         return event["id"]
 
     def _maintenance_payload(self, event):
+        from .graph_evidence import ASSET_DIAGNOSIS_PROTOCOL
+
         payload = {
+            "asset_diagnosis_contract": ASSET_DIAGNOSIS_PROTOCOL,
             "event": {**event, "facts": _brief_facts(event["facts"])},
             "wiki_version": self._wiki()["version"],
             "recent": self.context(8000)["entries"][-4:],

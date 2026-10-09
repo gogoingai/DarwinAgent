@@ -56,10 +56,28 @@ class AdoptionPolicy:
         for key in self.non_decreasing:
             if candidate.metrics.get(key, -1) < baseline.metrics.get(key, -1):
                 failures.append("metric_decreased:" + key)
+        baseline_complete = (
+            baseline.completed == baseline.total
+            and not baseline.generation_faults
+            and not baseline.evaluation_faults
+        )
+        candidate_complete = (
+            candidate.completed == candidate.total
+            and not candidate.generation_faults
+            and not candidate.evaluation_faults
+        )
         return {
             "accepted": not failures,
             "reasons": failures or ["primary_strictly_improved"],
             "baseline": baseline.to_dict(),
             "candidate": candidate.to_dict(),
             "external_faults": {"baseline": ext_b, "candidate": ext_c},
+            "comparison_status": "incomplete_baseline"
+            if not baseline_complete
+            else "incomplete_candidate"
+            if not candidate_complete
+            else "complete",
+            "quality_improvement_established": not failures
+            and baseline_complete
+            and candidate_complete,
         }

@@ -98,10 +98,9 @@ class Pipeline:
         # frozen_snapshot: 共享冻结记忆快照目录（graph/facts/vector＋manifest）。注入时
         # 抽取与构图全部跳过——图是指纹校验的冻结输入数据，臂间唯一差异是资产。
         # embedder_factory: 查询嵌入端点注入（默认读 EMBEDDING_* 环境变量）。
-        # graph_builder（新模式，recheck4）：frozen_snapshot 仍冻结记忆/向量，但图由
-        # builder(snapshot_dir, schema, embedder_factory) 按当前 S 从固定事实确定性
-        # 重建（零模型调用）——「冻结记忆/向量、图可重建」。builder 由任务/适配层
-        # 注入（core 不感知事实行格式）；旧模式（None）行为逐字节不变。
+        # graph_builder keeps the snapshot memory/vector plane immutable while rebuilding
+        # the graph under current assets. Model builders receive runtime/client/config;
+        # legacy deterministic callbacks remain supported for explicit reproduction.
         self.client, self.work_dir = client, Path(work_dir)
         self.workspace = workspace
         self.preparation_root = Path(preparation_root) if preparation_root is not None else None
@@ -115,25 +114,26 @@ class Pipeline:
         ⇒ 身份变化 ⇒ 旧检查点不可搬运）。旧模式返回空（身份逐字节不变）。"""
         if self.graph_builder is None:
             return {}
-        import inspect
+        from darwinagent.kg.builders import builder_identity
 
-        try:
-            source = inspect.getsource(self.graph_builder)
-        except (OSError, TypeError):
-            source = repr(self.graph_builder)
-        return {"graph_mode": "rebuild", "graph_builder": digest(source)}
+        return builder_identity(self.graph_builder)
 
-    async def run(self, case, spec, config: RunConfig, *, execution=None):
+    async def run(self, case, spec, config: RunConfig, *, execution=None, retry_answers=None):
+        # Only an explicit settled-failure retry bypasses generation cache. Healthy
+        # checkpoints, facts and graphs retain their normal identity and reuse path.
         if execution is None:
-            return await self._run(case, spec, config, execution=None)
+            return await self._run(case, spec, config, execution=None, retry_answers=retry_answers)
         from darwinagent.runtime.leases import execution_lease
 
         lease_root = self.preparation_root or self.work_dir
         # Shared preparation has one writer; a second process does not queue an external call.
         with execution_lease(lease_root / ".leases" / (digest(case.id) + ".lock")):
-            return await self._run(case, spec, config, execution=execution)
+            return await self._run(
+                case, spec, config, execution=execution, retry_answers=retry_answers
+            )
 
-    async def _run(self, case, spec, config: RunConfig, *, execution=None):
+    async def _run(self, case, spec, config: RunConfig, *, execution=None, retry_answers=None):
+        retry_answers = retry_answers or {}
         if not isinstance(config, RunConfig) or spec.bundle is None:
             raise ValueError("Pipeline requires frozen RunConfig and a published bundle")
         validate_case(case, spec)
@@ -180,6 +180,15 @@ class Pipeline:
                         a.content for a in runtime.bundle.assets.assets if a.kind == "S"
                     ),
                     "snapshot": snapshot_identity,
+                    **(
+                        {
+                            "extract_prompt": runtime.prompt("extract"),
+                            "graph_config": config.to_dict(),
+                            "graph_transport": transport,
+                        }
+                        if getattr(self.graph_builder, "uses_extract_prompt", False)
+                        else {}
+                    ),
                     **self._graph_mode_identity(),
                 }
             )
@@ -502,12 +511,21 @@ class Pipeline:
                 raise ValueError("Missing graph input; graph stage is not selected")
             try:
                 if self.graph_builder is not None and self.frozen_snapshot is not None:
-                    # 新模式：图＝按当前 S 从固定事实重建（builder 负责 rebuild＋出处落
+                    # 图按当前 S 构建（builder 负责生成＋出处落
                     # 真实证据块＋挂冻结向量＋命中映射校验，返回已包 GraphResult）；
                     # 记忆/向量仍取快照。sources 在此接 case 语料（builder 无 case 上下文
                     # 时兜底）。质量门与冻结路径同构：F 试跑＋反例探针＋任务图 C。
-                    graph = self.graph_builder(
-                        self.frozen_snapshot, runtime.schema, corpus, self.embedder_factory
+                    from darwinagent.kg.builders import build_snapshot_graph
+
+                    graph = await build_snapshot_graph(
+                        self.graph_builder,
+                        self.frozen_snapshot,
+                        runtime,
+                        corpus,
+                        self.client,
+                        config,
+                        embedder_factory=self.embedder_factory,
+                        workspace=workspace,
                     )
                     if not dict(getattr(graph, "sources", {}) or {}):
                         object.__setattr__(graph, "sources", MappingProxyType(corpus))
@@ -572,6 +590,21 @@ class Pipeline:
                         graph, memory.fingerprint if memory is not None else None
                     )
                 save_graph(graph.graph, root / "graph.json")
+                if self.graph_builder is not None and self.frozen_snapshot is not None:
+                    from darwinagent.experiments.graph_evidence import graph_evidence
+
+                    evidence = {
+                        "stage": "graph_evidence",
+                        "case_id": case.id,
+                        "graph_mode": self._graph_mode_identity()["graph_mode"],
+                        **graph_evidence(graph, runtime.schema),
+                        "artifacts": {
+                            "graph": str((root / "graph.json").resolve()),
+                            "facts": str((self.frozen_snapshot / "facts.jsonl").resolve()),
+                        },
+                    }
+                    atomic_json(root / "graph.evidence.json", evidence)
+                    object.__setattr__(graph, "diagnostics", (*graph.diagnostics, evidence))
                 graph_fingerprint = digest(json.loads((root / "graph.json").read_text()))
                 atomic_json(
                     root / "graph.complete.json",
@@ -758,6 +791,11 @@ class Pipeline:
                             graph,
                             journal=journal,
                             stages=None if execution is None else execution.stages,
+                            **(
+                                {"recovery_feedback": retry_answers[question.id]}
+                                if question.id in retry_answers
+                                else {}
+                            ),
                         )
                     except RequestAbandoned:
                         workspace.append_event(
@@ -836,7 +874,16 @@ class Pipeline:
             runtime.bundle.version,
             answers,
             0 if graph is None else graph.graph.number_of_nodes(),
-            ({"status": "execution_error", "error": graph_failure},)
+            (
+                {
+                    "stage": "graph",
+                    "case_id": case.id,
+                    **self._graph_mode_identity(),
+                    "status": "execution_error",
+                    "error": graph_failure,
+                    "artifacts": {"graph_failure": str((root / "graph.failure.json").resolve())},
+                },
+            )
             if graph_failure
             else graph.diagnostics,
             (0 if memory is None else len(memory.facts))

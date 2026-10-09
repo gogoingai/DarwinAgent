@@ -12,6 +12,7 @@ from .protocol import (
     ANSWER_PROTOCOL,
     REVIEW_PROTOCOL,
     TOOLS_PROTOCOL,
+    FeedbackExhausted,
     ModelSession,
     ProtocolError,
     validate_review,
@@ -28,7 +29,7 @@ class AnswerAgent:
             namespace,
         )
 
-    async def answer(self, question, graph, journal=None, stages=None):
+    async def answer(self, question, graph, journal=None, stages=None, recovery_feedback=None):
         from darwinagent.runtime.artifacts import digest
 
         session = ModelSession(
@@ -37,11 +38,12 @@ class AnswerAgent:
             f"{self.namespace}_q_{digest(question.id)[:12]}",
             self.config.calls_per_question,
             journal=journal,
+            bypass_cache=recovery_feedback is not None,
         )
         caps = DataCapabilities(graph)
         visible = set()
         tool_results = []
-        feedback = []
+        feedback = list(recovery_feedback or ())
         trace = []
         vector_once = self.config.retrieval_mode == "vector_once"
         stages = set(stages or ("retrieval", "answer", "check", "review"))
@@ -342,6 +344,7 @@ class AnswerAgent:
                     trace.append({"stage": "review", "status": "not_selected"})
                     review_inputs = []
                 for review_input in review_inputs:
+                    review_input["revision_history"] = plain(feedback)
                     review = await session.request(
                         self.config.review_role,
                         REVIEW_PROTOCOL + "\n任务语义审查指引：\n" + self.runtime.prompt("review"),
@@ -409,7 +412,14 @@ class AnswerAgent:
                     )
                     continue
                 return result
-            raise ProtocolError(
+            trace.append(
+                {
+                    "stage": "feedback_exhausted",
+                    "attempts": self.config.answer_attempts,
+                    "feedback": plain(feedback),
+                }
+            )
+            raise FeedbackExhausted(
                 "Feedback retries exhausted without a publishable candidate", session.raw
             )
         except Exception as exc:

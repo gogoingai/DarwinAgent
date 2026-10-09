@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import argparse
 import asyncio
 import json
 import time
@@ -46,8 +47,10 @@ async def _probe(client: LLMClient, role: str, json_mode: bool) -> dict:
         return {"ok": False, "error": repr(e)[:300], "latency_s": round(time.time() - t0, 1)}
 
 
-async def main() -> None:
-    lc = load_locomo_config()
+async def main(args) -> None:
+    from datasets.locomo.inputs import resolve_dataset
+
+    lc = load_locomo_config(dataset_path=resolve_dataset(args, args.output) / "locomo10_zh.json")
     client = LLMClient(lc.cfg)
     print(f"strong 端点: {lc.cfg.api_base_url}  模型: {lc.cfg.model_strong}")
     print(f"fast   端点: {lc.cfg.fast_base_url}  模型: {lc.cfg.model_fast}")
@@ -72,4 +75,9 @@ async def main() -> None:
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    from datasets.locomo.inputs import add_dataset_arguments
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--output", required=True)
+    add_dataset_arguments(parser)
+    asyncio.run(main(parser.parse_args()))

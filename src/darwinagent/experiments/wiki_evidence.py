@@ -29,12 +29,14 @@ def safe_feedback(feedback):
         rows.append(row)
     return {
         "scores": safe_scores(feedback["scores"]),
+        "graphs": feedback.get("graphs", []),
+        "asset_change_signals": feedback.get("asset_change_signals", []),
         "pipeline_active_stages": feedback.get("pipeline_active_stages"),
         "diagnostics": rows,
         "diagnostic_rows_total": feedback.get("diagnostic_rows_total", len(rows)),
         "diagnostic_rows_in_proposal": len(rows),
         "generation_failures": [
-            {k: row.get(k) for k in ("case_id", "question_id", "error")}
+            {k: row.get(k) for k in ("case_id", "question_id", "error", "fault_category")}
             for row in feedback.get("generation_failures", ())
         ],
         "generation_failures_total": feedback.get("generation_failures_total", 0),

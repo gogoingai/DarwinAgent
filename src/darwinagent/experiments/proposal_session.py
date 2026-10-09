@@ -9,7 +9,9 @@ from darwinagent.agents.protocol import ProtocolError, parse_json
 from darwinagent.runtime.artifacts import atomic_json, digest
 
 ACTION_GUIDANCE = """输出必须是一个 JSON 对象，必须有 action 字段；不要用 query_wiki 等动作名称作为顶层键。
-合法查询示例：{"action":"query_wiki","query":{"question":"核对原件与反证","scope":{"training_ids":["系统提供的 training_id"]},"view":"regroup","cursor":null,"max_chars":8000}}
+合法查询示例：{"action":"query_wiki","query":{"question":"核对相关原件与反证","scope":{"training_ids":["系统提供的 training_id"]},"view":"raw","cursor":null,"max_chars":8000}}
+优先用 scope.evidence_refs 指定反馈中已有的完整证据 ID，或用 training_ids、stages 等范围缩小查询；先读 raw 原件，必要时使用返回的 cursor 继续读取。不要为核对一项观察重组整个对话或所有历史轨迹。
+raw 和 summary 不调用维护模型；regroup 会逐段调用模型并合并，max_chars 只限制返回长度，不限制重组调用量。只有明确需要比较多份相关原件且已缩小范围时才用 regroup。
 题目的 wiki_scope 可直接作为查询 scope；training_ids 使用系统提供的完整组合编号。question_ids 使用局部 question_id，或兼容完整 training_id；跨对话同名题号应优先用 training_ids 精确定位。
 首次查询 cursor 必须为 null；后续 cursor 只能原样使用 Wiki 返回的字符串，不能用数字页码。
 提交示例：{"action":"submit_patch","patches":[...]}

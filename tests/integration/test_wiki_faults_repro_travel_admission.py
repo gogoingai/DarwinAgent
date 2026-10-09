@@ -1,6 +1,7 @@
 """Offline regression scenarios for travel admission."""
 
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -20,10 +21,14 @@ class RealFaultAdmissionTests(unittest.TestCase):
     MC_B0 = Path("datasets/locomo/runs/wiki_gap_repair_20261005_mc/train/B0/assets")
 
     def setUp(self):
+        if not os.environ.get("LOCOMO_TEST_MEMORY_ROOT") or not os.environ.get(
+            "LOCOMO_TEST_DATA_DIR"
+        ):
+            self.skipTest("Explicit external replay evidence not configured")
         required = (
             self.MC_B0 / "manifest.json",
-            Path("datasets/locomo/snapshots/gvtest_v1/conv-30/manifest.json"),
-            Path("datasets/locomo/snapshots/gvtest_v1/conv-30/graph.json"),
+            Path(os.environ["LOCOMO_TEST_MEMORY_ROOT"]) / "conv-30/manifest.json",
+            Path(os.environ["LOCOMO_TEST_MEMORY_ROOT"]) / "conv-30/graph.json",
         )
         missing = [str(p) for p in required if not p.is_file()]
         if missing:
@@ -66,10 +71,12 @@ class RealFaultAdmissionTests(unittest.TestCase):
         from darwinagent.experiments.snapshots import load_frozen_graph
         from datasets.locomo.adapter import LocomoAdapter
 
-        case = LocomoAdapter(Path("datasets/locomo/data/locomo10_zh.json")).generation_input(
-            "conv-30"
+        case = LocomoAdapter(
+            Path(os.environ["LOCOMO_TEST_DATA_DIR"]) / "locomo10_zh.json"
+        ).generation_input("conv-30")
+        graph = load_frozen_graph(
+            Path(os.environ["LOCOMO_TEST_MEMORY_ROOT"]) / "conv-30", case.corpus
         )
-        graph = load_frozen_graph(Path("datasets/locomo/snapshots/gvtest_v1/conv-30"), case.corpus)
         return case, graph
 
     def _admit_mc(self, content_override=None):

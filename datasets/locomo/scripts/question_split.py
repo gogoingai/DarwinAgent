@@ -16,16 +16,15 @@ from collections import Counter, defaultdict
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
-DATA = ROOT / 'datasets/locomo/data/locomo10_zh.json'
 TRAIN_N = 15
 VAL_N = 10
 SEED = 20261005
 
 
-def build_split(case_id='conv-26', train_n=TRAIN_N, val_n=VAL_N, seed=SEED):
+def build_split(case_id='conv-26', train_n=TRAIN_N, val_n=VAL_N, seed=SEED, *, data_path):
     if type(train_n) is not int or type(val_n) is not int or min(train_n, val_n)<1:
         raise ValueError('Training and validation counts must be positive integers')
-    data = json.loads(DATA.read_text())
+    data = json.loads(Path(data_path).read_text())
     item = next(x for x in data if x['sample_id'] == case_id)
     qs = item['qa']
     total = train_n + val_n
@@ -97,13 +96,18 @@ def largest_remainder(counts, total_pool, total_take):
 
 
 def main():
+    from datasets.locomo.inputs import add_dataset_arguments, resolve_dataset
     p = argparse.ArgumentParser()
+    add_dataset_arguments(p)
     p.add_argument('--case', default='conv-26')
     p.add_argument('--train', type=int, default=TRAIN_N)
     p.add_argument('--validation', type=int, default=VAL_N)
+    p.add_argument('--output', default='runs/locomo-split', help='输入版本记录目录')
     p.add_argument('--out', default=None, help='划分清单落盘路径（新模式运行目录）')
     args = p.parse_args()
-    split = build_split(args.case, args.train, args.validation)
+    identity_root = Path(args.out).parent if args.out else Path(args.output)
+    data_dir = resolve_dataset(args, identity_root)
+    split = build_split(args.case, args.train, args.validation, data_path=data_dir / "locomo10_zh.json")
     text = json.dumps(split, ensure_ascii=False, indent=1)
     if args.out:
         path = Path(args.out)

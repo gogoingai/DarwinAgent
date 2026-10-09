@@ -471,7 +471,9 @@ async def run_rounds(
                         else "baseline_comparison_unavailable:尚不能作此比较",
                     ]
                 # 新模式：P.extract 此模式不执行——其补丁不得报告为已生效优化。
-                if graph_builder is not None:
+                if graph_builder is not None and not getattr(
+                    graph_builder, "uses_extract_prompt", False
+                ):
                     origin = getattr(candidate.assets, "origin", None)
                     origin = origin if isinstance(origin, Mapping) else {}
                     px = [
@@ -662,6 +664,15 @@ async def run_rounds(
         and all(d.get("status") not in ("validation_failed", "round_timeout") for d in decisions)
         else "failed",
         "unhealthy_stages": unhealthy,
+        "execution_status": "complete"
+        if all(d.get("status") not in ("validation_failed", "round_timeout") for d in decisions)
+        else "incomplete",
+        "adopted_measurement_status": "complete"
+        if state.baseline.completed == state.baseline.total
+        and not state.baseline.generation_faults
+        and not state.baseline.evaluation_faults
+        else "incomplete",
+        "adopted_evidence_stage": state.evidence_stage,
         "stopped_by_operator": stopped,
         "rounds": decisions,
         "adopted_version": workspace.branch(branch)["adopted"],

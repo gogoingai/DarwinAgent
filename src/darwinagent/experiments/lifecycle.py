@@ -101,7 +101,9 @@ async def run(
             "proposal_attempts": proposal_attempts,
         }
     if graph_builder is not None:
-        declaration["graph_mode"] = "frozen-memory-rebuilt-graph"
+        from darwinagent.kg.builders import builder_identity
+
+        declaration["graph_mode"] = builder_identity(graph_builder)
     if validation_plan is not None:
         declaration["validation"] = {
             "case_fingerprint": digest(validation_plan["case"].to_dict()),

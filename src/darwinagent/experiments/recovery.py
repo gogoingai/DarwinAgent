@@ -63,22 +63,67 @@ async def batched_fault_retry(
                 _immutable_copy(archive, original)
                 # Unlink only after the original bytes are durable; retry writes a new view.
                 checkpoint.unlink()
-        result = await pipeline.run(case, spec, config)
+        result = await pipeline.run(
+            case,
+            spec,
+            config,
+            retry_answers={
+                a.question_id: _recovery_feedback(a) for a in faulted[start : start + batch_size]
+            },
+        )
         if start + batch_size < len(faulted):
             await sleep(gap_s)
     still_faulted = sorted(a.question_id for a in result.answers if a.status == "execution_error")
     return result, still_faulted
 
 
-def _retryable_answer(answer):
+def answer_fault_category(answer):
+    """Classify observed failure origin, without inferring semantic contradictions."""
+    error = str(answer.error)
+    events = plain(answer.trace or ())
     if any(ev.get("stage") == "tool_error" for ev in plain(answer.trace or ())):
-        return False
-    kind = str(answer.error).split(":", 1)[0].strip()
+        return "deterministic_tool_error"
+    kind = error.split(":", 1)[0].strip()
+    if kind == "FeedbackExhausted" or error.startswith("ProtocolError: Feedback retries exhausted"):
+        feedback = _recovery_feedback(answer)
+        if feedback:
+            final = feedback[-1]
+            if "review" in final:
+                return "review_exhausted"
+            if "publish_reject" in final:
+                return "publication_exhausted"
+            if "task_checks" in final:
+                return "check_exhausted"
+        if events and events[-1].get("stage") == "review" and not events[-1].get("accepted"):
+            return "review_exhausted"
+        return "feedback_exhausted"
     if kind in _DETERMINISTIC_ERRORS:
-        return False
-    return kind in _TRANSIENT_ERRORS or str(answer.error).startswith(
-        ("TransportExhausted:", "EmptyCompletion:")
-    )
+        return "deterministic_tool_error" if kind == "SandboxError" else "contract_error"
+    if kind in _TRANSIENT_ERRORS or error.startswith(("TransportExhausted:", "EmptyCompletion:")):
+        return "transient_service_error"
+    return "protocol_error" if kind == "ProtocolError" else "execution_error"
+
+
+def _recovery_feedback(answer):
+    events = plain(answer.trace or ())
+    for event in reversed(events):
+        if event.get("stage") == "feedback_exhausted":
+            return event.get("feedback", [])
+    # Legacy checkpoints have separate candidate/review events.
+    feedback, candidate = [], None
+    for event in events:
+        if event.get("stage") == "candidate":
+            candidate = event.get("candidate")
+            rejected = [c for c in event.get("checks", ()) if not c.get("ok")]
+            if rejected:
+                feedback.append({"candidate": candidate, "task_checks": rejected})
+        elif event.get("stage") == "review" and not event.get("accepted"):
+            feedback.append({"candidate": candidate, "review": event})
+    return feedback
+
+
+def _retryable_answer(answer):
+    return answer_fault_category(answer) in {"transient_service_error", "review_exhausted"}
 
 
 def _retry_journal(path, identity):

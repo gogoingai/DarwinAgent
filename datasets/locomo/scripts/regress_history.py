@@ -4,6 +4,7 @@
 每个「当时在全量炸过的错误类」都必须被电池在准入层复现（拦下）。
 用法：uv run python -m datasets.locomo.scripts.regress_history
 """
+import argparse
 import json
 import os
 import subprocess
@@ -93,10 +94,17 @@ def normalize(err):
 
 
 def main():
-    from datasets.locomo.run import LocomoAdapter, SNAPSHOTS
+    from datasets.locomo.run import LocomoAdapter
+    from datasets.locomo.inputs import add_dataset_arguments, resolve_dataset
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--memory-root", required=True)
+    parser.add_argument("--output", required=True)
+    add_dataset_arguments(parser)
+    args = parser.parse_args()
+    memory_root = Path(args.memory_root).resolve()
     from darwinagent.experiments.snapshots import load_frozen_graph
-    adapter = LocomoAdapter(REPO / 'datasets/locomo/data/locomo10_zh.json')
-    graph = load_frozen_graph(SNAPSHOTS / 'conv-26',
+    adapter = LocomoAdapter(resolve_dataset(args, args.output) / 'locomo10_zh.json')
+    graph = load_frozen_graph(memory_root / 'conv-26',
                               adapter.generation_input('conv-26').corpus)
     report, missed, attempted, not_replayed = [], 0, 0, 0
     for root in sorted(RUNS.glob('agentic_v*')):

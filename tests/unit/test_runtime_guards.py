@@ -1,9 +1,14 @@
 import asyncio
+import json
 import tempfile
 import time
 import unittest
+from copy import deepcopy
 from dataclasses import replace
 from pathlib import Path
+from unittest import mock
+
+import networkx as nx
 
 from darwinagent.agents import ExtractionAgent
 from darwinagent.config import RunConfig
@@ -11,6 +16,8 @@ from darwinagent.kernel.assets import KernelAssets
 from darwinagent.kernel.counterexamples import run_probes
 from darwinagent.kernel.execution import KernelRuntime
 from darwinagent.kernel.validation import validate_graph
+from darwinagent.kg.graph import node_id
+from darwinagent.operators.data import DataCapabilities
 from darwinagent.operators.sandbox import Interpreter, Limits, SandboxError, admit
 from tests.support.device import case, client, spec
 
@@ -95,6 +102,35 @@ class RuntimeGuardTests(unittest.TestCase):
         rt = KernelRuntime(KernelAssets(tuple(assets)).export(root / "constant"), RunConfig())
         with self.assertRaises(ValueError):
             run_probes(rt, graph)
+
+    def test_behavior_probe_compares_nested_rows_as_multisets(self):
+        _, _, _, runtime, graph = self.setup_graph()
+        graph = replace(graph, graph=nx.MultiDiGraph(graph.graph))
+        first = deepcopy(next(iter(graph.graph.nodes.values())))
+        key = {**json.loads(first["__key__"]), "serial": "Q-98"}
+        first["__key__"] = json.dumps(key)
+        first["__claims__"] = []
+        graph.graph.add_node(node_id("Maintenance", key), **first)
+
+        def call(_asset, _params, current):
+            rows = list(DataCapabilities(current).rows.values())
+            if rows[0]["serial"].startswith("cf_"):
+                rows.reverse()
+            return {"data": {"page": {"rows": rows}, "truncated": False}}
+
+        with mock.patch.object(runtime, "call", side_effect=call):
+            records = run_probes(runtime, graph)
+        self.assertTrue(all(r["status"] == "passed" for r in records))
+
+        def lost_row(asset, params, current):
+            result = call(asset, params, current)
+            if result["data"]["page"]["rows"][0]["serial"].startswith("cf_"):
+                result["data"]["page"]["rows"].pop()
+            return result
+
+        with mock.patch.object(runtime, "call", side_effect=lost_row):
+            with self.assertRaisesRegex(ValueError, "F counterexample failed"):
+                run_probes(runtime, graph)
 
     def test_timeout_bound_and_native_output_bound(self):
         fn = admit("def run(params):\n return [x for x in range(10000)]")

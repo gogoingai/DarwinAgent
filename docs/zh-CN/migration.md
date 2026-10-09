@@ -17,7 +17,12 @@ DarwinAgent 0.1.0 是新的包身份；此前历史框架版本不能按版本�
 当时包版本为 0.1.0，移动实现或格式化会改变源码身份。该次迁移使用新的输出目录；
 相同新源码可以续跑，旧源码检查点必须明确拒绝，不能改写原声明来绕过校验。
 
-LoCoMo 默认使用 `evaluation_lock.governance-20261007.json`，覆盖原四个文件，
+当时 LoCoMo 使用 `evaluation_lock.governance-20261007.json`，覆盖原四个文件，
 另加 `pipeline/dates.py` 和共享的 `operators/calendar.py`。历史 `evaluation_lock.json`
 保持原字节，校验新源码时应失败。显式 `lock_path` 参数继续可用，但需配合其对应源码。
 新锁记录源码身份，不代表新成绩或评分规则变化。详见[来源与验收](engineering-governance.md)。
+
+
+## 2026-10-09 显式 HF 数据源
+
+当前 LoCoMo 运行要求命令指定 HF 仓库与版本，或显式选择本地输入。实际 HF 提交和原始文件校验值独立于缓存位置记录。当前评测接口使用 `evaluation_lock.governance-20261009.json`，此前锁文件保留；默认使用原始 QA，修订参考须显式传入。

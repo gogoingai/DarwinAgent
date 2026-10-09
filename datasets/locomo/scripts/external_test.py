@@ -16,20 +16,21 @@ from darwinagent.kernel import KernelBundle, TaskSpec
 from darwinagent.llm.client import LLMClient
 from darwinagent.runtime.artifacts import atomic_json
 
+from datasets.locomo.inputs import add_dataset_arguments, resolve_dataset
 from datasets.locomo.adapter import LocomoAdapter
 from datasets.locomo.evaluator import LocomoEvaluator
-from datasets.locomo.run import ROOT, SNAPSHOTS, TASK_DIR, arm_config, connection
+from datasets.locomo.run import ROOT, TASK_DIR, arm_config, connection
 
 METRICS = ('original_precise', 'original_lenient', 'repaired_precise', 'repaired_lenient')
 
 
 async def evaluate_conversation(case_id, adapter, task, bundle, config, root,
-                                graph_builder=None):
+                                graph_builder=None, *, memory_root, dataset_path):
     case = adapter.generation_input(case_id)
     client = LLMClient(connection(root / case_id))
     try:
         pipeline = Pipeline(client, root / case_id / 'generation',
-                            frozen_snapshot=SNAPSHOTS / case_id,
+                            frozen_snapshot=memory_root / case_id,
                             graph_builder=graph_builder)
         result = await pipeline.run(case, task.with_bundle(bundle), config)
         # 每轮结束后一次有界故障重试（缺口④修复，2026-10-06）：与训练路径同款
@@ -45,7 +46,7 @@ async def evaluate_conversation(case_id, adapter, task, bundle, config, root,
                               {'questions': len(faulted), 'recovered':
                                len(faulted) - len(still),
                                'still_faulted': still}}, ensure_ascii=False), flush=True)
-        scores = await LocomoEvaluator(client, root / case_id / 'evaluation').evaluate(result)
+        scores = await LocomoEvaluator(client, root / case_id / 'evaluation', dataset_path=dataset_path, original_only=True).evaluate(result)
         cost = client.ledger_summary()
     finally:
         await client.aclose()
@@ -113,7 +114,7 @@ def aggregate_report(rows, baseline_rows=None):
 
 
 def preflight(bundle, config, task, cases, snap_root=None, embedder_factory=None,
-              graph_builder=None):
+              graph_builder=None, prepared_graphs=None):
     """外测与冷启动/候选修订同一套能力准入（评审①③）：AST 底线＋逐对话快照真实试跑
     （图挂冻结向量索引）＋完整图 C 检查否决即拒。锁定资产不因换了入口而豁免。
     graph_builder 给定时（新图重建模式）试跑图＝按锁定 S 从固定事实重建——与答题
@@ -125,7 +126,9 @@ def preflight(bundle, config, task, cases, snap_root=None, embedder_factory=None
     from darwinagent.operators.sandbox import Limits
     from darwinagent.operators.data import DataCapabilities
     from darwinagent.experiments.snapshots import attach_vector, load_frozen_graph
-    snap_root = Path(snap_root) if snap_root is not None else SNAPSHOTS
+    if snap_root is None:
+        raise ValueError("External replay requires --memory-root")
+    snap_root = Path(snap_root)
     required = capability_names(task.retrieval_floor)
     problems = capability_floor_errors(bundle.assets, required)
     if problems:
@@ -136,7 +139,9 @@ def preflight(bundle, config, task, cases, snap_root=None, embedder_factory=None
         from darwinagent.kernel.validation import validate_bundle
         schema = validate_bundle(bundle)
     for case_id, case in cases.items():
-        if graph_builder is not None:
+        if prepared_graphs is not None:
+            graph = prepared_graphs[case_id]
+        elif graph_builder is not None:
             graph = graph_builder(snap_root / case_id, schema, case.corpus)
         else:
             graph = load_frozen_graph(snap_root / case_id, case.corpus)
@@ -210,38 +215,42 @@ def baseline_compatibility(mine, base):
 
 
 def experiment_identity(bundle, config, conn, cases, snap_root=None,
-                        graph_builder=None):
+                        graph_builder=None, prepared_graphs=None, dataset_path=None):
     """实验条件身份（评审④）：资产版本、模型路由、运行配置、各对话快照指纹、
     冻结判题器文件锁——基线比对时核对共同条件，缺失/不兼容明确报出。
     新图重建模式（graph_builder 给定）加记：投影规则源码摘要、锁定 S 摘要、
     各对话实际重建图摘要——旧图缓存/不同 S 不得冒充同身份（CONTINUE.md 阶段六）。"""
     from darwinagent.experiments.spec import precheck_identity
-    from datasets.locomo.evaluator import AUDITED, LOCK_PATH
+    from datasets.locomo.evaluator import LOCK_PATH
     from darwinagent.runtime.artifacts import digest
     from darwinagent.runtime.identity import snapshot_files
-    snap_root = Path(snap_root) if snap_root is not None else SNAPSHOTS
+    if snap_root is None:
+        raise ValueError("External replay requires --memory-root")
+    snap_root = Path(snap_root)
     identity = {'asset_version': bundle.version,
                 'transport': precheck_identity(conn, config)['transport'],
                 'run_config': config.to_dict(),
                 'snapshots': {c: json.loads((snap_root / c / 'manifest.json').read_text())['snapshot_digest']
                               for c in cases},
-                'judge_lock': digest(snapshot_files([AUDITED, LOCK_PATH]))}
+                'judge_lock': digest(snapshot_files([LOCK_PATH]))}
     if graph_builder is not None:
-        import inspect
+        from darwinagent.kg.builders import builder_identity
         from darwinagent.kernel.validation import validate_bundle
         from darwinagent.operators.data import DataCapabilities
-        try:
-            builder_src = inspect.getsource(graph_builder)
-        except (OSError, TypeError):
-            builder_src = repr(graph_builder)
-        identity['graph_mode'] = 'rebuild'
-        identity['graph_rules'] = digest(builder_src)
+        identity.update(builder_identity(graph_builder))
+        identity['graph_rules'] = identity['graph_builder']
         schema = validate_bundle(bundle)
         identity['schema'] = digest(schema.to_yaml())
         identity['rebuilt_graphs'] = {}
-        adapter = LocomoAdapter(ROOT / 'datasets/locomo/data/locomo10_zh.json')
         for c in cases:
-            graph = graph_builder(snap_root / c, schema, adapter.generation_input(c).corpus)
+            if prepared_graphs is not None:
+                graph = prepared_graphs[c]
+            elif hasattr(graph_builder, 'build'):
+                raise ValueError('LLM graph identity requires already prepared graphs')
+            else:
+                if dataset_path is None:
+                    raise ValueError("Projection identity requires explicit dataset_path")
+                graph = graph_builder(snap_root / c, schema, LocomoAdapter(dataset_path).generation_input(c).corpus)
             # 与准入报告同口径的图身份：排序后数据行摘要（admission._graph_identity）
             identity['rebuilt_graphs'][c] = digest(
                 sorted(DataCapabilities(graph).rows.values(), key=lambda r: r['node_id']))
@@ -251,26 +260,49 @@ def experiment_identity(bundle, config, conn, cases, snap_root=None,
 async def main(args):
     root = Path(args.output).resolve()
     root.mkdir(parents=True, exist_ok=True)
-    adapter = LocomoAdapter(ROOT / 'datasets/locomo/data/locomo10_zh.json')
+    data_dir = resolve_dataset(args, root)
+    memory_root = Path(args.memory_root).resolve()
+    adapter = LocomoAdapter(data_dir / 'locomo10_zh.json')
     task = TaskSpec.load(TASK_DIR / 'task.yaml')
     bundle = KernelBundle(Path(args.assets))
     config = arm_config(args.arm, args.vector_k)
-    # 新图重建模式（CONTINUE.md 阶段六）：默认关闭＝冻结图旧行为逐字节不变；
-    # 开启后预检与答题 Pipeline 同用 rebuild_snapshot_graph（同一派生规则）。
+    # g1 默认由 LLM 按锁定 S 构图；预检与答题 Pipeline 复用同一构图缓存。
     graph_builder = None
-    if getattr(args, 'graph_rebuild', False):
+    mode = 'frozen' if args.arm == 'v0' else getattr(args, 'graph_mode', 'llm')
+    if getattr(args, 'graph_rebuild', False) and args.arm == 'g1':
+        mode = 'llm'
+    if mode == 'llm':
+        from datasets.locomo.llm_graph import LLMSnapshotGraphBuilder
+        graph_builder = LLMSnapshotGraphBuilder(root / 'graph-cache')
+    elif mode == 'projection':
         from datasets.locomo.graph_rules import rebuild_snapshot_graph
         graph_builder = rebuild_snapshot_graph
     cases = [c.strip() for c in args.cases.split(',') if c.strip()]
     for c in cases:
-        if not (SNAPSHOTS / c / 'manifest.json').exists():
+        if not (memory_root / c / 'manifest.json').exists():
             raise SystemExit(f'冻结快照缺失: {c}')
     case_inputs = {c: adapter.generation_input(c) for c in cases}
-    preflight(bundle, config, task, case_inputs, graph_builder=graph_builder)
+    prepared_graphs = None
+    if graph_builder is not None and hasattr(graph_builder, 'build'):
+        from darwinagent.kg.builders import build_snapshot_graph
+        from darwinagent.kernel.execution import KernelRuntime
+        from darwinagent.kernel.validation import capability_floor_errors, capability_names
+        problems = capability_floor_errors(bundle.assets, capability_names(task.retrieval_floor))
+        if problems:
+            raise SystemExit('外测预检失败（静态能力底线）: ' + str(problems))
+        client = LLMClient(connection(root / 'graph-preflight'))
+        try:
+            runtime = KernelRuntime(bundle, config)
+            prepared_graphs = {c: await build_snapshot_graph(graph_builder, memory_root / c, runtime,
+                case_inputs[c].corpus, client, config) for c in cases}
+        finally:
+            await client.aclose()
+    preflight(bundle, config, task, case_inputs, snap_root=memory_root, graph_builder=graph_builder,
+              prepared_graphs=prepared_graphs)
     rows = []
     for c in cases:
         row = await evaluate_conversation(c, adapter, task, bundle, config, root,
-                                          graph_builder=graph_builder)
+                                          graph_builder=graph_builder, memory_root=memory_root, dataset_path=adapter.path)
         rows.append(row)
         print(json.dumps(row, ensure_ascii=False), flush=True
               )
@@ -285,13 +317,13 @@ async def main(args):
         else:
             base_report = json.loads(bp.read_text())
             baseline_rows = base_report['per_conversation']
-            mine = experiment_identity(bundle, config, connection(root), cases,
-                                       graph_builder=graph_builder)
+            mine = experiment_identity(bundle, config, connection(root), cases, snap_root=memory_root, dataset_path=adapter.path,
+                                       graph_builder=graph_builder, prepared_graphs=prepared_graphs)
             compatibility['baseline'] = baseline_compatibility(mine, base_report.get('identity') or {})
             delta_valid = compatibility['baseline'] == 'compatible'
     report = aggregate_report(rows, baseline_rows)
-    report['identity'] = experiment_identity(bundle, config, connection(root), cases,
-                                             graph_builder=graph_builder)
+    report['identity'] = experiment_identity(bundle, config, connection(root), cases, snap_root=memory_root, dataset_path=adapter.path,
+                                             graph_builder=graph_builder, prepared_graphs=prepared_graphs)
     report['baseline_compatibility'] = compatibility
     if delta_valid is not None:
         # 不兼容时差值保留作参考但标记无效，不得当作有效实验提升（评审五）
@@ -306,9 +338,12 @@ if __name__ == '__main__':
     p.add_argument('--assets', required=True, help='锁定的 bundle 目录（含 manifest.json）')
     p.add_argument('--cases', required=True, help='逗号分隔对话 id，如 conv-30,conv-41,conv-48')
     p.add_argument('--output', required=True)
+    p.add_argument('--memory-root', required=True)
+    add_dataset_arguments(p)
     p.add_argument('--vector-k', type=int, default=60)
     p.add_argument('--baseline', help='另一臂外测输出目录（含 report.json），报告逐对话差值')
     p.add_argument('--graph-rebuild', action='store_true',
-                   help='新图重建模式：图按锁定 S 从固定事实重建（记忆/向量仍冻结）；'
-                        '默认关闭＝冻结图。身份加记投影规则/S/实际重建图摘要。')
+                   help='兼容参数：选择 LLM 根据当前 S 动态构图')
+    p.add_argument('--graph-mode', choices=('llm', 'frozen', 'projection'), default='llm',
+                   help='g1 默认 llm；frozen/projection 用于显式复现历史路径；v0 始终冻结')
     asyncio.run(main(p.parse_args()))

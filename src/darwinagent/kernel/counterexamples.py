@@ -125,8 +125,12 @@ def run_probes(runtime, graph, memory=None):
 
             # Query traversal order may change under renamed primary keys; compare list data as a multiset.
             def canonical(v):
+                if isinstance(v, dict):
+                    return {key: canonical(child) for key, child in v.items()}
                 if isinstance(v, list):
-                    return sorted(json.dumps(x, sort_keys=True, ensure_ascii=False) for x in v)
+                    return sorted(
+                        json.dumps(canonical(x), sort_keys=True, ensure_ascii=False) for x in v
+                    )
                 return v
 
             if canonical(expected) != canonical(after["data"]):

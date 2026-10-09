@@ -9,13 +9,22 @@ from darwinagent.runtime.artifacts import atomic_json, digest
 from darwinagent.runtime.identity import transport_identity
 
 
-def _rebuild_graph_cached(bundle, case, *, rebuild_cache, graph_builder, snapshot_root):
-    """重建图供给（准入/试跑共用）：键＝固定事实摘要＋S 规则指纹＋builder 源码
-    摘要（投影实现版本）——F/C/P 改动复用同图，S 变才重建。core 不 import
-    任务侧模块：builder 身份用源码摘要（与 Pipeline 身份同口径）。"""
+async def _rebuild_graph_cached(
+    bundle,
+    case,
+    *,
+    rebuild_cache,
+    graph_builder,
+    snapshot_root,
+    client_factory=None,
+    config=None,
+    connection_config=None,
+):
+    """Admission/trial graphs share an input-bound cache. Model builders additionally
+    bind P.extract, execution settings and transport; other asset changes reuse the graph.
+    Core code does not import dataset builders."""
 
-    import inspect
-
+    from darwinagent.kg.builders import build_snapshot_graph, builder_identity
     from darwinagent.runtime.artifacts import digest as _digest
 
     from ..kernel.validation import validate_bundle
@@ -23,27 +32,52 @@ def _rebuild_graph_cached(bundle, case, *, rebuild_cache, graph_builder, snapsho
 
     manifest = snapshot_manifest(snapshot_root / case.id)
     schema = validate_bundle(bundle)
-    try:
-        builder_src = inspect.getsource(graph_builder)
-    except (OSError, TypeError):
-        builder_src = repr(graph_builder)
     key = (
         case.id,
         manifest.get("facts_digest", ""),
+        _digest((snapshot_root / case.id / "facts.jsonl").read_text()),
+        _digest([block.to_dict() for block in getattr(case, "corpus", ())]),
         _digest(schema.to_yaml()),
-        _digest(builder_src),
+        _digest(builder_identity(graph_builder)),
+        _digest(
+            [a.fingerprint for a in bundle.assets.assets if a.kind == "P" and a.role == "extract"]
+        )
+        if getattr(graph_builder, "uses_extract_prompt", False)
+        else None,
+        _digest(config.to_dict()) if config and hasattr(graph_builder, "build") else None,
+        _digest(transport_identity(type("Connection", (), {"cfg": connection_config})()))
+        if connection_config and hasattr(graph_builder, "build")
+        else None,
     )
     if key not in rebuild_cache:
-        rebuild_cache[key] = graph_builder(
-            snapshot_root / case.id, schema, getattr(case, "corpus", ()), None
-        )
+        from types import SimpleNamespace
+
+        client = client_factory("graph-build") if hasattr(graph_builder, "build") else None
+        try:
+            if hasattr(graph_builder, "build"):
+                from darwinagent.kernel.execution import KernelRuntime
+
+                runtime = KernelRuntime(bundle, config)
+            else:
+                runtime = SimpleNamespace(schema=schema)
+            rebuild_cache[key] = await build_snapshot_graph(
+                graph_builder,
+                snapshot_root / case.id,
+                runtime,
+                getattr(case, "corpus", ()),
+                client,
+                config,
+            )
+        finally:
+            if client is not None:
+                await client.aclose()
     return rebuild_cache[key]
 
 
 async def _rebuild_trial_supply(bundle, cases, *, rebuild_graph_cached_hook):
     """新模式冷启动试跑图供给：草案 bundle 也在「按当前 S 重建的图」上试跑
     （与正式/准入同派生规则），异常处理复用 bootstrap 的 ValueError 反馈路径。"""
-    return {case.id: rebuild_graph_cached_hook(bundle, case) for case in cases}
+    return {case.id: await rebuild_graph_cached_hook(bundle, case) for case in cases}
 
 
 async def _dynamic_trial_graphs(

@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 
 from darwinagent.llm.client import LLMClient
 
-from .config import LOCOMO_TASK_DIR, ns
+from .config import ns
 from .data import CATEGORY_MAP, QA, TOPIC_CATEGORIES
 from .dates import answer_equivalent as answer_equivalent
 from .dates import cn_num as cn_num
@@ -23,9 +23,13 @@ from .prompts.answer import REFUSAL
 from .prompts.judge import CATEGORY_RULES, JUDGE_SYSTEM, JUDGE_TEMPLATE
 
 
-def load_repairs(conv_id: str) -> dict[int, dict]:
+def load_repairs(conv_id: str, path=None) -> dict[int, dict]:
     """gold 修复表：{idx: {answer|None, adversarial, question?, 依据, 引证}}。"""
-    p = LOCOMO_TASK_DIR / "data" / "gold_repairs.jsonl"
+    if path is None:
+        return {}
+    from pathlib import Path
+
+    p = Path(path)
     out: dict[int, dict] = {}
     if not p.exists():
         return out
