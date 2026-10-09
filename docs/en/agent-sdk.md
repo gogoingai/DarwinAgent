@@ -78,9 +78,18 @@ The host chooses endpoint, model, credentials and HTTP limits. No model is selec
 ReAct explicitly requests JSON mode. A settled reply that is not valid JSON receives
 protocol feedback within the same bounded loop; the original response receipt remains and
 each correction consumes the existing request/turn budget. No partial action is executed.
-Only `JSONDecodeError` at response parsing is recovered this way; unknown submissions remain
-quarantined, and unsupported action/schema/backend failures are not treated as format retries.
+The loop recovers `JSONDecodeError` and its own `ActionProtocolError` from pre-execution
+envelope validation only. Unknown submissions remain quarantined; errors from tool contracts,
+asset schemas, backend execution or host checks are not caught as protocol feedback.
 JSON mode is a request to the provider, not a guarantee of valid output.
+
+Tool replies require exactly a nonempty string `tool` and object `params`. Final replies
+require string `final_response`; optional `artifacts` must be an array of JSON objects, never
+path strings. The existing generic artifact contract has no universal required metadata
+field. For files use `[{"path": "actual tool output path"}]`, retaining only metadata supported
+by the completed tool result. The Agent must correct malformed entries itself; the runtime
+does not invent artifact paths/hashes or convert strings automatically. A final-shape
+correction must not repeat an already completed write.
 
 ## What a v4 kernel changes
 

@@ -1,18 +1,18 @@
 {
   "version": "0.3.0",
-  "status": "prepared_local_first_live_failed_comparison_pending",
+  "status": "prepared_local_two_live_failures_comparison_pending",
   "date": "2026-10-09",
-  "fix_scope": "Settled malformed ReAct action JSON receives bounded protocol feedback; explicit JSON mode was already requested before failure.",
+  "fix_scope": "Validate settled ReAct action/final envelope before dispatch; artifacts remain object mappings, no automatic conversion or universal required metadata.",
   "diagnostic_notices": "Passing assertions retain asyncio slow-task and expected legacy diagnostics; logs and thresholds preserved.",
   "distribution_record": "2026-10-09-agent-runtime-distributions.json",
   "prior_acceptance": {
-    "source_commit": "aadb5b4617b910c697e66a888c638f1b9120c0e2",
-    "directory": "offline-native-final-fix",
-    "integration_identity_sha256": "225ba2130a3055910bece7d6a0ffcc6a757eae272043e621b0985c80f905e37b",
+    "source_commit": "669b94d112ee8c9b0faec3ee52fdde19af495f3b",
+    "directory": "offline-native-live-repair",
+    "integration_identity_sha256": "869684fcfa24c7e773199896186235c4193ee5e8235ec07edde3322f8079ace0",
     "note": "All prior artifacts/distributions retained; full framework/dataset runs are pre-repair coverage."
   },
   "public_release_verified": "0.2.0",
-  "implementation_base": "aadb5b4617b910c697e66a888c638f1b9120c0e2",
+  "implementation_base": "669b94d112ee8c9b0faec3ee52fdde19af495f3b",
   "environment": {
     "core": "CPython 3.14.4",
     "installed_minimum": "CPython 3.11.15",
@@ -36,23 +36,24 @@
       "passed": 11
     },
     "native_focused": {
-      "ran": 21,
-      "passed": 21,
-      "seconds": 0.418
+      "ran": 26,
+      "passed": 26,
+      "seconds": 0.681
     },
     "minimum_focused": {
-      "ran": 64,
-      "passed": 64
+      "ran": 69,
+      "passed": 69,
+      "seconds": 9.824
     },
     "installed_python311": "passed",
-    "ruff": "passed",
-    "format_files": 3,
+    "ruff": "passed final; initial I001 retained and fixed before fresh source freeze",
+    "format_files": 2,
     "covering_core": {
-      "ran": 68,
-      "passed": 68,
-      "seconds": 9.644
+      "ran": 73,
+      "passed": 73,
+      "seconds": 9.562
     },
-    "format_scope": "three touched Python files; prior 314-file check preserved"
+    "format_scope": "two touched Python files; prior 314-file check preserved"
   },
   "native": {
     "mechanism_only": true,
@@ -67,29 +68,71 @@
         "requests": 32,
         "tokens": 960,
         "unknown_token_requests": 0,
-        "elapsed_s": 0.007382631301879883
+        "elapsed_s": 0.0070416927337646484
       },
       "worker": {
         "requests": 48,
         "tokens": 1440,
         "unknown_token_requests": 0,
-        "elapsed_s": 0.010338068008422852
+        "elapsed_s": 0.010632753372192383
       },
       "proposal": {
         "requests": 1,
         "tokens": 30,
         "unknown_token_requests": 0,
-        "elapsed_s": 0.00019502639770507812
+        "elapsed_s": 0.0002067089080810547
       }
     },
     "all_cells": [
       {
-        "cell_id": "03cd064895c750f6a2c41c36",
+        "cell_id": "06a37c3895da20daeb716ca3",
+        "task_id": "q1",
+        "arm": "campaign",
+        "phase": "admission",
+        "status": "completed",
+        "task_time_s": 1.8348591327667236,
+        "worker_usage": {
+          "model_calls": 3,
+          "leaf_calls": 3,
+          "unknown_calls": 0,
+          "pending_calls": 0
+        },
+        "worker_tokens": 90,
+        "worker_known_tokens_subtotal": 90,
+        "worker_unknown_token_requests": 0,
+        "worker_accounting_status": "complete",
+        "worker_time_s": 0.2606971263885498,
+        "worker_turns": 1,
+        "worker_unfinished_turns": 0,
+        "judge_usage": {
+          "model_calls": 2,
+          "leaf_calls": 1,
+          "unknown_calls": 0,
+          "pending_calls": 0
+        },
+        "judge_tokens": 60,
+        "judge_known_tokens_subtotal": 60,
+        "judge_unknown_token_requests": 0,
+        "judge_accounting_status": "complete",
+        "judge_time_s": 0.11965012550354004,
+        "judge_turns": 1,
+        "judge_unfinished_turns": 0,
+        "correction_turns": 0,
+        "native_tool_calls": 3,
+        "flattened_leaf_calls": 3,
+        "synthetic_native": {
+          "success": true,
+          "content_score": 1.0,
+          "turns": 1
+        }
+      },
+      {
+        "cell_id": "25d602ae9b6bd5ba07ce219c",
         "task_id": "q5",
         "arm": "C",
         "phase": "holdout",
         "status": "completed",
-        "task_time_s": 1.1691839694976807,
+        "task_time_s": 1.338587760925293,
         "worker_usage": {
           "model_calls": 3,
           "leaf_calls": 3,
@@ -100,7 +143,7 @@
         "worker_known_tokens_subtotal": 90,
         "worker_unknown_token_requests": 0,
         "worker_accounting_status": "complete",
-        "worker_time_s": 0.24573493003845215,
+        "worker_time_s": 0.284318208694458,
         "worker_turns": 1,
         "worker_unfinished_turns": 0,
         "judge_usage": {
@@ -113,7 +156,7 @@
         "judge_known_tokens_subtotal": 60,
         "judge_unknown_token_requests": 0,
         "judge_accounting_status": "complete",
-        "judge_time_s": 0.1782369613647461,
+        "judge_time_s": 0.13819217681884766,
         "judge_turns": 1,
         "judge_unfinished_turns": 0,
         "correction_turns": 0,
@@ -126,222 +169,12 @@
         }
       },
       {
-        "cell_id": "2e277b18572e2b53f9d978a7",
-        "task_id": "q1",
-        "arm": "campaign",
-        "phase": "admission",
-        "status": "completed",
-        "task_time_s": 1.4268908500671387,
-        "worker_usage": {
-          "model_calls": 3,
-          "leaf_calls": 3,
-          "unknown_calls": 0,
-          "pending_calls": 0
-        },
-        "worker_tokens": 90,
-        "worker_known_tokens_subtotal": 90,
-        "worker_unknown_token_requests": 0,
-        "worker_accounting_status": "complete",
-        "worker_time_s": 0.3152749538421631,
-        "worker_turns": 1,
-        "worker_unfinished_turns": 0,
-        "judge_usage": {
-          "model_calls": 2,
-          "leaf_calls": 1,
-          "unknown_calls": 0,
-          "pending_calls": 0
-        },
-        "judge_tokens": 60,
-        "judge_known_tokens_subtotal": 60,
-        "judge_unknown_token_requests": 0,
-        "judge_accounting_status": "complete",
-        "judge_time_s": 0.1376509666442871,
-        "judge_turns": 1,
-        "judge_unfinished_turns": 0,
-        "correction_turns": 0,
-        "native_tool_calls": 3,
-        "flattened_leaf_calls": 3,
-        "synthetic_native": {
-          "success": true,
-          "content_score": 1.0,
-          "turns": 1
-        }
-      },
-      {
-        "cell_id": "6109540acba864a61900b858",
-        "task_id": "q5",
-        "arm": "B",
-        "phase": "holdout",
-        "status": "completed",
-        "task_time_s": 1.6384670734405518,
-        "worker_usage": {
-          "model_calls": 6,
-          "leaf_calls": 4,
-          "unknown_calls": 0,
-          "pending_calls": 0
-        },
-        "worker_tokens": 180,
-        "worker_known_tokens_subtotal": 180,
-        "worker_unknown_token_requests": 0,
-        "worker_accounting_status": "complete",
-        "worker_time_s": 0.3588111400604248,
-        "worker_turns": 2,
-        "worker_unfinished_turns": 0,
-        "judge_usage": {
-          "model_calls": 4,
-          "leaf_calls": 2,
-          "unknown_calls": 0,
-          "pending_calls": 0
-        },
-        "judge_tokens": 120,
-        "judge_known_tokens_subtotal": 120,
-        "judge_unknown_token_requests": 0,
-        "judge_accounting_status": "complete",
-        "judge_time_s": 0.21605610847473145,
-        "judge_turns": 2,
-        "judge_unfinished_turns": 0,
-        "correction_turns": 1,
-        "native_tool_calls": 4,
-        "flattened_leaf_calls": 4,
-        "synthetic_native": {
-          "success": true,
-          "content_score": 1.0,
-          "turns": 2
-        }
-      },
-      {
-        "cell_id": "82d14eb1485d91a3e07a793b",
-        "task_id": "q5",
-        "arm": "A",
-        "phase": "holdout",
-        "status": "completed",
-        "task_time_s": 1.597398042678833,
-        "worker_usage": {
-          "model_calls": 6,
-          "leaf_calls": 4,
-          "unknown_calls": 0,
-          "pending_calls": 0
-        },
-        "worker_tokens": 180,
-        "worker_known_tokens_subtotal": 180,
-        "worker_unknown_token_requests": 0,
-        "worker_accounting_status": "complete",
-        "worker_time_s": 0.3304460048675537,
-        "worker_turns": 2,
-        "worker_unfinished_turns": 0,
-        "judge_usage": {
-          "model_calls": 4,
-          "leaf_calls": 2,
-          "unknown_calls": 0,
-          "pending_calls": 0
-        },
-        "judge_tokens": 120,
-        "judge_known_tokens_subtotal": 120,
-        "judge_unknown_token_requests": 0,
-        "judge_accounting_status": "complete",
-        "judge_time_s": 0.259613037109375,
-        "judge_turns": 2,
-        "judge_unfinished_turns": 0,
-        "correction_turns": 1,
-        "native_tool_calls": 4,
-        "flattened_leaf_calls": 4,
-        "synthetic_native": {
-          "success": true,
-          "content_score": 1.0,
-          "turns": 2
-        }
-      },
-      {
-        "cell_id": "a9300f25835d865e918e73c6",
-        "task_id": "q2",
-        "arm": "campaign",
-        "phase": "validation",
-        "status": "completed",
-        "task_time_s": 1.3950951099395752,
-        "worker_usage": {
-          "model_calls": 3,
-          "leaf_calls": 3,
-          "unknown_calls": 0,
-          "pending_calls": 0
-        },
-        "worker_tokens": 90,
-        "worker_known_tokens_subtotal": 90,
-        "worker_unknown_token_requests": 0,
-        "worker_accounting_status": "complete",
-        "worker_time_s": 0.2519538402557373,
-        "worker_turns": 1,
-        "worker_unfinished_turns": 0,
-        "judge_usage": {
-          "model_calls": 2,
-          "leaf_calls": 1,
-          "unknown_calls": 0,
-          "pending_calls": 0
-        },
-        "judge_tokens": 60,
-        "judge_known_tokens_subtotal": 60,
-        "judge_unknown_token_requests": 0,
-        "judge_accounting_status": "complete",
-        "judge_time_s": 0.2077345848083496,
-        "judge_turns": 1,
-        "judge_unfinished_turns": 0,
-        "correction_turns": 0,
-        "native_tool_calls": 3,
-        "flattened_leaf_calls": 3,
-        "synthetic_native": {
-          "success": true,
-          "content_score": 1.0,
-          "turns": 1
-        }
-      },
-      {
-        "cell_id": "b75ed6f172f9dd53fb41e5b4",
-        "task_id": "q1",
-        "arm": "campaign",
-        "phase": "train",
-        "status": "completed",
-        "task_time_s": 2.040259838104248,
-        "worker_usage": {
-          "model_calls": 6,
-          "leaf_calls": 4,
-          "unknown_calls": 0,
-          "pending_calls": 0
-        },
-        "worker_tokens": 180,
-        "worker_known_tokens_subtotal": 180,
-        "worker_unknown_token_requests": 0,
-        "worker_accounting_status": "complete",
-        "worker_time_s": 0.4281315803527832,
-        "worker_turns": 2,
-        "worker_unfinished_turns": 0,
-        "judge_usage": {
-          "model_calls": 4,
-          "leaf_calls": 2,
-          "unknown_calls": 0,
-          "pending_calls": 0
-        },
-        "judge_tokens": 120,
-        "judge_known_tokens_subtotal": 120,
-        "judge_unknown_token_requests": 0,
-        "judge_accounting_status": "complete",
-        "judge_time_s": 0.34508490562438965,
-        "judge_turns": 2,
-        "judge_unfinished_turns": 0,
-        "correction_turns": 1,
-        "native_tool_calls": 4,
-        "flattened_leaf_calls": 4,
-        "synthetic_native": {
-          "success": true,
-          "content_score": 1.0,
-          "turns": 2
-        }
-      },
-      {
-        "cell_id": "c3596c62b1d9a8c1c24d0b5f",
+        "cell_id": "489bbba2977be9902884ec6f",
         "task_id": "q1",
         "arm": "warmup",
         "phase": "warmup",
         "status": "completed",
-        "task_time_s": 15.646523237228394,
+        "task_time_s": 14.595648050308228,
         "worker_usage": {
           "model_calls": 6,
           "leaf_calls": 4,
@@ -352,7 +185,7 @@
         "worker_known_tokens_subtotal": 180,
         "worker_unknown_token_requests": 0,
         "worker_accounting_status": "complete",
-        "worker_time_s": 0.5870730876922607,
+        "worker_time_s": 0.4411771297454834,
         "worker_turns": 2,
         "worker_unfinished_turns": 0,
         "judge_usage": {
@@ -365,7 +198,7 @@
         "judge_known_tokens_subtotal": 120,
         "judge_unknown_token_requests": 0,
         "judge_accounting_status": "complete",
-        "judge_time_s": 0.303375244140625,
+        "judge_time_s": 0.21122312545776367,
         "judge_turns": 2,
         "judge_unfinished_turns": 0,
         "correction_turns": 1,
@@ -378,12 +211,54 @@
         }
       },
       {
-        "cell_id": "dd205bf96728f626b940dee6",
+        "cell_id": "6b7ff00989aa249915a1ebba",
+        "task_id": "q2",
+        "arm": "campaign",
+        "phase": "validation",
+        "status": "completed",
+        "task_time_s": 1.8009159564971924,
+        "worker_usage": {
+          "model_calls": 6,
+          "leaf_calls": 4,
+          "unknown_calls": 0,
+          "pending_calls": 0
+        },
+        "worker_tokens": 180,
+        "worker_known_tokens_subtotal": 180,
+        "worker_unknown_token_requests": 0,
+        "worker_accounting_status": "complete",
+        "worker_time_s": 0.3446202278137207,
+        "worker_turns": 2,
+        "worker_unfinished_turns": 0,
+        "judge_usage": {
+          "model_calls": 4,
+          "leaf_calls": 2,
+          "unknown_calls": 0,
+          "pending_calls": 0
+        },
+        "judge_tokens": 120,
+        "judge_known_tokens_subtotal": 120,
+        "judge_unknown_token_requests": 0,
+        "judge_accounting_status": "complete",
+        "judge_time_s": 0.24298477172851562,
+        "judge_turns": 2,
+        "judge_unfinished_turns": 0,
+        "correction_turns": 1,
+        "native_tool_calls": 4,
+        "flattened_leaf_calls": 4,
+        "synthetic_native": {
+          "success": true,
+          "content_score": 1.0,
+          "turns": 2
+        }
+      },
+      {
+        "cell_id": "9ae6ad241324725915459084",
         "task_id": "q1",
         "arm": "campaign",
         "phase": "train",
         "status": "completed",
-        "task_time_s": 1.5473389625549316,
+        "task_time_s": 1.3520147800445557,
         "worker_usage": {
           "model_calls": 3,
           "leaf_calls": 3,
@@ -394,7 +269,7 @@
         "worker_known_tokens_subtotal": 90,
         "worker_unknown_token_requests": 0,
         "worker_accounting_status": "complete",
-        "worker_time_s": 0.2725229263305664,
+        "worker_time_s": 0.2504153251647949,
         "worker_turns": 1,
         "worker_unfinished_turns": 0,
         "judge_usage": {
@@ -407,7 +282,7 @@
         "judge_known_tokens_subtotal": 60,
         "judge_unknown_token_requests": 0,
         "judge_accounting_status": "complete",
-        "judge_time_s": 0.14413094520568848,
+        "judge_time_s": 0.12033414840698242,
         "judge_turns": 1,
         "judge_unfinished_turns": 0,
         "correction_turns": 0,
@@ -420,12 +295,12 @@
         }
       },
       {
-        "cell_id": "e6a7be30418d85ab401f0dbd",
+        "cell_id": "a49391000083563eca907df1",
         "task_id": "q1",
         "arm": "campaign",
         "phase": "admission",
         "status": "completed",
-        "task_time_s": 2.7101471424102783,
+        "task_time_s": 1.6126530170440674,
         "worker_usage": {
           "model_calls": 6,
           "leaf_calls": 4,
@@ -436,7 +311,7 @@
         "worker_known_tokens_subtotal": 180,
         "worker_unknown_token_requests": 0,
         "worker_accounting_status": "complete",
-        "worker_time_s": 0.4736659526824951,
+        "worker_time_s": 0.3732597827911377,
         "worker_turns": 2,
         "worker_unfinished_turns": 0,
         "judge_usage": {
@@ -449,7 +324,7 @@
         "judge_known_tokens_subtotal": 120,
         "judge_unknown_token_requests": 0,
         "judge_accounting_status": "complete",
-        "judge_time_s": 0.24024343490600586,
+        "judge_time_s": 0.22832584381103516,
         "judge_turns": 2,
         "judge_unfinished_turns": 0,
         "correction_turns": 1,
@@ -462,12 +337,12 @@
         }
       },
       {
-        "cell_id": "fda51f3f6683e2821a93b42d",
-        "task_id": "q2",
-        "arm": "campaign",
-        "phase": "validation",
+        "cell_id": "aff176ab20caec6571347558",
+        "task_id": "q5",
+        "arm": "A",
+        "phase": "holdout",
         "status": "completed",
-        "task_time_s": 1.8671948909759521,
+        "task_time_s": 1.4788179397583008,
         "worker_usage": {
           "model_calls": 6,
           "leaf_calls": 4,
@@ -478,7 +353,7 @@
         "worker_known_tokens_subtotal": 180,
         "worker_unknown_token_requests": 0,
         "worker_accounting_status": "complete",
-        "worker_time_s": 0.37477588653564453,
+        "worker_time_s": 0.3245508670806885,
         "worker_turns": 2,
         "worker_unfinished_turns": 0,
         "judge_usage": {
@@ -491,7 +366,133 @@
         "judge_known_tokens_subtotal": 120,
         "judge_unknown_token_requests": 0,
         "judge_accounting_status": "complete",
-        "judge_time_s": 0.2812979221343994,
+        "judge_time_s": 0.20759010314941406,
+        "judge_turns": 2,
+        "judge_unfinished_turns": 0,
+        "correction_turns": 1,
+        "native_tool_calls": 4,
+        "flattened_leaf_calls": 4,
+        "synthetic_native": {
+          "success": true,
+          "content_score": 1.0,
+          "turns": 2
+        }
+      },
+      {
+        "cell_id": "dd4eef55db9e8adb1a2774a2",
+        "task_id": "q2",
+        "arm": "campaign",
+        "phase": "validation",
+        "status": "completed",
+        "task_time_s": 1.6321489810943604,
+        "worker_usage": {
+          "model_calls": 3,
+          "leaf_calls": 3,
+          "unknown_calls": 0,
+          "pending_calls": 0
+        },
+        "worker_tokens": 90,
+        "worker_known_tokens_subtotal": 90,
+        "worker_unknown_token_requests": 0,
+        "worker_accounting_status": "complete",
+        "worker_time_s": 0.3767881393432617,
+        "worker_turns": 1,
+        "worker_unfinished_turns": 0,
+        "judge_usage": {
+          "model_calls": 2,
+          "leaf_calls": 1,
+          "unknown_calls": 0,
+          "pending_calls": 0
+        },
+        "judge_tokens": 60,
+        "judge_known_tokens_subtotal": 60,
+        "judge_unknown_token_requests": 0,
+        "judge_accounting_status": "complete",
+        "judge_time_s": 0.20390605926513672,
+        "judge_turns": 1,
+        "judge_unfinished_turns": 0,
+        "correction_turns": 0,
+        "native_tool_calls": 3,
+        "flattened_leaf_calls": 3,
+        "synthetic_native": {
+          "success": true,
+          "content_score": 1.0,
+          "turns": 1
+        }
+      },
+      {
+        "cell_id": "ef68a84ba955edbd83d19513",
+        "task_id": "q5",
+        "arm": "B",
+        "phase": "holdout",
+        "status": "completed",
+        "task_time_s": 1.9218428134918213,
+        "worker_usage": {
+          "model_calls": 6,
+          "leaf_calls": 4,
+          "unknown_calls": 0,
+          "pending_calls": 0
+        },
+        "worker_tokens": 180,
+        "worker_known_tokens_subtotal": 180,
+        "worker_unknown_token_requests": 0,
+        "worker_accounting_status": "complete",
+        "worker_time_s": 0.412426233291626,
+        "worker_turns": 2,
+        "worker_unfinished_turns": 0,
+        "judge_usage": {
+          "model_calls": 4,
+          "leaf_calls": 2,
+          "unknown_calls": 0,
+          "pending_calls": 0
+        },
+        "judge_tokens": 120,
+        "judge_known_tokens_subtotal": 120,
+        "judge_unknown_token_requests": 0,
+        "judge_accounting_status": "complete",
+        "judge_time_s": 0.3741781711578369,
+        "judge_turns": 2,
+        "judge_unfinished_turns": 0,
+        "correction_turns": 1,
+        "native_tool_calls": 4,
+        "flattened_leaf_calls": 4,
+        "synthetic_native": {
+          "success": true,
+          "content_score": 1.0,
+          "turns": 2
+        }
+      },
+      {
+        "cell_id": "fce07d81fbe42e0ca573e15a",
+        "task_id": "q1",
+        "arm": "campaign",
+        "phase": "train",
+        "status": "completed",
+        "task_time_s": 2.129281997680664,
+        "worker_usage": {
+          "model_calls": 6,
+          "leaf_calls": 4,
+          "unknown_calls": 0,
+          "pending_calls": 0
+        },
+        "worker_tokens": 180,
+        "worker_known_tokens_subtotal": 180,
+        "worker_unknown_token_requests": 0,
+        "worker_accounting_status": "complete",
+        "worker_time_s": 0.4559812545776367,
+        "worker_turns": 2,
+        "worker_unfinished_turns": 0,
+        "judge_usage": {
+          "model_calls": 4,
+          "leaf_calls": 2,
+          "unknown_calls": 0,
+          "pending_calls": 0
+        },
+        "judge_tokens": 120,
+        "judge_known_tokens_subtotal": 120,
+        "judge_unknown_token_requests": 0,
+        "judge_accounting_status": "complete",
+        "judge_time_s": 0.333935022354126,
         "judge_turns": 2,
         "judge_unfinished_turns": 0,
         "correction_turns": 1,
@@ -534,7 +535,7 @@
       "src/darwinagent/agent/graph.py": "76c81966b1611f7190ebbdf93103aa7c19ac7e5655f65229665d0031b44a39a2",
       "src/darwinagent/agent/interpreter.py": "4b9d7e7738096baf904d534b49f5abcf240344b23eb9a9fa308c19e087a4aec0",
       "src/darwinagent/agent/kernel.py": "6284b085376170c2c5140a817a15219f223f3504e7e96e925609085b8514e1eb",
-      "src/darwinagent/agent/react.py": "d3e956521491613a73bb16c3a1a0168ae268e085af68608a138dbd3b4c866c68",
+      "src/darwinagent/agent/react.py": "d08e9526f936ab7ab8586f5e0fbbcf401ec8de0da8261688d5a50081c45e70bf",
       "src/darwinagent/agent/tools.py": "205facb2fb694bbc00721e40d0f82f1023f8a558c9f68276159295ea49def298",
       "src/darwinagent/agents/__init__.py": "840875ac9de2301a42f5f3286bd0efc64b23614f74124fe638c8f4a9c502cf49",
       "src/darwinagent/agents/answer.py": "aa86924814bb9bf5673d526090bbef5ebcd6407ae78ca113307a6d59737f45ff",
@@ -639,29 +640,30 @@
     "upstream": "9d282e415c5e3b0f65b82c8758a013b269583d93",
     "evidence_sha256": {
       "acceptance.json": "9f8fd6468025d27d73bfd8155b629efe3d13c08351f3a813860ee579e404102b",
-      "integration-identity.json": "869684fcfa24c7e773199896186235c4193ee5e8235ec07edde3322f8079ace0",
-      "all-pair-report.json": "38d05cfb6d332ea074a2eae7d7cd93cbef70a4bc3ba5edcd3af64899e8e5e261",
-      "trace-acceptance.json": "cfef84daa048cf0ec5de0df9cf15e9ac0a43656a85506dcd0a04e7e92b7d085f",
-      "hook-idempotency.json": "15f9895027ba0aef081208dba771c6bdc4c757278a44f064b0bba14c7c97061c",
-      "selected-state.json": "2308fd47304d6231bdd437cf57588fcc28778f63bd21dd706d0a3907f01b85fe",
-      "delta-image.json": "d8667b22b696e91b156526ff90a388234fda4d4d9045e647eb97a2072cd296ee",
-      "loads/6a215ecc816749c4ab030774/load-receipt.json": "1b12b36f0b758ffd2e95d7be8f950ba0d337e20404fb6361de2dc464fc54ad48",
-      "loads/80101a499d334ff31d8a8959-candidate/load-receipt.json": "aaaffc3416364437d091ed1aa3ceda63a5cb3ed33db849c79a286b75e7f58eb0",
-      "loads/6a215ecc816749c4ab030774-candidate/load-receipt.json": "1b12b36f0b758ffd2e95d7be8f950ba0d337e20404fb6361de2dc464fc54ad48",
-      "loads/382efbcd3ad3dcfdc6fbd922/load-receipt.json": "859df1795dace18f677f1baa40c8ff30215475767ca1a917775fce378286eaae",
-      "loads/52fa106dfdd676f49fd16df2/load-receipt.json": "2bff10881e54cc42eb3f17ebbe60bb113c043b734aacb1fa7cb5d556a6c910f5",
-      "loads/6b81581fe0992cf7db976c86-candidate/load-receipt.json": "95b9cfb90bce4dcd4072cf5867b0413d6df0a216a1599f62d0820919d251e16d",
-      "loads/52fa106dfdd676f49fd16df2-candidate/load-receipt.json": "2bff10881e54cc42eb3f17ebbe60bb113c043b734aacb1fa7cb5d556a6c910f5",
-      "loads/0df8c510836ba7ce8a238a22-candidate/load-receipt.json": "f29302ca2b2c5fdd3501e34a2fb13d4565be5efd77eed1f94b3bc13c977625f9",
-      "loads/0df8c510836ba7ce8a238a22/load-receipt.json": "f29302ca2b2c5fdd3501e34a2fb13d4565be5efd77eed1f94b3bc13c977625f9",
-      "loads/f99038b6bdf7674fc8a6c4a2/load-receipt.json": "be3cc21461dc5bf64a19c6e20c92eaa76d298dd3f9f0a66a1d2cf634900043d7",
-      "loads/33e5e9cf138ecf7fd398b783/load-receipt.json": "4ce9661b36444659388c17d441887d60ec461d311b0e650a8d15d53070e70375",
-      "loads/80101a499d334ff31d8a8959/load-receipt.json": "aaaffc3416364437d091ed1aa3ceda63a5cb3ed33db849c79a286b75e7f58eb0",
-      "loads/df0035f662a056f334ca9b52/load-receipt.json": "d26b78c033a3778ed1db5aebf0dbb51f4150a2d3d7f3ea805ac0ddf54aad140c",
-      "loads/345b0cf81a539264f88ad216/load-receipt.json": "07952594c34410c8f1df2daff116fbb2decff177d73ca731653b8f6c383fed03",
-      "loads/df0035f662a056f334ca9b52-candidate/load-receipt.json": "d26b78c033a3778ed1db5aebf0dbb51f4150a2d3d7f3ea805ac0ddf54aad140c",
-      "loads/6b81581fe0992cf7db976c86/load-receipt.json": "95b9cfb90bce4dcd4072cf5867b0413d6df0a216a1599f62d0820919d251e16d"
-    }
+      "integration-identity.json": "e03360f070efc85116422613809f8ef9d215926ea1c919396aecf6e1e5b05846",
+      "all-pair-report.json": "aa63f9aea59edea194233e974b8cd543e6ecc28a8f89fa7e5dcaf7f6394f68e8",
+      "trace-acceptance.json": "8e8ae45f191eabd23c10ee9c5bda44e371a849333a5ec8f7d4691d6ee4988501",
+      "hook-idempotency.json": "e86b703e467477dfb3b5bfde7f91f581bbf3547ba068e37c015057b827a1bd57",
+      "selected-state.json": "bd2c2879bd67189f6b9fc9f70688a5997174ba4cd5367f592c3ec72b148e2a14",
+      "delta-image.json": "27339b36f23adbd29709e63f6bb4247d7f1a49fe87e750ab11a8356feb962ddf",
+      "loads/87e41918173a378d09b94452-candidate/load-receipt.json": "6e63e7000dffccd58d0ccf570d3995170590867387eda7c06502160f4f33211f",
+      "loads/e1a237222ae2a212dcd2649b/load-receipt.json": "e8bcca99158498d263fd77c1bc5aefa04aaf3d6c6b9eeaa140d4863024667a56",
+      "loads/9527957f9bf349859ece8c57-candidate/load-receipt.json": "2cba924fce02f4909e48a716df93ffbdbad7f53e51fb88d58dd3582d019c8a9a",
+      "loads/87e41918173a378d09b94452/load-receipt.json": "6e63e7000dffccd58d0ccf570d3995170590867387eda7c06502160f4f33211f",
+      "loads/32664fcc1b3c7fe15bc8ecb7/load-receipt.json": "b3107de0239cf91348094b29a72fd7ba9931185112022c555f4131dbba633dca",
+      "loads/fdefe2e4fa815a261b487067/load-receipt.json": "70c607ff636e5a25809438dfee6321a86e3dce721f2e34177aa8479cdd1bd7ab",
+      "loads/9527957f9bf349859ece8c57/load-receipt.json": "2cba924fce02f4909e48a716df93ffbdbad7f53e51fb88d58dd3582d019c8a9a",
+      "loads/32664fcc1b3c7fe15bc8ecb7-candidate/load-receipt.json": "b3107de0239cf91348094b29a72fd7ba9931185112022c555f4131dbba633dca",
+      "loads/99276e00c30d61688ebb870f/load-receipt.json": "765e0edd5d617c592663211545ae511fff8b52819329caa3d9490a9d8147414d",
+      "loads/474fca3a9723ca19913eac03-candidate/load-receipt.json": "7629143749d912b22cf1bb1a26e3c9efb8afc7849b90e71a2ae621ce64d0f58b",
+      "loads/474fca3a9723ca19913eac03/load-receipt.json": "7629143749d912b22cf1bb1a26e3c9efb8afc7849b90e71a2ae621ce64d0f58b",
+      "loads/4ee4dc9d92fd936b8eeb00cd/load-receipt.json": "3120dd13b80d1fad166b6a6b093db218c12c24d7a40879fac4bb620b0fed8bb2",
+      "loads/57c68dadd2208ce830a28b7a/load-receipt.json": "230ac0129f189feff43271113b0075557116e43ab6b3cc7f584fd4f4a239be03",
+      "loads/599a6f9dcdd24876fd5e06a1/load-receipt.json": "8633a54e9cba22ac7804dda666999c5bb11c8f767e465dafa9c3d475ff5b4ad0",
+      "loads/4ee4dc9d92fd936b8eeb00cd-candidate/load-receipt.json": "3120dd13b80d1fad166b6a6b093db218c12c24d7a40879fac4bb620b0fed8bb2",
+      "loads/fdefe2e4fa815a261b487067-candidate/load-receipt.json": "70c607ff636e5a25809438dfee6321a86e3dce721f2e34177aa8479cdd1bd7ab"
+    },
+    "evidence_directory": "offline-native-live002-repair-final"
   },
   "logs_sha256": {
     "task4-framework.log": "382275d9a95438591e986c843c201d13204970e1456db191130dc068e0988105",
@@ -698,31 +700,147 @@
     "live-repair-trace.log": "fd5318b1fbbf59856e3bb00342ab334285cac03e02f10942c1b1f820a58be98c",
     "live-repair-minimum-focused.log": "654a8f08ffffe6b6ea2549f7c092a569fc624018773647ed40f7c93fc37023cb",
     "live-repair-ruff.log": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18",
-    "live-repair-format.log": "eee76f865de5a9f2456950f710ae5d5f9b5bd0ea02aa54f614c5eed6642a0bfd"
+    "live-repair-format.log": "eee76f865de5a9f2456950f710ae5d5f9b5bd0ea02aa54f614c5eed6642a0bfd",
+    "live002-repair-red.log": "e0ab2194253796098c164624dc419a2c2a73ebcb73d2d4b7079443f317b52258",
+    "live002-repair-green.log": "76817d3ee9690b5bf89a62b5708684dc73c872aec44b80414bc237f3829f5bad",
+    "live002-repair-counterexample.log": "71ed5f065d105c82e559527e6fe8a3f9aa75a59c25f605e32cba0698a80065d6",
+    "live002-repair-focused.log": "9f201d85f22fa7be2539b092794bc43b1d6627c84ea8d467f2382c06af77a279",
+    "live002-repair-native-focused.log": "e261ffb3bbce57acd0e203030ddb03800372ca18aeab6a66c63dc88427198889",
+    "live002-repair-native.log": "884902dea2bff93e000c893516ae59c6ce04c67ef03912146f25213b068dfa4c",
+    "live002-repair-trace.log": "cb33ae51ec98a8b62728590ca69fdb841126ea261bcb8172946188f68841918d",
+    "live002-repair-minimum-focused.log": "7c8560f257372df453d49e62f3bef5f2f8c6c10178089f0be854a5a0fdc4c36e",
+    "live002-repair-ruff.log": "ab87088d6209cb2d75828b2f2789446aa4eb7f79a542f368bb16fe8852f963b3",
+    "live002-repair-format.log": "3bc53bf3e981a98a34a852e175bf9b77af841edea74fca595d9aedcbaf9a4938",
+    "live002-repair-ruff-final.log": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18",
+    "live002-repair-format-final.log": "3bc53bf3e981a98a34a852e175bf9b77af841edea74fca595d9aedcbaf9a4938",
+    "live002-repair-focused-final.log": "d22ca376024961c606b73245f224ed060ec1f5c9478422c779007c029412ece8",
+    "live002-repair-native-focused-final.log": "0fb0f575cf40adbc17e501e733f370a32464a23ef57667939545b2703f148cd1",
+    "live002-repair-native-final.log": "66159b6eb0e9adc1c2594ed96fabd7ed2ce9be7b49dcde9d288e325a951c9024",
+    "live002-repair-trace-final.log": "246444af4c1289193b97ba51159de1c7d49d998693711dfc46cd9031084d6717",
+    "live002-delivery-minimum-focused.log": "abefbc78bc953de096207b3e7bcdae89a4a7e2d31c974dd29e0c07a8ee47f718"
   },
   "live_accounting": {
-    "status": "first_native_attempt_failed_comparison_unstarted",
-    "source_commit": "aadb5b4617b910c697e66a888c638f1b9120c0e2",
-    "actual_http_attempts_global": 5,
+    "status": "two_failed_native_attempts_comparison_unstarted",
+    "runs": [
+      {
+        "status": "first_native_attempt_failed_comparison_unstarted",
+        "source_commit": "aadb5b4617b910c697e66a888c638f1b9120c0e2",
+        "actual_http_attempts_global": 5,
+        "availability_requests": 1,
+        "native_worker_requests": 4,
+        "completed_http_requests": 5,
+        "unknown_requests": 0,
+        "paused": false,
+        "shared_http_cap": 100,
+        "remaining_shared_http_cap": 95,
+        "failure": {
+          "task": "q1",
+          "phase": "warmup",
+          "model_response_kind": "natural_language_status_not_json",
+          "error_type": "JSONDecodeError",
+          "response": "计算已验证。正在写入结果文件。",
+          "settled_leaf_calls": 3,
+          "worker_prompt_tokens": 21459,
+          "worker_completion_tokens": 1997,
+          "json_mode_requested": true,
+          "cause": "settled reply violated JSON action protocol; ReAct lacked bounded parse-error feedback"
+        },
+        "q2": "not_run",
+        "q5_arms": {
+          "A": "unstarted",
+          "B": "unstarted",
+          "C": "unstarted"
+        },
+        "q6": "sealed_not_opened",
+        "native_postprocess": "failed_no_pairs",
+        "cli_exit_zero_is_completion": false,
+        "original_json_mode": true,
+        "quality_claim": false,
+        "requests_by_this_repair": 0,
+        "evidence_sha256": {
+          "infra/live-001-diagnostic.json": "cfe39674d8afc09f84717af644039b34f2e1143ff9adafe969158f861c22f618",
+          "original-mode-receipt-summary": "7b20ff46f1e437641a4e206449003331b72755829dee16080ab3fd6018b71f91"
+        },
+        "note": "5 actual attempts are infrastructure/failed q1 warmup, separate from recorded native metrics. New source requires full fresh pipeline and same non-resetting shared ledger; live-v030-002 is coordinator-only after review."
+      },
+      {
+        "source_commit": "669b94d112ee8c9b0faec3ee52fdde19af495f3b",
+        "run": "live-v030-002",
+        "status": "failed",
+        "task": "q1",
+        "phase": "warmup",
+        "error_type": "ValueError",
+        "cause": "final artifacts contained strings; runtime requires object mappings; shared protocol did not explain artifact entry shape",
+        "invalid_artifact_shape": "array of strings",
+        "final_response_type": "str",
+        "json_mode_requested": true,
+        "worker_usage": {
+          "model_calls": 5,
+          "leaf_calls": 4,
+          "unknown_calls": 0,
+          "pending_calls": 0,
+          "failed_leaf_calls": 0,
+          "prompt_tokens": 29087,
+          "completion_tokens": 1254
+        },
+        "global_actual_http": 10,
+        "run_actual_worker_http": 5,
+        "global_completed_http": 10,
+        "global_unknown": 0,
+        "q2": "not_run",
+        "q5_arms": {
+          "A": "unstarted",
+          "B": "unstarted",
+          "C": "unstarted"
+        },
+        "q6": "sealed_not_opened",
+        "quality_claim": false,
+        "evidence_sha256": {
+          "live-v030-002/sessions/worker-282adffebe72fee06d0f9eb7/episodes/turn-0/result.json": "0717e4c2d9300ac171dc0eb980f4cbf8c654254c4b75e02f1de208daaf169828",
+          "live-v030-002/sessions/worker-282adffebe72fee06d0f9eb7/episodes/turn-0/identity.json": "c95b11f19f6b6547e2c5bf4267d6495f2175d1d2df863ae59536259d1534df38",
+          "live-v030-002/sessions/worker-282adffebe72fee06d0f9eb7/episodes/turn-0/steps/000000.json": "4c9a7053cac4667e78c4424120d78441ebc90ddfb2c8c4854d250207968c1f67",
+          "live-v030-002/sessions/worker-282adffebe72fee06d0f9eb7/episodes/turn-0/steps/000001.json": "063d849421ddbc7f8fa19f8acd263e25cb44f0053a31d2afd561b5e9de771ff6",
+          "live-v030-002/sessions/worker-282adffebe72fee06d0f9eb7/episodes/turn-0/steps/000006.json": "ec01fde0c677dba323f259c344631f3b26f3489d0cc54472dd947d0a4ecf97ce",
+          "live-v030-002/sessions/worker-282adffebe72fee06d0f9eb7/episodes/turn-0/steps/000007.json": "980554cc65ceec95c5ef0e7e38a798a04545928396c95e196497441ca79f6757",
+          "live-v030-002/sessions/worker-282adffebe72fee06d0f9eb7/episodes/turn-0/steps/000008.json": "b522dd908c99b685c390a88facb291d867998883f00c6846d9046b500bceab86",
+          "live-v030-002/sessions/worker-282adffebe72fee06d0f9eb7/episodes/turn-0/steps/000004.json": "54b03a745eb6622047588c56f6ba66863d0ffb7d235a0be65211b63dbba6e773",
+          "live-v030-002/sessions/worker-282adffebe72fee06d0f9eb7/episodes/turn-0/steps/000005.json": "133802f4326c56cb1c4b08dd7f326c9a165c23e86e69dd328582ca469d46afef",
+          "live-v030-002/sessions/worker-282adffebe72fee06d0f9eb7/episodes/turn-0/steps/000002.json": "33676aa2896ae84536746631eb9ac196dab1c1850d624c26f923d38b2f138b10",
+          "live-v030-002/sessions/worker-282adffebe72fee06d0f9eb7/episodes/turn-0/steps/000003.json": "a2dcbc09df3b3c86c56a8964afdc37e07c22c8088c43c809fca96eec0d9f301a",
+          "live-v030-002/sessions/worker-282adffebe72fee06d0f9eb7/episodes/turn-0/events/000000.json": "68756e72610290b1d0b4105958b235f0df668d9ea3ab3521da5a0442c581466d",
+          "live-v030-002/sessions/worker-282adffebe72fee06d0f9eb7/episodes/turn-0/events/000016.json": "fbd09a471f5e578f4d1c74201ef0bb7b3ec24459892b2a915e9e171a8794c21d",
+          "live-v030-002/sessions/worker-282adffebe72fee06d0f9eb7/episodes/turn-0/events/000020.json": "d1c5ea40ac0ee6310a3cb4d88decd81142dbe329cac4ff7c4a0e9061d530ea72",
+          "live-v030-002/sessions/worker-282adffebe72fee06d0f9eb7/episodes/turn-0/events/000021.json": "31f576923524a603bfa33f91b30acc8e12050870ee74a78f70e3d62fac3f81b6",
+          "live-v030-002/sessions/worker-282adffebe72fee06d0f9eb7/episodes/turn-0/events/000017.json": "45e7e15a4766c21c0e41cc7865efadf9510a4d96cf37064aa48b8507cd2096c2",
+          "live-v030-002/sessions/worker-282adffebe72fee06d0f9eb7/episodes/turn-0/events/000001.json": "99f6c6afc0815cf248dcf20a6a8316f3e2acb21c70fae8fdc002a070e396e22b",
+          "live-v030-002/sessions/worker-282adffebe72fee06d0f9eb7/episodes/turn-0/events/000006.json": "1bf8c6b7f417fd1e55ba642e60f34bb3767e6c55f1c139fff7b7fc919f95fde8",
+          "live-v030-002/sessions/worker-282adffebe72fee06d0f9eb7/episodes/turn-0/events/000010.json": "80a15e517de156ca492be74aa9d6d90c96b3580b43979bbdece036e3ccce2611",
+          "live-v030-002/sessions/worker-282adffebe72fee06d0f9eb7/episodes/turn-0/events/000011.json": "b7514d7d2be51f8c00b06f5bf14db3275eedf9828b42e0b55c121826e3bea70d",
+          "live-v030-002/sessions/worker-282adffebe72fee06d0f9eb7/episodes/turn-0/events/000007.json": "881fea9a6b2b1f73d8019ddbbfbc64e64b3b5808e11026b1d328b60650b4684c",
+          "live-v030-002/sessions/worker-282adffebe72fee06d0f9eb7/episodes/turn-0/events/000008.json": "4d7ee18490b99c384c90543085706986eb9cdf1d3a12c04030c1f368258ef3f8",
+          "live-v030-002/sessions/worker-282adffebe72fee06d0f9eb7/episodes/turn-0/events/000012.json": "48b2d98041b7fdf004563147846b4afc139928302b8c62f0c60f7e9dd03a1c3d",
+          "live-v030-002/sessions/worker-282adffebe72fee06d0f9eb7/episodes/turn-0/events/000004.json": "5666925940cd87083b4f6ae24e129c1e5674c83841f45bb085a3973f0d51019c",
+          "live-v030-002/sessions/worker-282adffebe72fee06d0f9eb7/episodes/turn-0/events/000005.json": "37cab3f23a45ccf6256e553847b44c30e8a0b9db6562ade393e5d3811fd55e75",
+          "live-v030-002/sessions/worker-282adffebe72fee06d0f9eb7/episodes/turn-0/events/000013.json": "cb63f067291764e35a29136baf069bdf39738396654a62b018d9732e8a67f8a2",
+          "live-v030-002/sessions/worker-282adffebe72fee06d0f9eb7/episodes/turn-0/events/000009.json": "46e48e43d0245ff086faefd775dc374608a601410b514b9b31c80a366fd01aca",
+          "live-v030-002/sessions/worker-282adffebe72fee06d0f9eb7/episodes/turn-0/events/000014.json": "75f48a4a5e293cccb9d576cc6e845946602abc5e565c980deed69f8ff1ddb54d",
+          "live-v030-002/sessions/worker-282adffebe72fee06d0f9eb7/episodes/turn-0/events/000002.json": "b996f6aa1939fbd500faed5d80e14137156177274ad5a425f70a29f2a89eea21",
+          "live-v030-002/sessions/worker-282adffebe72fee06d0f9eb7/episodes/turn-0/events/000018.json": "ed64ddade29f0ff9256ddbc65ee1fc6e15450fd7bb9e7b64497149780eb3c359",
+          "live-v030-002/sessions/worker-282adffebe72fee06d0f9eb7/episodes/turn-0/events/000019.json": "95a94b6c844d337a5d04424c427124a634329217c329d837c52d436e72f3b897",
+          "live-v030-002/sessions/worker-282adffebe72fee06d0f9eb7/episodes/turn-0/events/000003.json": "4779c033c8d172979a034af6094e111db57ce726281b3563b72d922961024afd",
+          "live-v030-002/sessions/worker-282adffebe72fee06d0f9eb7/episodes/turn-0/events/000015.json": "503f0b0f61e394827c38f552b9d94a26f0984e3caa2ace484572855864ab3d48"
+        }
+      }
+    ],
+    "actual_http_attempts_global": 10,
+    "completed_http_requests": 10,
     "availability_requests": 1,
-    "native_worker_requests": 4,
-    "completed_http_requests": 5,
+    "availability_tokens": null,
+    "native_worker_requests": 9,
     "unknown_requests": 0,
-    "paused": false,
     "shared_http_cap": 100,
-    "remaining_shared_http_cap": 95,
-    "failure": {
-      "task": "q1",
-      "phase": "warmup",
-      "model_response_kind": "natural_language_status_not_json",
-      "error_type": "JSONDecodeError",
-      "response": "计算已验证。正在写入结果文件。",
-      "settled_leaf_calls": 3,
-      "worker_prompt_tokens": 21459,
-      "worker_completion_tokens": 1997,
-      "json_mode_requested": true,
-      "cause": "settled reply violated JSON action protocol; ReAct lacked bounded parse-error feedback"
-    },
+    "remaining_shared_http_cap": 90,
+    "failed_native_runs": 2,
     "q2": "not_run",
     "q5_arms": {
       "A": "unstarted",
@@ -730,18 +848,32 @@
       "C": "unstarted"
     },
     "q6": "sealed_not_opened",
-    "native_postprocess": "failed_no_pairs",
-    "cli_exit_zero_is_completion": false,
-    "original_json_mode": true,
     "quality_claim": false,
     "requests_by_this_repair": 0,
     "evidence_sha256": {
-      "infra/live-001-diagnostic.json": "cfe39674d8afc09f84717af644039b34f2e1143ff9adafe969158f861c22f618",
-      "original-mode-receipt-summary": "7b20ff46f1e437641a4e206449003331b72755829dee16080ab3fd6018b71f91"
+      "live002-repair-failure-facts.json": "f4e0e49fdcb7304da29a57e62aaccbe1eb29a804448368152582796deec0eb53"
     },
-    "note": "5 actual attempts are infrastructure/failed q1 warmup, separate from recorded native metrics. New source requires full fresh pipeline and same non-resetting shared ledger; live-v030-002 is coordinator-only after review."
+    "note": "10 actual attempts include availability and two failed q1 warmups; separate from all recorded mechanism metrics. Fresh entire pipeline on the same non-resetting ledger is coordinator-only after review. Availability token usage was not provided here; null is unavailable, not zero."
   },
   "protocol_counterexample": {
+    "mechanism_only": true,
+    "before": {
+      "status": "failed",
+      "model_calls": 5,
+      "leaf_calls": 4,
+      "write_calls": 1
+    },
+    "after": {
+      "status": "completed",
+      "model_calls": 6,
+      "leaf_calls": 4,
+      "write_calls": 1
+    },
+    "actual_model_http": 0,
+    "original_response_and_write_receipts_preserved": true,
+    "replay_writes": 0
+  },
+  "prior_protocol_counterexample": {
     "mechanism_only": true,
     "before": {
       "status": "failed",
@@ -755,5 +887,12 @@
     },
     "actual_model_http": 0,
     "original_response_receipt_preserved": true
+  },
+  "format_repair": {
+    "issue": "I001 extra blank line after imports in react.py",
+    "original_log": "live002-repair-ruff.log",
+    "final_log": "live002-repair-ruff-final.log",
+    "new_native_identity": "offline-native-live002-repair-final",
+    "note": "Old preliminary native and archives retained; final artifacts rebuilt after formatting change."
   }
 }

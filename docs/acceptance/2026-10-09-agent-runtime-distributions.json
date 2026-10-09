@@ -2,35 +2,37 @@
   "status": "PASS",
   "prepared_version": "0.3.0",
   "source_files_verified": 129,
-  "integration_identity_sha256": "869684fcfa24c7e773199896186235c4193ee5e8235ec07edde3322f8079ace0",
-  "source_map_sha256": "db23d6f524fa2696291721d390ec2acd986220d53eef2f68dd763dd3610b1c88",
+  "integration_identity_sha256": "e03360f070efc85116422613809f8ef9d215926ea1c919396aecf6e1e5b05846",
+  "source_map_sha256": "e88cea646038e9aa79d684f424aec6b9a1c4dc9ddd3bd66ea2d1ab99e0125986",
   "v3_content_id": "28958cf5fa8347dcde49dfcc9a1b881dd6857de725b249c615495facf03b415b",
   "v3_version": "9349f1a5b3f8c5a6fd47f09507c25c552a1c9b389021376bc0908efe036f73c4",
   "wheel_identical_to_minimum_tested": true,
   "distributions": {
-    "darwinagent-0.3.0-py3-none-any.whl": "e3ea918d01c6cfdab68490c168d7dabc1ae239a619c664e6abd839f52815e2a2",
-    "darwinagent-0.3.0.tar.gz": "400de72ce9b0ab879eaa9503b5770e42110684dcc96602ffa54c220a8fe23da3"
+    "darwinagent-0.3.0-py3-none-any.whl": "0af63944e597dbadf06d82b96e9cf5205d902ce721f4aefcb55513e82aa7f910",
+    "darwinagent-0.3.0.tar.gz": "6ee3f7c22acf8431e4b67c93f5069ac91dc32007455a2dcaa4bd09907dd68d2d"
   },
   "actual_model_http_this_repair": 0,
-  "global_actual_model_http_at_handoff": 5,
+  "global_actual_model_http_at_handoff": 10,
   "q6": "sealed_not_opened",
   "v3_byte_equal_files": 8,
   "installed_checker": "passed outside checkout on Python 3.11.15",
-  "artifact_directory": ".superpowers/sdd/2026-10-09-agent-runtime/live-repair-dist",
-  "acceptance_summary_sha256": "5f1e7f2ad586e6b74598ac4e15c01c4812b66310a100f3e38102a67c0f0c304c",
+  "artifact_directory": ".superpowers/sdd/2026-10-09-agent-runtime/live002-delivery-dist",
+  "acceptance_summary_sha256": "dc11da3a070c11ef8477a5af4d0fad9934d0f687505d67529657194bb577ccc4",
   "evidence_sha256": {
-    "live-repair-build.log": "069bfcee9244a9398fff19d264f5df2775fd899189aacc374154c18c62e45322",
-    "live-repair-install311.log": "6b4074fde74dc5756b56ed33f2d7a19e5fcb241d04a9953fda6f3b3033630c32",
-    "live-repair-installed311.log": "2052e86aa5019af41f5a0ad04879db4f6359d09734ef57b64089f76151887fbd",
-    "live-repair-minimum-focused.log": "654a8f08ffffe6b6ea2549f7c092a569fc624018773647ed40f7c93fc37023cb",
-    "live-repair-distribution.log": "429dcba2b934430397dde6022896ffcde3cc20e13e4180d90acb9305bffead03"
+    "live002-delivery-build.log": "39474e09bc112e318aade8278e8fcd0fc29683ce3fcd0f002636051b33893276",
+    "live002-delivery-install311.log": "a958ce5886488868c133d75dde4afdfd0a9e19d99dd611f93d0e92e28fb285b2",
+    "live002-delivery-installed311.log": "3b4d86359b53336af396992aa8085ecab7aa5cd7a87e799f09280b23189c8706",
+    "live002-delivery-minimum-focused.log": "abefbc78bc953de096207b3e7bcdae89a4a7e2d31c974dd29e0c07a8ee47f718",
+    "live002-delivery-distribution.log": "a010d0b21d9ece3b816fc9a07e10496513027ede656bd19b5366f2122e28c999",
+    "live002-repair-ruff-final.log": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18",
+    "live002-repair-format-final.log": "3bc53bf3e981a98a34a852e175bf9b77af841edea74fca595d9aedcbaf9a4938"
   },
   "previous_distributions": {
-    "artifact_directory": ".superpowers/sdd/2026-10-09-agent-runtime/final-fix-dist",
+    "artifact_directory": ".superpowers/sdd/2026-10-09-agent-runtime/live-repair-dist",
     "distributions": {
-      "darwinagent-0.3.0-py3-none-any.whl": "518ac2534213e9ead5cfe502ad7ff76e72045b799cec1cb823bfc1aa69545b7b",
-      "darwinagent-0.3.0.tar.gz": "f092d2a68c016eccf698a6004c12a8f7be4bbed76391d5631bfa72160c91ab44"
+      "darwinagent-0.3.0-py3-none-any.whl": "e3ea918d01c6cfdab68490c168d7dabc1ae239a619c664e6abd839f52815e2a2",
+      "darwinagent-0.3.0.tar.gz": "400de72ce9b0ab879eaa9503b5770e42110684dcc96602ffa54c220a8fe23da3"
     }
   },
-  "note": "Local unpublished builds; only settled ReAct JSON parse recovery changed. Original live failure and all prior archives retained. Five global actual requests are pre-repair infrastructure/failed q1 diagnosis; this repair made zero model requests."
+  "note": "Unpublished local builds after final Ruff correction and fresh native source freeze. All earlier archives/native evidence and both failed live runs retained. This repair made zero model requests; shared actual ledger remains 10/100 at handoff."
 }

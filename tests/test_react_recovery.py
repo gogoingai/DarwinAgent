@@ -13,6 +13,12 @@ def delivery_check(stage, candidate):
     return stage != "final_delivery" or candidate["final_response"] == "valid"
 
 
+def broken_delivery_check(stage, candidate):
+    if stage == "final_delivery":
+        raise ValueError("host check failure")
+    return True
+
+
 class ReActRecoveryTests(unittest.IsolatedAsyncioTestCase):
     async def test_known_read_failure_then_delivery_rejection_recover_with_fixed_prompt(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -169,10 +175,10 @@ class ReActRecoveryTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(len(client.requests), 2)
             self.assertFalse((root / "first/result.json").exists())
 
-    async def test_valid_json_with_unsupported_action_is_not_parse_recovery(self):
+    async def test_unknown_registered_tool_error_is_not_protocol_recovery(self):
         with tempfile.TemporaryDirectory() as temporary:
             client = RawRecordedClient(
-                ['{"unsupported_action":true}', '{"final_response":"valid"}']
+                ['{"tool":"not_registered","params":{}}', '{"final_response":"valid"}']
             )
             backend = ExecutionBackend(
                 ReActAgent(),
@@ -184,4 +190,138 @@ class ReActRecoveryTests(unittest.IsolatedAsyncioTestCase):
             result = await backend.run(AgentTask("q", "deliver"), run_id="first")
             self.assertEqual(result.status, "failed")
             self.assertEqual(len(client.requests), 1)
+            self.assertEqual(result.events[-1]["error_type"], "ValueError")
+
+    async def test_artifact_strings_receive_feedback_without_rewriting_settled_file(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            invalid = {"final_response": "Saved", "artifacts": ["result/result_q1"]}
+            corrected = {"final_response": "Saved", "artifacts": [{"path": "result/result_q1"}]}
+            client = RawRecordedClient(
+                [
+                    json.dumps(
+                        {
+                            "tool": "write_file",
+                            "params": {"path": "result/result_q1", "content": "once"},
+                        }
+                    ),
+                    json.dumps(invalid),
+                    json.dumps(corrected),
+                ]
+            )
+            backend = ExecutionBackend(
+                ReActAgent(),
+                file_tools(root / "files"),
+                ExecutionProfile("artifact-shape", ("read_file", "write_file")),
+                client,
+                root / "receipts",
+            )
+            task = AgentTask("q", "Save the artifact")
+            result = await backend.run(task, run_id="first")
+            self.assertEqual(result.status, "completed")
+            self.assertEqual(result.to_dict()["artifacts"], corrected["artifacts"])
+            self.assertEqual(result.usage["model_calls"], 3)
+            self.assertEqual(result.usage["leaf_calls"], 1)
+            feedback = json.loads(client.requests[2]["messages"][-1]["content"])["observation"][
+                "error"
+            ]
+            self.assertEqual(feedback["error_type"], "ActionProtocolError")
+            self.assertIn("objects", feedback["message"])
+            self.assertIn('"path"', client.requests[0]["messages"][0]["content"])
+            receipts = root / "receipts/first/steps"
+            before = {p.name: p.read_bytes() for p in receipts.glob("*.json")}
+            self.assertTrue(
+                any(
+                    json.loads(b).get("response", {}).get("content") == json.dumps(invalid)
+                    for b in before.values()
+                )
+            )
+            path = root / "files/result/result_q1"
+            modified = path.stat().st_mtime_ns
+            self.assertEqual(path.read_text(), "once")
+            replay = await backend.run(task, run_id="first")
+            self.assertEqual(replay.to_dict(), result.to_dict())
+            self.assertEqual(before, {p.name: p.read_bytes() for p in receipts.glob("*.json")})
+            self.assertEqual(len(client.requests), 3)
+            self.assertEqual(path.stat().st_mtime_ns, modified)
+
+    async def test_invalid_action_shapes_do_not_dispatch_partial_actions(self):
+        invalids = [
+            None,
+            42,
+            "status",
+            [],
+            {},
+            {"unsupported": True},
+            {"tool": "write_file"},
+            {"tool": 3, "params": {}},
+            {"tool": "write_file", "params": []},
+            {"tool": "write_file", "params": {}, "final_response": "done"},
+            {"final_response": 42},
+            {"final_response": "done", "artifacts": None},
+            {"final_response": "done", "artifacts": {}},
+            {"final_response": "done", "artifacts": ["file"]},
+        ]
+        for invalid in invalids:
+            with self.subTest(invalid=invalid), tempfile.TemporaryDirectory() as temporary:
+                client = RawRecordedClient([json.dumps(invalid), '{"final_response":"valid"}'])
+                backend = ExecutionBackend(
+                    ReActAgent(), [], ExecutionProfile("shape", ()), client, Path(temporary)
+                )
+                result = await backend.run(AgentTask("q", "deliver"), run_id="first")
+                self.assertEqual(result.status, "completed")
+                self.assertEqual(result.usage["model_calls"], 2)
+                self.assertEqual(result.usage["leaf_calls"], 0)
+                error = json.loads(client.requests[1]["messages"][-1]["content"])["observation"][
+                    "error"
+                ]
+                self.assertEqual(error["error_type"], "ActionProtocolError")
+
+    async def test_generic_artifact_mappings_keep_existing_contract(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            artifacts = [{"kind": "summary", "value": 7}, {}]
+            client = RecordedClient([{"final_response": "done", "artifacts": artifacts}])
+            backend = ExecutionBackend(
+                ReActAgent(), [], ExecutionProfile("generic", ()), client, Path(temporary)
+            )
+            result = await backend.run(AgentTask("q", "deliver"), run_id="first")
+            self.assertEqual(result.status, "completed")
+            self.assertEqual(result.to_dict()["artifacts"], artifacts)
+
+    async def test_protocol_schema_feedback_obeys_budget_and_unknown_quarantine(self):
+        invalid = '{"final_response":"done","artifacts":["file"]}'
+        for responses, expected, calls in [
+            ([invalid] * 9, "budget_exhausted", 8),
+            ([invalid, ConnectionError("lost")], "unknown", 2),
+        ]:
+            with self.subTest(expected=expected), tempfile.TemporaryDirectory() as temporary:
+                client = RawRecordedClient(responses)
+                backend = ExecutionBackend(
+                    ReActAgent(),
+                    [],
+                    ExecutionProfile("schema-cap", (), max_model_calls=8),
+                    client,
+                    Path(temporary),
+                )
+                task = AgentTask("q", "deliver")
+                result = await backend.run(task, run_id="first")
+                self.assertEqual(result.status, expected)
+                self.assertEqual(result.usage["model_calls"], calls)
+                self.assertEqual(result.usage["leaf_calls"], 0)
+                self.assertEqual((await backend.run(task, run_id="first")).status, expected)
+                self.assertEqual(len(client.requests), calls)
+
+    async def test_host_final_check_value_error_is_not_protocol_feedback(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            client = RecordedClient([{"final_response": "valid"}, {"final_response": "valid"}])
+            backend = ExecutionBackend(
+                ReActAgent(),
+                [],
+                ExecutionProfile("host-failure", (), host_checks=(broken_delivery_check,)),
+                client,
+                Path(temporary),
+            )
+            result = await backend.run(AgentTask("q", "deliver"), run_id="first")
+            self.assertEqual(result.status, "failed")
+            self.assertEqual(client.calls, 1)
             self.assertEqual(result.events[-1]["error_type"], "ValueError")

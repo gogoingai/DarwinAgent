@@ -8,15 +8,46 @@ from darwinagent.contracts import plain
 from .context import CheckRejected
 from .failures import ToolFailure
 
+_ACTION_PROTOCOL = (
+    'Return exactly one JSON object: {"tool": "registered name", "params": {...}} to act, '
+    'or {"final_response": "text", "artifacts": [{"path": "actual output path"}]} to finish. '
+    "Tool must be a nonempty string and params an object. Final_response must be a string. "
+    "Artifacts is optional; when present it must be an array of JSON objects, never strings. "
+    "Use [] for no artifacts. For files, copy the actual path from a completed tool result; "
+    "include other metadata only when supported by that result. Do not invent files or receipts. "
+    "Other artifact objects follow the host artifact contract; no universal metadata field "
+    "is required. Do not repeat a completed write just to correct the final response format."
+)
+
+
+class ActionProtocolError(ValueError):
+    """A settled reply violates the ReAct envelope, before any runtime operation."""
+
+
+def _validate_action(action):
+    if not isinstance(action, dict):
+        raise ActionProtocolError("Reply must be a JSON object.")
+    if "final_response" in action and set(action) <= {"final_response", "artifacts"}:
+        if not isinstance(action["final_response"], str):
+            raise ActionProtocolError("final_response must be a string.")
+        artifacts = action.get("artifacts", [])
+        if not isinstance(artifacts, list) or any(not isinstance(a, dict) for a in artifacts):
+            raise ActionProtocolError("artifacts must be an array of JSON objects, not strings.")
+        return
+    if set(action) == {"tool", "params"}:
+        if not isinstance(action["tool"], str) or not action["tool"].strip():
+            raise ActionProtocolError("tool must be a nonempty string.")
+        if not isinstance(action["params"], dict):
+            raise ActionProtocolError("params must be a JSON object.")
+        return
+    raise ActionProtocolError("Use exactly tool/params or final_response with optional artifacts.")
+
 
 @dataclass(frozen=True)
 class ReActAgent:
     max_turns: int = 16
     role: str = "worker"
-    system_prompt: str = (
-        'Return a JSON object: {"tool": "registered name", "params": {...}} to act, '
-        'or {"final_response": "text", "artifacts": []} to finish.'
-    )
+    system_prompt: str = _ACTION_PROTOCOL
 
     async def run(self, task, context):
         messages = [
@@ -39,7 +70,8 @@ class ReActAgent:
             messages.append({"role": "assistant", "content": response.content})
             try:
                 action = json.loads(response.content)
-            except json.JSONDecodeError:
+                _validate_action(action)
+            except (json.JSONDecodeError, ActionProtocolError) as exc:
                 messages.append(
                     {
                         "role": "user",
@@ -47,12 +79,14 @@ class ReActAgent:
                             {
                                 "observation": {
                                     "error": {
-                                        "error_type": "JSONDecodeError",
+                                        "error_type": type(exc).__name__,
                                         "message": (
-                                            "Reply was not valid JSON; no action was executed. "
-                                            'Return {"tool": "registered name", "params": {...}} '
-                                            'or {"final_response": "text", "artifacts": []}.'
-                                        ),
+                                            "Reply was not valid JSON. "
+                                            if isinstance(exc, json.JSONDecodeError)
+                                            else str(exc) + " "
+                                        )
+                                        + "No action was executed for this reply. "
+                                        + _ACTION_PROTOCOL,
                                     }
                                 }
                             }
@@ -61,9 +95,7 @@ class ReActAgent:
                 )
                 continue
             try:
-                if set(action) <= {"final_response", "artifacts"} and isinstance(
-                    action.get("final_response"), str
-                ):
+                if "final_response" in action:
                     result = context.result(
                         action["final_response"], artifacts=action.get("artifacts", ())
                     )
@@ -76,8 +108,6 @@ class ReActAgent:
                         },
                     )
                     return result
-                if set(action) != {"tool", "params"}:
-                    raise ValueError("Invalid ReAct action")
                 output = await context.call(action["tool"], action["params"])
             except ToolFailure as exc:
                 output = {"error": exc.to_dict()}
