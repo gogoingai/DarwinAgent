@@ -19,12 +19,18 @@ def sha(path):
 
 
 class LiftDataset:
+    ids = IDS
+    manifest_name = "download-manifest.json"
+    manifest_q6 = "not_downloaded"
+    path_pattern = r"/q[125]_[^/]+/"
+    q6_status = "sealed_not_opened"
+
     def __init__(self, data_root):
         from src.models import ExpectedResult, SuiteTask, TaskRequirements
 
         self.root = Path(data_root).resolve()
-        manifest = json.loads((self.root / "download-manifest.json").read_text())
-        if manifest["revision"] != EALE_REVISION or manifest.get("q6") != "not_downloaded":
+        manifest = json.loads((self.root / self.manifest_name).read_text())
+        if manifest["revision"] != EALE_REVISION or manifest.get("q6") != self.manifest_q6:
             raise ValueError("Unexpected EALE revision or sealed task state")
         self.files = manifest["files"]
         if len({r["path"] for r in self.files}) != len(self.files):
@@ -39,8 +45,8 @@ class LiftDataset:
                 or any(p.is_symlink() for p in (path, *path.parents) if p != self.root)
             ):
                 raise ValueError("Dataset file escapes its root")
-            if not re.search(r"/q[125]_[^/]+/", row["path"]):
-                raise ValueError("Only q1/q2/q5 may be opened")
+            if not re.search(self.path_pattern, row["path"]):
+                raise ValueError("File outside the declared authorized task split")
             if sha(path) != row["sha256"]:
                 raise ValueError("Dataset material changed")
             if path.suffix == ".md" and not any(p.endswith("_materials") for p in path.parts):
@@ -58,8 +64,8 @@ class LiftDataset:
                         content_reqs=sections["要求"], trajectory_reqs=sections["轨迹要求"]
                     ),
                 )
-        if set(self.native) != set(IDS):
-            raise ValueError("Development dataset must contain exactly q1/q2/q5")
+        if set(self.native) != set(self.ids):
+            raise ValueError("Dataset must contain exactly its declared task split")
 
         self.materials = {}
         for task_id, native in self.native.items():
@@ -102,11 +108,11 @@ class LiftDataset:
         return {
             "revision": EALE_REVISION,
             "manifest": digest(self.files),
-            "q6": "sealed_not_opened",
+            "q6": self.q6_status,
         }
 
     def task(self, task_id):
-        if task_id not in IDS:
+        if task_id not in self.ids:
             raise ValueError("Task outside authorized development split")
         native = self.native[task_id]
         material = Path(native.requirements.material_dir)
@@ -148,3 +154,20 @@ class LiftDataset:
         )
         Path(path).write_text(suite.model_dump_json(indent=2))
         return suite
+
+
+class LiftConfirmationDataset(LiftDataset):
+    """Separately authorized q6-only manifest; never admitted to development training.
+
+    Construction opens q6 files, so only use after the frozen development run and
+    explicit confirmation-data authorization. Importing this class opens nothing.
+    """
+
+    ids = ("q6",)
+    manifest_name = "confirmation-manifest.json"
+    manifest_q6 = "authorized_confirmation"
+    path_pattern = r"/q6_[^/]+/"
+    q6_status = "independent_confirmation"
+
+    def write_suite(self, path):
+        raise PermissionError("Confirmation tasks cannot enter a development training suite")

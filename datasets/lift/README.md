@@ -4,9 +4,9 @@
 
 - LIFT：`9d282e415c5e3b0f65b82c8758a013b269583d93`。
 - EALE：`419789ed1662e7b9ad16aa6620a4b31449612948`；本地 `download-manifest.json` 校验每个文件。
-- q1：训练/行为准入；q2：独立候选验证；冻结选中版本后 q5：开发比较。q6 不下载、不读取、不执行。
+- q1：训练/行为准入；q2：独立候选验证；冻结选中版本后 q5：开发比较。开发阶段 q6 不下载、不读取、不执行；修复后的冻结版本另用独立 q6 确认。
 - A：同一 ReAct 与固定原语，无 kernel；B：K0；C：采纳的 K1，拒绝则 K0。所有 worker/judge 使用同一用户指定模型、端点、temperature=0，保持独立历史。
-- 每题最多 3 次原生 worker↔judge 回合，即最多 2 次原生纠错；整个 worker session 累计最多 8 次模型请求。共同的实际 HTTP attempt 上限为 100，SDK retries=0、传输最大尝试次数为 1。
+- 每题最多 3 次原生 worker↔judge 回合，即最多 2 次原生纠错；整个 worker session 累计最多 8 次模型请求。共同的实际 HTTP attempt 默认上限为 100；经显式审计修订后可为总计 500，SDK retries=0、传输最大尝试次数为 1。
 - `budget_root` 必须独立于每次比较的 `run_root`。框架修复后新建比较目录，但复用预算目录、HTTP 总账和未知请求暂停状态。`submitted` 未收据请求在恢复时全局隔离；禁止自动清除暂停文件或重发未知请求。
 
 ## 本地执行 / Local execution
@@ -18,7 +18,8 @@
 使用现有 Python 3.12 环境、已有固定上游与 16 文件数据清单，沿用 `pilot.example.json`。
 `run_root` 采用新目录；`budget_root` 指向原始独立的 100 请求账本，不能重置。
 凭据只从宿主 `DARWINAGENT_API_KEY` 获取；模型、端点环境变量必须与 JSON 完全一致。
-当前授权模型为 `glm-5.3-flash`，所有角色温度为 0，8/3/100 三项限制不可提高。
+当前授权模型为 `glm-5.3-flash`，所有角色温度为 0；worker 8 次请求与 3 次原生回合保持固定。
+`http_cap` 默认 100；显式 500 必须先有下述审计记录，启动器不会自动提高上限。
 以下真实运行命令仅供获得模型调用授权的协调者使用：
 
 ```sh
@@ -36,8 +37,40 @@ q1 的相同任务/K0/固定身份收据复用于 warmup、准入和训练；候
 公开证据。q2 仍独立验证，最多提交一个联合 S/F/C/P 候选，并沿用核心严格选择。
 训练失败时跳过 proposal/Wiki，仍诊断 q2；进化不可用时显式选择 K0。
 冻结选择后，q5 A/B/C 各自独立执行，C=K0 也不会复用 B 的运行。
-单题已知失败或 8 次 worker 上限产生可重放终态，继续下一题；未知请求/写入或全局 100 上限暂停。
+单题已知失败或 8 次 worker 上限产生可重放终态，继续下一题；未知请求/写入或全局已授权 HTTP 上限暂停。
 历史歧义暂停仅由协调者调用 `SharedTransport.recover_local_cap_pause` 审计恢复，启动器不会自动恢复。
+
+ReAct 兼容单工具与 final 回复，新增可选的 `{"actions":[{"tool":"read_text","params":{"path":"public.txt"}}, ...]}`，
+每批 1–16 项。执行前校验整批的协议、工具注册及输入契约，再顺序通过同一个 `context.call`；
+已知工具/C 失败停止剩余项并逐项返回观察，未知写入仍隔离，已完成操作恢复时不重做。
+批量只节省模型决策次数，每个原语 leaf 仍接受检查并记账。K0 的 `inspect_materials` 从 S 的
+公开 Material 路径实际读取最多 16 个 TXT/MD/CSV/XLSX，或使用显式 `paths`；不读取私有评判。
+
+总预算修订只供已授权且停止所有运行的协调者：用与原 `policy.json` 相同模型、端点、路由和
+账本的 cap=100 客户端构造 `SharedTransport`，调用
+`shared.amend_http_cap(total_cap=500, expected_http_attempts=78)`。它要求所有历史请求有已结算收据，
+没有未知/未处理暂停，保存独立 `http-cap-amendment.json`，不会改原 100 政策、总账、计数或历史收据。
+随后以相同 `budget_root`、显式 `http_cap: 500` 和新 `run_root` 启动；旧 100 客户端停止调度。
+500 是共享总量，原 78 次保留，修订时剩余 422。未来发送继续递增原总账；审计永久校验原收据与
+政策字节。历史已确认暂停保留，未来暂停另记 `active-pause.json`，不会被旧恢复记录放行。
+
+独立确认沿用原计划授权，在冻结开发比较完成后由协调者准备单独 q6 数据目录及
+`confirmation-manifest.json`：`revision` 为上述 EALE SHA、`q6` 为 `authorized_confirmation`，
+`files` 仅列 q6 查询/材料的相对路径和 SHA256。默认开发清单仍严格只含 q1/q2/q5。
+新配置设置 `mode: confirmation`、`selection_run_root: /private/completed-development-run`、新的
+`run_root` 与 q6 专属 `data_root`，沿用同一 500 总账及上面的模块命令。此模式校验开发调度已结束、
+源码/模型/账本/K0/选中资产相同，独立运行 q6 A/B/C，跳过训练、proposal、Wiki 和进化；私有要求仍只给 judge。
+它不把 q6 加入训练，也不把三组运行验证或录制分数等同于质量提升或整个版本验收。
+
+Optional ReAct batches contain 1–16 tool/params actions. All envelopes, registrations and input
+contracts validate before effects; checked calls execute sequentially and every primitive counts.
+Known failures stop the batch with individual observations; uncertain effects remain quarantined.
+K0 now loads public S Material paths through the same fixed read primitives, with P unchanged.
+The default total HTTP cap remains 100. Only an explicit stopped-run coordinator audit with
+`amend_http_cap(total_cap=500, expected_http_attempts=78)` permits a new cap=500 client using the
+original ledger; existing usage and original policy/receipts remain preserved. Independent q6
+confirmation uses a separate manifest, mode and run root after the frozen development run ends,
+with the same source, selected assets, model and shared budget and no training or evolution.
 
 无需服务器即可生成 `all-pair-report.json`、`.csv`、`.md`，保留失败、未开始、缺失值、
 中间评判以及 worker/judge/proposal/Wiki 各角色的实际费用。最终内容分数与失败前的中间分数
@@ -58,7 +91,7 @@ Langfuse, service calls, dotenv discovery or child tool processes. Use the modul
 fresh run directory and the original independent budget directory. Identical public q1 evidence may
 be reused across warmup/admission/training; q2 remains private validation, and q5 A/B/C always execute
 independently after selection freezes. Known local failures continue; unknown effects and the global
-100-attempt gate pause. Reports disclose fallback, null/intermediate scores, all role costs and the
+authorized HTTP attempt gate pause. Reports disclose fallback, null/intermediate scores, all role costs and the
 unopened q6 scope. This is a local adaptation, not full native container reproduction; recorded tests
 do not establish real model quality or complete real acceptance.
 

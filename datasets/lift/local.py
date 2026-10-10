@@ -16,7 +16,7 @@ from darwinagent.runtime.artifacts import atomic_json, digest
 from darwinagent.runtime.identity import assert_files, snapshot_files
 from darwinagent.runtime.leases import execution_lease
 
-from .data import UPSTREAM_REVISION, LiftDataset, sha
+from .data import UPSTREAM_REVISION, LiftConfirmationDataset, LiftDataset, sha
 from .local_tools import LocalTools
 from .report import available_sum, cell, report, token_count, update_cell
 
@@ -93,15 +93,42 @@ class LocalEvaluator:
 
 
 class LocalRunner:
-    def __init__(self, *, dataset, shared, root, initial, run_id):
+    def __init__(
+        self, *, dataset, shared, root, initial, run_id, mode="development", selection_run_root=None
+    ):
         from src.lift.eval import task_exec
 
         self.dataset, self.shared, self.root = dataset, shared, Path(root).resolve()
-        if isinstance(dataset, LiftDataset) and len(dataset.files) != 16:
+        self.mode, self.selection_run_root = (
+            mode,
+            Path(selection_run_root).resolve() if selection_run_root else None,
+        )
+        if mode not in {"development", "confirmation"}:
+            raise ValueError("Unknown local execution mode")
+        if mode == "confirmation" and (
+            not isinstance(dataset, LiftConfirmationDataset) or not self.selection_run_root
+        ):
+            raise ValueError(
+                "Independent confirmation requires a separate q6 dataset and frozen selection run"
+            )
+        if mode == "development" and isinstance(dataset, LiftConfirmationDataset):
+            raise ValueError("q6 cannot enter development training")
+        if type(dataset) is LiftDataset and len(dataset.files) != 16:
             raise ValueError("Local pilot requires the existing exact 16-file manifest")
+        if self.selection_run_root and (
+            self.selection_run_root.is_relative_to(self.root)
+            or self.root.is_relative_to(self.selection_run_root)
+        ):
+            raise ValueError("Confirmation and selection run roots must be independent")
         self.initial, self.run_id = initial, run_id
-        if shared.trace or shared.worker_limit != 8 or shared.cfg.max_http_requests != 100:
-            raise ValueError("Local runner requires trace=False and fixed 8/100 caps")
+        if (
+            shared.trace
+            or shared.worker_limit != 8
+            or shared.cfg.max_http_requests not in (100, 500)
+        ):
+            raise ValueError(
+                "Local runner requires trace=False and fixed worker 8 and authorized total HTTP cap"
+            )
         if shared.root.resolve().is_relative_to(self.root) or self.root.is_relative_to(
             shared.root.resolve()
         ):
@@ -117,7 +144,10 @@ class LocalRunner:
             ]
         )
         identity = {
-            "mode": "local-native-task-adaptation-v1",
+            "mode": "local-native-task-adaptation-v1"
+            if mode == "development"
+            else "local-independent-q6-confirmation-v1",
+            "selection_run_root": str(self.selection_run_root) if self.selection_run_root else None,
             "run_id": run_id,
             "source": self.source,
             "upstream": UPSTREAM_REVISION,
@@ -443,7 +473,78 @@ class LocalRunner:
         atomic_json(selected_path, state)
         return selected
 
+    async def run_confirmation(self, selected=None):
+        """q6-only frozen confirmation: no training, proposal, Wiki or evolution."""
+        if self.mode != "confirmation":
+            raise ValueError("Confirmation must use its separate mode/root/dataset")
+        self.verify()
+        origin_identity = self.selection_run_root / "integration-identity.json"
+        origin_selection = self.selection_run_root / "selected-state.json"
+        origin_report = self.selection_run_root / "all-pair-report.json"
+        origin = json.loads(origin_identity.read_text())
+        selection = json.loads(origin_selection.read_text())
+        development = json.loads(origin_report.read_text())
+        compared = [row for row in development["rows"] if row["task_id"] == "q5"]
+        if (
+            development["status"] not in {"complete", "finished_with_failures"}
+            or {row["arm"] for row in compared} != {"A", "B", "C"}
+            or len(compared) != 3
+            or any(row["status"] not in {"completed", "failed"} for row in compared)
+        ):
+            raise ValueError("Independent confirmation requires completed development scheduling")
+        if (
+            origin["mode"] != "local-native-task-adaptation-v1"
+            or origin["source"] != self.source
+            or origin["initial"] != self.initial.content_id
+            or origin["transport"] != self.shared.identity()
+        ):
+            raise ValueError("Confirmation requires the same frozen development source and K0")
+        if selection["source_sha256"] != digest(self.source):
+            raise ValueError("Selected development source changed")
+        if selected is None:
+            selected = AgentKernelBundle(selection["bundle_root"])
+        selected.verify()
+        if selected.content_id != selection["kernel_id"]:
+            raise ValueError(
+                "Confirmation selected kernel differs from frozen development selection"
+            )
+        frozen_origin = snapshot_files([origin_identity, origin_selection, origin_report])
+        proof_path = self.root / "confirmation-origin.json"
+        proof = {"source": frozen_origin, "selected": selected.content_id, "training": "not_run"}
+        if proof_path.exists() and json.loads(proof_path.read_text()) != proof:
+            raise ValueError("Frozen confirmation origin changed")
+        if not proof_path.exists():
+            atomic_json(proof_path, proof)
+        selected_path = self.root / "selected-state.json"
+        frozen_selection = {
+            "kernel_id": selected.content_id,
+            "bundle_root": str(selected.root),
+            "fallback": selection["fallback"],
+            "campaign": {"status": "not_run_independent_confirmation"},
+            "source_sha256": digest(self.source),
+        }
+        if selected_path.exists() and json.loads(selected_path.read_text()) != frozen_selection:
+            raise ValueError("Frozen confirmation selection changed")
+        if not selected_path.exists():
+            atomic_json(selected_path, frozen_selection)
+        for arm in ("A", "B", "C"):
+            key = digest({"task_id": "q6", "arm": arm, "phase": "holdout", "run_id": self.run_id})[
+                :24
+            ]
+            if not (self.root / "cells" / (key + ".json")).exists():
+                cell(self.root, "q6", arm, "holdout", self.run_id)
+        with execution_lease(self.root / "local-run.lock"):
+            try:
+                for arm, kernel in (("A", None), ("B", self.initial), ("C", selected)):
+                    assert_files(frozen_origin)
+                    await self.execute(self.dataset.task("q6"), kernel, arm, "holdout", "q6-" + arm)
+            finally:
+                self.write_reports()
+        return json.loads((self.root / "all-pair-report.json").read_text())
+
     async def run(self):
+        if self.mode == "confirmation":
+            return await self.run_confirmation()
         self.verify()
         for task_id, arm, phase in (
             ("q1", "campaign", "train"),
@@ -471,7 +572,7 @@ class LocalRunner:
         self.verify()
         state_path = self.root / "selected-state.json"
         value["selected"] = json.loads(state_path.read_text()) if state_path.exists() else None
-        value["execution_mode"] = "local-native-task-adaptation-v1"
+        value["execution_mode"] = self.frozen_identity["mode"]
         histories = {}
         for path in sorted((self.shared.root / "requests").glob("*.json")):
             request = json.loads(path.read_text())
@@ -524,22 +625,44 @@ class LocalRunner:
         value["macro_count_semantics"] = (
             "completed_worker_F_invocations_in_receipted_episode_events"
         )
-        holdout = [r for r in value["rows"] if r["task_id"] == "q5"]
+        comparison_task = "q6" if self.mode == "confirmation" else "q5"
+        holdout = [r for r in value["rows"] if r["task_id"] == comparison_task]
+        value["comparison_task"] = comparison_task
+        if self.mode == "confirmation":
+            value["q6"] = "independent_confirmation"
+            value["status"] = (
+                "paused"
+                if value["status"] == "paused"
+                else "finished_with_failures"
+                if any(r["status"] == "failed" for r in holdout)
+                else "complete"
+                if len(holdout) == 3 and all(r["status"] == "completed" for r in holdout)
+                else "incomplete"
+            )
         value["evaluation_healthy"] = (
             bool(holdout) and len(holdout) == 3 and all(r.get("healthy") for r in holdout)
         )
-        value["q5_verification_complete"] = (
+        value["comparison_verification_complete"] = (
             value["status"] in {"complete", "finished_with_failures"}
             and value["evaluation_healthy"]
             and value["model_evidence"] == "host_transport"
         )
-        value["acceptance_complete"] = value["q5_verification_complete"]
-        value["acceptance_scope"] = "local_q5_A_B_C_execution_verification_only"
+        value["q5_verification_complete"] = (
+            self.mode == "development" and value["comparison_verification_complete"]
+        )
+        value["acceptance_complete"] = value["comparison_verification_complete"]
+        value["acceptance_scope"] = (
+            "local_" + comparison_task + "_A_B_C_execution_verification_only"
+        )
         value["quality_improvement_claim"] = False
         value["evolution_complete"] = (
             bool(value["selected"]) and value["selected"]["campaign"].get("status") == "complete"
         )
-        value["evolution_adopted"] = bool(value["selected"]) and not value["selected"]["fallback"]
+        value["evolution_adopted"] = (
+            self.mode == "development"
+            and bool(value["selected"])
+            and not value["selected"]["fallback"]
+        )
         value["source_sha256"] = digest(self.source)
         atomic_json(self.root / "all-pair-report.json", value)
         fields = [
@@ -572,9 +695,11 @@ class LocalRunner:
             "# Local LIFT all-pair evidence",
             "",
             f"Status: {value['status']}; acceptance complete: {value['acceptance_complete']}",
-            f"HTTP attempts: {value['actual_http_attempts']}/100; evaluation healthy: {value['evaluation_healthy']}",
-            "q6: sealed, no independent generalization or measured improvement claim.",
-            "Acceptance scope: local q5 A/B/C execution verification only; release acceptance remains separate.",
+            f"HTTP attempts: {value['actual_http_attempts']}/{self.shared.cfg.max_http_requests}; evaluation healthy: {value['evaluation_healthy']}",
+            "q6: sealed, no independent generalization or measured improvement claim."
+            if self.mode == "development"
+            else "q6: separate independent confirmation; no training or measured improvement claim.",
+            f"Acceptance scope: local {comparison_task} A/B/C execution verification only; release acceptance remains separate.",
             "Recorded scores are synthetic."
             if value["model_evidence"] == "recorded_offline"
             else "Scores use the authorized host model and unchanged native content judge.",
@@ -631,17 +756,23 @@ def build_runner(config, run_id):
     from .transport import SharedTransport
 
     for key, default in (
-        ("http_cap", 100),
         ("worker_limit", 8),
         ("correction_rounds", 3),
         ("temperature", 0),
     ):
         if config.get(key, default) != default:
             raise ValueError("Local pilot requires fixed " + key)
+    http_cap = config.get("http_cap", 100)
+    if type(http_cap) is not int or http_cap not in (100, 500):
+        raise ValueError("HTTP cap defaults to 100; 500 requires explicit audited authorization")
     model, endpoint = os.environ["DARWINAGENT_MODEL"], os.environ["DARWINAGENT_BASE_URL"]
     if model != "glm-5.3-flash" or model != config["model"] or endpoint != config["base_url"]:
         raise ValueError("Model/endpoint differs from the authorized frozen config")
     root, budget = Path(config["run_root"]).resolve(), Path(config["budget_root"]).resolve()
+    mode = config.get("mode", "development")
+    selection_root = config.get("selection_run_root")
+    if mode == "confirmation" and not selection_root:
+        raise ValueError("Confirmation config requires the frozen development selection_run_root")
     if root.is_relative_to(budget) or budget.is_relative_to(root):
         raise ValueError("budget_root must be independent of run_root")
     cfg = Config(
@@ -652,7 +783,7 @@ def build_runner(config, run_id):
         model_fast=model,
         max_retries=1,
         max_concurrency=1,
-        max_http_requests=100,
+        max_http_requests=http_cap,
         request_budget_path=budget / "http-attempts.json",
         work_dir=root / "transport",
         model_profiles=False,
@@ -660,14 +791,22 @@ def build_runner(config, run_id):
     cfg.role_tiers.update(worker="strong", judge="strong")
     shared = SharedTransport(LLMClient(cfg), budget / "shared", worker_limit=8)
     initial = (
-        AgentKernelBundle(root / "K0") if (root / "K0").exists() else initial_kernel(root / "K0")
+        AgentKernelBundle(Path(selection_root) / "K0")
+        if mode == "confirmation"
+        else AgentKernelBundle(root / "K0")
+        if (root / "K0").exists()
+        else initial_kernel(root / "K0")
     )
     return LocalRunner(
-        dataset=LiftDataset(config["data_root"]),
+        dataset=LiftConfirmationDataset(config["data_root"])
+        if mode == "confirmation"
+        else LiftDataset(config["data_root"]),
         shared=shared,
         root=root,
         initial=initial,
         run_id=run_id,
+        mode=mode,
+        selection_run_root=selection_root,
     )
 
 

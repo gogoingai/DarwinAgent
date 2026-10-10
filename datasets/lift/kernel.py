@@ -31,10 +31,34 @@ def initial_kernel(root):
             AgentAsset(
                 "inspect_materials",
                 "F",
-                'def run(params):\n    return call("list_files", {})\n',
+                "def run(params):\n"
+                '    paths = params.get("paths", [])\n'
+                "    if not paths:\n"
+                "        paths = []\n"
+                '        for node in view()["nodes"]:\n'
+                '            if node["type"] == "Material":\n'
+                '                paths.append(node["fields"]["path"])\n'
+                "    loaded = []\n"
+                "    skipped = []\n"
+                "    for path in paths[:16]:\n"
+                "        lower = path.lower()\n"
+                '        if lower.endswith(".csv") or lower.endswith(".xlsx"):\n'
+                '            result = call("read_table", {"path":path})\n'
+                '        elif lower.endswith(".txt") or lower.endswith(".md"):\n'
+                '            result = call("read_text", {"path":path})\n'
+                "        else:\n"
+                "            skipped.append(path)\n"
+                "            continue\n"
+                '        loaded.append({"path":path,"result":result})\n'
+                '    return {"loaded":loaded,"skipped":skipped,"remaining_paths":paths[16:]}\n',
                 schema_dependencies=("schema",),
                 trial_inputs=({},),
-                description="List task materials",
+                input_contract={
+                    "type": "object",
+                    "properties": {"paths": {"type": "array", "items": {"type": "string"}}},
+                    "additionalProperties": True,
+                },
+                description="Read up to 16 public Material graph text/table paths together; optional paths overrides the graph; every read is a counted primitive",
             ),
             AgentAsset(
                 "delivery",

@@ -242,6 +242,10 @@ def report(root, shared):
         "all_pairs_retained": True,
         "roles": roles,
         "actual_http_attempts": shared.client.http_attempts(),
+        "http_cap": shared.cfg.max_http_requests,
+        "remaining_http_attempts": max(
+            0, shared.cfg.max_http_requests - shared.client.http_attempts()
+        ),
         "global_request_records": global_request_count,
         "campaign_request_records": len(requests),
         "model_evidence": "recorded_offline" if not shared.cfg.api_base_url else "host_transport",

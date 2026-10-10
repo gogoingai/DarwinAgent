@@ -22,15 +22,30 @@ class SharedTransport:
         self.trace = False
         self.run_id = self.root.name
         self.root.mkdir(parents=True, exist_ok=True)
+        self.cap_amendment = None
         policy = self.root / "policy.json"
         declaration = self.identity()
-        if policy.exists() and json.loads(policy.read_text()) != declaration:
-            raise ValueError("Shared budget transport policy changed")
-        if not policy.exists():
+        amendment = self.root / "http-cap-amendment.json"
+        if amendment.exists():
+            self.cap_amendment = self._verify_cap_amendment(json.loads(amendment.read_text()))
+            if self.cfg.max_http_requests != self.cap_amendment["to_cap"]:
+                raise ValueError("Use the explicitly amended total HTTP cap")
+            declaration = self.identity()
+        if policy.exists():
+            original = json.loads(policy.read_text())
+            comparable = dict(declaration)
+            comparable.pop("http_cap_amendment_sha256", None)
+            if self.cap_amendment:
+                comparable["http_cap"] = self.cap_amendment["from_cap"]
+            if original != comparable:
+                raise ValueError("Shared budget transport policy changed")
+        else:
+            if self.cfg.max_http_requests is not None and self.cfg.max_http_requests > 100:
+                raise ValueError("An explicit audited HTTP cap amendment is required")
             atomic_json(policy, declaration)
 
     def identity(self):
-        return {
+        identity = {
             "transport": transport_identity(self.client),
             "worker_limit": self.worker_limit,
             "budget_root": str(self.root.resolve()),
@@ -39,9 +54,111 @@ class SharedTransport:
             if self.cfg.request_budget_path
             else None,
         }
+        if self.cap_amendment:
+            from darwinagent.runtime.artifacts import digest
+
+            identity["http_cap_amendment_sha256"] = digest(self.cap_amendment)
+        return identity
+
+    def _verify_cap_amendment(self, audit):
+        policy = self.root / "policy.json"
+        if (audit.get("from_cap"), audit.get("to_cap")) != (100, 500):
+            raise ValueError("Only the explicit 100-to-500 total amendment is supported")
+        if audit["original_policy_sha256"] != hashlib.sha256(policy.read_bytes()).hexdigest():
+            raise ValueError("Original HTTP policy changed")
+        original = json.loads(policy.read_text())
+        if original["http_cap"] != 100 or audit["http_ledger"] != original["http_ledger"]:
+            raise ValueError("Amendment does not bind the original HTTP ledger")
+        if self.client.http_attempts() < audit["http_attempts"]:
+            raise ValueError("Amended HTTP ledger was reset")
+        pause_hash = audit.get("original_pause_sha256")
+        if (
+            pause_hash
+            and hashlib.sha256((self.root / "pause.json").read_bytes()).hexdigest() != pause_hash
+        ):
+            raise ValueError("Original pause evidence changed")
+        for name, checksum in audit["settled_receipts"].items():
+            path = self.root / "requests" / name
+            if Path(name).name != name or hashlib.sha256(path.read_bytes()).hexdigest() != checksum:
+                raise ValueError("Original settled request receipt changed")
+        return audit
+
+    def amend_http_cap(self, *, total_cap, expected_http_attempts):
+        """Explicit coordinator audit; preserve all original bytes and counters.
+
+        This API writes only an immutable authorization record. Recreate the
+        client with cap=500 afterwards; ordinary startup never raises a cap.
+        """
+        if total_cap != 500 or self.cfg.max_http_requests != 100:
+            raise ValueError("Amendment requires the original 100 cap and authorized total 500")
+        with execution_lease(self.root / "http-cap-amendment.lock"):
+            target = self.root / "http-cap-amendment.json"
+            if target.exists():
+                audit = self._verify_cap_amendment(json.loads(target.read_text()))
+                if audit["http_attempts"] != expected_http_attempts:
+                    raise ValueError("Amendment expected-attempt evidence changed")
+                return audit
+            actual = self.client.http_attempts()
+            if actual != expected_http_attempts or not 0 <= actual < 100:
+                raise ValueError("HTTP attempts changed or the original global cap is exhausted")
+            pause = self.root / "pause.json"
+            if (self.root / "active-pause.json").exists():
+                raise ValueError("Unresolved active pause forbids amendment")
+            if pause.exists():
+                recovered = self.root / "recovery/local-cap.json"
+                if (
+                    not recovered.exists()
+                    or json.loads(recovered.read_text())["pause_sha256"]
+                    != hashlib.sha256(pause.read_bytes()).hexdigest()
+                ):
+                    raise ValueError("Unresolved unknown/trace/global pause forbids amendment")
+            receipts = {
+                p.name: (p, json.loads(p.read_text()))
+                for p in (self.root / "requests").glob("*.json")
+            }
+            settled = {"completed", "failed", "budget_exhausted"}
+            if not receipts or any(r["status"] not in settled for _, r in receipts.values()):
+                raise ValueError("Every original HTTP request must have a settled receipt")
+            if sum(r.get("actual_http_attempts", 0) for _, r in receipts.values()) != actual:
+                raise ValueError("Original settled HTTP receipts do not reconcile")
+            if list((self.root / "trace-errors").glob("*.json")):
+                raise ValueError("Unresolved trace failure forbids amendment")
+            policy = self.root / "policy.json"
+            original = json.loads(policy.read_text())
+            if original != self.identity() or original["http_cap"] != 100:
+                raise ValueError("Original transport policy changed")
+            counter = self.root / "worker-calls.json"
+            audit = {
+                "from_cap": 100,
+                "to_cap": 500,
+                "http_attempts": actual,
+                "authorization": "explicit_user_total_cap",
+                "http_ledger": original["http_ledger"],
+                "original_policy_sha256": hashlib.sha256(policy.read_bytes()).hexdigest(),
+                "original_http_ledger_sha256": hashlib.sha256(
+                    Path(original["http_ledger"]).read_bytes()
+                ).hexdigest()
+                if original["http_ledger"]
+                else None,
+                "original_worker_counter_sha256": hashlib.sha256(counter.read_bytes()).hexdigest()
+                if counter.exists()
+                else None,
+                "original_pause_sha256": hashlib.sha256(pause.read_bytes()).hexdigest()
+                if pause.exists()
+                else None,
+                "settled_receipts": {
+                    name: hashlib.sha256(path.read_bytes()).hexdigest()
+                    for name, (path, _) in sorted(receipts.items())
+                },
+            }
+            atomic_json(target, audit)
+            return audit
 
     def check(self):
-        path = self.root / "pause.json"
+        if (self.root / "http-cap-amendment.json").exists() and self.cfg.max_http_requests != 500:
+            raise BudgetExceeded("Recreate transport with the explicitly amended total HTTP cap")
+        active = self.root / "active-pause.json"
+        path = active if active.exists() else self.root / "pause.json"
         for request in (self.root / "requests").glob("*.json"):
             if json.loads(request.read_text())["status"] in {"submitted", "unknown"}:
                 self.pause("unknown")
@@ -49,6 +166,7 @@ class SharedTransport:
         recovered = self.root / "recovery" / "local-cap.json"
         acknowledged = (
             recovered.exists()
+            and path.name == "pause.json"
             and path.exists()
             and json.loads(recovered.read_text())["pause_sha256"]
             == hashlib.sha256(path.read_bytes()).hexdigest()
@@ -65,8 +183,13 @@ class SharedTransport:
             raise BudgetExceeded("Shared HTTP attempt budget exhausted")
 
     def pause(self, status):
-        path = self.root / "pause.json"
-        if not path.exists() or (self.root / "recovery" / "local-cap.json").exists():
+        # The amendment permanently binds historical pause bytes. Later gates
+        # live separately and cannot be acknowledged by that old recovery.
+        historical = self.cap_amendment and self.cap_amendment.get("original_pause_sha256")
+        path = self.root / ("active-pause.json" if historical else "pause.json")
+        if not path.exists() or (
+            not historical and (self.root / "recovery" / "local-cap.json").exists()
+        ):
             atomic_json(path, {"status": status, "gate_id": uuid.uuid4().hex})
 
     def recover_local_cap_pause(self, *, session_root, expected_http_attempts):
