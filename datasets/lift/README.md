@@ -6,7 +6,7 @@
 - EALE：`419789ed1662e7b9ad16aa6620a4b31449612948`；本地 `download-manifest.json` 校验每个文件。
 - q1：训练/行为准入；q2：独立候选验证；冻结选中版本后 q5：开发比较。开发阶段 q6 不下载、不读取、不执行；修复后的冻结版本另用独立 q6 确认。
 - A：同一 ReAct 与固定原语，无 kernel；B：K0；C：采纳的 K1，拒绝则 K0。所有 worker/judge 使用同一用户指定模型、端点、temperature=0，保持独立历史。
-- 每题最多 3 次原生 worker↔judge 回合，即最多 2 次原生纠错；整个 worker session 累计最多 8 次模型请求。共同的实际 HTTP attempt 默认上限为 100；经显式审计修订后可为总计 500，SDK retries=0、传输最大尝试次数为 1。
+- 每题最多 3 次原生 worker↔judge 回合，即最多 2 次原生纠错；每个原生回合最多 8 次模型决策；worker session 默认累计 8 次，经独立审计可改为累计 16 次。共同的实际 HTTP attempt 默认上限为 100；经显式审计修订后可为总计 500，SDK retries=0、传输最大尝试次数为 1。
 - `budget_root` 必须独立于每次比较的 `run_root`。框架修复后新建比较目录，但复用预算目录、HTTP 总账和未知请求暂停状态。`submitted` 未收据请求在恢复时全局隔离；禁止自动清除暂停文件或重发未知请求。
 
 ## 本地执行 / Local execution
@@ -16,9 +16,10 @@
 不等同于完整原生容器生命周期复现。下面保留的容器路线仅作为历史记录。
 
 使用现有 Python 3.12 环境、已有固定上游与 16 文件数据清单，沿用 `pilot.example.json`。
-`run_root` 采用新目录；`budget_root` 指向原始独立的 100 请求账本，不能重置。
+`run_root` 采用新目录；`budget_root` 指向原始独立的共享请求账本，不能重置。
 凭据只从宿主 `DARWINAGENT_API_KEY` 获取；模型、端点环境变量必须与 JSON 完全一致。
-当前授权模型为 `glm-5.3-flash`，所有角色温度为 0；worker 8 次请求与 3 次原生回合保持固定。
+当前授权模型为 `glm-5.3-flash`，所有角色温度为 0；每回合 8 次模型决策、每回合 64 个原语 leaf 与 3 次原生回合保持固定。
+当前诊断轮配置为 `worker_limit:16`、`max_tokens:16384`、`http_cap:500`；累计 worker 16 需要独立审计。
 `http_cap` 默认 100；显式 500 必须先有下述审计记录，启动器不会自动提高上限。
 以下真实运行命令仅供获得模型调用授权的协调者使用：
 
@@ -37,7 +38,7 @@ q1 的相同任务/K0/固定身份收据复用于 warmup、准入和训练；候
 公开证据。q2 仍独立验证，最多提交一个联合 S/F/C/P 候选，并沿用核心严格选择。
 训练失败时跳过 proposal/Wiki，仍诊断 q2；进化不可用时显式选择 K0。
 冻结选择后，q5 A/B/C 各自独立执行，C=K0 也不会复用 B 的运行。
-单题已知失败或 8 次 worker 上限产生可重放终态，继续下一题；未知请求/写入或全局已授权 HTTP 上限暂停。
+单题已知失败或已授权累计 worker 上限产生可重放终态，继续下一题；未知请求/写入或全局已授权 HTTP 上限暂停。
 历史歧义暂停仅由协调者调用 `SharedTransport.recover_local_cap_pause` 审计恢复，启动器不会自动恢复。
 
 ReAct 兼容单工具与 final 回复，新增可选的 `{"actions":[{"tool":"read_text","params":{"path":"public.txt"}}, ...]}`，
@@ -51,7 +52,7 @@ ReAct 兼容单工具与 final 回复，新增可选的 `{"actions":[{"tool":"re
 `shared.amend_http_cap(total_cap=500, expected_http_attempts=78)`。它要求所有历史请求有已结算收据，
 没有未知/未处理暂停，保存独立 `http-cap-amendment.json`，不会改原 100 政策、总账、计数或历史收据。
 随后以相同 `budget_root`、显式 `http_cap: 500` 和新 `run_root` 启动；旧 100 客户端停止调度。
-500 是共享总量，原 78 次保留，修订时剩余 422。未来发送继续递增原总账；审计永久校验原收据与
+500 是共享总量，原 78 次保留，HTTP 修订时剩余 422。未来发送继续递增原总账；审计永久校验原收据与
 政策字节。历史已确认暂停保留，未来暂停另记 `active-pause.json`，不会被旧恢复记录放行。
 
 独立确认沿用原计划授权，在冻结开发比较完成后由协调者准备单独 q6 数据目录及
@@ -61,6 +62,28 @@ ReAct 兼容单工具与 final 回复，新增可选的 `{"actions":[{"tool":"re
 `run_root` 与 q6 专属 `data_root`，沿用同一 500 总账及上面的模块命令。此模式校验开发调度已结束、
 源码/模型/账本/K0/选中资产相同，独立运行 q6 A/B/C，跳过训练、proposal、Wiki 和进化；私有要求仍只给 judge。
 它不把 q6 加入训练，也不把三组运行验证或录制分数等同于质量提升或整个版本验收。
+
+后续诊断轮只调整两项已诊断的预算：以 HTTP500/cumulative-worker8 客户端调用
+`shared.amend_worker_limit(worker_limit=16, expected_http_attempts=136)`，保存独立
+`worker-limit-amendment.json`；原 policy/HTTP 修订/历史暂停/收据/旧 SID 计数保留。
+审计时要求全部请求已结算且没有未处理暂停；实际总账在005后为136时，500总量剩余364。
+然后用显式 `worker_limit:16`、`max_tokens:16384` 和新的006目录完成整组 q1/q2/q5 A/B/C，
+不混用005分数。16仅为整个任务 worker session 累计上限，每原生回合仍限8次模型决策，最多3回合。
+所有角色（worker、judge、Wiki、proposal、准入/训练/验证）统一转发 `max_tokens=16384`，
+包括覆盖 proposal 的既有内部默认值；模型、温度0、思考配置和工具权限保持不变。
+生成配置进入 Agent/backend/run 身份和实际请求指纹；改变设置必须新建比较目录。
+通用 `ReActAgent.max_tokens` 默认 `None`，仍使用核心4096默认；核心配置与其他调用默认值未改变。
+空正文与已记录思考保留，不通过 JSON 修补制造输出；增加预算能否改善结果仍待真实006/q6测量。
+q6 仅确认冻结006的同一16/16384/500身份及选中资产。
+
+The next diagnostic comparison uses an explicit cumulative worker limit16, generation16384 for
+all roles and the existing total HTTP500 ledger. A separate coordinator audit
+`amend_worker_limit(worker_limit=16, expected_http_attempts=136)` preserves original policies,
+old receipts and historical SID counters. Native per-turn8, leaf64, three rounds, model,
+temperature0, reasoning configuration and tool rights remain unchanged. Generation is bound in
+adapter/backend/run identity and effective request fingerprints; generic ReAct leaves max_tokens
+unspecified by default and retains the core4096 default. Run all groups in a fresh006 root and
+confirm its frozen selection separately on q6; no mixed scores or repaired empty responses.
 
 Optional ReAct batches contain 1–16 tool/params actions. All envelopes, registrations and input
 contracts validate before effects; checked calls execute sequentially and every primitive counts.

@@ -2,6 +2,7 @@
 
 import json
 import time
+from dataclasses import dataclass
 from pathlib import Path
 
 from src.lift.eval.chat_agent import ChatAgent
@@ -18,14 +19,19 @@ def worker_profile():
     return ExecutionProfile("lift-tools-v1", NAMES, max_model_calls=8, max_leaf_calls=64)
 
 
+@dataclass(frozen=True)
 class NativeReAct(ReActAgent):
+    worker_session_cap: int = 8
+
     def identity(self):
         return {
             "runtime": "darwinagent",
             "max_turns": self.max_turns,
             "role": self.role,
             "system_prompt": self.system_prompt,
-            "worker_session_cap": 8,
+            "worker_session_cap": self.worker_session_cap,
+            "worker_turn_model_cap": 8,
+            "max_tokens": self.max_tokens,
             "native_correction_rounds": 3,
         }
 
@@ -85,7 +91,13 @@ class DarwinChatAgent(ChatAgent):
         if role == "judge":
             prompt += " Inspect delivered files using read tools. final_response must be a JSON string with success, reason, score as requested by the native judge prompt."
         self.backend = ExecutionBackend(
-            NativeReAct(max_turns=16, role=role, system_prompt=prompt),
+            NativeReAct(
+                max_turns=16,
+                role=role,
+                system_prompt=prompt,
+                worker_session_cap=shared.worker_limit,
+                max_tokens=getattr(shared, "generation_max_tokens", None),
+            ),
             tools,
             profile,
             shared.scoped(session, role),

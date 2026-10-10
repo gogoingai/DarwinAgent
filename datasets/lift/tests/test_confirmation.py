@@ -9,7 +9,6 @@ from types import SimpleNamespace
 from darwinagent.config import Config
 from darwinagent.runtime.artifacts import atomic_json, digest
 from datasets.lift.data import EALE_REVISION, LiftConfirmationDataset, LiftDataset, sha
-from datasets.lift.transport import SharedTransport
 
 try:
     import src.lift  # noqa: F401
@@ -87,7 +86,9 @@ class ConfirmationTests(unittest.IsolatedAsyncioTestCase):
             with self.assertRaises(ValueError):
                 dataset.task("q1")
             client = Client(root / "client")
-            shared = SharedTransport(client, root / "budget/shared")
+            from datasets.lift.tests.fixtures import worker16_fixture
+
+            shared = worker16_fixture(client, root / "budget/shared")
             origin = root / "development"
             initial = initial_kernel(origin / "K0")
             with self.assertRaisesRegex(ValueError, "training"):
@@ -97,6 +98,7 @@ class ConfirmationTests(unittest.IsolatedAsyncioTestCase):
                     root=root / "wrong",
                     initial=initial,
                     run_id="wrong",
+                    max_tokens=16384,
                 )
             runner = LocalRunner(
                 dataset=dataset,
@@ -105,6 +107,7 @@ class ConfirmationTests(unittest.IsolatedAsyncioTestCase):
                 initial=initial,
                 run_id="fixture-confirmation",
                 mode="confirmation",
+                max_tokens=16384,
                 selection_run_root=origin,
             )
             atomic_json(
@@ -114,6 +117,7 @@ class ConfirmationTests(unittest.IsolatedAsyncioTestCase):
                     "source": runner.source,
                     "initial": initial.content_id,
                     "transport": shared.identity(),
+                    "generation_max_tokens": runner.max_tokens,
                 },
             )
             atomic_json(

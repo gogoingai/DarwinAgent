@@ -96,6 +96,13 @@ class ReActAgent:
     max_turns: int = 16
     role: str = "worker"
     system_prompt: str = _ACTION_PROTOCOL
+    max_tokens: int | None = None
+
+    def __post_init__(self):
+        if self.max_tokens is not None and (
+            type(self.max_tokens) is not int or self.max_tokens <= 0
+        ):
+            raise ValueError("max_tokens must be a positive integer or None")
 
     async def run(self, task, context):
         messages = [
@@ -114,7 +121,8 @@ class ReActAgent:
             },
         ]
         for _ in range(self.max_turns):
-            response = await context.model(messages, role=self.role, json_mode=True)
+            generation = {} if self.max_tokens is None else {"max_tokens": self.max_tokens}
+            response = await context.model(messages, role=self.role, json_mode=True, **generation)
             messages.append({"role": "assistant", "content": response.content})
             try:
                 action = json.loads(response.content)

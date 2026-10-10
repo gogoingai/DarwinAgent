@@ -41,7 +41,7 @@ class LocalEpisodeBackend(ExecutionBackend):
 
         self.owner, self.workspace = owner, Path(workspace).resolve()
         super().__init__(
-            NativeReAct(),
+            NativeReAct(worker_session_cap=owner.shared.worker_limit, max_tokens=owner.max_tokens),
             LocalTools(self.workspace).specs(),
             worker_profile(),
             owner.shared.scoped("campaign-worker", "worker"),
@@ -94,11 +94,26 @@ class LocalEvaluator:
 
 class LocalRunner:
     def __init__(
-        self, *, dataset, shared, root, initial, run_id, mode="development", selection_run_root=None
+        self,
+        *,
+        dataset,
+        shared,
+        root,
+        initial,
+        run_id,
+        mode="development",
+        selection_run_root=None,
+        max_tokens=4096,
     ):
         from src.lift.eval import task_exec
 
         self.dataset, self.shared, self.root = dataset, shared, Path(root).resolve()
+        if type(max_tokens) is not int or max_tokens not in (4096, 16384):
+            raise ValueError("Local generation max_tokens must be explicit 4096 or 16384")
+        if shared.worker_limit == 16 and max_tokens != 16384:
+            raise ValueError("The cumulative16 diagnostic requires uniform generation16384")
+        self.max_tokens = max_tokens
+        shared.generation_max_tokens = max_tokens
         self.mode, self.selection_run_root = (
             mode,
             Path(selection_run_root).resolve() if selection_run_root else None,
@@ -123,12 +138,10 @@ class LocalRunner:
         self.initial, self.run_id = initial, run_id
         if (
             shared.trace
-            or shared.worker_limit != 8
+            or shared.worker_limit not in (8, 16)
             or shared.cfg.max_http_requests not in (100, 500)
         ):
-            raise ValueError(
-                "Local runner requires trace=False and fixed worker 8 and authorized total HTTP cap"
-            )
+            raise ValueError("Local runner requires trace=False and authorized worker/HTTP limits")
         if shared.root.resolve().is_relative_to(self.root) or self.root.is_relative_to(
             shared.root.resolve()
         ):
@@ -154,7 +167,9 @@ class LocalRunner:
             "dataset": self.dataset.identity(),
             "initial": self.initial.content_id,
             "transport": shared.identity(),
-            "worker_limit": 8,
+            "worker_limit": shared.worker_limit,
+            "worker_turn_model_cap": 8,
+            "generation_max_tokens": max_tokens,
             "correction_rounds": 3,
             "trace": False,
         }
@@ -169,6 +184,11 @@ class LocalRunner:
         return self.frozen_identity
 
     def verify(self):
+        if (
+            self.max_tokens != self.frozen_identity["generation_max_tokens"]
+            or self.shared.generation_max_tokens != self.max_tokens
+        ):
+            raise ValueError("Frozen generation policy changed")
         assert_files(self.source)
         if self.dataset.identity() != self.frozen_identity["dataset"]:
             raise ValueError("Frozen dataset identity changed")
@@ -429,7 +449,12 @@ class LocalRunner:
                 self.dataset,
                 self.evaluator_factory,
                 self.shared.cfg,
-                RunConfig(temperature=0, concurrency=1),
+                RunConfig(
+                    temperature=0,
+                    concurrency=1,
+                    max_tokens=self.max_tokens,
+                    wiki_max_tokens=self.max_tokens,
+                ),
                 AgentExperimentSpec(
                     train=("q1",),
                     validation=("q2",),
@@ -497,6 +522,7 @@ class LocalRunner:
             or origin["source"] != self.source
             or origin["initial"] != self.initial.content_id
             or origin["transport"] != self.shared.identity()
+            or origin["generation_max_tokens"] != self.max_tokens
         ):
             raise ValueError("Confirmation requires the same frozen development source and K0")
         if selection["source_sha256"] != digest(self.source):
@@ -573,6 +599,9 @@ class LocalRunner:
         state_path = self.root / "selected-state.json"
         value["selected"] = json.loads(state_path.read_text()) if state_path.exists() else None
         value["execution_mode"] = self.frozen_identity["mode"]
+        value["worker_session_cap"] = self.shared.worker_limit
+        value["worker_turn_model_cap"] = 8
+        value["generation_max_tokens"] = self.max_tokens
         histories = {}
         for path in sorted((self.shared.root / "requests").glob("*.json")):
             request = json.loads(path.read_text())
@@ -695,6 +724,7 @@ class LocalRunner:
             "# Local LIFT all-pair evidence",
             "",
             f"Status: {value['status']}; acceptance complete: {value['acceptance_complete']}",
+            f"Worker model requests: {self.shared.worker_limit} cumulative/session; 8 per native turn; generation max_tokens: {self.max_tokens} all roles",
             f"HTTP attempts: {value['actual_http_attempts']}/{self.shared.cfg.max_http_requests}; evaluation healthy: {value['evaluation_healthy']}",
             "q6: sealed, no independent generalization or measured improvement claim."
             if self.mode == "development"
@@ -756,12 +786,19 @@ def build_runner(config, run_id):
     from .transport import SharedTransport
 
     for key, default in (
-        ("worker_limit", 8),
         ("correction_rounds", 3),
         ("temperature", 0),
     ):
         if config.get(key, default) != default:
             raise ValueError("Local pilot requires fixed " + key)
+    worker_limit = config.get("worker_limit", 8)
+    if type(worker_limit) is not int or worker_limit not in (8, 16):
+        raise ValueError("Worker limit defaults to8;16 requires explicit audited authorization")
+    max_tokens = config.get("max_tokens", 4096)
+    if type(max_tokens) is not int or max_tokens not in (4096, 16384):
+        raise ValueError("Local max_tokens must be explicit4096 or16384")
+    if worker_limit == 16 and max_tokens != 16384:
+        raise ValueError("Cumulative16 requires explicit max_tokens16384")
     http_cap = config.get("http_cap", 100)
     if type(http_cap) is not int or http_cap not in (100, 500):
         raise ValueError("HTTP cap defaults to 100; 500 requires explicit audited authorization")
@@ -789,7 +826,7 @@ def build_runner(config, run_id):
         model_profiles=False,
     )
     cfg.role_tiers.update(worker="strong", judge="strong")
-    shared = SharedTransport(LLMClient(cfg), budget / "shared", worker_limit=8)
+    shared = SharedTransport(LLMClient(cfg), budget / "shared", worker_limit=worker_limit)
     initial = (
         AgentKernelBundle(Path(selection_root) / "K0")
         if mode == "confirmation"
@@ -807,6 +844,7 @@ def build_runner(config, run_id):
         run_id=run_id,
         mode=mode,
         selection_run_root=selection_root,
+        max_tokens=max_tokens,
     )
 
 

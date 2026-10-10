@@ -60,7 +60,16 @@ def infrastructure_guard():
         yield
 
 
-async def pilot(upstream, data, output, *, failures=False, all_failed=False):
+async def pilot(
+    upstream,
+    data,
+    output,
+    *,
+    failures=False,
+    all_failed=False,
+    worker_limit=8,
+    max_tokens=4096,
+):
     from darwinagent.config import Config
     from darwinagent.runtime.artifacts import atomic_json
     from datasets.lift.data import LiftDataset
@@ -81,13 +90,29 @@ async def pilot(upstream, data, output, *, failures=False, all_failed=False):
     cfg.role_tiers.update(worker="strong", judge="strong")
     client = RecordedClient(cfg, initial)
     client.failure_injection, client.fail_all_holdout = failures, all_failed
-    shared = SharedTransport(client, root.parent / (root.name + "-budget") / "shared")
+    original_chat = client.chat
+    generation_requests = []
+
+    async def generation_guard(**kwargs):
+        assert kwargs.get("max_tokens") == max_tokens
+        generation_requests.append({"role": kwargs["role"], "max_tokens": kwargs["max_tokens"]})
+        return await original_chat(**kwargs)
+
+    client.chat = generation_guard
+    budget = root.parent / (root.name + "-budget") / "shared"
+    if worker_limit == 16:
+        from datasets.lift.tests.fixtures import worker16_fixture
+
+        shared = worker16_fixture(client, budget)
+    else:
+        shared = SharedTransport(client, budget)
     runner = LocalRunner(
         dataset=LiftDataset(data),
         shared=shared,
         root=root,
         initial=initial,
         run_id="recorded-" + root.name,
+        max_tokens=max_tokens,
     )
     result = await runner.run()
     rows = [r for r in result["rows"] if r["task_id"] == "q5"]
@@ -112,7 +137,7 @@ async def pilot(upstream, data, output, *, failures=False, all_failed=False):
     ]  # Synthetic mechanism evidence is never real acceptance.
     assert client.http_attempts() == 0
     counts = json.loads((shared.root / "worker-calls.json").read_text())
-    assert max(counts.values()) <= 8
+    assert max(counts.values()) <= worker_limit
     assert not (shared.root / "pause.json").exists()
     assert len({r["native"]["workspace_dir"] for r in rows}) == 3
     calls = client.calls
@@ -152,6 +177,11 @@ async def pilot(upstream, data, output, *, failures=False, all_failed=False):
             "resume_new_calls": 0,
             "resume_receipt_artifact_writes": 0,
             "source_sha256": result["source_sha256"],
+            "worker_session_cap": worker_limit,
+            "worker_turn_model_cap": 8,
+            "generation_max_tokens": max_tokens,
+            "role_generation_limits": {r["role"]: r["max_tokens"] for r in generation_requests},
+            "http_cap": shared.cfg.max_http_requests,
         },
     )
     return result
@@ -164,6 +194,8 @@ def main():
     parser.add_argument("--output", required=True)
     parser.add_argument("--failures", action="store_true")
     parser.add_argument("--all-failed", action="store_true")
+    parser.add_argument("--worker-limit", type=int, choices=(8, 16), default=8)
+    parser.add_argument("--max-tokens", type=int, choices=(4096, 16384), default=4096)
     args = parser.parse_args()
     with infrastructure_guard():
         configure_native(args.upstream)
@@ -174,6 +206,8 @@ def main():
                 args.output,
                 failures=args.failures,
                 all_failed=args.all_failed,
+                worker_limit=args.worker_limit,
+                max_tokens=args.max_tokens,
             )
         )
     print(
