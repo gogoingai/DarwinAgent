@@ -36,6 +36,9 @@ DARWINAGENT_MODEL=glm-5.3-flash DARWINAGENT_BASE_URL=AUTHORIZED_CODING_ENDPOINT 
 
 q1 的相同任务/K0/固定身份收据复用于 warmup、准入和训练；候选 q1 的准入/训练也复用同一
 公开证据。q2 仍独立验证，最多提交一个联合 S/F/C/P 候选，并沿用核心严格选择。
+本地 proposal 对话固定最多 6 次模型调用，允许查询原件、纠正已知 scope 错误再提交；
+候选与演化轮次仍各限一次，所有请求计入同一总账。训练 entry 的 `wiki_scope` 精确指向
+真实原件；SHA 仅用于 `evidence_refs`，不能作为组合 `training_ids` 或伪造问题身份。
 训练失败时跳过 proposal/Wiki，仍诊断 q2；进化不可用时显式选择 K0。
 冻结选择后，q5 A/B/C 各自独立执行，C=K0 也不会复用 B 的运行。
 单题已知失败或已授权累计 worker 上限产生可重放终态，继续下一题；未知请求/写入或全局已授权 HTTP 上限暂停。
@@ -73,8 +76,9 @@ ReAct 兼容单工具与 final 回复，新增可选的 `{"actions":[{"tool":"re
 包括覆盖 proposal 的既有内部默认值；模型、温度0、思考配置和工具权限保持不变。
 生成配置进入 Agent/backend/run 身份和实际请求指纹；改变设置必须新建比较目录。
 通用 `ReActAgent.max_tokens` 默认 `None`，仍使用核心4096默认；核心配置与其他调用默认值未改变。
-空正文与已记录思考保留，不通过 JSON 修补制造输出；增加预算能否改善结果仍待真实006/q6测量。
-q6 仅确认冻结006的同一16/16384/500身份及选中资产。
+空正文与已记录思考保留，不通过 JSON 修补制造输出；预算诊断不保证质量提升，006实际结果保留。
+006 已诊断本地单调用 proposal 与 Wiki 对话不兼容，以及 ReAct 累计重复视图的问题。
+修复后的007必须在新目录完整重测 q1/q2/q5 A/B/C，再独立确认同一冻结源码/16/16384/500身份及选中资产的q6。
 
 The next diagnostic comparison uses an explicit cumulative worker limit16, generation16384 for
 all roles and the existing total HTTP500 ledger. A separate coordinator audit
@@ -82,8 +86,25 @@ all roles and the existing total HTTP500 ledger. A separate coordinator audit
 old receipts and historical SID counters. Native per-turn8, leaf64, three rounds, model,
 temperature0, reasoning configuration and tool rights remain unchanged. Generation is bound in
 adapter/backend/run identity and effective request fingerprints; generic ReAct leaves max_tokens
-unspecified by default and retains the core4096 default. Run all groups in a fresh006 root and
-confirm its frozen selection separately on q6; no mixed scores or repaired empty responses.
+unspecified by default and retains the core4096 default. After the006 proposal/context diagnosis,
+rerun the repaired007 q1/q2/q5 comparison in a fresh root, then confirm its frozen selection
+separately on q6; no mixed scores or repaired empty responses.
+
+ReAct 的结构化模型输入仅保留一份最新 `view`，每次决策重新读取当前 S/F/C/P 状态。
+先前工具观察、错误、检查和反馈保留顺序；只去除与初始 task 精确相同的 raw view.task。
+完整 `AgentContext.view()`、图语义和不可变事件/收据不变，其他 Agent 算法不变。
+native judge 只澄清把原生结果 JSON 放进外层 `final_response` 字符串，
+不改变原生提示、评价条件、解析或计分，也不接受裸结果自动终结。
+本地6次对话上限和 `latest-view-v1` 布局均进入执行身份，旧运行必须保留原身份恢复。
+
+Local proposal dialogue allows at most 6 model calls for Wiki inspection/correction and submission,
+while retaining one candidate and one evolution round under the same total ledger. Episode
+`wiki_scope` identifies the actual training original; SHA256 references are never training IDs.
+ReAct retains one latest structured view, refreshing current schema/function state for each
+decision and preserving chronological observations, errors, checks and feedback. Only an exact
+raw duplicate of the initial task is removed; full context API, semantic graph and audit receipts
+stay intact. Native judge changes only clarify the result-string wrapper. Dialogue cap and layout
+are frozen in execution identity; source changes require a fresh comparison root.
 
 Optional ReAct batches contain 1–16 tool/params actions. All envelopes, registrations and input
 contracts validate before effects; checked calls execute sequentially and every primitive counts.

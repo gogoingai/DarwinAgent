@@ -32,6 +32,7 @@ class NativeReAct(ReActAgent):
             "worker_session_cap": self.worker_session_cap,
             "worker_turn_model_cap": 8,
             "max_tokens": self.max_tokens,
+            "view_layout": self.view_layout,
             "native_correction_rounds": 3,
         }
 
@@ -89,7 +90,13 @@ class DarwinChatAgent(ChatAgent):
         )
         prompt = ReActAgent.system_prompt
         if role == "judge":
-            prompt += " Inspect delivered files using read tools. final_response must be a JSON string with success, reason, score as requested by the native judge prompt."
+            prompt += (
+                " Inspect delivered files using read tools. Keep the native judge's result "
+                "JSON inside the outer final_response STRING, never as top-level action fields. "
+                'Wrapper example: {"final_response":"{\\"success\\":false,\\"reason\\":'
+                '\\"example only\\",\\"score\\":0.0}","artifacts":[]}. '
+                "Use the native prompt's actual success, reason and score values."
+            )
         self.backend = ExecutionBackend(
             NativeReAct(
                 max_turns=16,

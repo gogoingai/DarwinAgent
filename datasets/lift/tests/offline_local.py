@@ -7,6 +7,7 @@ import json
 import subprocess
 from contextlib import ExitStack, contextmanager
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from datasets.lift.local import LocalRunner, configure_native
@@ -92,10 +93,39 @@ async def pilot(
     client.failure_injection, client.fail_all_holdout = failures, all_failed
     original_chat = client.chat
     generation_requests = []
+    proposal_queries = 0
 
     async def generation_guard(**kwargs):
+        nonlocal proposal_queries
         assert kwargs.get("max_tokens") == max_tokens
         generation_requests.append({"role": kwargs["role"], "max_tokens": kwargs["max_tokens"]})
+        if kwargs["role"] in {"worker", "judge"}:
+            users = [json.loads(m["content"]) for m in kwargs["messages"] if m["role"] == "user"]
+            assert sum("view" in u for u in users) == 1
+            assert sum("task" in u for u in users) == 1
+            assert "task" not in users[-1]["view"]
+        if kwargs["role"] == "proposal" and proposal_queries == 0:
+            proposal_queries += 1
+            client.calls += 1
+            payload = json.loads(kwargs["messages"][1]["content"])
+            scope = payload["training"]["entries"][0]["facts"]["wiki_scope"]
+            return SimpleNamespace(
+                content=json.dumps(
+                    {
+                        "action": "query_wiki",
+                        "query": {
+                            "question": "Inspect the public training original",
+                            "scope": scope,
+                            "view": "raw",
+                            "cursor": None,
+                            "max_chars": 8000,
+                        },
+                    }
+                ),
+                usage={"prompt_tokens": 20, "completion_tokens": 10},
+                model="offline-recorded",
+                elapsed_s=0.0,
+            )
         return await original_chat(**kwargs)
 
     client.chat = generation_guard
@@ -182,6 +212,9 @@ async def pilot(
             "generation_max_tokens": max_tokens,
             "role_generation_limits": {r["role"]: r["max_tokens"] for r in generation_requests},
             "http_cap": shared.cfg.max_http_requests,
+            "proposal_call_limit": runner.identity()["proposal_call_limit"],
+            "react_view_layout": runner.identity()["react_view_layout"],
+            "proposal_original_queries": proposal_queries,
         },
     )
     return result

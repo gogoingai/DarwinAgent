@@ -1,7 +1,7 @@
 """Minimal JSON ReAct loop. External adapters can use the context without this loop."""
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from darwinagent.contracts import plain
 from darwinagent.kernel.spec import validate_value
@@ -91,12 +91,31 @@ async def _run_batch(context, actions):
     return {"actions": observations, "stopped": False, "unexecuted_actions": 0}
 
 
+def _current_view(messages, previous, task, context):
+    """Replace only our structured snapshot; observations and raw context stay intact."""
+    if previous is not None:
+        payload = json.loads(messages[previous]["content"])
+        payload.pop("view")
+        messages[previous]["content"] = json.dumps(payload, ensure_ascii=False)
+    view = context.view()
+    # The raw no-schema view repeats the exact task already supplied once. A
+    # schema's materialized fields are semantic state and must never be trimmed.
+    if view.get("task") == task.to_dict():
+        view = {k: v for k, v in view.items() if k != "task"}
+    position = len(messages) - 1
+    payload = json.loads(messages[position]["content"])
+    payload["view"] = view
+    messages[position]["content"] = json.dumps(payload, ensure_ascii=False)
+    return position
+
+
 @dataclass(frozen=True)
 class ReActAgent:
     max_turns: int = 16
     role: str = "worker"
     system_prompt: str = _ACTION_PROTOCOL
     max_tokens: int | None = None
+    view_layout: str = field(default="latest-view-v1", init=False)
 
     def __post_init__(self):
         if self.max_tokens is not None and (
@@ -114,13 +133,14 @@ class ReActAgent:
                         "task": task.to_dict(),
                         "prompt": context.prompt(self.role),
                         "tools": context.tool_descriptions(),
-                        "view": context.view(),
                     },
                     ensure_ascii=False,
                 ),
             },
         ]
+        view_position = None
         for _ in range(self.max_turns):
+            view_position = _current_view(messages, view_position, task, context)
             generation = {} if self.max_tokens is None else {"max_tokens": self.max_tokens}
             response = await context.model(messages, role=self.role, json_mode=True, **generation)
             messages.append({"role": "assistant", "content": response.content})
@@ -178,9 +198,7 @@ class ReActAgent:
             messages.append(
                 {
                     "role": "user",
-                    "content": json.dumps(
-                        {"observation": plain(output), "view": context.view()}, ensure_ascii=False
-                    ),
+                    "content": json.dumps({"observation": plain(output)}, ensure_ascii=False),
                 }
             )
         return context.result(status="budget_exhausted")

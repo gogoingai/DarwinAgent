@@ -353,6 +353,11 @@ class EpisodeExperiment:
                         "task_id": task_id,
                         "kernel_id": bundle.content_id,
                         "training_original": ref,
+                        "wiki_scope": {
+                            "evidence_refs": [ref],
+                            "case_ids": [task_id],
+                            "stage_ids": [label],
+                        },
                         "public_feedback": scored["evaluation"]["public_feedback"],
                     },
                     scope="training",

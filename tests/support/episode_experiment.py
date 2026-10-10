@@ -173,6 +173,41 @@ class ProposalClient:
         pass
 
 
+class WikiProposalClient(ProposalClient):
+    """Read an actual episode original before the single terminal candidate."""
+
+    def __init__(self, candidate, *, bad_scope=False, query_forever=False):
+        super().__init__([candidate])
+        self.bad_scope, self.query_forever = bad_scope, query_forever
+
+    async def chat(self, **kwargs):
+        self.messages.append(json.loads(json.dumps(kwargs["messages"])))
+        payload = json.loads(kwargs["messages"][1]["content"])
+        facts = payload["training"]["entries"][0]["facts"]
+        self.calls += 1
+        if self.calls == 1 or (self.bad_scope and self.calls == 2) or self.query_forever:
+            scope = facts["wiki_scope"]
+            if self.bad_scope and self.calls == 1:
+                scope = {"training_ids": [facts["training_original"]]}
+            value = {
+                "action": "query_wiki",
+                "query": {
+                    "question": "Inspect training original " + str(self.calls),
+                    "scope": scope,
+                    "view": "raw",
+                    "cursor": None,
+                    "max_chars": 8000,
+                },
+            }
+        else:
+            value = self.responses[0]
+        return SimpleNamespace(
+            content=json.dumps(value),
+            usage={"prompt_tokens": 12, "completion_tokens": 5},
+            model="offline",
+        )
+
+
 def candidate_action(kernel):
     assets = [a.to_dict() for a in kernel.assets.assets]
     for asset in assets:

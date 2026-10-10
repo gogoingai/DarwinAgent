@@ -13,6 +13,10 @@ from .proposal_session import ProposalSession
 PROTOCOL = """Propose a generic Agent kernel using only the supplied training evidence.
 Keep the host profile, primitive tools, model configuration and evaluator fixed.
 Use query_wiki to inspect training originals. Never request validation/test references.
+Use each episode's supplied wiki_scope for its original. training_original is a SHA256
+evidence reference, never a training_id. evidence_refs accepts complete SHA256 hashes;
+training_ids accepts only supplied <len>:<case>::<question> identities. When an episode
+has no training_ids, keep that list empty and use wiki_scope; never invent identities.
 Use no_change when evidence is insufficient. To submit a full S/F/C/P candidate use
 {"action":"submit_patch","patches":{"assets":[complete asset declarations]}}.
 Alternatively patches is a list of {"op":"upsert","asset":{complete asset declaration}}

@@ -116,12 +116,13 @@ class LocalClient:
             model_profiles=False,
             work_dir=root,
         )
-        self.calls, self.fault = [], fault
+        self.calls, self.fault, self.requests = [], fault, []
 
     def http_attempts(self):
         return 0
 
     async def chat(self, **kwargs):
+        self.requests.append(json.loads(json.dumps(kwargs)))
         role = kwargs["role"]
         if role not in {"worker", "judge"}:
             raise AssertionError("Unhealthy training must not dispatch proposal or Wiki")
@@ -179,6 +180,45 @@ class LocalSchedulingTests(unittest.IsolatedAsyncioTestCase):
             initial=initial_kernel(root / "run/K0"),
             run_id="local-test",
         ), client
+
+    async def test_frozen_dialogue_layout_and_native_wrapper_without_bare_result_shortcut(self):
+        from darwinagent.agent.react import ActionProtocolError, _validate_action
+        from datasets.lift.local import LocalRunner
+        from datasets.lift.tests.offline_local import infrastructure_guard
+
+        with tempfile.TemporaryDirectory() as d, infrastructure_guard():
+            runner, client = self.runner(Path(d))
+            self.assertEqual(runner.identity()["proposal_call_limit"], 6)
+            self.assertEqual(runner.identity()["react_view_layout"], "latest-view-v1")
+            await runner.execute(
+                runner.dataset.task("q2"), runner.initial, "campaign", "validation", "q2"
+            )
+            judge = next(r for r in client.requests if r["role"] == "judge")
+            system = judge["messages"][0]["content"]
+            example = system.split("Wrapper example: ", 1)[1].split(". Use the native", 1)[0]
+            action = json.loads(example)
+            _validate_action(action)
+            self.assertEqual(
+                set(json.loads(action["final_response"])), {"success", "reason", "score"}
+            )
+            with self.assertRaises(ActionProtocolError):
+                _validate_action(json.loads(action["final_response"]))
+            self.assertIn("PRIVATE_CRITERION", judge["messages"][1]["content"])
+            path = runner.root / "integration-identity.json"
+            identity = json.loads(path.read_text())
+            for key, old in (("proposal_call_limit", 1), ("react_view_layout", "cumulative-v0")):
+                path.write_text(json.dumps({**identity, key: old}))
+                before = len(client.calls)
+                with self.assertRaisesRegex(ValueError, "Frozen source/data/config changed"):
+                    LocalRunner(
+                        dataset=runner.dataset,
+                        shared=runner.shared,
+                        root=runner.root,
+                        initial=runner.initial,
+                        run_id=runner.run_id,
+                    )
+                self.assertEqual(len(client.calls), before)
+            path.write_text(json.dumps(identity))
 
     async def test_known_local_caps_continue_q2_and_failed_a_does_not_skip_b_c(self):
         from datasets.lift.tests.offline_local import infrastructure_guard

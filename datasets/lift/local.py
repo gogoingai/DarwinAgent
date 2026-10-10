@@ -20,6 +20,8 @@ from .data import UPSTREAM_REVISION, LiftConfirmationDataset, LiftDataset, sha
 from .local_tools import LocalTools
 from .report import available_sum, cell, report, token_count, update_cell
 
+LOCAL_PROPOSAL_CALL_LIMIT = 6
+
 
 def configure_native(path):
     """Disable dotenv discovery and native reporting before importing upstream."""
@@ -107,6 +109,8 @@ class LocalRunner:
     ):
         from src.lift.eval import task_exec
 
+        from .agents import NativeReAct
+
         self.dataset, self.shared, self.root = dataset, shared, Path(root).resolve()
         if type(max_tokens) is not int or max_tokens not in (4096, 16384):
             raise ValueError("Local generation max_tokens must be explicit 4096 or 16384")
@@ -170,6 +174,8 @@ class LocalRunner:
             "worker_limit": shared.worker_limit,
             "worker_turn_model_cap": 8,
             "generation_max_tokens": max_tokens,
+            "proposal_call_limit": LOCAL_PROPOSAL_CALL_LIMIT,
+            "react_view_layout": NativeReAct.view_layout,
             "correction_rounds": 3,
             "trace": False,
         }
@@ -461,7 +467,7 @@ class LocalRunner:
                     admission=("q1",),
                     rounds=1,
                     max_episode_runs=6,
-                    proposal_call_limit=1,
+                    proposal_call_limit=LOCAL_PROPOSAL_CALL_LIMIT,
                 ),
                 self.root / "campaign",
                 frozen_files=[Path(__file__).parent],

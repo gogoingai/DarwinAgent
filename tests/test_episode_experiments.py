@@ -37,6 +37,7 @@ from tests.support.episode_experiment import (
     ProposalClient,
     SharedWorkspaceBackend,
     TaskDataset,
+    WikiProposalClient,
     bound_file_tools,
     candidate_action,
 )
@@ -117,6 +118,76 @@ class EpisodeExperimentTests(unittest.IsolatedAsyncioTestCase):
     async def test_runner_facade_uses_tasks_directly(self):
         result = await self.controller(runner=True).run(self.spec.train, self.kernel, rounds=1)
         self.assertNotEqual(result["selected"], self.kernel.content_id)
+
+    async def test_original_wiki_scope_then_single_candidate_and_resume(self):
+        for bad_scope in (False, True):
+            with self.subTest(bad_scope=bad_scope):
+                self.client = WikiProposalClient(candidate_action(self.kernel), bad_scope=bad_scope)
+                controller = self.controller(
+                    spec=replace(self.spec, rounds=1, proposal_call_limit=6)
+                )
+                controller.root = self.root / ("wiki-bad" if bad_scope else "wiki-valid")
+                result = await controller.run(self.kernel)
+                self.assertEqual(result["status"], "complete")
+                self.assertEqual(len(result["decisions"]), 1)
+                self.assertEqual(self.client.calls, 3 if bad_scope else 2)
+                payload = json.loads(self.client.messages[0][1]["content"])
+                entry = payload["training"]["entries"][0]
+                self.assertEqual(entry["training_ids"], [])
+                self.assertEqual(
+                    entry["facts"]["wiki_scope"],
+                    {
+                        "evidence_refs": [entry["facts"]["training_original"]],
+                        "case_ids": ["train"],
+                        "stage_ids": ["K0"],
+                    },
+                )
+                from darwinagent.experiments.wiki_service import WikiQuery, WikiService
+
+                query = WikiQuery("original", scope=entry["facts"]["wiki_scope"])
+                index = json.loads(
+                    (controller.root / "optimization/evidence/index.json").read_text()
+                )
+                matched = [r for r in index["objects"] if WikiService._matches(r, query.scope)]
+                self.assertEqual(len(matched), 1)
+                self.assertEqual(matched[0]["source_kind"], "training")
+                session = json.loads((controller.root / "rounds/R1/proposal.json").read_text())
+                self.assertEqual(session["phase"], "finished")
+                self.assertEqual(session["exchanges"][-1]["reply"]["status"], "complete")
+                if bad_scope:
+                    first = session["exchanges"][0]["reply"]
+                    self.assertEqual(first["status"], "failed")
+                    self.assertIn("ValueError", first["error"])
+                    self.assertIn("wiki_reply", self.client.messages[1][-1]["content"])
+                self.assertNotIn("PRIVATE-GOLD-SENTINEL", json.dumps(self.client.messages))
+                self.assertNotIn('"id": "val"', json.dumps(self.client.messages))
+                before = self.client.calls
+                protected = {
+                    str(p): (p.read_bytes(), p.stat().st_mtime_ns)
+                    for p in (controller.root / "rounds").rglob("*.json")
+                }
+                self.assertEqual(await controller.run(self.kernel, resume=True), result)
+                self.assertEqual(self.client.calls, before)
+                self.assertEqual(
+                    protected,
+                    {
+                        str(p): (p.read_bytes(), p.stat().st_mtime_ns)
+                        for p in (controller.root / "rounds").rglob("*.json")
+                    },
+                )
+
+    async def test_six_dialogue_calls_stop_before_seventh_without_candidate(self):
+        from darwinagent.agents.protocol import ProtocolError
+
+        self.client = WikiProposalClient(candidate_action(self.kernel), query_forever=True)
+        controller = self.controller(spec=replace(self.spec, rounds=1, proposal_call_limit=6))
+        with self.assertRaisesRegex(ProtocolError, "call budget exhausted"):
+            await controller.run(self.kernel)
+        self.assertEqual(self.client.calls, 6)
+        self.assertFalse((controller.root / "rounds/R1/candidate-payload.json").exists())
+        state = json.loads((controller.root / "rounds/R1/proposal.json").read_text())
+        self.assertEqual(len(state["exchanges"]), 6)
+        self.assertTrue(all(e["reply"]["status"] == "complete" for e in state["exchanges"]))
 
     async def test_no_change_retains_baseline_and_stops_proposing(self):
         self.client = ProposalClient([{"action": "no_change", "reason": "No training evidence"}])
