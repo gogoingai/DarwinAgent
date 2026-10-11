@@ -162,6 +162,65 @@ class UnlimitedProposalTests(unittest.TestCase):
             self.assertEqual(len(session.state["exchanges"]), 2)
             self.assertEqual(session.state["calls"], 3)
 
+    def test_reworded_raw_partial_query_reports_no_new_evidence(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            service = WikiService(tmp)
+            ref = service.register({"text": "training source " * 800})
+            client = Client(
+                [
+                    {
+                        "action": "query_wiki",
+                        "query": {
+                            "question": q,
+                            "scope": {"evidence_refs": [ref]},
+                            "max_chars": 1800,
+                        },
+                    }
+                    for q in ("inspect failure", "reworded failure")
+                ]
+                + [{"action": "no_change", "reason": "insufficient evidence"}]
+            )
+            session = ProposalSession(
+                Path(tmp) / "s.json", payload={"base_version": "b"}, protocol="p"
+            )
+            asyncio.run(session.run(client, CONFIG, decode_action, service))
+            first, second = session.state["exchanges"]
+            self.assertEqual(first["reply"]["status"], "partial")
+            self.assertNotEqual(first["reply"]["cursor"], second["reply"]["cursor"])
+            feedback = json.loads(session.state["messages"][-2]["content"])
+            self.assertEqual(feedback["wiki_feedback"]["status"], "no_new_evidence")
+            self.assertEqual(session.state["calls"], 3)
+
+    def test_many_refs_preserve_full_source_chunk_in_outer_paging(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            service = WikiService(tmp)
+            for i in range(61):
+                service.register({"index": i, "text": "source " * 30})
+            query = {"question": "all training originals", "max_chars": 8000}
+            reply = asyncio.run(service.query(WikiQuery(**query)))
+            self.assertIn("reply_fragment", reply.facts[0])
+            source_chunks = []
+            while True:
+                outer = []
+                while True:
+                    self.assertLessEqual(len(json.dumps(reply.to_dict(), ensure_ascii=False)), 8000)
+                    outer.append(reply.facts[0]["reply_fragment"])
+                    if not reply.cursor or "reply" not in json.loads(reply.cursor):
+                        break
+                    reply = asyncio.run(service.query(WikiQuery(**query, cursor=reply.cursor)))
+                full = json.loads("".join(outer))
+                fragment = full["facts"][0]["raw_fragment"]
+                source_chunks.append(fragment)
+                if len(source_chunks) == 1:
+                    self.assertEqual(len(fragment), 7000)
+                    self.assertEqual(json.loads(full["cursor"])["offset"], 7000)
+                if not full["cursor"]:
+                    break
+                reply = asyncio.run(service.query(WikiQuery(**query, cursor=full["cursor"])))
+            parts = json.loads("".join(source_chunks))
+            originals = [json.loads(part["text"])["data"] for part in parts]
+            self.assertEqual(originals, [{"index": i, "text": "source " * 30} for i in range(61)])
+
     def test_damaged_continuation_offers_exact_original_query_without_scope_bypass(self):
         with tempfile.TemporaryDirectory() as tmp:
             service = WikiService(tmp)

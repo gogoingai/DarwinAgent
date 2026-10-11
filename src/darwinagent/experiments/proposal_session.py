@@ -120,6 +120,28 @@ class ProposalSession:
         )
         return identity, progress
 
+    @staticmethod
+    def _successful_evidence(reply):
+        # Outgoing cursors/snapshot IDs bind query wording, not new source facts.
+        # Raw fragment offsets and coverage still distinguish different pages.
+        return digest(
+            {
+                key: reply.get(key)
+                for key in (
+                    "evidence_refs",
+                    "facts",
+                    "hypotheses",
+                    "support",
+                    "refutation",
+                    "covered",
+                    "uncovered",
+                    "missing",
+                    "matched",
+                    "progress",
+                )
+            }
+        )
+
     def _raise_wiki_pause(self):
         from .control import ControlSignal
 
@@ -271,7 +293,8 @@ class ProposalSession:
                     exchange["query"].get("scope", {}) == action["query"].get("scope", {})
                     and exchange["query"].get("view", "raw") == action["query"].get("view", "raw")
                     and exchange["query"].get("cursor") == action["query"].get("cursor")
-                    and self._wiki_progress(exchange["query"], exchange["reply"])[1] == progress
+                    and self._successful_evidence(exchange["reply"])
+                    == self._successful_evidence(reply)
                     for exchange in self.state["exchanges"][:-1]
                 ):
                     context["wiki_feedback"] = {

@@ -54,7 +54,9 @@ class ExperimentRunner:
     ):
         if optimization_mode not in ("legacy", "wiki"):
             raise ValueError("Unknown optimization mode")
-        if type(wiki_call_limit) is not int or wiki_call_limit < 1:
+        if wiki_call_limit is not None and (
+            type(wiki_call_limit) is not int or wiki_call_limit < 1
+        ):
             raise ValueError("Wiki call limit must be positive")
         if dynamic_trial and (snapshot_root is not None or bootstrap_trial_graph is not None):
             raise ValueError("dynamic_trial is the no-snapshot dynamic-graph admission mode")

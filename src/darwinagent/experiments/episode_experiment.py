@@ -91,7 +91,9 @@ class EpisodeExperiment:
         if type(rounds) is not int or rounds < 0:
             raise ValueError("Generic experiments require a finite nonnegative round count")
         self.owner, self.spec, self.baseline, self.rounds = owner, spec, baseline, rounds
-        if type(owner.wiki_call_limit) is not int or owner.wiki_call_limit < 1:
+        if owner.wiki_call_limit is not None and (
+            type(owner.wiki_call_limit) is not int or owner.wiki_call_limit < 1
+        ):
             raise ValueError("Wiki model call limit must be positive")
         self.root, self.backend = owner.root, owner.backend
         self.tasks = {}

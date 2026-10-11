@@ -35,6 +35,7 @@ from tests.support.episode_experiment import (
     DerivedReceiptBackend,
     IsolatedFileBackend,
     ProposalClient,
+    RegroupProposalClient,
     SharedWorkspaceBackend,
     TaskDataset,
     WikiProposalClient,
@@ -59,7 +60,7 @@ class EpisodeExperimentTests(unittest.IsolatedAsyncioTestCase):
         self.evaluator = ArtifactEvaluator()
         self.client = ProposalClient([candidate_action(self.kernel)])
 
-    def controller(self, *, runner=False, backend=None, spec=None):
+    def controller(self, *, runner=False, backend=None, spec=None, wiki_call_limit=30):
         def evaluator_factory(client, path):
             return self.evaluator
 
@@ -74,6 +75,7 @@ class EpisodeExperimentTests(unittest.IsolatedAsyncioTestCase):
                 self.root / "experiment",
                 backend=backend or self.backend,
                 validation_plan=spec or self.spec,
+                wiki_call_limit=wiki_call_limit,
                 client_factory=client_factory,
             )
         return CampaignController(
@@ -81,6 +83,7 @@ class EpisodeExperimentTests(unittest.IsolatedAsyncioTestCase):
             spec or self.spec,
             self.root / "experiment",
             backend=backend or self.backend,
+            wiki_call_limit=wiki_call_limit,
             client_factory=client_factory,
         )
 
@@ -484,6 +487,29 @@ class EpisodeExperimentTests(unittest.IsolatedAsyncioTestCase):
         resumed = await controller.run(self.kernel, resume=True)
         self.assertEqual(result, resumed)
         self.assertEqual(self.client.calls, 3)
+
+    async def test_unlimited_wiki_and_proposal_controller_run_resume_accounting(self):
+        from darwinagent.experiments.episode_experiment import EpisodeExperiment
+
+        self.client = RegroupProposalClient()
+        spec = replace(self.spec, proposal_call_limit=None)
+        controller = self.controller(spec=spec, wiki_call_limit=None)
+        experiment = EpisodeExperiment(controller, spec, self.kernel, 1)
+        self.assertIsNone(experiment.identity["wiki_call_limit"])
+        self.assertIsNone(experiment.identity["spec"]["proposal_call_limit"])
+        result = await controller.run(self.kernel)
+        self.assertEqual(result["status"], "complete")
+        self.assertEqual(self.client.proposal_calls, 2)
+        actual_calls = self.client.calls
+        counter = json.loads((controller.root / "wiki-calls.json").read_text())
+        self.assertEqual(counter["reserved_calls"], self.client.wiki_calls)
+        self.assertGreater(self.client.wiki_calls, 0)
+        self.assertEqual(await controller.run(self.kernel, resume=True), result)
+        self.assertEqual(self.client.calls, actual_calls)
+        runner = self.controller(runner=True, spec=spec, wiki_call_limit=None)
+        self.assertIsNone(
+            EpisodeExperiment(runner, spec, self.kernel, 1).identity["wiki_call_limit"]
+        )
 
     def test_bound_host_policy_changes_campaign_identity(self):
         from darwinagent.experiments.episode_experiment import EpisodeExperiment

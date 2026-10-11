@@ -327,7 +327,14 @@ class WikiService:
             )
             if len(json.dumps(result.to_dict(), ensure_ascii=False)) <= min(query.max_chars, 8000):
                 return result
-            if end <= start + 1:
+            metadata = result.to_dict()
+            metadata["facts"] = ({"raw_fragment": "", "offset": start},)
+            if (
+                len(json.dumps(metadata, ensure_ascii=False)) > min(query.max_chars, 8000)
+                or end <= start + 1
+            ):
+                # Provenance alone cannot fit: preserve the source chunk and let
+                # the existing lossless outer reply pager carry its metadata.
                 return self._bound_reply(result, signature, query.max_chars)
             end = start + max(1, (end - start) * 3 // 4)
 

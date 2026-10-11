@@ -522,7 +522,11 @@ class WikiMaintainer:
             reservations = state.setdefault("maintenance_reservations", {})
             allocation = reservations.get(reservation_key)
             if allocation is None:
-                remaining = self.limit - state["reserved_calls"]
+                remaining = (
+                    self.config.protocol_attempts
+                    if self.limit is None
+                    else self.limit - state["reserved_calls"]
+                )
                 if remaining <= 0:
                     control["state"] = "awaiting_budget"
                     atomic_json(control_path, control)

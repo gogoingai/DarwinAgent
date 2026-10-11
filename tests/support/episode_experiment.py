@@ -173,6 +173,43 @@ class ProposalClient:
         pass
 
 
+class RegroupProposalClient(ProposalClient):
+    """Return empty valid cited Wiki findings and a two-action proposal dialogue."""
+
+    def __init__(self):
+        super().__init__([])
+        self.proposal_calls = 0
+        self.wiki_calls = 0
+
+    async def chat(self, **kwargs):
+        self.calls += 1
+        self.messages.append(kwargs["messages"])
+        if kwargs.get("role") == "wiki_maintainer":
+            self.wiki_calls += 1
+            value = {
+                name: [] for name in ("facts", "hypotheses", "support", "refutation", "uncertainty")
+            }
+        else:
+            self.proposal_calls += 1
+            value = (
+                {
+                    "action": "query_wiki",
+                    "query": {
+                        "question": "Inspect training originals",
+                        "scope": {},
+                        "view": "regroup",
+                    },
+                }
+                if self.proposal_calls == 1
+                else {"action": "no_change", "reason": "insufficient training evidence"}
+            )
+        return SimpleNamespace(
+            content=json.dumps(value),
+            usage={"prompt_tokens": 12, "completion_tokens": 5},
+            model="offline",
+        )
+
+
 class WikiProposalClient(ProposalClient):
     """Read an actual episode original before the single terminal candidate."""
 
