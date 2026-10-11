@@ -261,3 +261,166 @@ class UnboundedExecutionTests(unittest.IsolatedAsyncioTestCase):
             with self.assertRaises(UnknownRequest):
                 await JournalClient(client, StepJournal(directory)).chat(role="worker", messages=[])
             self.assertEqual(client.calls, 1)
+
+
+class CompletedCancellationTests(unittest.IsolatedAsyncioTestCase):
+    def client(self, root, stream, *, deadline=True):
+        import asyncio
+        import time
+
+        cfg = Config(
+            work_dir=root / "client",
+            api_key="req-FAKESECRET123",
+            max_http_requests=None,
+            model_strong="MiniMax-M3.1-Flash-Preview",
+            provider_request_policy="minimax-adaptive-v1",
+            thinking_type="adaptive",
+            reasoning_effort="max",
+            deadline_monotonic=time.monotonic() + 0.08 if deadline else None,
+        )
+        cfg.role_tiers["worker"] = "strong"
+        client = LLMClient(cfg)
+        client.mock_calls = 0
+
+        async def create(**kwargs):
+            client.mock_calls += 1
+            return stream
+
+        client._site_for = lambda model: (
+            NS(chat=NS(completions=NS(create=create))),
+            asyncio.Semaphore(1),
+        )
+        return client
+
+    async def test_deadline_during_complete_close_and_ledger_returns_known_receipt(self):
+        import asyncio
+
+        from darwinagent.runtime.journal_client import JournalClient
+        from darwinagent.runtime.steps import StepJournal
+
+        for stage in ("close", "ledger"):
+            with self.subTest(stage=stage), tempfile.TemporaryDirectory() as directory:
+
+                class HungClose(Stream):
+                    async def close(self):
+                        await asyncio.Event().wait()
+
+                root = Path(directory)
+                client = self.client(root, HungClose() if stage == "close" else Stream())
+                if stage == "ledger":
+
+                    async def hung_ledger(*args, **kwargs):
+                        await asyncio.Event().wait()
+
+                    client._append_ledger = hung_ledger
+                shared = SharedTransport(client, root / "shared", worker_limit=None)
+                scope = shared.scoped("task", "worker")
+                result = await JournalClient(scope, StepJournal(root / "steps")).chat(
+                    role="worker", messages=[]
+                )
+                self.assertEqual(result.content, '{"final_response":"ok"}')
+                key = "stream_close_error_type" if stage == "close" else "ledger_write_error_type"
+                self.assertEqual(result.usage[key], "CancelledError")
+                row = json.loads(next((root / "shared/requests").glob("*.json")).read_text())
+                self.assertEqual(row["status"], "completed")
+                self.assertFalse((root / "shared/pause.json").exists())
+                await JournalClient(scope, StepJournal(root / "steps")).chat(
+                    role="worker", messages=[]
+                )
+                self.assertEqual(client.mock_calls, 1)
+                await client.aclose()
+
+    async def test_external_cancel_preserves_completed_receipts_and_still_cancels_caller(self):
+        import asyncio
+
+        from darwinagent.runtime.journal_client import JournalClient
+        from darwinagent.runtime.steps import StepJournal
+
+        started = asyncio.Event()
+
+        class HungClose(Stream):
+            async def close(self):
+                started.set()
+                await asyncio.Event().wait()
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            client = self.client(root, HungClose(), deadline=False)
+            shared = SharedTransport(client, root / "shared", worker_limit=None)
+            scope = shared.scoped("task", "worker")
+            task = asyncio.create_task(
+                JournalClient(scope, StepJournal(root / "steps")).chat(role="worker", messages=[])
+            )
+            await started.wait()
+            task.cancel()
+            with self.assertRaises(asyncio.CancelledError):
+                await task
+            self.assertEqual(
+                json.loads((root / "steps/000000.json").read_text())["state"], "responded"
+            )
+            self.assertEqual(
+                json.loads(next((root / "shared/requests").glob("*.json")).read_text())["status"],
+                "completed",
+            )
+            await JournalClient(scope, StepJournal(root / "steps")).chat(role="worker", messages=[])
+            self.assertEqual(client.mock_calls, 1)
+            await client.aclose()
+
+    async def test_incomplete_deadline_is_unknown_and_response_id_never_leaks(self):
+        import asyncio
+
+        from darwinagent.llm.client import BudgetExceeded
+
+        class Partial(Stream):
+            async def __aiter__(self):
+                yield NS(
+                    model=None,
+                    id="req-FAKESECRET123",
+                    usage=None,
+                    choices=[
+                        NS(
+                            delta=NS(content="PRIVATE-PARTIAL", reasoning_content=None),
+                            finish_reason=None,
+                        )
+                    ],
+                )
+                await asyncio.Event().wait()
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            client = self.client(root, Partial())
+            shared = SharedTransport(client, root / "shared", worker_limit=None)
+            with self.assertRaises(BudgetExceeded):
+                await shared.scoped("task", "worker").chat(role="worker", messages=[])
+            text = next((root / "shared/requests").glob("*.json")).read_text()
+            row = json.loads(text)
+            self.assertEqual(row["status"], "unknown")
+            self.assertFalse(row["diagnostics"]["stream_complete"])
+            self.assertEqual(row["diagnostics"]["chunks_received"], 1)
+            self.assertEqual(len(row["diagnostics"]["response_id_sha256"]), 64)
+            self.assertNotIn("req-FAKESECRET123", text)
+            self.assertNotIn("PRIVATE-PARTIAL", text)
+            with self.assertRaises(BudgetExceeded):
+                await shared.scoped("another-task", "worker").chat(role="worker", messages=[])
+            self.assertEqual(client.mock_calls, 1)
+            await client.aclose()
+
+    def test_config_old_positional_fields_keep_original_order(self):
+        import dataclasses
+
+        fields = [f for f in dataclasses.fields(Config) if f.init]
+        self.assertEqual(fields[-1].name, "provider_request_policy")
+        old_values = [getattr(Config(), f.name) for f in fields[:-1]]
+        names = [f.name for f in fields[:-1]]
+        replacements = {
+            "request_timeout_s": 321.0,
+            "max_http_requests": 123,
+            "deadline_monotonic": 456.0,
+            "request_budget_path": Path("legacy-counter.json"),
+        }
+        for name, value in replacements.items():
+            old_values[names.index(name)] = value
+        legacy = Config(*old_values)
+        for name, value in replacements.items():
+            self.assertEqual(getattr(legacy, name), value)
+        self.assertEqual(legacy.provider_request_policy, "generic")

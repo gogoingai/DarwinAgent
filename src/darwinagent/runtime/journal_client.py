@@ -1,5 +1,6 @@
 """Persist calls made by existing evaluator clients without changing their protocols."""
 
+import asyncio
 from types import SimpleNamespace
 
 from .steps import AwaitingBudget, RequestAbandoned, UnknownRequest
@@ -31,8 +32,15 @@ class JournalClient:
         request = dict(kwargs, durable=True)
         if self.journal.bypass_cache:
             request["use_cache"] = False
+        cancellation = None
         try:
             result = await self.client.chat(**request)
+        except asyncio.CancelledError as exc:
+            result = getattr(exc, "completed_result", None)
+            if result is None:
+                self.journal.unknown(path, exc)
+                raise
+            cancellation = exc
         except Exception as exc:
             from openai import APIStatusError
 
@@ -62,4 +70,6 @@ class JournalClient:
             "elapsed_s": getattr(result, "elapsed_s", 0),
         }
         self.journal.respond(path, response)
+        if cancellation is not None:
+            raise cancellation
         return result

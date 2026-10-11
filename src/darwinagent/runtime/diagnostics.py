@@ -1,6 +1,6 @@
 """Allowlisted failure evidence: never retain exception text or request bodies."""
 
-import re
+import hashlib
 
 
 def exception_evidence(error, *, stage="model"):
@@ -22,8 +22,6 @@ def exception_evidence(error, *, stage="model"):
         if type(value) in (bool, int):
             result[key] = value
     identifier = diagnostics.get("response_id")
-    if isinstance(identifier, str) and re.fullmatch(
-        r"(?:chatcmpl|req)-[a-zA-Z0-9]{1,80}", identifier
-    ):
-        result["response_id"] = identifier
+    if isinstance(identifier, str):
+        result["response_id_sha256"] = hashlib.sha256(identifier.encode()).hexdigest()
     return result

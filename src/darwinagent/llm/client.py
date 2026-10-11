@@ -206,16 +206,28 @@ class LLMClient:
             use_cache=use_cache,
             durable=durable,
         )
+        completion = {}
+
+        async def dispatch():
+            try:
+                return await self._chat(**request, _completion_receipt=completion)
+            except asyncio.CancelledError as exc:
+                if "result" in completion:
+                    exc.completed_result = completion["result"]
+                raise
+
         deadline = self.cfg.deadline_monotonic
         if deadline is None:
-            return await self._chat(**request)
+            return await dispatch()
         remaining = deadline - time.monotonic()
         if remaining <= 0:
             raise BudgetExceeded("Model request deadline exceeded")
         try:
             async with asyncio.timeout(remaining):
-                return await self._chat(**request)
+                return await dispatch()
         except TimeoutError as exc:
+            if durable and "result" in completion:
+                return completion["result"]
             failure = BudgetExceeded("Model request deadline exceeded", dispatched=True)
             failure.transport_diagnostics = getattr(exc.__cause__, "transport_diagnostics", {})
             raise failure from None
@@ -231,6 +243,7 @@ class LLMClient:
         namespace,
         use_cache,
         durable=False,
+        _completion_receipt=None,
     ):
         model = self.cfg.model_for(role)
         resolved = resolve(model, self.cfg)
@@ -348,32 +361,41 @@ class LLMClient:
                         exc.transport_diagnostics = diagnostics
                         raise
                     finally:
+                        if diagnostics["stream_complete"]:
+                            content = "".join(parts)
+                            if reasoning_chars:
+                                usage["reasoning_chars"] = reasoning_chars
+                            result = LLMResult(
+                                content=content,
+                                usage=usage,
+                                cache_hit=False,
+                                elapsed_s=round(time.time() - t0, 2),
+                                model=model,
+                                role=role,
+                                requested_model=model,
+                                provider_model=provider_model,
+                                response_id=response_id,
+                            )
+                            if _completion_receipt is not None:
+                                _completion_receipt["result"] = result
                         close = getattr(stream, "close", None) or getattr(stream, "aclose", None)
                         if close is not None:
                             try:
                                 closing = close()
                                 if inspect.isawaitable(closing):
                                     await closing
-                            except Exception as exc:
+                            except BaseException as exc:
+                                diagnostics["stage"] = "stream_close"
+                                exc.transport_diagnostics = diagnostics
                                 if diagnostics["stream_complete"]:
                                     usage["stream_close_error_type"] = type(exc).__name__
+                                    if not isinstance(exc, Exception):
+                                        raise
                                 else:
-                                    exc.transport_diagnostics = diagnostics
                                     raise
                     content = "".join(parts)
                     if reasoning_chars:
                         usage["reasoning_chars"] = reasoning_chars
-                result = LLMResult(
-                    content=content,
-                    usage=usage,
-                    cache_hit=False,
-                    elapsed_s=round(time.time() - t0, 2),
-                    model=model,
-                    role=role,
-                    requested_model=model,
-                    provider_model=provider_model,
-                    response_id=response_id,
-                )
                 # 空正文（思考吃光预算）不入缓存，下次调用自动重试
                 if content.strip():
                     try:
@@ -386,10 +408,10 @@ class LLMClient:
                     result.usage["empty_content"] = True
                 try:
                     await self._append_ledger(namespace, role, model, usage, cache_hit=False)
-                except Exception as exc:
-                    if not durable:
-                        raise
+                except BaseException as exc:
                     usage["ledger_write_error_type"] = type(exc).__name__
+                    if not durable or not isinstance(exc, Exception):
+                        raise
                 if (
                     not durable
                     and not content.strip()

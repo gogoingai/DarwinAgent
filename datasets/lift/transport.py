@@ -1,5 +1,6 @@
 """One host transport, persistent pause gate, and cumulative per-session worker caps."""
 
+import asyncio
 import hashlib
 import json
 import time
@@ -462,6 +463,15 @@ class SessionTransport:
         before_http = self.shared.client.http_attempts()
         try:
             response = await self.shared.client.chat(**effective)
+        except asyncio.CancelledError as exc:
+            completed = getattr(exc, "completed_result", None)
+            if completed is not None:
+                record.update(status="completed", usage=completed.usage, output=completed.content)
+            else:
+                record["status"] = "unknown"
+                record["diagnostics"] = exception_evidence(exc)
+                self.shared.pause("unknown")
+            raise
         except BudgetExceeded as exc:
             record["diagnostics"] = exception_evidence(exc)
             record["status"] = "unknown" if exc.dispatched else "budget_exhausted"
