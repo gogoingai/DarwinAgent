@@ -254,30 +254,40 @@ class UnlimitedProposalTests(unittest.TestCase):
             service = WikiService(tmp)
             for i in range(61):
                 service.register({"index": i, "text": "source " * 30})
-            query = {"question": "all training originals", "max_chars": 8000}
-            reply = asyncio.run(service.query(WikiQuery(**query)))
-            self.assertIn("reply_fragment", reply.facts[0])
-            source_chunks = []
-            while True:
-                outer = []
-                while True:
-                    self.assertLessEqual(len(json.dumps(reply.to_dict(), ensure_ascii=False)), 8000)
-                    outer.append(reply.facts[0]["reply_fragment"])
-                    if not reply.cursor or "reply" not in json.loads(reply.cursor):
-                        break
-                    reply = asyncio.run(service.query(WikiQuery(**query, cursor=reply.cursor)))
-                full = json.loads("".join(outer))
-                fragment = full["facts"][0]["raw_fragment"]
-                source_chunks.append(fragment)
-                if len(source_chunks) == 1:
-                    self.assertEqual(len(fragment), 7000)
-                    self.assertEqual(json.loads(full["cursor"])["offset"], 7000)
-                if not full["cursor"]:
-                    break
-                reply = asyncio.run(service.query(WikiQuery(**query, cursor=full["cursor"])))
-            parts = json.loads("".join(source_chunks))
-            originals = [json.loads(part["text"])["data"] for part in parts]
-            self.assertEqual(originals, [{"index": i, "text": "source " * 30} for i in range(61)])
+            for max_chars in (8000, 512):
+                with self.subTest(max_chars=max_chars):
+                    query = {"question": "all training originals", "max_chars": max_chars}
+                    reply = asyncio.run(service.query(WikiQuery(**query)))
+                    self.assertIn("reply_fragment", reply.facts[0])
+                    source_chunks = []
+                    while True:
+                        outer = []
+                        while True:
+                            self.assertLessEqual(
+                                len(json.dumps(reply.to_dict(), ensure_ascii=False)), max_chars
+                            )
+                            outer.append(reply.facts[0]["reply_fragment"])
+                            if not reply.cursor or "reply" not in json.loads(reply.cursor):
+                                break
+                            reply = asyncio.run(
+                                service.query(WikiQuery(**query, cursor=reply.cursor))
+                            )
+                        full = json.loads("".join(outer))
+                        fragment = full["facts"][0]["raw_fragment"]
+                        source_chunks.append(fragment)
+                        if len(source_chunks) == 1:
+                            self.assertEqual(len(fragment), 7000)
+                            self.assertEqual(json.loads(full["cursor"])["offset"], 7000)
+                        if not full["cursor"]:
+                            break
+                        reply = asyncio.run(
+                            service.query(WikiQuery(**query, cursor=full["cursor"]))
+                        )
+                    parts = json.loads("".join(source_chunks))
+                    originals = [json.loads(part["text"])["data"] for part in parts]
+                    self.assertEqual(
+                        originals, [{"index": i, "text": "source " * 30} for i in range(61)]
+                    )
 
     def test_damaged_continuation_offers_exact_original_query_without_scope_bypass(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -360,5 +370,24 @@ class UnlimitedProposalTests(unittest.TestCase):
                 asyncio.run(
                     service.query(WikiQuery(**{**query, "question": "changed"}, cursor=page.cursor))
                 )
+            # Old persisted reply IDs and spaced JSON cursor strings also fully
+            # traverse under the public minimum budget without rewriting storage.
+            page = service._bound_reply(
+                legacy,
+                digest({"question": "inspect", "scope": query["scope"], "view": "raw"}),
+                512,
+            )
+            fragments = []
+            while True:
+                self.assertLessEqual(len(json.dumps(page.to_dict(), ensure_ascii=False)), 512)
+                fragments.append(page.facts[0]["reply_fragment"])
+                if not page.cursor:
+                    break
+                page = asyncio.run(
+                    service.query(WikiQuery(**{**query, "max_chars": 512}, cursor=page.cursor))
+                )
+            self.assertEqual(
+                json.loads("".join(fragments)), json.loads(json.dumps(legacy.to_dict()))
+            )
             with self.assertRaises(PermissionError):
                 service.register({"private": "holdout"}, source_kind="validation")

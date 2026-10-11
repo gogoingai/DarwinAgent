@@ -329,12 +329,17 @@ class WikiService:
                 return result
             metadata = result.to_dict()
             metadata["facts"] = ({"raw_fragment": "", "offset": start},)
-            if (
-                len(json.dumps(metadata, ensure_ascii=False)) > min(query.max_chars, 8000)
-                or end <= start + 1
-            ):
-                # Provenance alone cannot fit: preserve the source chunk and let
-                # the existing lossless outer reply pager carry its metadata.
+            metadata_overflow = len(json.dumps(metadata, ensure_ascii=False)) > min(
+                query.max_chars, 8000
+            )
+            if metadata_overflow or end <= start + 1:
+                # Provenance alone cannot fit: carry a normal source chunk via
+                # the lossless outer pager, even when the wire budget is tiny.
+                # The budget bounds each outer response, not this stored source.
+                useful_end = min(len(body), start + 7000)
+                if metadata_overflow and end < useful_end:
+                    end = useful_end
+                    continue
                 return self._bound_reply(result, signature, query.max_chars)
             end = start + max(1, (end - start) * 3 // 4)
 
@@ -371,7 +376,10 @@ class WikiService:
                         "reply_fragment": text[start:end],
                         "offset": start,
                         "encoding": "json",
-                        "coverage_in_fragment": True,
+                        # The complete original coverage is inside the retained
+                        # inner JSON. This redundant hint is optional at tiny wire
+                        # budgets so offset digit growth cannot crowd out payload.
+                        **({"coverage_in_fragment": True} if available >= 1024 else {}),
                     },
                 ),
                 cursor=cursor,
