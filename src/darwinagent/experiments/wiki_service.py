@@ -383,6 +383,47 @@ class WikiService:
                 raise ValueError("Wiki reply budget cannot hold continuation metadata")
             end = start + max(1, (end - start) * 3 // 4)
 
+    def source_page_digest(self, query, reply):
+        """Identity of intact outer-page evidence, separate from its wire envelope.
+
+        Used only for dialogue progress guidance. The stored source and returned
+        fragment are checked byte-for-byte; no hashes are stripped from source text.
+        Old reply cursors continue to work, including a final page's snapshot cursor.
+        """
+        facts = reply.get("facts", ())
+        if len(facts) != 1 or "reply_fragment" not in facts[0]:
+            return None
+        for cursor in (reply.get("cursor"), query.get("cursor")):
+            if not cursor:
+                continue
+            token = json.loads(cursor)
+            ref = token.get("reply")
+            if not isinstance(ref, str) or not re.fullmatch(r"[0-9a-f]{64}", ref):
+                continue
+            stored = json.loads((self.root / "replies" / f"{ref}.json").read_text())
+            start = facts[0]["offset"]
+            fragment = facts[0]["reply_fragment"]
+            end = start + len(fragment)
+            if stored["text"][start:end] != fragment:
+                continue
+            evidence = {
+                key: stored["data"].get(key)
+                for key in (
+                    "evidence_refs",
+                    "facts",
+                    "hypotheses",
+                    "support",
+                    "refutation",
+                    "covered",
+                    "uncovered",
+                    "missing",
+                    "matched",
+                    "progress",
+                )
+            }
+            return digest({"evidence": evidence, "serialized_range": [start, end]})
+        return None
+
     async def _regroup(self, query, snapshot, parts, refs, missing, start):
         if not parts:
             gap = {

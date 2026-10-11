@@ -191,6 +191,64 @@ class UnlimitedProposalTests(unittest.TestCase):
             self.assertEqual(feedback["wiki_feedback"]["status"], "no_new_evidence")
             self.assertEqual(session.state["calls"], 3)
 
+    def test_reworded_outer_partial_query_uses_authoritative_source_digest(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            service = WikiService(tmp)
+            for i in range(61):
+                service.register({"index": i, "text": "source " * 30})
+            for max_chars in (8000, 512):
+                with self.subTest(max_chars=max_chars):
+                    client = Client(
+                        [
+                            {
+                                "action": "query_wiki",
+                                "query": {"question": q, "max_chars": max_chars},
+                            }
+                            for q in (
+                                "inspect all training failures",
+                                "rephrased all training failures",
+                            )
+                        ]
+                        + [{"action": "no_change", "reason": "insufficient evidence"}]
+                    )
+                    session = ProposalSession(
+                        Path(tmp) / f"s-{max_chars}.json",
+                        payload={"base_version": "b"},
+                        protocol="p",
+                    )
+                    asyncio.run(session.run(client, CONFIG, decode_action, service))
+                    first, second = session.state["exchanges"]
+                    self.assertIn("reply_fragment", first["reply"]["facts"][0])
+                    if max_chars == 8000:
+                        self.assertNotEqual(
+                            first["reply"]["facts"][0]["reply_fragment"],
+                            second["reply"]["facts"][0]["reply_fragment"],
+                        )
+                    self.assertEqual(
+                        first["source_page_digest"],
+                        second["source_page_digest"],
+                    )
+                    feedback = json.loads(session.state["messages"][-2]["content"])
+                    self.assertEqual(feedback["wiki_feedback"]["status"], "no_new_evidence")
+                    self.assertEqual(
+                        (session.state["calls"], len(session.state["exchanges"])), (3, 2)
+                    )
+                    continuation = asyncio.run(
+                        service.query(WikiQuery(**first["query"], cursor=first["reply"]["cursor"]))
+                    ).to_dict()
+                    self.assertNotEqual(
+                        first["source_page_digest"],
+                        service.source_page_digest(
+                            {**first["query"], "cursor": first["reply"]["cursor"]}, continuation
+                        ),
+                    )
+                    with self.assertRaisesRegex(ValueError, "another query"):
+                        asyncio.run(
+                            service.query(
+                                WikiQuery(**second["query"], cursor=first["reply"]["cursor"])
+                            )
+                        )
+
     def test_many_refs_preserve_full_source_chunk_in_outer_paging(self):
         with tempfile.TemporaryDirectory() as tmp:
             service = WikiService(tmp)

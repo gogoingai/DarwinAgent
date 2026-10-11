@@ -124,23 +124,22 @@ class ProposalSession:
     def _successful_evidence(reply):
         # Outgoing cursors/snapshot IDs bind query wording, not new source facts.
         # Raw fragment offsets and coverage still distinguish different pages.
-        return digest(
-            {
-                key: reply.get(key)
-                for key in (
-                    "evidence_refs",
-                    "facts",
-                    "hypotheses",
-                    "support",
-                    "refutation",
-                    "covered",
-                    "uncovered",
-                    "missing",
-                    "matched",
-                    "progress",
-                )
-            }
-        )
+        evidence = {
+            key: reply.get(key)
+            for key in (
+                "evidence_refs",
+                "facts",
+                "hypotheses",
+                "support",
+                "refutation",
+                "covered",
+                "uncovered",
+                "missing",
+                "matched",
+                "progress",
+            )
+        }
+        return digest(evidence)
 
     def _raise_wiki_pause(self):
         from .control import ControlSignal
@@ -273,7 +272,14 @@ class ProposalSession:
                     and exchange["reply"].get("status") in ("pending", "failed")
                     for exchange in self.state["exchanges"]
                 )
-                self.state["exchanges"].append({"query": action["query"], "reply": reply})
+                exchange = {"query": action["query"], "reply": reply}
+                if reply.get("status") in ("complete", "partial") and callable(
+                    getattr(wiki_service, "source_page_digest", None)
+                ):
+                    source_page = wiki_service.source_page_digest(action["query"], reply)
+                    if source_page is not None:
+                        exchange["source_page_digest"] = source_page
+                self.state["exchanges"].append(exchange)
                 if stalled:
                     self.state["wiki_pause"] = {
                         "query": action["query"],
@@ -293,8 +299,13 @@ class ProposalSession:
                     exchange["query"].get("scope", {}) == action["query"].get("scope", {})
                     and exchange["query"].get("view", "raw") == action["query"].get("view", "raw")
                     and exchange["query"].get("cursor") == action["query"].get("cursor")
-                    and self._successful_evidence(exchange["reply"])
-                    == self._successful_evidence(reply)
+                    and (
+                        exchange.get("source_page_digest")
+                        == self.state["exchanges"][-1].get("source_page_digest")
+                        if self.state["exchanges"][-1].get("source_page_digest") is not None
+                        else self._successful_evidence(exchange["reply"])
+                        == self._successful_evidence(reply)
+                    )
                     for exchange in self.state["exchanges"][:-1]
                 ):
                     context["wiki_feedback"] = {
