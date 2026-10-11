@@ -10,8 +10,8 @@ from darwinagent.agent import ExecutionProfile
 from darwinagent.config import Config
 from darwinagent.llm.client import LLMClient
 from darwinagent.runtime.diagnostics import exception_evidence
-from datasets.lift.tests.test_transport import Recorded
 from datasets.lift.transport import SharedTransport
+from tests.support.lift_transport import Recorded
 
 
 class Stream:

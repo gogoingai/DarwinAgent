@@ -177,10 +177,14 @@ class LLMClient:
                 continue
             seen.add(id(current))
             pending.extend(e for e in (current.__cause__, current.__context__) if e is not None)
-            current.args = (type(current).__name__,)
+            classification = type(current).__name__ + ": [redacted]"
+            status = getattr(current, "status_code", None)
+            if type(status) is int:
+                classification += f" (Error code: {status})"
+            current.args = (classification,)
             for name in ("message", "body", "code", "param", "type"):
                 if hasattr(current, name):
-                    setattr(current, name, None if name == "body" else type(current).__name__)
+                    setattr(current, name, None if name == "body" else classification)
         return error
 
     # ---------- 对外主入口 ----------
