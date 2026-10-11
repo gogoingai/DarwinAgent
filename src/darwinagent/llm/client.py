@@ -150,7 +150,7 @@ class LLMClient:
         return site
 
     def _redact_error(self, value):
-        """Redact transport-error data only; successful model output is unchanged."""
+        """Redact configured credentials from metadata; model output stays unchanged."""
         secrets = {self.cfg.api_key, self.cfg.fast_api_key, self.cfg.middle_api_key}
         secrets.update(api_key for _base_url, api_key in self._sites)
         if isinstance(value, str):
@@ -283,8 +283,8 @@ class LLMClient:
                     model=model,
                     role=role,
                     requested_model=model,
-                    provider_model=data.get("provider_model"),
-                    response_id=data.get("response_id"),
+                    provider_model=self._redact_error(data.get("provider_model")),
+                    response_id=self._redact_error(data.get("response_id")),
                 )
             except Exception:
                 pass  # 缓存损坏则重打
@@ -373,8 +373,8 @@ class LLMClient:
                                 model=model,
                                 role=role,
                                 requested_model=model,
-                                provider_model=provider_model,
-                                response_id=response_id,
+                                provider_model=self._redact_error(provider_model),
+                                response_id=self._redact_error(response_id),
                             )
                             if _completion_receipt is not None:
                                 _completion_receipt["result"] = result

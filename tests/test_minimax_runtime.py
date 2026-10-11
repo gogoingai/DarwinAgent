@@ -424,3 +424,62 @@ class CompletedCancellationTests(unittest.IsolatedAsyncioTestCase):
         for name, value in replacements.items():
             self.assertEqual(getattr(legacy, name), value)
         self.assertEqual(legacy.provider_request_policy, "generic")
+
+
+class SuccessMetadataCredentialTests(unittest.IsolatedAsyncioTestCase):
+    client = CompletedCancellationTests.client
+
+    async def test_success_identifiers_redacted_before_cache_shared_and_journal(self):
+        from darwinagent.runtime.journal_client import JournalClient
+        from darwinagent.runtime.steps import StepJournal
+
+        class SecretIDStream(Stream):
+            async def __aiter__(self):
+                yield NS(
+                    model="provider-req-FAKESECRET123",
+                    id="req-FAKESECRET123",
+                    usage=NS(prompt_tokens=2, completion_tokens=3),
+                    choices=[
+                        NS(
+                            delta=NS(content="known body", reasoning_content=None),
+                            finish_reason="stop",
+                        )
+                    ],
+                )
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            client = self.client(root, SecretIDStream(), deadline=False)
+            shared = SharedTransport(client, root / "shared", worker_limit=None)
+            result = await JournalClient(
+                shared.scoped("task", "worker"), StepJournal(root / "steps")
+            ).chat(role="worker", messages=[])
+            self.assertEqual(result.content, "known body")
+            self.assertEqual(result.response_id, "[redacted]")
+            self.assertEqual(result.provider_model, "provider-[redacted]")
+            cache = list(client.cfg.cache_dir.rglob("*.json"))
+            self.assertEqual(len(cache), 1)
+            for path in (
+                cache
+                + list((root / "shared").rglob("*.json"))
+                + list((root / "steps").rglob("*.json"))
+            ):
+                self.assertNotIn("req-FAKESECRET123", path.read_text())
+            saved = json.loads((root / "steps/000000.json").read_text())
+            self.assertEqual(saved["state"], "responded")
+            self.assertEqual(saved["response"]["response_id"], "[redacted]")
+            await client.aclose()
+
+    async def test_generic_legitimate_ids_and_cached_identifier_compatibility(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            client = self.client(root, Stream(), deadline=False)
+            client.cfg.provider_request_policy = "generic"
+            first = await client.chat(role="worker", messages=[], durable=True)
+            second = await client.chat(role="worker", messages=[], durable=True)
+            self.assertEqual(first.response_id, "chatcmpl-123")
+            self.assertEqual(first.provider_model, "MiniMax-M3.1-Flash-Preview")
+            self.assertEqual(second.response_id, first.response_id)
+            self.assertTrue(second.cache_hit)
+            self.assertEqual(client.mock_calls, 1)
+            await client.aclose()
