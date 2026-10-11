@@ -289,40 +289,47 @@ class WikiService:
             return self._bound_reply(result, signature, query.max_chars)
         body = json.dumps(parts, ensure_ascii=False)
         end = min(len(body), start + max(64, min(query.max_chars, 8000) - 1000))
-        cursor = (
-            json.dumps({"snapshot": snapshot["id"], "offset": end}) if end < len(body) else None
-        )
-        covered, uncovered = [], []
-        position = 1
-        for block_index, part in enumerate(parts):
-            encoded = json.dumps(part, ensure_ascii=False)
-            part_end = position + len(encoded)
-            if start < part_end and end > position:
-                covered.append(
-                    {
-                        "ref": part["ref"],
-                        "block_offset": part["offset"],
-                        "view": query.view,
-                        "serialized_range": [max(start, position), min(end, part_end)],
-                        "fragment_complete": start <= position and end >= part_end,
-                    }
-                )
-            if start > position or end < part_end:
-                uncovered.append(block_index)
-            position = part_end + 2
-        result = WikiReply(
-            "partial" if cursor or missing else "complete",
-            snapshot["id"],
-            tuple(refs),
-            ({"raw_fragment": body[start:end], "offset": start},),
-            covered=tuple(covered),
-            uncovered=tuple(uncovered),
-            matched=tuple(refs),
-            missing=tuple(missing),
-            cursor=cursor,
-            wiki_version=snapshot["version"],
-        )
-        return self._bound_reply(result, signature, query.max_chars)
+        # Page the raw source against the actual wire size, avoiding a second
+        # escaped reply_fragment layer. Existing snapshot/reply cursors still read.
+        while True:
+            cursor = (
+                json.dumps({"snapshot": snapshot["id"], "offset": end}) if end < len(body) else None
+            )
+            covered, uncovered = [], []
+            position = 1
+            for block_index, part in enumerate(parts):
+                encoded = json.dumps(part, ensure_ascii=False)
+                part_end = position + len(encoded)
+                if start < part_end and end > position:
+                    covered.append(
+                        {
+                            "ref": part["ref"],
+                            "block_offset": part["offset"],
+                            "view": query.view,
+                            "serialized_range": [max(start, position), min(end, part_end)],
+                            "fragment_complete": start <= position and end >= part_end,
+                        }
+                    )
+                if start > position or end < part_end:
+                    uncovered.append(block_index)
+                position = part_end + 2
+            result = WikiReply(
+                "partial" if cursor or missing else "complete",
+                snapshot["id"],
+                tuple(refs),
+                ({"raw_fragment": body[start:end], "offset": start},),
+                covered=tuple(covered),
+                uncovered=tuple(uncovered),
+                matched=tuple(refs),
+                missing=tuple(missing),
+                cursor=cursor,
+                wiki_version=snapshot["version"],
+            )
+            if len(json.dumps(result.to_dict(), ensure_ascii=False)) <= min(query.max_chars, 8000):
+                return result
+            if end <= start + 1:
+                return self._bound_reply(result, signature, query.max_chars)
+            end = start + max(1, (end - start) * 3 // 4)
 
     def _bound_reply(self, reply, signature, max_chars):
         data = reply.to_dict()

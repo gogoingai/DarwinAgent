@@ -67,7 +67,7 @@ class AgentExperimentSpec:
     test: tuple[str, ...] = ()
     rounds: int = 1
     max_episode_runs: int = 100
-    proposal_call_limit: int = 4
+    proposal_call_limit: int | None = 4
 
     def __post_init__(self):
         for name in ("train", "validation", "admission", "test"):
@@ -88,6 +88,8 @@ class AgentExperimentSpec:
             raise ValueError("Holdout splits must be disjoint from training and admission")
         for name in ("rounds", "max_episode_runs", "proposal_call_limit"):
             value = getattr(self, name)
+            if name == "proposal_call_limit" and value is None:
+                continue
             if type(value) is not int or value < (0 if name == "rounds" else 1):
                 raise ValueError("Invalid finite experiment budget: " + name)
 

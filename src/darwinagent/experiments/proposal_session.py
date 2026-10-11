@@ -14,6 +14,9 @@ ACTION_GUIDANCE = """输出必须是一个 JSON 对象，必须有 action 字段
 raw 和 summary 不调用维护模型；regroup 会逐段调用模型并合并，max_chars 只限制返回长度，不限制重组调用量。只有明确需要比较多份相关原件且已缩小范围时才用 regroup。
 题目的 wiki_scope 可直接作为查询 scope；training_ids 使用系统提供的完整组合编号。question_ids 使用局部 question_id，或兼容完整 training_id；跨对话同名题号应优先用 training_ids 精确定位。
 首次查询 cursor 必须为 null；后续 cursor 只能原样使用 Wiki 返回的字符串，不能用数字页码。
+继续分页时直接复制 continuation_query 的全部字段；不要改 question、scope 或 cursor 中的哈希。
+reply_fragment 是序列化 WikiReply 的一段，raw_fragment 是序列化原件的一段；这些是训练原件分页，不是新结论。先按 cursor 继续，不要把转义字符或片段误当完整事实。
+查询失败时按 retry_query 修复，错误不是证据。已获充分训练证据时提交一个候选或明确 no_change，不必读完无关历史。
 提交示例：{"action":"submit_patch","patches":[...]}
 无修改示例：{"action":"no_change","reason":"当前证据不足","unresolved":["待查问题"]}
 字段含义与训练范围仍以系统提供的输入为准。"""
@@ -227,6 +230,19 @@ class ProposalSession:
                                     "cursor": action["query"]["cursor"],
                                 }
                                 break
+                        if "retry_query" not in reply and action["query"].get("cursor"):
+                            # A damaged cursor/hash cannot match literally. Offer the last
+                            # successful continuation, without altering the recorded action
+                            # or bypassing Wiki's scope/cursor validation.
+                            for exchange in reversed(self.state["exchanges"]):
+                                if exchange["reply"].get("cursor") and exchange["reply"].get(
+                                    "status"
+                                ) not in ("failed", "pending"):
+                                    reply["retry_query"] = {
+                                        **exchange["query"],
+                                        "cursor": exchange["reply"]["cursor"],
+                                    }
+                                    break
                 atomic_json(query_receipt, {"query_id": query_id, "reply": reply})
                 identity, progress = self._wiki_progress(action["query"], reply)
                 stalled = reply.get("status") in ("pending", "failed") and any(
@@ -251,6 +267,18 @@ class ProposalSession:
                     self.save()
                     self._raise_wiki_pause()
                 context = {"wiki_reply": reply}
+                if reply.get("status") in ("complete", "partial") and any(
+                    exchange["query"].get("scope", {}) == action["query"].get("scope", {})
+                    and exchange["query"].get("view", "raw") == action["query"].get("view", "raw")
+                    and exchange["query"].get("cursor") == action["query"].get("cursor")
+                    and self._wiki_progress(exchange["query"], exchange["reply"])[1] == progress
+                    for exchange in self.state["exchanges"][:-1]
+                ):
+                    context["wiki_feedback"] = {
+                        "status": "no_new_evidence",
+                        "guidance": "相同范围和页码已返回相同证据。使用已有事实提交候选或明确 no_change；有未读页则复制 continuation_query。",
+                    }
+                    self.state["events"].append({"status": "wiki_repeated_evidence"})
                 if reply.get("cursor"):
                     context["continuation_query"] = {**action["query"], "cursor": reply["cursor"]}
                 self.state["messages"].append(
