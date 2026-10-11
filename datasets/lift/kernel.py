@@ -7,7 +7,7 @@ from darwinagent.agent import AgentAsset, AgentKernelAssets
 from .agents import worker_profile
 
 
-def initial_kernel(root):
+def initial_kernel(root, *, max_model_calls=8):
     schema = {
         "nodes": [
             {
@@ -75,5 +75,5 @@ def initial_kernel(root):
                 schema_dependencies=("schema",),
             ),
         ),
-        worker_profile(),
+        worker_profile(max_model_calls),
     ).export(root)

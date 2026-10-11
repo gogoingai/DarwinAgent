@@ -11,6 +11,7 @@ from openai import APIStatusError
 from darwinagent.llm.client import BudgetExceeded
 from darwinagent.runtime.artifacts import atomic_json, digest
 from darwinagent.runtime.budgets import counter_transaction
+from darwinagent.runtime.diagnostics import exception_evidence
 from darwinagent.runtime.identity import transport_identity
 from darwinagent.runtime.leases import execution_lease
 
@@ -41,7 +42,7 @@ class SharedTransport:
             if self.worker_limit != 16:
                 raise ValueError("Use the explicitly amended cumulative worker limit16")
             declaration = self.identity()
-        elif self.worker_limit > 8:
+        elif self.worker_limit is not None and self.worker_limit > 8:
             raise ValueError("An explicit audited worker limit amendment is required")
         if policy.exists():
             original = json.loads(policy.read_text())
@@ -433,7 +434,7 @@ class SessionTransport:
         if self.role == "worker":
             with counter_transaction(self.shared.root / "worker-calls.json") as counts:
                 used = counts.get(self.session, 0)
-                if used >= self.shared.worker_limit:
+                if self.shared.worker_limit is not None and used >= self.shared.worker_limit:
                     raise BudgetExceeded("Cumulative worker session budget exhausted")
                 counts[self.session] = used + 1
         effective = dict(kwargs, temperature=0, durable=True, use_cache=False)
@@ -454,20 +455,26 @@ class SessionTransport:
             "usage": None,
             "model": self.cfg.model_strong,
         }
+        if self.cfg.provider_request_policy != "generic":
+            record["provider_request_policy"] = self.cfg.provider_request_policy
+            record["generation_parameter"] = "max_completion_tokens"
         atomic_json(path, record)
         before_http = self.shared.client.http_attempts()
         try:
             response = await self.shared.client.chat(**effective)
         except BudgetExceeded as exc:
+            record["diagnostics"] = exception_evidence(exc)
             record["status"] = "unknown" if exc.dispatched else "budget_exhausted"
             self.shared.pause(record["status"])
             raise
         except APIStatusError as exc:
+            record["diagnostics"] = exception_evidence(exc)
             record.update(
                 status="failed", error_type=type(exc).__name__, http_status=exc.status_code
             )
             raise
-        except Exception:
+        except Exception as exc:
+            record["diagnostics"] = exception_evidence(exc)
             record["status"] = "unknown"
             self.shared.pause("unknown")
             raise

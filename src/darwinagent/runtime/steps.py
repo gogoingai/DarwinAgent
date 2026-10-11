@@ -139,11 +139,20 @@ class StepJournal:
         row.update(state="responded", response=response, response_digest=digest(response))
         atomic_json(path, row)
 
+    def unknown(self, path, exc):
+        from .diagnostics import exception_evidence
+
+        row = json.loads(path.read_text())
+        row["diagnostics"] = exception_evidence(exc)
+        atomic_json(path, row)
+
     def fail(self, path, exc):
         row = json.loads(path.read_text())
         if self.workspace is not None:
             self.workspace.set_request_status(row["request_id"], "failed")
-        row.update(state="failed", error=f"{type(exc).__name__}: {exc}")
+        from .diagnostics import exception_evidence
+
+        row.update(state="failed", error=type(exc).__name__, diagnostics=exception_evidence(exc))
         atomic_json(path, row)
 
     def tool(self, payload, operation):

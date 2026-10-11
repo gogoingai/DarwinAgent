@@ -92,7 +92,7 @@ class AgentContext:
         used = sum(
             json.loads(p.read_text())["kind"] == kind for p in self.journal.root.glob("[0-9]*.json")
         )
-        if used >= limit:
+        if limit is not None and used >= limit:
             raise EpisodeBudgetExceeded(f"{kind} budget exhausted: {used}/{limit}")
 
     def tool_descriptions(self):

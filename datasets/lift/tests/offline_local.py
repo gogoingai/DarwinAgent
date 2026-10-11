@@ -79,14 +79,17 @@ async def pilot(
 
     root = Path(output).resolve()
     root.mkdir(parents=True, exist_ok=False)
-    initial = initial_kernel(root / "K0")
+    initial = initial_kernel(root / "K0", max_model_calls=None if worker_limit is None else 8)
     cfg = Config(
         model_strong="offline-recorded",
         model_middle="offline-recorded",
         model_fast="offline-recorded",
         work_dir=root / "transport",
         max_retries=1,
-        max_http_requests=100,
+        max_http_requests=None if worker_limit is None else 100,
+        provider_request_policy="minimax-adaptive-v1" if worker_limit is None else "generic",
+        thinking_type="adaptive" if worker_limit is None else "",
+        reasoning_effort="max" if worker_limit is None else "",
     )
     cfg.role_tiers.update(worker="strong", judge="strong")
     client = RecordedClient(cfg, initial)
@@ -128,6 +131,8 @@ async def pilot(
             )
         return await original_chat(**kwargs)
 
+    if worker_limit is None:
+        cfg.limits = {}
     client.chat = generation_guard
     budget = root.parent / (root.name + "-budget") / "shared"
     if worker_limit == 16:
@@ -135,7 +140,7 @@ async def pilot(
 
         shared = worker16_fixture(client, budget)
     else:
-        shared = SharedTransport(client, budget)
+        shared = SharedTransport(client, budget, worker_limit=worker_limit)
     runner = LocalRunner(
         dataset=LiftDataset(data),
         shared=shared,
@@ -167,7 +172,7 @@ async def pilot(
     ]  # Synthetic mechanism evidence is never real acceptance.
     assert client.http_attempts() == 0
     counts = json.loads((shared.root / "worker-calls.json").read_text())
-    assert max(counts.values()) <= worker_limit
+    assert worker_limit is None or max(counts.values()) <= worker_limit
     assert not (shared.root / "pause.json").exists()
     assert len({r["native"]["workspace_dir"] for r in rows}) == 3
     calls = client.calls
@@ -208,7 +213,7 @@ async def pilot(
             "resume_receipt_artifact_writes": 0,
             "source_sha256": result["source_sha256"],
             "worker_session_cap": worker_limit,
-            "worker_turn_model_cap": 8,
+            "worker_turn_model_cap": None if worker_limit is None else 8,
             "generation_max_tokens": max_tokens,
             "role_generation_limits": {r["role"]: r["max_tokens"] for r in generation_requests},
             "http_cap": shared.cfg.max_http_requests,
@@ -229,6 +234,7 @@ def main():
     parser.add_argument("--all-failed", action="store_true")
     parser.add_argument("--worker-limit", type=int, choices=(8, 16), default=8)
     parser.add_argument("--max-tokens", type=int, choices=(4096, 16384), default=4096)
+    parser.add_argument("--unbounded", action="store_true")
     args = parser.parse_args()
     with infrastructure_guard():
         configure_native(args.upstream)
@@ -239,8 +245,8 @@ def main():
                 args.output,
                 failures=args.failures,
                 all_failed=args.all_failed,
-                worker_limit=args.worker_limit,
-                max_tokens=args.max_tokens,
+                worker_limit=None if args.unbounded else args.worker_limit,
+                max_tokens=16384 if args.unbounded else args.max_tokens,
             )
         )
     print(

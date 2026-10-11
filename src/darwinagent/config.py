@@ -134,6 +134,7 @@ class Config:
     thinking_type: str = ""
     # Provider-specific routing is an explicit compatibility preset.
     model_profiles: bool = False
+    provider_request_policy: str = "generic"
     request_timeout_s: float = 120.0
     max_http_requests: int | None = None
     deadline_monotonic: float | None = None

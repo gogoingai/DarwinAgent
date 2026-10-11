@@ -15,13 +15,16 @@ from . import tracing
 from .tools import NAMES, DockerTools
 
 
-def worker_profile():
-    return ExecutionProfile("lift-tools-v1", NAMES, max_model_calls=8, max_leaf_calls=64)
+def worker_profile(max_model_calls=8):
+    return ExecutionProfile(
+        "lift-tools-v1", NAMES, max_model_calls=max_model_calls, max_leaf_calls=64
+    )
 
 
 @dataclass(frozen=True)
 class NativeReAct(ReActAgent):
-    worker_session_cap: int = 8
+    worker_session_cap: int | None = 8
+    worker_turn_model_cap: int | None = 8
 
     def identity(self):
         return {
@@ -30,7 +33,7 @@ class NativeReAct(ReActAgent):
             "role": self.role,
             "system_prompt": self.system_prompt,
             "worker_session_cap": self.worker_session_cap,
-            "worker_turn_model_cap": 8,
+            "worker_turn_model_cap": self.worker_turn_model_cap,
             "max_tokens": self.max_tokens,
             "view_layout": self.view_layout,
             "native_correction_rounds": 3,
@@ -78,13 +81,13 @@ class DarwinChatAgent(ChatAgent):
         for tool in tools:
             tool.handler.__self__.audit_path = self.root / "tool-timings"
         profile = (
-            worker_profile()
+            worker_profile(None if shared.worker_limit is None else 8)
             if role == "worker"
             else ExecutionProfile(
                 "lift-judge-read-v1",
                 tuple(t.name for t in tools),
                 prompt_roles={"judge": ("instruction", "tools", "view")},
-                max_model_calls=8,
+                max_model_calls=None if shared.worker_limit is None else 8,
                 max_leaf_calls=64,
             )
         )
@@ -99,7 +102,8 @@ class DarwinChatAgent(ChatAgent):
             )
         self.backend = ExecutionBackend(
             NativeReAct(
-                max_turns=16,
+                max_turns=None if shared.worker_limit is None else 16,
+                worker_turn_model_cap=None if shared.worker_limit is None else 8,
                 role=role,
                 system_prompt=prompt,
                 worker_session_cap=shared.worker_limit,

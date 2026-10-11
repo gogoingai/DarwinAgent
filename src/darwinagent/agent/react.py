@@ -1,5 +1,6 @@
 """Minimal JSON ReAct loop. External adapters can use the context without this loop."""
 
+import itertools
 import json
 from dataclasses import dataclass, field
 
@@ -111,13 +112,15 @@ def _current_view(messages, previous, task, context):
 
 @dataclass(frozen=True)
 class ReActAgent:
-    max_turns: int = 16
+    max_turns: int | None = 16
     role: str = "worker"
     system_prompt: str = _ACTION_PROTOCOL
     max_tokens: int | None = None
     view_layout: str = field(default="latest-view-v1", init=False)
 
     def __post_init__(self):
+        if self.max_turns is not None and (type(self.max_turns) is not int or self.max_turns <= 0):
+            raise ValueError("max_turns must be positive or None")
         if self.max_tokens is not None and (
             type(self.max_tokens) is not int or self.max_tokens <= 0
         ):
@@ -139,7 +142,7 @@ class ReActAgent:
             },
         ]
         view_position = None
-        for _ in range(self.max_turns):
+        for _ in itertools.count() if self.max_turns is None else range(self.max_turns):
             view_position = _current_view(messages, view_position, task, context)
             generation = {} if self.max_tokens is None else {"max_tokens": self.max_tokens}
             response = await context.model(messages, role=self.role, json_mode=True, **generation)

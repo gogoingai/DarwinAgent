@@ -57,6 +57,12 @@ def transport_identity(client):
         if hasattr(cfg, field):
             value = getattr(cfg, field)
             result[field] = sorted(value) if isinstance(value, set) else value
+    policy = getattr(cfg, "provider_request_policy", "generic")
+    if policy != "generic":
+        result["provider_request_policy"] = policy
+    limits = getattr(cfg, "limits", None)
+    if limits is not None and limits != {"build_round_calls": 600, "inference_calls_per_q": 60}:
+        result["limits"] = limits
     # Detect credential changes without publishing credentials or reversible hints.
     result["credential_identity"] = digest(
         [getattr(cfg, "api_key", ""), getattr(cfg, "fast_api_key", "")]

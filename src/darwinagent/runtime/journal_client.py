@@ -45,6 +45,7 @@ class JournalClient:
                 self.journal.fail(path, exc)
                 raise
             else:
+                self.journal.unknown(path, exc)
                 self.pending_error = UnknownRequest(
                     f"No response receipt at {path}: {type(exc).__name__}"
                 )

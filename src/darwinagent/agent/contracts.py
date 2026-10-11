@@ -131,12 +131,14 @@ class ExecutionProfile:
     )
     check_stages: tuple[str, ...] = ("before_action", "after_action", "final_delivery")
     host_checks: tuple[Callable, ...] = ()
-    max_model_calls: int = 8
+    max_model_calls: int | None = 8
     max_leaf_calls: int = 64
 
     def __post_init__(self):
         if not self.id or any(
-            type(x) is not int or x < 1 for x in (self.max_model_calls, self.max_leaf_calls)
+            type(x) is not int or x < 1
+            for x in (self.max_leaf_calls,)
+            + (() if self.max_model_calls is None else (self.max_model_calls,))
         ):
             raise ValueError("Invalid execution profile")
         if set(self.check_stages) != {"before_action", "after_action", "final_delivery"}:

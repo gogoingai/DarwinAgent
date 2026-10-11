@@ -43,9 +43,14 @@ class LocalEpisodeBackend(ExecutionBackend):
 
         self.owner, self.workspace = owner, Path(workspace).resolve()
         super().__init__(
-            NativeReAct(worker_session_cap=owner.shared.worker_limit, max_tokens=owner.max_tokens),
+            NativeReAct(
+                worker_session_cap=owner.shared.worker_limit,
+                max_tokens=owner.max_tokens,
+                max_turns=None if owner.shared.worker_limit is None else 16,
+                worker_turn_model_cap=None if owner.shared.worker_limit is None else 8,
+            ),
             LocalTools(self.workspace).specs(),
-            worker_profile(),
+            worker_profile(None if owner.shared.worker_limit is None else 8),
             owner.shared.scoped("campaign-worker", "worker"),
             owner.root / "campaign-receipts",
         )
@@ -141,9 +146,14 @@ class LocalRunner:
             raise ValueError("Confirmation and selection run roots must be independent")
         self.initial, self.run_id = initial, run_id
         if (
+            shared.worker_limit is None
+            and initial.profile_declaration["max_model_calls"] is not None
+        ):
+            raise ValueError("Unbounded runtime requires an unbounded initial kernel profile")
+        if (
             shared.trace
-            or shared.worker_limit not in (8, 16)
-            or shared.cfg.max_http_requests not in (100, 500)
+            or shared.worker_limit not in (8, 16, None)
+            or shared.cfg.max_http_requests not in (100, 500, None)
         ):
             raise ValueError("Local runner requires trace=False and authorized worker/HTTP limits")
         if shared.root.resolve().is_relative_to(self.root) or self.root.is_relative_to(
@@ -172,11 +182,18 @@ class LocalRunner:
             "initial": self.initial.content_id,
             "transport": shared.identity(),
             "worker_limit": shared.worker_limit,
-            "worker_turn_model_cap": 8,
+            "worker_turn_model_cap": None if shared.worker_limit is None else 8,
             "generation_max_tokens": max_tokens,
-            "proposal_call_limit": LOCAL_PROPOSAL_CALL_LIMIT,
+            "proposal_call_limit": None
+            if shared.worker_limit is None
+            else LOCAL_PROPOSAL_CALL_LIMIT,
             "react_view_layout": NativeReAct.view_layout,
             "correction_rounds": 3,
+            **(
+                {"wiki_call_limit": None, "judge_turn_model_cap": None}
+                if shared.worker_limit is None
+                else {}
+            ),
             "trace": False,
         }
         path = self.root / "integration-identity.json"
@@ -467,12 +484,12 @@ class LocalRunner:
                     admission=("q1",),
                     rounds=1,
                     max_episode_runs=6,
-                    proposal_call_limit=LOCAL_PROPOSAL_CALL_LIMIT,
+                    proposal_call_limit=self.frozen_identity["proposal_call_limit"],
                 ),
                 self.root / "campaign",
                 frozen_files=[Path(__file__).parent],
                 client_factory=self.client_factory,
-                wiki_call_limit=4,
+                wiki_call_limit=None if self.shared.worker_limit is None else 4,
                 backend=LocalEpisodeBackend(self, self.root / "campaign-template"),
             )
             try:
@@ -529,6 +546,8 @@ class LocalRunner:
             or origin["initial"] != self.initial.content_id
             or origin["transport"] != self.shared.identity()
             or origin["generation_max_tokens"] != self.max_tokens
+            or origin["worker_turn_model_cap"] != self.frozen_identity["worker_turn_model_cap"]
+            or origin["proposal_call_limit"] != self.frozen_identity["proposal_call_limit"]
         ):
             raise ValueError("Confirmation requires the same frozen development source and K0")
         if selection["source_sha256"] != digest(self.source):
@@ -606,8 +625,18 @@ class LocalRunner:
         value["selected"] = json.loads(state_path.read_text()) if state_path.exists() else None
         value["execution_mode"] = self.frozen_identity["mode"]
         value["worker_session_cap"] = self.shared.worker_limit
-        value["worker_turn_model_cap"] = 8
+        value["worker_turn_model_cap"] = self.frozen_identity["worker_turn_model_cap"]
         value["generation_max_tokens"] = self.max_tokens
+        if self.shared.worker_limit is None:
+            value.update(
+                proposal_call_limit=None,
+                wiki_call_limit=None,
+                judge_turn_model_cap=None,
+                provider_request_policy=self.shared.cfg.provider_request_policy,
+                generation_parameter="max_completion_tokens"
+                if self.shared.cfg.provider_request_policy == "minimax-adaptive-v1"
+                else "max_tokens",
+            )
         histories = {}
         for path in sorted((self.shared.root / "requests").glob("*.json")):
             request = json.loads(path.read_text())
@@ -730,7 +759,7 @@ class LocalRunner:
             "# Local LIFT all-pair evidence",
             "",
             f"Status: {value['status']}; acceptance complete: {value['acceptance_complete']}",
-            f"Worker model requests: {self.shared.worker_limit} cumulative/session; 8 per native turn; generation max_tokens: {self.max_tokens} all roles",
+            f"Worker model requests: {self.shared.worker_limit} cumulative/session; {self.frozen_identity['worker_turn_model_cap']} per native turn; generation max_tokens: {self.max_tokens} all roles",
             f"HTTP attempts: {value['actual_http_attempts']}/{self.shared.cfg.max_http_requests}; evaluation healthy: {value['evaluation_healthy']}",
             "q6: sealed, no independent generalization or measured improvement claim."
             if self.mode == "development"
@@ -798,7 +827,7 @@ def build_runner(config, run_id):
         if config.get(key, default) != default:
             raise ValueError("Local pilot requires fixed " + key)
     worker_limit = config.get("worker_limit", 8)
-    if type(worker_limit) is not int or worker_limit not in (8, 16):
+    if worker_limit is not None and (type(worker_limit) is not int or worker_limit not in (8, 16)):
         raise ValueError("Worker limit defaults to8;16 requires explicit audited authorization")
     max_tokens = config.get("max_tokens", 4096)
     if type(max_tokens) is not int or max_tokens not in (4096, 16384):
@@ -806,11 +835,26 @@ def build_runner(config, run_id):
     if worker_limit == 16 and max_tokens != 16384:
         raise ValueError("Cumulative16 requires explicit max_tokens16384")
     http_cap = config.get("http_cap", 100)
-    if type(http_cap) is not int or http_cap not in (100, 500):
+    if http_cap is not None and (type(http_cap) is not int or http_cap not in (100, 500)):
         raise ValueError("HTTP cap defaults to 100; 500 requires explicit audited authorization")
     model, endpoint = os.environ["DARWINAGENT_MODEL"], os.environ["DARWINAGENT_BASE_URL"]
-    if model != "glm-5.3-flash" or model != config["model"] or endpoint != config["base_url"]:
+    if model != config["model"] or endpoint != config["base_url"]:
         raise ValueError("Model/endpoint differs from the authorized frozen config")
+    policy = config.get("provider_request_policy", "generic")
+    if policy not in {"generic", "minimax-adaptive-v1"}:
+        raise ValueError("Unknown provider request policy")
+    if policy == "minimax-adaptive-v1" and (
+        model != "MiniMax-M3.1-Flash-Preview"
+        or endpoint != "https://api.minimax.cn/v1"
+        or max_tokens != 16384
+    ):
+        raise ValueError(
+            "MiniMax preset requires the authorized model/endpoint and generation16384"
+        )
+    if (worker_limit is None or http_cap is None) and not config.get(
+        "unbounded_model_calls", False
+    ):
+        raise ValueError("Null model caps require explicit unbounded_model_calls opt-in")
     root, budget = Path(config["run_root"]).resolve(), Path(config["budget_root"]).resolve()
     mode = config.get("mode", "development")
     selection_root = config.get("selection_run_root")
@@ -830,7 +874,12 @@ def build_runner(config, run_id):
         request_budget_path=budget / "http-attempts.json",
         work_dir=root / "transport",
         model_profiles=False,
+        provider_request_policy=policy,
+        thinking_type="adaptive" if policy == "minimax-adaptive-v1" else "",
+        reasoning_effort="max" if policy == "minimax-adaptive-v1" else "",
     )
+    if worker_limit is None:
+        cfg.limits = {}
     cfg.role_tiers.update(worker="strong", judge="strong")
     shared = SharedTransport(LLMClient(cfg), budget / "shared", worker_limit=worker_limit)
     initial = (
@@ -838,7 +887,7 @@ def build_runner(config, run_id):
         if mode == "confirmation"
         else AgentKernelBundle(root / "K0")
         if (root / "K0").exists()
-        else initial_kernel(root / "K0")
+        else initial_kernel(root / "K0", max_model_calls=None if worker_limit is None else 8)
     )
     return LocalRunner(
         dataset=LiftConfirmationDataset(config["data_root"])

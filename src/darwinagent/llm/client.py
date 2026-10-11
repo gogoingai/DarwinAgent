@@ -31,6 +31,10 @@ class EmptyCompletion(RuntimeError):
     pass
 
 
+class IncompleteStream(RuntimeError):
+    """Stream exhausted without a provider completion marker."""
+
+
 class TransportExhausted(RuntimeError):
     """A transport failure after the client's existing bounded recovery."""
 
@@ -61,6 +65,14 @@ class LLMResult:
 class LLMClient:
     def __init__(self, cfg: Config) -> None:
         self.cfg = cfg
+        if cfg.provider_request_policy not in {"generic", "minimax-adaptive-v1"}:
+            raise ValueError("Unknown provider request policy")
+        if cfg.provider_request_policy == "minimax-adaptive-v1" and (
+            cfg.model_profiles or cfg.thinking_type != "adaptive" or cfg.reasoning_effort != "max"
+        ):
+            raise ValueError(
+                "MiniMax request policy requires explicit adaptive/max and generic routing"
+            )
         self._http_budget_path = Path(
             cfg.request_budget_path or (Path(cfg.work_dir) / "http_attempts.json")
         )
@@ -165,10 +177,10 @@ class LLMClient:
                 continue
             seen.add(id(current))
             pending.extend(e for e in (current.__cause__, current.__context__) if e is not None)
-            current.args = tuple(self._redact_error(arg) for arg in current.args)
+            current.args = (type(current).__name__,)
             for name in ("message", "body", "code", "param", "type"):
                 if hasattr(current, name):
-                    setattr(current, name, self._redact_error(getattr(current, name)))
+                    setattr(current, name, None if name == "body" else type(current).__name__)
         return error
 
     # ---------- 对外主入口 ----------
@@ -203,8 +215,10 @@ class LLMClient:
         try:
             async with asyncio.timeout(remaining):
                 return await self._chat(**request)
-        except TimeoutError:
-            raise BudgetExceeded("Model request deadline exceeded", dispatched=True) from None
+        except TimeoutError as exc:
+            failure = BudgetExceeded("Model request deadline exceeded", dispatched=True)
+            failure.transport_diagnostics = getattr(exc.__cause__, "transport_diagnostics", {})
+            raise failure from None
 
     async def _chat(
         self,
@@ -226,6 +240,9 @@ class LLMClient:
             extra_body["reasoning_effort"] = self.cfg.reasoning_effort
         if self.cfg.thinking_type:
             extra_body["thinking"] = {"type": self.cfg.thinking_type}
+        minimax = self.cfg.provider_request_policy == "minimax-adaptive-v1"
+        if minimax:
+            buffer = 0
         key = self._cache_key(
             model,
             messages,
@@ -262,6 +279,13 @@ class LLMClient:
         last_err: Exception | None = None
         use_client, use_sem = self._site_for(model)
         for attempt in range(self.cfg.max_retries):
+            diagnostics = {
+                "stage": "request",
+                "stream_complete": False,
+                "chunks_received": 0,
+                "partial_content_chars": 0,
+                "reasoning_chars": 0,
+            }
             try:
                 async with use_sem:
                     t0 = time.time()
@@ -281,6 +305,8 @@ class LLMClient:
                         if self.cfg.deadline_monotonic is not None
                         else self.cfg.request_timeout_s,
                     )
+                    if minimax:
+                        kwargs["max_completion_tokens"] = kwargs.pop("max_tokens")
                     if json_mode:
                         kwargs["response_format"] = {"type": "json_object"}
                     if extra_body:
@@ -291,27 +317,49 @@ class LLMClient:
                     reasoning_chars = 0
                     provider_model, response_id = None, None
                     stream = await use_client.chat.completions.create(**kwargs)
+                    finish_received = False
+                    diagnostics["stage"] = "stream"
                     try:
                         async for chunk in stream:
+                            diagnostics["chunks_received"] += 1
                             provider_model = getattr(chunk, "model", None) or provider_model
                             response_id = getattr(chunk, "id", None) or response_id
                             if chunk.choices:
+                                finish_received = finish_received or bool(
+                                    getattr(chunk.choices[0], "finish_reason", None)
+                                )
                                 delta = chunk.choices[0].delta
                                 if delta and delta.content:
                                     parts.append(delta.content)
+                                    diagnostics["partial_content_chars"] += len(delta.content)
                                 if delta and getattr(delta, "reasoning_content", None):
                                     reasoning_chars += len(delta.reasoning_content)
+                                    diagnostics["reasoning_chars"] = reasoning_chars
                             if getattr(chunk, "usage", None):
                                 usage = {
                                     "prompt_tokens": chunk.usage.prompt_tokens or 0,
                                     "completion_tokens": chunk.usage.completion_tokens or 0,
                                 }
+                        if minimax and not finish_received:
+                            raise IncompleteStream("No provider completion marker")
+                        diagnostics["stream_complete"] = True
+                    except BaseException as exc:
+                        diagnostics["response_id"] = response_id
+                        exc.transport_diagnostics = diagnostics
+                        raise
                     finally:
                         close = getattr(stream, "close", None) or getattr(stream, "aclose", None)
                         if close is not None:
-                            closing = close()
-                            if inspect.isawaitable(closing):
-                                await closing
+                            try:
+                                closing = close()
+                                if inspect.isawaitable(closing):
+                                    await closing
+                            except Exception as exc:
+                                if diagnostics["stream_complete"]:
+                                    usage["stream_close_error_type"] = type(exc).__name__
+                                else:
+                                    exc.transport_diagnostics = diagnostics
+                                    raise
                     content = "".join(parts)
                     if reasoning_chars:
                         usage["reasoning_chars"] = reasoning_chars
@@ -328,10 +376,20 @@ class LLMClient:
                 )
                 # 空正文（思考吃光预算）不入缓存，下次调用自动重试
                 if content.strip():
-                    self._save_cache(cache_file, result)
+                    try:
+                        self._save_cache(cache_file, result)
+                    except Exception as exc:
+                        if not durable:
+                            raise
+                        usage["cache_write_error_type"] = type(exc).__name__
                 else:
                     result.usage["empty_content"] = True
-                await self._append_ledger(namespace, role, model, usage, cache_hit=False)
+                try:
+                    await self._append_ledger(namespace, role, model, usage, cache_hit=False)
+                except Exception as exc:
+                    if not durable:
+                        raise
+                    usage["ledger_write_error_type"] = type(exc).__name__
                 if (
                     not durable
                     and not content.strip()
@@ -339,20 +397,27 @@ class LLMClient:
                 ):
                     raise EmptyCompletion(f"Empty generation response from {model}")
                 return result
-            except BudgetExceeded:
+            except BudgetExceeded as e:
+                e.transport_diagnostics = diagnostics
                 raise
             except EmptyCompletion as e:
                 last_err = e
             except (APIConnectionError, APITimeoutError) as e:
+                e.transport_diagnostics = diagnostics
                 last_err = self._sanitize_transport_error(e)
                 if durable:
                     raise last_err from None
             except APIStatusError as e:
+                e.transport_diagnostics = diagnostics
                 last_err = self._sanitize_transport_error(e)
                 if durable or e.status_code not in (429, 500, 502, 503, 504, 529):
                     raise last_err from None  # Retry only transient service status codes.
             except APIError as e:
+                e.transport_diagnostics = diagnostics
                 raise self._sanitize_transport_error(e) from None
+            except Exception as e:
+                e.transport_diagnostics = diagnostics
+                raise
             # 指数退避 + 抖动（429 首次退避从 8s 起，避免反复撞限流）
             base = (
                 8.0
