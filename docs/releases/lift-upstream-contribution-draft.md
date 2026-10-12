@@ -7,6 +7,32 @@ all 14 requirements passed within approved local framework, real MiniMax q5/q6 v
 unpublished package preparation.
 This is not a submission or release.
 
+## Full local extension: implementation complete, real evaluation pending
+
+The measurements, package checks, and three-round protocol below describe the historical
+single-scene pilot; they are not full-benchmark acceptance for the new extension.
+
+The full local extension at source commit `9066d4b` covers all 14 pinned EALE scenes, with
+56 training/validation cells and 84 A/B/C holdout cells (140 required executions). It uses
+30 native interaction rounds uniformly, adds bounded web search/read tools, and invokes
+the native trajectory-judge prompts/parser through the same paid MiniMax request ledger.
+Every scene selection is frozen before any holdout execution. q1–q3 supply evolution
+inputs; q4 exposes only permitted validation aggregates. Sales q5/q6 are already observed
+historical tests and are identified separately.
+
+A complete recorded native-execution smoke settled all 140 cells with 434 recorded calls,
+zero actual HTTP, and terminal recovery with no new calls or changed files. Recorded
+scores cannot satisfy real acceptance. Independent review found and fixed a report case
+that could mark acceptance true while the shared gate was paused; the focused complete-matrix
+regression passes. These checks establish mechanism behavior, not real task quality.
+
+Real full-run `minimax-full-v030-001` has started locally using the existing cumulative
+MiniMax ledger. Its original policy and 307 historical receipts remain unchanged. Full
+coverage, C quality, evolutionary gains, and release acceptance are **not yet verified**.
+See the full protocol guides: [English](../en/lift-full-local.md) /
+[简体中文](../zh-CN/lift-full-local.md). Any future submission must attach complete
+real results, failure/regression records, and all role costs before making performance claims.
+
 ## Proposed contribution
 
 Provide an optional integration against LIFT commit
