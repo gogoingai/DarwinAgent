@@ -113,11 +113,10 @@ class ConfirmationTests(unittest.IsolatedAsyncioTestCase):
             atomic_json(
                 origin / "integration-identity.json",
                 {
+                    **runner.frozen_identity,
                     "mode": "local-native-task-adaptation-v1",
-                    "source": runner.source,
-                    "initial": initial.content_id,
-                    "transport": shared.identity(),
-                    "generation_max_tokens": runner.max_tokens,
+                    "selection_run_root": None,
+                    "run_id": "fixture-development",
                 },
             )
             atomic_json(
