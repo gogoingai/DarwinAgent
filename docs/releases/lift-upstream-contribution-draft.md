@@ -2,7 +2,8 @@
 
 **Unsent contribution draft. No upstream issue, pull request or message has been sent.**
 Prepared 0.3.0 is unpublished. q5 and independent q6 measurements are complete and the current
-wheel passed outside-checkout installed checks. Final sdist and review/audit remain pending.
+wheel passed outside-checkout installed checks. Sdist package checks passed; final documentation
+review and requirement audit remain pending.
 This is not a submission or release.
 
 ## Proposed contribution
@@ -37,7 +38,9 @@ Frozen source `97c6cbb` passed 692 discovered framework tests (684 passed,8 reso
 LoCoMo 18, TravelPlanner 11 and Ruff/format 330. Current-source wheel verification passed in the
 existing Python 3.11 environment outside the checkout with four episodes and zero modelHTTP;
 SHA 256 `9d3466ec0ef1d7d151d61cbaa57553b26443f426832896520b51cde543c9c32b`.
-Final sdist and distribution manifest update remain pending.
+The audited sdist excludes private artifacts/configured credentials and rebuilds a wheel
+byte-identical to the installed wheel. The check uses documentation commit `5e069e0`; final
+documentation review/audit and the resulting archive/manifest regeneration remain pending.
 
 Healthy/failure local unbounded-v3 fixtures passed with 57/166 recorded calls and 0 model/infrastructure
 requests. Replay added 0 calls and 0 receipt/artifact writes; the failure fixture explicitly fell
@@ -65,8 +68,8 @@ Independent q6 completed with A/B/C content 0.79/0.86/0.93 and native success=fa
 All evaluations are healthy/final; worker calls 15/18/20 and leaves 24/28/59 show greater C costs.
 This supports content-score increase on one independent task only, not task-success, efficiency
 or generality improvement. Confirmation 89 adds to development 218 for 307 completed benchmark
-requests; two availability probes yield 309 total MiniMax attempts. Final sdist/review remain
-pending; neither execution verification nor these scores establish full benchmark/release acceptance.
+requests; two availability probes yield 309 total MiniMax attempts. Package checks passed, with final documentation review/audit still pending; neither
+execution verification nor these scores establish full benchmark/release acceptance.
 
 Historical GLM 335/500 remains 334 completed and 1 unknown with run 007 paused, unchanged. The unknown
 cause cannot be reconstructed from old receipts. New allowlisted stream diagnostics and durable
@@ -81,6 +84,6 @@ into MiniMax quality conclusions. Earlier 26/100 protocol and budget failures re
 - Representation of final null scores, failed/unstarted cells, macro/leaf costs and all role overhead.
 - Placement of recorded-response lifecycle/recovery fixtures and native trace-version compatibility.
 
-Submission, copied-material licensing review and final packaging/review remain future work.
+Submission, copied-material licensing review and final documentation review/audit remain future work.
 Frozen q6 measurements are documented without private task/criteria/reason text. No upstream
 files or external communication were changed by this draft.

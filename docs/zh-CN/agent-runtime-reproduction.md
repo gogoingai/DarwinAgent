@@ -5,7 +5,7 @@
 本页对应本地准备、尚未发布的 0.3.0，冻结源码为 `97c6cbb`。
 当前 MiniMax 运行通过**本地执行适配**复用固定 LIFT 的任务执行与内容评判协议。
 q5 与独立 q6 A/B/C 实测已完成，当前 wheel 源码外安装检查通过；
-sdist、文档审查和需求审计仍待完成。
+sdist打包检查已通过，最终文档审查和需求审计仍待完成。
 [验收记录](../acceptance/2026-10-09-agent-runtime.md)区分当前实测与历史证据。
 
 ## 核心回归与实际安装包
@@ -134,7 +134,8 @@ C=K 0 也不复用 B。本轮真实候选只改 worker P；q2 内容 0.5833→0.
 该模式独立执行 q6 A/B/C，不训练、不调用 proposal/Wiki、不进化。本轮冻结 MiniMax
 确认已完成：A/B/C 健康最终内容评分为 0.79/0.86/0.93，native success 均 false，
 各使用 3 次交互/2 次纠错；worker 调用 15/18/20、leaf 24/28/59。C 的 worker 调用、
-token、leaf 更高；q6C 原生任务耗时包含用户要求的暂停，不能用于无暂停性能比较。
+token、leaf 更高。协调者误将旧GLM的暂停范围用于MiniMax，随后用户要求恢复；
+q6C整题耗时包含执行暂停，整题/请求耗时均不作为比较延迟。
 因此只支持这一道独立题的内容评分上升，不支持任务成功、
 效率或泛化提升。安全指标和全部费用见验收记录，q6 私有文本/评判条件不公开。
 
@@ -149,7 +150,7 @@ worker/judge/proposal/Wiki 实测调用/token/耗时。宏和可选 1–16 动�
 与 token 为 null，不能补成 0；中间分数不能代替最终结果。开发 benchmark 为 218 次 completed HTTP，worker 124/judge 85/proposal 9，
 2533327 tokens、请求耗时之和 1403.6033 秒；MiniMax 两次可用性请求单列。报告完成范围
 开发报告范围仅为 q5 执行验证，quality_improvement_claim=false；独立 q6 执行验证
-也已完成，最终打包/审查验收待补。确认新增 89 次 completed 请求（worker 53、judge 36），
+与打包检查也已完成，最终文档审查/需求审计待补。确认新增 89 次 completed 请求（worker 53、judge 36），
 1042902 tokens、请求耗时之和 648.5198 秒；累计 benchmark 307 + 可用性2 = MiniMax 309，
 benchmark 总 tokens 3576229。历史 GLM 335 单列。
 
@@ -161,5 +162,7 @@ benchmark 总 tokens 3576229。历史 GLM 335 单列。
 容器/追踪/81 录制响应记录已归档至验收报告；它们属于独立源码身份，不能描述当前 MiniMax
 验收。本地路线没有本轮 Docker/Langfuse/完整容器追踪或独立轨迹评判结果，不能称为完整
 容器或全基准复现。没有合并、推送、标签、发版或向上游发送消息。真实测量与当前 wheel
-验证完成，最终 sdist 和审查/审计待补；当前 wheel SHA 256 为
+验证与sdist检查通过：无私有产物/配置凭据，sdist重建wheel与已安装wheel逐字节一致。
+检查对应文档提交 `5e069e0`；最终文档审查/审计待补，协调者随后重建最终文档归档。
+当前wheel SHA256为
 `9d3466ec0ef1d7d151d61cbaa57553b26443f426832896520b51cde543c9c32b`。

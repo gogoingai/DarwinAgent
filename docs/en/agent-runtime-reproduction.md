@@ -5,7 +5,7 @@
 Prepared, unpublished 0.3.0 at frozen source `97c6cbb`.
 The current MiniMax run is a LOCAL adaptation of pinned LIFT task execution and content judging.
 q5 and independent q6 A/B/C measurements are complete; the current wheel passed installed checks.
-Final sdist packaging, documentation review and requirement audit remain pending.
+Sdist package checks passed; final documentation review and requirement audit remain pending.
 The dated [record](../acceptance/2026-10-09-agent-runtime.md) separates measurements from history.
 
 ## Core checks and actual installed package
@@ -147,7 +147,9 @@ performs independent q6 A/B/C without training, proposal, Wiki or evolution. The
 confirmation completed with healthy final content scores 0.79/0.86/0.93 and native success=false
 for A/B/C. All arms used three interactions/two corrections; worker calls were 15/18/20 and
 leaves 24/28/59. C used more worker calls, tokens and leaves. Its native task duration includes
-a user-requested suspension and is not clean performance wall time. This establishes higher
+an execution suspension caused by the coordinator misreading the GLM-only pause scope; the
+user instructed MiniMax to resume. Task/request elapsed timings are not comparative latency.
+This establishes higher
 content scores on this one independent task, not task success, efficiency or generality.
 Safe metrics and all costs appear in the acceptance record; private q6 text/criteria are not exported.
 
@@ -164,8 +166,8 @@ improvement or regression. Missing final quality/tokens are null, never invented
 scores cannot replace final results. Development benchmark accounting is 218 completed HTTP, worker 124/judge 85/proposal 9,
 2533327 tokens and 1403.6033 summed request seconds; two MiniMax availability calls are separate.
 The report acceptance scope is q5 execution verification only, with quality_improvement_claim=false;
-independent q6 execution verification is also complete, while final packaging/review acceptance
-remains pending. Confirmation added 89 completed requests (worker 53, judge 36), 1042902 tokens and
+independent q6 execution verification and package checks are complete, while final documentation
+review and requirement audit remain pending. Confirmation added 89 completed requests (worker 53, judge 36), 1042902 tokens and
 648.5198 summed request seconds. Cumulative benchmark 307 plus availability 2 equals 309 MiniMax
 attempts; benchmark tokens total 3576229. Historical GLM 335 remains separate.
 
@@ -180,6 +182,8 @@ container/trace/81-recorded-response records are archived in the acceptance reco
 separate source identities and do not describe current MiniMax acceptance. The current local
 route has no Docker/Langfuse/full container trace or independent trajectory-judge result; it is
 not full-container or full-benchmark reproduction. No merge, push, tag, release or upstream
-message occurred. Real measurements and the current wheel checks are complete; final sdist and
-review/audit remain pending. The current wheel hash is
+message occurred. Real measurements and wheel/sdist checks passed: the audited sdist excludes
+private artifacts/configured credentials and rebuilds a byte-identical installed wheel. The check
+uses documentation commit `5e069e0`; the coordinator regenerates the final archive after the
+remaining documentation review/audit. The installed wheel hash is
 `9d3466ec0ef1d7d151d61cbaa57553b26443f426832896520b51cde543c9c32b`.

@@ -9,7 +9,7 @@ of pinned upstream task execution and native content judging. It is not complete
 reproduction, and the registration wrapper leaves upstream source untouched.
 
 冻结源码 `97c6cbb`，0.3.0 仅本地准备、未发布。q5 与独立 q6 三组实测已完成，
-当前 wheel/源码外安装检查通过；最终 sdist、文档审查和需求审计待补。详细实测与历史记录见
+当前wheel/源码外安装与sdist打包检查通过；最终文档审查和需求审计待补。详细实测与历史记录见
 [验收报告](../../docs/acceptance/2026-10-09-agent-runtime.md)，复现见
 [中文](../../docs/zh-CN/agent-runtime-reproduction.md) / [English](../../docs/en/agent-runtime-reproduction.md)。
 
@@ -93,8 +93,8 @@ q2 原始私有评判不进训练 Wiki。原件通过精确 `wiki_scope` 引用�
 私有要求只给 judge；q6 不加入训练。独立确认可得负面结果，不以完成执行代表质量提升。
 本轮冻结确认已完成，安全汇总显示 A/B/C 最终内容 0.79/0.86/0.93，三组健康且
 native success 均 false；worker 调用 15/18/20、leaf 24/28/59，均为 3 次交互/2 次纠错。
-C 的 worker 调用、leaf、token 更多；q6C 原生任务耗时包含用户要求的暂停，不能作为
-无暂停性能比较。这只支持单道独立题内容评分上升，不能声称任务成功、
+C 的 worker 调用、leaf、token 更多；协调者误读旧GLM暂停范围后暂停了MiniMax，
+随后用户要求恢复。q6C整题耗时含执行暂停，整题/请求耗时均不作为比较延迟。这只支持单道独立题内容评分上升，不能声称任务成功、
 效率或泛化提升；q6 私有原文、评判条件和原始理由不进入公开文档。
 
 ## 录制本地机制检查 / Recorded local mechanism checks
@@ -144,4 +144,6 @@ Docker/Langfuse 验收。`requirements.lock` 是已解析环境版本清单，�
 本地路线没有本轮 Docker、Langfuse、完整容器追踪或独立轨迹评判，不声明全 LIFT 基准完成。
 当前源码 wheel 已通过现有 Python 3.11 环境的源码外安装检查，4 个 Episode、0 模型 HTTP；
 SHA 256 `9d3466ec0ef1d7d151d61cbaa57553b26443f426832896520b51cde543c9c32b`。
-最终 sdist、分发清单同步、文档评审和需求审计仍由协调者完成；没有推送、标签或发布。
+sdist无私有产物/配置凭据，重建wheel与已安装wheel逐字节一致；打包检查对应文档提交
+`5e069e0`。最终文档评审与需求审计待补，协调者随后重建最终文档归档并同步外部分发清单；
+没有推送、标签或发布。

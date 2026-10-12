@@ -1,8 +1,8 @@
 # 通用 Agent 运行时验收 / Generic Agent runtime acceptance
 
-**MiniMax q5 与独立 q6 实测已完成，当前 wheel 源码外安装检查通过；sdist 与最终审查待完成。0.3.0 仅为本地准备版本，未发布。**
+**MiniMax q5 与独立 q6 实测已完成，当前 wheel 源码外安装检查通过；sdist 打包检查通过；最终文档审查与需求审计待完成。0.3.0 仅为本地准备版本，未发布。**
 
-**MiniMax q5 and independent q6 measurements are complete; the current wheel passed installed checks outside the checkout. Final sdist and review are pending. 0.3.0 is prepared locally and unpublished.**
+**MiniMax q5 and independent q6 measurements are complete; the current wheel passed installed checks outside the checkout. Sdist package checks passed; final documentation review and requirement audit are pending. 0.3.0 is prepared locally and unpublished.**
 
 本页当前证据属于冻结提交 `97c6cbb695384bdd4f0023d68f2baa0bdfd12dce`，
 冻结测量源码身份摘要为 `0bd50bf7407d8274cd926e82c193d2e5825af84c54b6d28b5010e45f4122d10a`。
@@ -165,12 +165,15 @@ Development 218+confirmation 89=307 completed benchmark requests,0 unknown/submi
 and 2052.1231 summed request seconds. Two availability probes bring total MiniMax attempts to 309;
 their token total was not supplied and is not invented as zero. HistoricalGLM 335 remains separate.
 
-q6C 的原生 `task_time_s=298.6357932090759` 包含用户要求的暂停时间，仅保留为原始
-观测，不用于无暂停的性能比较。分角色请求耗时之和同样是实际记录的时长，不是 campaign
-墙钟时间，也不据此声称性能改善。
-q6C native `task_time_s=298.6357932090759` includes a user-requested suspension. It is retained as
-an observed field and is not clean performance wall time. Role request-duration sums remain observed
-durations rather than campaign wall time and do not support a performance-improvement claim.
+q6C 执行期间，协调者误将仅针对旧 GLM 的暂停范围用于 MiniMax，暂停了该进程；
+随后用户明确要求恢复 MiniMax。原生 `task_time_s=298.6357932090759` 包含这次执行暂停，
+仅保留为原始观测。整题及请求耗时均不作为比较延迟；请求耗时之和也不是 campaign
+墙钟时间，不能据此声称性能改善。
+The coordinator misread a pause scoped only to historical GLM and suspended MiniMax during q6C;
+the user then explicitly instructed MiniMax to resume. Native `task_time_s=298.6357932090759`
+includes that execution suspension. Task and request elapsed times are retained observations,
+not comparative latency. Summed request durations are not campaign wall time and do not support
+a performance-improvement claim.
 
 ## 当前分发与最终准备 / Current distribution and final readiness
 
@@ -183,23 +186,28 @@ configured credentials are excluded. Its existing Python 3.11 verification envir
 site-packages outside the checkout and passed four episodes, settled replay and legacy checks,
 with zero model HTTP.
 
-真实测量与wheel安装验证已完成，sdist重建、分发清单同步、文档审查与需求审计仍待完成。
+真实测量、wheel安装验证与sdist打包检查已通过：sdist无私有产物/配置凭据，
+从sdist重建的wheel与已安装的 `9d3466ec...` wheel逐字节一致。此打包检查对应文档提交
+`5e069e0`；最终文档审查与需求审计待完成，协调者随后按最终文档重建sdist并更新外部分发清单。
 机器记录的整体 `acceptance_complete:false` 保留这一准备状态；没有合并、推送、标签、
 上游消息或发布。后续分发清单由协调者在文档提交后更新。
-Real measurement and wheel installation checks are complete. Final sdist, distribution manifest,
-documentation review and requirement audit remain pending, so whole-goal acceptance is false.
+Real measurement, wheel installation and sdist package checks passed. The audited sdist excludes
+private artifacts/configured credentials and rebuilds a wheel byte-identical to the installed
+`9d3466ec...` wheel. That package check uses documentation commit `5e069e0`. Final documentation
+review and requirement audit remain pending; the coordinator regenerates the sdist and external
+distribution record after final documentation status. Whole-goal acceptance remains false.
 No merge, push, tag, upstream message or publication occurred. The coordinator updates the
 [distribution record](2026-10-09-agent-runtime-distributions.json) after this documentation commit.
 
 上述源码身份对应实测冻结快照，也包含当时测试夹具。补充原生契约检查初次为39项、
 38通过/1错误：手写 confirmation 夹具缺少已有的执行策略身份字段。`528d0e9` 仅修正
 `datasets/lift/tests/test_confirmation.py`，没有放宽生产校验；复测39/39通过、0跳过，
-8.598秒、0模型HTTP。原始失败日志保留，限定范围审查仍待完成。
+8.598秒、0模型HTTP。原始失败日志保留，限定范围审查已通过。
 The measured source identity includes its then-current test fixtures. The initial supplemental
 native contract suite had39tests,38passes and one error caused by missing existing policy fields
 in a handcrafted confirmation fixture. Commit `528d0e9` changes only that test fixture, preserves
 production validation and passes39/39tests with0skips in8.598seconds and0modelHTTP. The original
-failure log is retained; scoped review remains pending.
+failure log is retained; scoped review passed.
 
 证明记录核对全部255个非测试源码路径字节不变，生产摘要为
 `bb83f6b8966d528a0706a59b05c0f6e68710060e2346011f2a671154b386f2bf`。

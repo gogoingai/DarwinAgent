@@ -1,6 +1,6 @@
 {
   "version": "0.3.0",
-  "status": "real_minimax_measurements_and_wheel_verified_final_audit_pending",
+  "status": "real_minimax_measurements_and_package_checks_passed_final_audit_pending",
   "date": "2026-10-12",
   "acceptance_complete": false,
   "public_release_verified": false,
@@ -389,7 +389,7 @@
     "total_tokens": 1042902,
     "sum_of_request_elapsed_seconds": 648.5198402404785,
     "claim": "one independent task shows higher native content score; all native success false; no efficiency or generality claim",
-    "timing_caveat": "q6 C native task_time_s includes a user-requested suspension; not clean performance wall time; reported role request elapsed sums are observed durations, not campaign wall time"
+    "timing_caveat": "coordinator misread the GLM-only pause scope and suspended MiniMax; user explicitly instructed resume; q6 C task_time_s includes execution suspension; task/request elapsed times are retained observations, not comparative latency or campaign wall time"
   },
   "current_wheel": {
     "status": "built_and_installed_check_passed",
@@ -405,7 +405,15 @@
     "installed_checks": "passed_outside_checkout_existing_python311",
     "installed_check_model_http": 0,
     "installed_check_log_sha256": "c6cc2c2136035f00196ddcdaddb07c47a888e7f208138defb358b2a1c0651a07",
-    "sdist": "pending_final_documentation_packaging",
+    "sdist": {
+      "status": "package_checks_passed",
+      "validated_documentation_commit": "5e069e0",
+      "private_artifacts_excluded": true,
+      "configured_credentials_absent": true,
+      "rebuilt_wheel_byte_identical_to_installed": true,
+      "final_archive_hash_record": "external 2026-10-09-agent-runtime-distributions.json, excluded from the sdist",
+      "final_documentation_archive_rebuild": "coordinator regenerates after final documentation status"
+    },
     "published": false
   },
   "boundaries": {
@@ -1740,9 +1748,8 @@
     }
   },
   "pending_final_updates": [
-    "final sdist packaging and distribution manifest",
-    "documentation review and requirement audit",
-    "supplemental native contract fixture-only scoped review"
+    "final documentation review and requirement audit",
+    "regenerate sdist and external distribution manifest after final documentation status"
   ],
   "development": {
     "status": "complete",
@@ -2064,7 +2071,7 @@
   },
   "source_files_sha256_scope": "frozen measured snapshot, including then-current test fixtures; not an assertion that later fixture-only changes match these hashes",
   "supplemental_native_contract_check": {
-    "status": "retest_passed_scoped_review_pending",
+    "status": "retest_and_scoped_review_passed",
     "initial": {
       "tests": 39,
       "passed": 38,
@@ -2090,6 +2097,6 @@
     "production_sha256": "bb83f6b8966d528a0706a59b05c0f6e68710060e2346011f2a671154b386f2bf",
     "measurement_identity_rewritten": false,
     "original_failure_log_unchanged": true,
-    "scoped_review": "pending"
+    "scoped_review": "pass"
   }
 }
