@@ -1,0 +1,15 @@
+{
+  "model": "MiniMax-M3.1-Flash-Preview",
+  "base_url": "https://api.minimax.cn/v1",
+  "provider_request_policy": "minimax-adaptive-v1",
+  "temperature": 0,
+  "correction_rounds": 30,
+  "max_tokens": 16384,
+  "worker_limit": null,
+  "http_cap": null,
+  "unbounded_model_calls": true,
+  "rounds": 1,
+  "data_root": "/absolute/path/to/pinned/full-eale-pinned",
+  "run_root": "/absolute/path/to/new/full-run",
+  "budget_root": "/absolute/path/to/preserved/existing/minimax-budget"
+}
