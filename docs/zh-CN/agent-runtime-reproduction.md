@@ -2,10 +2,15 @@
 
 [English](../en/agent-runtime-reproduction.md) · [SDK](agent-sdk.md)
 
-本页对应本地准备、尚未发布的 0.3.0。常规检查使用录制或本地响应；原生 LIFT 与独立轨迹
-评判属于不同验收层。[验收记录](../acceptance/2026-10-09-agent-runtime.md)给出实际结果和边界。
+本页对应本地准备、尚未发布的 0.3.0，冻结源码为 `97c6cbb`。
+当前 MiniMax 运行通过**本地执行适配**复用固定 LIFT 的任务执行与内容评判协议。
+q5 与独立 q6 A/B/C 实测已完成，当前 wheel 源码外安装检查通过；
+sdist、文档审查和需求审计仍待完成。
+[验收记录](../acceptance/2026-10-09-agent-runtime.md)区分当前实测与历史证据。
 
-## 核心回归与安装包
+## 核心回归与实际安装包
+
+以下命令用于复现检查，实际结果单独记录：
 
 ```sh
 uv sync --frozen --group test
@@ -15,95 +20,146 @@ uv run --frozen --group test python -m unittest discover -s datasets/travelplann
 uv run --frozen --group test ruff check .
 uv run --frozen --group test ruff format --check .
 uv run --frozen python examples/agent_runtime.py --output runs/NEW-agent-offline
-uv build
+uv build --wheel
 ```
 
-创建干净的 Python 3.11 环境、安装本地 wheel，在源码目录外运行
+协调者在 `97c6cbb` 上的记录：完整框架发现 692 项，通过 684 项、明确跳过资源项 8 项；
+LoCoMo 18 项、TravelPlanner 11 项通过；Ruff 与 330 文件格式检查通过。原日志与诊断提示
+保留，跳过项不计为通过；回归未调用真实模型。当前 wheel 已在现有 Python 3.11 验证环境
+于源码目录外通过，完成 4 个 Episode、0 模型 HTTP。复现时将新建 wheel 安装到
+干净的 Python 3.11 环境，在源码目录外运行
 `/path/to/clean/python /absolute/checkout/scripts/check_installed.py`。
-该脚本确认导入来自 site-packages，检查两种 Agent 循环、真实文件、已完成回执复用，以及
-旧 doctor/demo/resume 与 Wiki 字节不变。原生集成另用已验证的 Python 3.12 环境，核心不导入
-基准依赖。历史外部资源和形式验证资源缺失造成的跳过不能计为通过；保留完整日志，不放宽
-已有启动时间阈值。
+该脚本检查 site-packages 导入、自有 Agent 与 ReAct 循环、真实文件、已完成回执复用，以及
+旧 doctor/demo/resume/Wiki 行为。旧 wheel 哈希或早期 73/26/69 覆盖检查不能证明当前安装包可用。
 
-## 原生录制响应验收
+## 公开 API 与显式取消模型调用上限
 
-固定 LIFT 提交 `9d282e415c5e3b0f65b82c8758a013b269583d93`，在独立 Python 3.12 环境
-安装 `datasets/lift/requirements.lock`。材料使用 EALE
-`419789ed1662e7b9ad16aa6620a4b31449612948` 的 q1/q2/q5 和逐文件固定清单，
-不打开、不准备 q6。先准备本地 trace 服务，凭据留在版本库外。
-[适配器文档](../../datasets/lift/README.md)说明能力、限制与注册方式。显式指定 Docker context：
+`AgentAdapter.run(task, context)` 由适配器自行控制循环，返回 `EpisodeResult`。
+`AgentTask` 提供指令、公开参数与附件；`AgentContext` 提供 model/call/view/check；
+`ExecutionBackend` 绑定执行、宿主策略与持久回执。`EpisodeResult.artifacts` 必须是对象数组。
+完整构造方式见 [SDK 文档](agent-sdk.md)。
+
+通用默认值仍为 `ExecutionProfile.max_model_calls=8`、`ReActAgent.max_turns=16`、核心生成 4096。
+显式 `None` 只取消对应的模型调用或决策次数上限：
+
+```python
+from darwinagent.agent import ExecutionProfile, ReActAgent
+
+profile = ExecutionProfile(
+    "explicit-model-unbounded", ("read_text", "write_text"),
+    max_model_calls=None, max_leaf_calls=64,
+)
+agent = ReActAgent(max_turns=None, max_tokens=16384)
+```
+
+这些对象本身不选择模型提供方、不注册工具，也不取消宿主检查。S/F/C/P 资产仍受固定能力
+与生命周期契约约束。每次调用继续持久计数，未知请求/写入不自动重放。旧 v3 bundle、
+graph-QA 路径、有限预算与默认执行身份保持兼容；旧有限上限 K 0 不能直接挪用于新的 null 执行。
+
+## 当前 MiniMax 本地复现策略
+
+使用现有 Python 3.12 环境及固定 LIFT 提交
+`9d282e415c5e3b0f65b82c8758a013b269583d93`。开发材料为固定 EALE
+`419789ed1662e7b9ad16aa6620a4b31449612948` 的 q1/q2/q5 清单；开发中 q6 保持未打开。
+本地路线不需要启动 Docker、Langfuse、新服务或安装依赖。
+
+复制 [minimax.local.example.json](../../datasets/lift/minimax.local.example.json)，填入独立私有
+运行、材料和预算路径。MiniMax 使用新的预算身份；历史 GLM 总账及未知暂停保留。在同一
+MiniMax 身份内，各授权角色、进程和新的比较目录共享原总账。凭据仅由宿主
+`DARWINAGENT_API_KEY` 提供；模型/端点环境变量必须与配置完全一致。以下真实模型命令
+仅由已获授权的协调者执行：
 
 ```sh
-DOCKER_CONTEXT=colima-darwin-lift docker build -t darwinagent-lift-tools:task3 datasets/lift
-DOCKER_CONTEXT=colima-darwin-lift DO_TRAJECTORY_JUDGE=false \
-/path/to/python3.12 -m datasets.lift.tests.offline_native \
-  --upstream /path/to/pinned/LIFT --data /private/pinned-data \
-  --output /private/NEW-native-run --trace --trace-env /private/infra/.env
-/path/to/python3.12 -m datasets.lift.tests.trace_probe \
-  --upstream /path/to/pinned/LIFT --root /private/NEW-native-run --trace-env /private/infra/.env
+DARWINAGENT_MODEL=MiniMax-M3.1-Flash-Preview \
+DARWINAGENT_BASE_URL=https://api.minimax.cn/v1 \
+PYTHONPATH=src /path/to/existing/python3.12 -m datasets.lift.local \
+  --upstream /path/to/pinned/LIFT --config /private/minimax-local.json \
+  --run-id UNIQUE_MINIMAX_DEVELOPMENT_RUN
 ```
 
-不切换全局 Docker context。该夹具实际运行容器、工具、上游内容评判协议、演化钩子、
-新容器加载 delta、trace 回读与后处理，但回复为 81 条录制内容，实际模型 HTTP 为 0。
-分数与 token 为合成数据，本地耗时不代表网络模型延迟。原生报告中的轨迹占位值统一按
-`trajectory_judge=not_run` 理解。
+显式策略 `minimax-adaptive-v1` 使用通用路由（`model_profiles=False`），
+`thinking.type=adaptive`、`reasoning_effort=max`、温度 0；worker、judge、proposal、Wiki
+生成上限均为 16384。JSON 配置键为 `max_tokens`，实际 MiniMax 请求键为
+`max_completion_tokens`，不叠加旧推理 buffer，也不回退模型或端点。通用及历史注册提供方
+沿用原请求 token 约定。
 
-## 有界真实开发诊断：部分执行，已暂停
+`unbounded_model_calls:true`、`worker_limit:null`、`http_cap:null` 是显式选择。
+worker/session、worker/turn、judge、proposal、Wiki 的模型调用上限为真实 None/null，
+不是极大整数。3 次原生交互（最多 2 次纠错）、原语权限、每个 Episode 的 64 个 leaf、
+一个候选和一轮进化保持固定。SDK retries 仍为 0；已提交未知请求仍关闭共享闸门。
+取消调用数量上限不会取消持久计账、请求时限、未知写隔离或身份验证。
+旧 [pilot.example.json](../../datasets/lift/pilot.example.json)保持 HTTP 100/worker 8。
 
-截至 2026-10-10：LIVE001（`aadb5b4`）因已结算回复不是 JSON 失败；LIVE002（`669b94d`）
-因产物数组含字符串失败。有界协议反馈与对象数组预校验修复了这两项框架边界，录制反例保留
-修复前后证据。新身份 LIVE003（`68a0084`）完成 q1 初次交付，原生中间评审为 false/0.33，
-纠错中耗尽累计 8 次 worker 上限，最终题目分数不可用。26 次实际 HTTP 全部完成（worker 17、
-judge 8、probe 1），共 244539 tokens；未知提交为 0。第 9 个本地预留在 HTTP 前拒绝，
-原生 worker 总量仍为 null、已知小计 47613。q2、演化/候选、q5 A/B/C 未启动；K0 不变，
-q6 封存，轨迹评判 not_run。没有进一步调用授权；保留暂停及稳定总账，不能用剩余总额度绕过单题上限。
+本地原语为 `list_files`、`read_text`、`read_table`、`transform_tables`、`write_text`，
+限制在独立题目工作区。judge 仅有读工具；不开放任意宿主代码或子进程。私有评判条件、
+凭据、选中资产与账本均在工作区外。关闭 dotenv 自动发现与原生 pre-chat 上报。
+原生内容评判提示、条件、解析和计分通过本地适配保持权威；结果 JSON 作为字符串放入
+外层 `final_response`，没有替换为自制评判器。
 
-实际 trace 只回读已完成 worker turn 0（5 请求）和 judge（8 请求）；纠错的 3 次已完成
-请求仍在本地 journal，尚未 flush 到 trace-state。真实 native CSV/HTML 未生成。
-重试覆盖的 task_time_s 不能作整题墙钟耗时；LIVE003 实测请求耗时之和为 worker 60.9758 秒、
-judge 391.4317 秒。全部失败、未启动行和成本见验收记录。完整 642 项通过属于此前 `aadb5b4`，
-当前源码覆盖检查为 73/26/69 项。本次仅更新文档、重建 sdist，保留已测 wheel/源码，不重复无关套件。
+## 本地录制机制检查
 
+使用新的输出目录。以下命令只消耗录制响应，不请求真实模型：
 
-代码审查与新源码冻结后，由协调者执行真实模型请求。已授权配置是 `glm-5.3-flash`、
-temperature 0、Coding 端点 `https://open.bigmodel.cn/api/coding/paas/v4`，各角色保持一致。
-每题最多 3 次交互（2 次纠错）、每个 worker task/session 累计 8 次请求，只允许一轮演化和
-一个候选。worker、judge、proposal、Wiki、可用性探测、各进程和新运行目录的实际 HTTP
-尝试共享一个稳定的 100 次总账。`budget_root` 独立于 `run_root`，改源码不能重置预算。
+```sh
+PYTHONPATH=src /path/to/existing/python3.12 -m datasets.lift.tests.offline_local \
+  --upstream /path/to/pinned/LIFT --data /private/pinned-q1-q2-q5-data \
+  --unbounded --output /private/NEW_minimax_healthy
+PYTHONPATH=src /path/to/existing/python3.12 -m datasets.lift.tests.offline_local \
+  --upstream /path/to/pinned/LIFT --data /private/pinned-q1-q2-q5-data \
+  --unbounded --failures --output /private/NEW_minimax_failures
+```
 
-A 是原始 ReAct，B 加 K0，C 加实际选中的 K1（拒绝候选则保留 K0）。q1 训练与准入，q2
-验证，q5 仅作开发诊断。比较前固定代码、模型、backend、kernel、评测器、数据、权限与
-逐题预算。q5 后如有修复，保留原失败，使用新身份、剩余预算重新运行全部 A/B/C；
-预算不足就报告未完成。q6 保持封存，独立质量确认尚未运行。
+冻结源码 healthy-v3/failure-v3 检查通过，分别为 57/166 次录制调用、0 模型 HTTP、
+0 基础设施调用。healthy 选中夹具候选；failure 继续已知失败并显式回退 K 0。
+两组重放均为 0 新模型调用、0 回执/产物写入。合成分数与 token 只证明机制，
+不代表 MiniMax 质量或节省。早期 v1/v2 失败继续保留，不能将 v3 通过反写成旧轮次通过。
 
-权威报告 `all-pair-report.json` 保留每个计划单元的 arm/phase、状态、success/content、
-纠错轮数、展开后的 leaf 与原生工具计数、分角色模型调用/token、实测耗时、失败与未知值。
-未完成的 turn 和未启动的 arm 也保留。proposal/Wiki 额外费用、全局 HTTP 单独列出，
-缺失 token 为未知。上游筛选后的汇总不能替代全行报告，也不能隐藏下降或错误。
-已提交但未知的请求暂停后续传输，明确处理前不能静默重试或删除暂停状态。
+## 选择、开发比较与独立确认
 
-本地 `.superpowers/`、材料、密钥与原始评判证据保留在磁盘上；仅将无秘密的汇总事实和哈希
-写入跟踪文档。每项缺陷记录复现命令、原始失败、原因、限定范围的修复和覆盖复测，
-原始产物保持不变。离线夹具不支持真实质量或泛化提升结论。
+相同任务、kernel、身份的 q1 公开证据可在 warmup/准入/训练间复用。q2 私有验证不进入
+训练 Wiki。沿用 CampaignController/EpisodeExperiment/ProposalSession/Wiki，开放完整
+S/F/C/P 提案能力；不支持的声明及固定权限变更无法准入。只提交一个候选。
+即使收到重复证据提示或修正复制的续页字段，proposal/Wiki 调用及原查询也保留计数。
+原件与旧存储游标继续可读；8000 与 512 的序列化回复边界检查不改变源文字节。
 
-### 单题终态失败与共享请求闸门
+A 为原始 ReAct，B 加 K 0，C 加选中 K 1 或显式 K 0 回退。选择冻结后，q5 A/B/C 独立执行；
+C=K 0 也不复用 B。本轮真实候选只改 worker P；q2 内容 0.5833→0.75、success 0→0
+支持候选采纳，不是独立质量提升证据。q5 A/B/C 评审健康且为最终结果，但均 success=false，
+内容分别为 0.6666666667/0.6/0.8；worker 调用 14/20/30、leaf 27/43/49，C 执行成本更高。
+三组均为 3 次原生交互/2 次纠错。负面结果必须保留。
 
-原生 LIFT 插件在已知 worker/judge 错误或原有单会话 8 次 worker 调用上限后保存
-单题终态记录，继续独立 q2 与 q5 A/B/C，原生总轮次仍为 3。warmup 失败后跳过
-提案调用，独立执行 q2 诊断，明确拒绝提升候选，并将 K0 物化给 C。不健康的
-campaign 同样回退 K0；这不代表进化成功。部分文件、轮次回执、追踪增量、原始
-耗时和失败记录全部保留；终态重放不重新请求模型。
+开发调度结束后，协调者才准备独立 q6 清单与新目录。设置 `mode:confirmation`，
+`selection_run_root` 指向已完成开发目录，`data_root` 使用 q6 专属材料。
+沿用冻结源码、模型/请求策略、生成配置、实际 cap、总账、K 0 和选中资产。
+该模式独立执行 q6 A/B/C，不训练、不调用 proposal/Wiki、不进化。本轮冻结 MiniMax
+确认已完成：A/B/C 健康最终内容评分为 0.79/0.86/0.93，native success 均 false，
+各使用 3 次交互/2 次纠错；worker 调用 15/18/20、leaf 24/28/59。C 的 worker 调用、
+token、leaf 更高；q6C 原生任务耗时包含用户要求的暂停，不能用于无暂停性能比较。
+因此只支持这一道独立题的内容评分上升，不支持任务成功、
+效率或泛化提升。安全指标和全部费用见验收记录，q6 私有文本/评判条件不公开。
 
-已提交但结果未知的请求、不确定的写入、追踪失败和共享 100 次 HTTP 上限仍然
-阻断所有独立任务。分派前被拒绝的预留不能算作已提交未知请求。
-`all-pair-report.json` 区分失败、全局阻断、取消和未启动。失败任务的最终质量为
-null，已有 judge 分数标记为中间结果。固定版本原生报告不能表达未评审的空分数；
-插件因此在完整逐题报告保留失败，即使 B 失败也独立执行 C，不以零分替代缺失值，
-也不把略过失败 pair 的原生 CSV/HTML 算作该 pair 验收通过。
+## 结果、失败与历史边界
 
-显式 `SharedTransport.recover_local_cap_pause` API 只审核旧版裸
-`{"status":"budget_exhausted"}` 暂停：必须提供原始 worker 会话、低于 100 的当前
-HTTP 数，并核对全部已完成请求回执、8 次 worker 计数和明确的本地上限拒绝日志，
-确认不存在未知请求/写入或追踪错误。原始 pause 字节和预算计数不变，另存不可变
-恢复确认；新版明确的全局闸门不能用此 API 恢复。历史真实账本只由主协调任务操作。
-源码变化后全部对照组使用新的运行身份，历史运行保持独立，共享 HTTP 账本连续计数。
+`all-pair-report.json/.csv/.md` 保留全部计划组、最终/中间分数、失败、未启动项、回退及
+worker/judge/proposal/Wiki 实测调用/token/耗时。宏和可选 1–16 动作批量中的每个 leaf
+单独计数；整批先校验契约，再执行，已知失败停止剩余项。ReAct 保留一份最新视图，
+按顺序保留观察与不可变回执。
+
+健康的原生评审也可以 success=false；完整比较也可以没有提升或发生下降。缺失最终质量
+与 token 为 null，不能补成 0；中间分数不能代替最终结果。开发 benchmark 为 218 次 completed HTTP，worker 124/judge 85/proposal 9，
+2533327 tokens、请求耗时之和 1403.6033 秒；MiniMax 两次可用性请求单列。报告完成范围
+开发报告范围仅为 q5 执行验证，quality_improvement_claim=false；独立 q6 执行验证
+也已完成，最终打包/审查验收待补。确认新增 89 次 completed 请求（worker 53、judge 36），
+1042902 tokens、请求耗时之和 648.5198 秒；累计 benchmark 307 + 可用性2 = MiniMax 309，
+benchmark 总 tokens 3576229。历史 GLM 335 单列。
+
+已知单题失败可结算后继续独立调度；模型回执未知、不确定写入和适用共享闸门会暂停
+新请求，不自动重放。新 MiniMax 诊断只保存限定阶段/类型/状态/流计数与响应 ID 哈希；
+完整终止流在清理故障或取消中保留已结算回执。这些修复不能重建旧 GLM 007 的故障原因。
+
+历史 GLM 为 335/500（334 completed、1 unknown），保持暂停且未改动。早期 26/100、
+容器/追踪/81 录制响应记录已归档至验收报告；它们属于独立源码身份，不能描述当前 MiniMax
+验收。本地路线没有本轮 Docker/Langfuse/完整容器追踪或独立轨迹评判结果，不能称为完整
+容器或全基准复现。没有合并、推送、标签、发版或向上游发送消息。真实测量与当前 wheel
+验证完成，最终 sdist 和审查/审计待补；当前 wheel SHA 256 为
+`9d3466ec0ef1d7d151d61cbaa57553b26443f426832896520b51cde543c9c32b`。

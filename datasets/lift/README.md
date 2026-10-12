@@ -1,187 +1,147 @@
-# DarwinAgent 原生 LIFT 集成 / Native LIFT integration
+# DarwinAgent LIFT 集成 / LIFT integration
 
-本目录是可选的 Python 3.12+ 基准集成，不进入核心 wheel。调用固定上游原生 CLI、`LIFTPipeline`、`ContainerAgentRuntimeAdapter`、`run_task` 内容评判、warmup/commit/load/holdout 生命周期。注册 wrapper 不修改上游源码。
+本目录是可选 Python 3.12+ 基准集成，不进入核心 wheel。当前路线通过**本地执行适配**
+复用固定上游 `execute_task`、`run_task` 和原生内容评判提示、解析与计分；不是完整容器
+生命周期复现。注册 wrapper 不修改上游源码。
+
+This optional integration stays outside the core wheel. The current route is a **LOCAL adaptation**
+of pinned upstream task execution and native content judging. It is not complete container
+reproduction, and the registration wrapper leaves upstream source untouched.
+
+冻结源码 `97c6cbb`，0.3.0 仅本地准备、未发布。q5 与独立 q6 三组实测已完成，
+当前 wheel/源码外安装检查通过；最终 sdist、文档审查和需求审计待补。详细实测与历史记录见
+[验收报告](../../docs/acceptance/2026-10-09-agent-runtime.md)，复现见
+[中文](../../docs/zh-CN/agent-runtime-reproduction.md) / [English](../../docs/en/agent-runtime-reproduction.md)。
+
+## 固定输入与对照 / Pinned inputs and comparisons
 
 - LIFT：`9d282e415c5e3b0f65b82c8758a013b269583d93`。
-- EALE：`419789ed1662e7b9ad16aa6620a4b31449612948`；本地 `download-manifest.json` 校验每个文件。
-- q1：训练/行为准入；q2：独立候选验证；冻结选中版本后 q5：开发比较。开发阶段 q6 不下载、不读取、不执行；修复后的冻结版本另用独立 q6 确认。
-- A：同一 ReAct 与固定原语，无 kernel；B：K0；C：采纳的 K1，拒绝则 K0。所有 worker/judge 使用同一用户指定模型、端点、temperature=0，保持独立历史。
-- 每题最多 3 次原生 worker↔judge 回合，即最多 2 次原生纠错；每个原生回合最多 8 次模型决策；worker session 默认累计 8 次，经独立审计可改为累计 16 次。共同的实际 HTTP attempt 默认上限为 100；经显式审计修订后可为总计 500，SDK retries=0、传输最大尝试次数为 1。
-- `budget_root` 必须独立于每次比较的 `run_root`。框架修复后新建比较目录，但复用预算目录、HTTP 总账和未知请求暂停状态。`submitted` 未收据请求在恢复时全局隔离；禁止自动清除暂停文件或重发未知请求。
+- EALE：`419789ed1662e7b9ad16aa6620a4b31449612948`；清单逐文件校验。
+- q1：训练/行为准入；q2：独立候选选择；选择冻结后的 q5：开发诊断。
+- 开发清单只含 q1/q2/q5；q6 独立材料只在开发结束且门检查通过后由协调者准备。
+- A：同一 ReAct 和固定原语、无 kernel；B：K 0；C：选中 K 1，拒绝则显式 K 0 回退。
+- A/B/C 的历史和工作区独立，权限、模型、生成与原生交互契约一致；C=K 0 也不复用 B。
 
-## 本地执行 / Local execution
+## 当前 MiniMax 本地路线 / Current MiniMax local route
 
-当前推荐直接本地运行：不启动 Docker、Langfuse、容器、后台服务，也不下载依赖或创建新环境。
-它复用固定上游的 `execute_task`、`run_task`、内容评判提示与解析协议；这是本地执行适配，
-不等同于完整原生容器生命周期复现。下面保留的容器路线仅作为历史记录。
+使用现有 Python 3.12 环境、固定上游与已有材料；不启动 Docker、Langfuse、后台服务、
+子工具进程，也不为本轮安装依赖。复制 [minimax.local.example.json](minimax.local.example.json)
+并填入独立私有 `run_root`、`data_root`、`budget_root`。旧 [pilot.example.json](pilot.example.json)
+保持默认 HTTP 100/worker 8；不要改写它以默认启用无限调用。
 
-使用现有 Python 3.12 环境、已有固定上游与 16 文件数据清单，沿用 `pilot.example.json`。
-`run_root` 采用新目录；`budget_root` 指向原始独立的共享请求账本，不能重置。
-凭据只从宿主 `DARWINAGENT_API_KEY` 获取；模型、端点环境变量必须与 JSON 完全一致。
-当前授权模型为 `glm-5.3-flash`，所有角色温度为 0；每回合 8 次模型决策、每回合 64 个原语 leaf 与 3 次原生回合保持固定。
-当前诊断轮配置为 `worker_limit:16`、`max_tokens:16384`、`http_cap:500`；累计 worker 16 需要独立审计。
-`http_cap` 默认 100；显式 500 必须先有下述审计记录，启动器不会自动提高上限。
-以下真实运行命令仅供获得模型调用授权的协调者使用：
-
-```sh
-DARWINAGENT_MODEL=glm-5.3-flash DARWINAGENT_BASE_URL=AUTHORIZED_CODING_ENDPOINT \
-/path/to/existing/python3.12 -m datasets.lift.local \
-  --upstream /path/to/pinned/LIFT --config /private/local-pilot.json --run-id UNIQUE_LOCAL_RUN_ID
-```
-
-本地工具沿用五项原语及其输入输出；每个实例拥有独立工作区根路径，不启动子进程，
-不提供任意宿主代码执行。judge 只注册读工具，直接调用写入也会拒绝。私有评判、已选资产、
-传输凭据与账本不在工具可访问工作区内。启动时关闭 dotenv 自动读取和原生 pre-chat 上报。
-每次执行前验证工程源码、数据及传输身份，源码变化必须另建 A/B/C 比较目录。
-
-q1 的相同任务/K0/固定身份收据复用于 warmup、准入和训练；候选 q1 的准入/训练也复用同一
-公开证据。q2 仍独立验证，最多提交一个联合 S/F/C/P 候选，并沿用核心严格选择。
-本地 proposal 对话固定最多 6 次模型调用，允许查询原件、纠正已知 scope 错误再提交；
-候选与演化轮次仍各限一次，所有请求计入同一总账。训练 entry 的 `wiki_scope` 精确指向
-真实原件；SHA 仅用于 `evidence_refs`，不能作为组合 `training_ids` 或伪造问题身份。
-训练失败时跳过 proposal/Wiki，仍诊断 q2；进化不可用时显式选择 K0。
-冻结选择后，q5 A/B/C 各自独立执行，C=K0 也不会复用 B 的运行。
-单题已知失败或已授权累计 worker 上限产生可重放终态，继续下一题；未知请求/写入或全局已授权 HTTP 上限暂停。
-历史歧义暂停仅由协调者调用 `SharedTransport.recover_local_cap_pause` 审计恢复，启动器不会自动恢复。
-
-ReAct 兼容单工具与 final 回复，新增可选的 `{"actions":[{"tool":"read_text","params":{"path":"public.txt"}}, ...]}`，
-每批 1–16 项。执行前校验整批的协议、工具注册及输入契约，再顺序通过同一个 `context.call`；
-已知工具/C 失败停止剩余项并逐项返回观察，未知写入仍隔离，已完成操作恢复时不重做。
-批量只节省模型决策次数，每个原语 leaf 仍接受检查并记账。K0 的 `inspect_materials` 从 S 的
-公开 Material 路径实际读取最多 16 个 TXT/MD/CSV/XLSX，或使用显式 `paths`；不读取私有评判。
-
-总预算修订只供已授权且停止所有运行的协调者：用与原 `policy.json` 相同模型、端点、路由和
-账本的 cap=100 客户端构造 `SharedTransport`，调用
-`shared.amend_http_cap(total_cap=500, expected_http_attempts=78)`。它要求所有历史请求有已结算收据，
-没有未知/未处理暂停，保存独立 `http-cap-amendment.json`，不会改原 100 政策、总账、计数或历史收据。
-随后以相同 `budget_root`、显式 `http_cap: 500` 和新 `run_root` 启动；旧 100 客户端停止调度。
-500 是共享总量，原 78 次保留，HTTP 修订时剩余 422。未来发送继续递增原总账；审计永久校验原收据与
-政策字节。历史已确认暂停保留，未来暂停另记 `active-pause.json`，不会被旧恢复记录放行。
-
-独立确认沿用原计划授权，在冻结开发比较完成后由协调者准备单独 q6 数据目录及
-`confirmation-manifest.json`：`revision` 为上述 EALE SHA、`q6` 为 `authorized_confirmation`，
-`files` 仅列 q6 查询/材料的相对路径和 SHA256。默认开发清单仍严格只含 q1/q2/q5。
-新配置设置 `mode: confirmation`、`selection_run_root: /private/completed-development-run`、新的
-`run_root` 与 q6 专属 `data_root`，沿用同一 500 总账及上面的模块命令。此模式校验开发调度已结束、
-源码/模型/账本/K0/选中资产相同，独立运行 q6 A/B/C，跳过训练、proposal、Wiki 和进化；私有要求仍只给 judge。
-它不把 q6 加入训练，也不把三组运行验证或录制分数等同于质量提升或整个版本验收。
-
-后续诊断轮只调整两项已诊断的预算：以 HTTP500/cumulative-worker8 客户端调用
-`shared.amend_worker_limit(worker_limit=16, expected_http_attempts=136)`，保存独立
-`worker-limit-amendment.json`；原 policy/HTTP 修订/历史暂停/收据/旧 SID 计数保留。
-审计时要求全部请求已结算且没有未处理暂停；实际总账在005后为136时，500总量剩余364。
-然后用显式 `worker_limit:16`、`max_tokens:16384` 和新的006目录完成整组 q1/q2/q5 A/B/C，
-不混用005分数。16仅为整个任务 worker session 累计上限，每原生回合仍限8次模型决策，最多3回合。
-所有角色（worker、judge、Wiki、proposal、准入/训练/验证）统一转发 `max_tokens=16384`，
-包括覆盖 proposal 的既有内部默认值；模型、温度0、思考配置和工具权限保持不变。
-生成配置进入 Agent/backend/run 身份和实际请求指纹；改变设置必须新建比较目录。
-通用 `ReActAgent.max_tokens` 默认 `None`，仍使用核心4096默认；核心配置与其他调用默认值未改变。
-空正文与已记录思考保留，不通过 JSON 修补制造输出；预算诊断不保证质量提升，006实际结果保留。
-006 已诊断本地单调用 proposal 与 Wiki 对话不兼容，以及 ReAct 累计重复视图的问题。
-修复后的007必须在新目录完整重测 q1/q2/q5 A/B/C，再独立确认同一冻结源码/16/16384/500身份及选中资产的q6。
-
-The next diagnostic comparison uses an explicit cumulative worker limit16, generation16384 for
-all roles and the existing total HTTP500 ledger. A separate coordinator audit
-`amend_worker_limit(worker_limit=16, expected_http_attempts=136)` preserves original policies,
-old receipts and historical SID counters. Native per-turn8, leaf64, three rounds, model,
-temperature0, reasoning configuration and tool rights remain unchanged. Generation is bound in
-adapter/backend/run identity and effective request fingerprints; generic ReAct leaves max_tokens
-unspecified by default and retains the core4096 default. After the006 proposal/context diagnosis,
-rerun the repaired007 q1/q2/q5 comparison in a fresh root, then confirm its frozen selection
-separately on q6; no mixed scores or repaired empty responses.
-
-ReAct 的结构化模型输入仅保留一份最新 `view`，每次决策重新读取当前 S/F/C/P 状态。
-先前工具观察、错误、检查和反馈保留顺序；只去除与初始 task 精确相同的 raw view.task。
-完整 `AgentContext.view()`、图语义和不可变事件/收据不变，其他 Agent 算法不变。
-native judge 只澄清把原生结果 JSON 放进外层 `final_response` 字符串，
-不改变原生提示、评价条件、解析或计分，也不接受裸结果自动终结。
-本地6次对话上限和 `latest-view-v1` 布局均进入执行身份，旧运行必须保留原身份恢复。
-
-Local proposal dialogue allows at most 6 model calls for Wiki inspection/correction and submission,
-while retaining one candidate and one evolution round under the same total ledger. Episode
-`wiki_scope` identifies the actual training original; SHA256 references are never training IDs.
-ReAct retains one latest structured view, refreshing current schema/function state for each
-decision and preserving chronological observations, errors, checks and feedback. Only an exact
-raw duplicate of the initial task is removed; full context API, semantic graph and audit receipts
-stay intact. Native judge changes only clarify the result-string wrapper. Dialogue cap and layout
-are frozen in execution identity; source changes require a fresh comparison root.
-
-Optional ReAct batches contain 1–16 tool/params actions. All envelopes, registrations and input
-contracts validate before effects; checked calls execute sequentially and every primitive counts.
-Known failures stop the batch with individual observations; uncertain effects remain quarantined.
-K0 now loads public S Material paths through the same fixed read primitives, with P unchanged.
-The default total HTTP cap remains 100. Only an explicit stopped-run coordinator audit with
-`amend_http_cap(total_cap=500, expected_http_attempts=78)` permits a new cap=500 client using the
-original ledger; existing usage and original policy/receipts remain preserved. Independent q6
-confirmation uses a separate manifest, mode and run root after the frozen development run ends,
-with the same source, selected assets, model and shared budget and no training or evolution.
-
-无需服务器即可生成 `all-pair-report.json`、`.csv`、`.md`，保留失败、未开始、缺失值、
-中间评判以及 worker/judge/proposal/Wiki 各角色的实际费用。最终内容分数与失败前的中间分数
-分别展示；宏调用数单列，原生工具计数及展开计数均按实际原语 leaf 计数。`evaluation_healthy` 与任务终态
-分开；`acceptance_complete` 只有真实传输、完整有效的 q5 A/B/C 和身份验证通过才可能为真。
-录制机制测试永远不会成为真实验收，回退及 q6 未测范围会写入报告。
-
-离线录制试跑（不连接基础设施、不调用真实模型）：
+本轮显式模型为 `MiniMax-M3.1-Flash-Preview`、端点 `https://api.minimax.cn/v1`、温度 0，
+`provider_request_policy:minimax-adaptive-v1`。所有角色使用 `thinking.type=adaptive`、
+`reasoning_effort=max`、生成上限 16384；本地 `max_tokens:16384` 配置在请求时转换为
+`max_completion_tokens:16384`，不加旧推理 buffer。没有模型/端点回退。
+模型/端点环境变量必须与配置完全相同；凭据只由宿主 `DARWINAGENT_API_KEY` 提供。
+以下会产生真实模型请求，只有已授权协调者执行：
 
 ```sh
-/path/to/existing/python3.12 -m datasets.lift.tests.offline_local \
-  --upstream /path/to/pinned/LIFT --data /private/pinned-data --output /private/NEW_local_pilot
-# 失败继续与 K0 回退：在新目录运行相同命令，并加 --failures；全失败加 --all-failed。
+DARWINAGENT_MODEL=MiniMax-M3.1-Flash-Preview \
+DARWINAGENT_BASE_URL=https://api.minimax.cn/v1 \
+PYTHONPATH=src /path/to/existing/python3.12 -m datasets.lift.local \
+  --upstream /path/to/pinned/LIFT --config /private/minimax-local.json \
+  --run-id UNIQUE_MINIMAX_DEVELOPMENT_RUN
 ```
 
-Local mode uses existing dependencies and the pinned native worker/judge protocol, without containers,
-Langfuse, service calls, dotenv discovery or child tool processes. Use the module command above with a
-fresh run directory and the original independent budget directory. Identical public q1 evidence may
-be reused across warmup/admission/training; q2 remains private validation, and q5 A/B/C always execute
-independently after selection freezes. Known local failures continue; unknown effects and the global
-authorized HTTP attempt gate pause. Reports disclose fallback, null/intermediate scores, all role costs and the
-unopened q6 scope. This is a local adaptation, not full native container reproduction; recorded tests
-do not establish real model quality or complete real acceptance.
+显式 `unbounded_model_calls:true`、`worker_limit:null`、`http_cap:null` 使 worker/session、
+worker/turn、judge、proposal、Wiki 的模型调用上限为真实 None/null。次数仍逐次持久保存，
+不是大整数占位，也不重置计数。每 Episode 64 个原语 leaf、3 次原生 worker↔judge 交互
+（最多 2 次纠错）、一个候选和一轮进化保持固定。默认 API 的 model 8/ReAct 16/generation 4096
+保持不变；取消调用数量上限不取消请求时限、宿主检查、未知写隔离或恢复闸门。
 
-## 历史容器运行与边界 / Historical container route
+`budget_root` 与比较目录独立。MiniMax 使用新的明确策略身份，历史 GLM 账本与未知暂停
+保留；之后同一 MiniMax 身份内的角色、进程和新比较目录共用持续计数的总账。
+源码、模型、生成、权限或选中资产改变时，必须新建比较身份，保留原始失败和收据。
+未知请求/写入禁止自动重放；历史恢复 API 不得用于放行这类未知状态。
 
-使用独立 3.12 环境安装本目录 `requirements.lock` 与当前核心源码；不修改核心 `uv.lock`。锁文件是实际验收环境的已解析版本清单，非跨平台 wheel 哈希锁。Docker 镜像仅包含固定 Python 基础镜像与标准库工具：
+All roles use the exact MiniMax model/endpoint, adaptive/max and generation 16384. Explicit null
+model-call caps keep durable counters and unknown-effect quarantine. Tool rights,64 leaves per
+episode,3 native interactions and one candidate/round remain fixed. Existing API defaults and
+legacy example caps remain unchanged. The new MiniMax identity does not resolve old GLM pauses.
+
+## 工具、提案与独立性 / Tools, proposal and isolation
+
+本地提供五项固定原语：`list_files`、`read_text`、`read_table`（CSV/XLSX 首表）、
+`transform_tables`（内存 SQLite 只读 SELECT）、`write_text`。路径、符号链接和写入限制在
+独立题目工作区；judge 只注册读工具。私有条件、凭据、账本、kernel 和选中资产不在工作区内。
+不提供任意宿主代码执行；启动时禁用 dotenv 发现和原生 pre-chat 上报。
+
+原生内容 judge 保留上游提示、条件、解析和计分。仅澄清结果 JSON 必须放在外层
+`final_response` 字符串中，不接受裸结果自动终结，不改原生成功标准。
+ReAct 可使用单动作、final 或 1–16 项 `actions` 批量；整批契约先验证，再顺序经过
+`context.call`，每个原语仍检查/计账。已知工具或 C 失败停止剩余动作，未知效果隔离。
+ReAct 每次刷新一份最新 view，按顺序保留观察、检查、错误、反馈与不可变回执。
+
+K 0 的 `inspect_materials` 从公开 S Material 路径读取最多 16 个 TXT/MD/CSV/XLSX；
+不读取私有评判。完整 S/F/C/P 提案空间向提案模型开放，仍受固定 ExecutionProfile、工具
+契约与准入检查约束，不用提示优化绕过现有 ProposalSession/Wiki/选择流程。
+本次真实候选仅修改 worker P，不能声称已经实测 S/F/C 变更。
+
+q1 相同任务/K 0/身份收据可在 warmup/准入/训练间复用；候选 q1 同样复用公开证据。
+q2 原始私有评判不进训练 Wiki。原件通过精确 `wiki_scope` 引用；证据 SHA 不冒充 training ID。
+提案/Wiki 无限调用仍保存全部查询/费用；重复证据提示、复制续页纠正不丢弃历史。
+原始文本、来源覆盖及旧存储游标兼容；小回复预算也必须可完整遍历，不以首条返回证明完成。
+训练失败跳过提案，独立诊断 q2；进化不可用显式回退 K 0；已知失败可以继续独立任务。
+
+## 独立 q6 确认 / Independent q6 confirmation
+
+开发 q5 A/B/C 调度终态后，协调者以单独 q6 查询/材料清单及 SHA 256 准备 confirmation 数据。
+配置设置 `mode:confirmation`、`selection_run_root` 指向已完成开发根、新 `run_root`、q6
+专属 `data_root`，沿用同一 MiniMax 总账、源码、请求策略、生成、有效 cap、K 0 和选中资产。
+模式检查开发调度终态和冻结身份，独立执行 q6 A/B/C，不训练、不调用 proposal/Wiki、不进化。
+私有要求只给 judge；q6 不加入训练。独立确认可得负面结果，不以完成执行代表质量提升。
+本轮冻结确认已完成，安全汇总显示 A/B/C 最终内容 0.79/0.86/0.93，三组健康且
+native success 均 false；worker 调用 15/18/20、leaf 24/28/59，均为 3 次交互/2 次纠错。
+C 的 worker 调用、leaf、token 更多；q6C 原生任务耗时包含用户要求的暂停，不能作为
+无暂停性能比较。这只支持单道独立题内容评分上升，不能声称任务成功、
+效率或泛化提升；q6 私有原文、评判条件和原始理由不进入公开文档。
+
+## 录制本地机制检查 / Recorded local mechanism checks
 
 ```sh
-DOCKER_CONTEXT=colima-darwin-lift docker build -t darwinagent-lift-tools:task3 datasets/lift
+PYTHONPATH=src /path/to/existing/python3.12 -m datasets.lift.tests.offline_local \
+  --upstream /path/to/pinned/LIFT --data /private/pinned-q1-q2-q5-data \
+  --unbounded --output /private/NEW_minimax_healthy
+PYTHONPATH=src /path/to/existing/python3.12 -m datasets.lift.tests.offline_local \
+  --upstream /path/to/pinned/LIFT --data /private/pinned-q1-q2-q5-data \
+  --unbounded --failures --output /private/NEW_minimax_failures
 ```
 
-不切换全局 Docker context。容器仅挂当前题工作区，worker 为 rw、judge 为 ro，无网络和凭据。原语包括 `list_files`、`read_text`、`read_table`（CSV/XLSX 首表）、`transform_tables`（内存 SQLite 只读 SELECT）、`write_text`。SQL 可聚合、连接、转换和排序；XLSX 日期序列值保持数值，SQLite 可用 `date(value + 2415018.5)` 转换。路径、符号链接和写入均限制在 `/workspace/task`。
+`97c6cbb` 的 healthy-v3/failure-v3 分别 PASS：57/166 录制调用、0 实际模型 HTTP、
+0 基础设施调用。failure 明确回退 K 0。两组重放均为 0 新调用、0 回执/产物写入。
+这些是原生内容协议经本地适配的机制检查，合成分数/token 不代表真实质量、节省或完整验收。
+旧 v1/v2 失败及修复前日志保留，不反写历史结果。
 
-接受的 kernel、训练 Wiki、选择记录哈希及镜像证据在清理前导出。`/opt/darwin-state/accepted.json` 位于容器可提交层，fresh evolved worker 实际读取并校验内容 ID。judge 始终使用基线工具镜像。
+## 全行报告及实际结果 / All-pair reports and observed results
 
-warmup hook 调用现有 `CampaignController`、`EpisodeExperiment`、`WikiService`、`ProposalSession`。其 6 次独立的 q1/q2 准入、训练和验证运行都是原生 `execute_task`，费用全部计入共享总账。原生 warmup q1 是额外训练轨迹，不冒充这 6 次运行之一。只有训练原文和用户式反馈进入 Wiki；q2 的原始评判留在宿主评测目录。
+无需服务器生成 `all-pair-report.json/.csv/.md`，保留全部阶段/组、失败、未启动项、
+中间/最终分数、回退与 worker/judge/proposal/Wiki 用量。宏调用单列，每个原语 leaf 展开记账。
+缺失质量/token 为 null，不补成 0；评审健康、任务 success、比较完成和最终版本验收分别报告。
 
-先复制 `pilot.example.json`，填入维护者提供的模型/端点和独立目录。模型凭据只通过宿主 `DARWINAGENT_API_KEY` 环境变量提供。以下命令会进行真实模型调用，限获得授权的协调者执行：
+当前 q5 A/B/C 均为健康最终评审，三组 success=false，内容分别为 0.6666666667/0.6/0.8；
+worker 调用 14/20/30、leaf 27/43/49，均为 3 次原生交互/2 次纠错。C 内容较高，同时
+worker 成本增加；B 内容低于 A。q2 的 0.5833→0.75、success 0→0 支持候选选择，
+不能掩盖任务失败或成为独立泛化提升声明。完整指标/费用见验收记录。
 
-```sh
-DOCKER_CONTEXT=colima-darwin-lift DO_TRAJECTORY_JUDGE=false \
-DARWIN_LIFT_CONFIG=/private/pilot.json \
-/path/to/python3.12 -m datasets.lift.run --upstream /path/to/pinned/LIFT \
-  -r darwinagent --run-id UNIQUE_RUN_ID --repeat 1 \
-  --warmup-container-policy serial_single --holdout-container-policy serial_multi \
-  --holdout-phase-policy serial --max-parallel-suites 1 --max-concurrent-tasks 1 \
-  --max-conversation-turns 3
-```
+开发 benchmark 共 218 次实际 HTTP，全部 completed；worker 124、judge 85、proposal 9。
+MiniMax 可用性2次、历史 GLM 335 次分别报告。报告的 `acceptance_complete:true` 范围明确为
+`local_q5_A_B_C_execution_verification_only`，`quality_improvement_claim:false`；
+独立确认新增 89 次 completed HTTP，worker 53/judge 36，1042902 tokens；累计 benchmark 307
+全部 completed，加可用性2为 MiniMax 309。q6 报告完成范围也仅为独立执行验证，
+不代表任务成功、整个 LIFT 基准或版本验收完成。
 
-wrapper 从固定数据自动生成仅 q1 warmup / q5 holdout 的原生 suite；不要自行传 `--suite` 或 `--benchmark_dir`。q2 验证发生在 warmup hook 的受控 campaign 中。`DARWINAGENT_MODEL`、`DARWINAGENT_BASE_URL` 必须与配置完全相符。完整后处理需先在宿主设置 `LANGFUSE_PUBLIC_KEY`、`LANGFUSE_SECRET_KEY`、`LANGFUSE_BASE_URL`，固定上游的 `trace.list/get` 需要 Langfuse dual-write 兼容模式。
+## 历史容器与 GLM 边界 / Historical container and GLM boundaries
 
-`DO_TRAJECTORY_JUDGE=false` 强制关闭上游独立轨迹模型；原生 CSV/HTML 中的 trajectory 数字是上游占位值，统一按 `trajectory_judge=not_run` 解读。权威全行报告为 `all-pair-report.json`，保留 A/B/C、失败与回归，不把缺失 token/耗时当作测量 0。原生工具计数为实际容器原语调用，宏展开的每个 leaf 都有真实子 span；本 adapter 的 native tool count 与 flattened leaf count 因而相同。proposal/Wiki 成本单独记录。观察故障保留已完成响应并暂停后续调度。
+旧容器实现提供 `ContainerAgentRuntimeAdapter`/`ChatAgent` warmup/evolve/commit/load/holdout，
+worker rw/judge ro 无网络容器、`/opt/darwin-state/accepted.json` 层内导出/加载及 leaf trace。
+旧 81 录制响应容器/追踪/后处理记录保留在验收报告，它是合成机制证据；不是本轮 MiniMax
+Docker/Langfuse 验收。`requirements.lock` 是已解析环境版本清单，不是跨平台 wheel 哈希锁。
 
-## 离线验收
-
-```sh
-/path/to/python3.12 -m unittest tests.test_react_recovery datasets.lift.tests.test_tools datasets.lift.tests.test_transport -q
-/path/to/python3.12 -m datasets.lift.tests.http_budget_probe --output /private/NEW_http_probe
-DOCKER_CONTEXT=colima-darwin-lift DO_TRAJECTORY_JUDGE=false \
-/path/to/python3.12 -m datasets.lift.tests.offline_native \
-  --upstream /path/to/pinned/LIFT --data /private/pinned-data --output /private/NEW_native_run \
-  --trace --trace-env /private/infra/.env
-/path/to/python3.12 -m datasets.lift.tests.trace_probe \
-  --upstream /path/to/pinned/LIFT --root /private/NEW_native_run --trace-env /private/infra/.env
-```
-
-`--trace-env` 读取本地初始化项目的 `LANGFUSE_INIT_PROJECT_PUBLIC_KEY/SECRET_KEY`，只设置当前进程环境。离线 native 测试使用录制回复：实际 Docker、原生内容评判协议、工具、候选采纳、delta、trace 与后处理均运行，但任务分数、token 和质量差异是合成机制证据，不构成实模型质量结论。候选只改 F，P 字节保持一致。HTTP probe 调用本地模拟 SSE 服务，3 个独立进程/比较目录共用一个 cap=1 的账本，第 2、3 次发送被拒绝。
-
-Source changes require fresh A/B/C identities. Preserve previous artifacts; reuse the independent global budget directory. This adapter is an optional, host-controlled native LIFT integration, not an independent optimizer or replacement judge.
+历史 GLM 007 仍为 335/500，334 completed、1 unknown，保持暂停；HTTP 200 头不能证明完整
+流收到，历史异常原因不可还原。新诊断保存限定异常类型/阶段/状态/流计数与响应 ID 哈希，
+完整终止流在后续清理取消中仍保存完成回执；不能据此恢复旧请求或拼接旧质量结果。
+本地路线没有本轮 Docker、Langfuse、完整容器追踪或独立轨迹评判，不声明全 LIFT 基准完成。
+当前源码 wheel 已通过现有 Python 3.11 环境的源码外安装检查，4 个 Episode、0 模型 HTTP；
+SHA 256 `9d3466ec0ef1d7d151d61cbaa57553b26443f426832896520b51cde543c9c32b`。
+最终 sdist、分发清单同步、文档评审和需求审计仍由协调者完成；没有推送、标签或发布。

@@ -1,0 +1,26 @@
+{
+  "run_root": "/absolute/private/fresh-minimax-development-run",
+  "budget_root": "/absolute/private/new-minimax-shared-budget",
+  "data_root": "/absolute/private/pinned-q1-q2-q5-data",
+  "mode": "development",
+  "model": "MiniMax-M3.1-Flash-Preview",
+  "base_url": "https://api.minimax.cn/v1",
+  "provider_request_policy": "minimax-adaptive-v1",
+  "unbounded_model_calls": true,
+  "worker_limit": null,
+  "http_cap": null,
+  "max_tokens": 16384,
+  "temperature": 0,
+  "correction_rounds": 3,
+  "train": [
+    "q1"
+  ],
+  "validation": [
+    "q2"
+  ],
+  "development_comparison": [
+    "q5"
+  ],
+  "q6": "sealed_not_opened",
+  "trajectory_judge": "not_run"
+}

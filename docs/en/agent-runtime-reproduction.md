@@ -2,11 +2,15 @@
 
 [简体中文](../zh-CN/agent-runtime-reproduction.md) · [SDK](agent-sdk.md)
 
-This describes prepared, unpublished 0.3.0. All ordinary checks below use recorded/local
-responses. Native LIFT and the separate trajectory judge are different acceptance layers.
-The dated [record](../acceptance/2026-10-09-agent-runtime.md) states actual results and limits.
+Prepared, unpublished 0.3.0 at frozen source `97c6cbb`.
+The current MiniMax run is a LOCAL adaptation of pinned LIFT task execution and content judging.
+q5 and independent q6 A/B/C measurements are complete; the current wheel passed installed checks.
+Final sdist packaging, documentation review and requirement audit remain pending.
+The dated [record](../acceptance/2026-10-09-agent-runtime.md) separates measurements from history.
 
-## Core and installed package
+## Core checks and actual installed package
+
+The following commands reproduce the checks; actual results are recorded separately:
 
 ```sh
 uv sync --frozen --group test
@@ -16,117 +20,166 @@ uv run --frozen --group test python -m unittest discover -s datasets/travelplann
 uv run --frozen --group test ruff check .
 uv run --frozen --group test ruff format --check .
 uv run --frozen python examples/agent_runtime.py --output runs/NEW-agent-offline
-uv build
+uv build --wheel
 ```
 
-Create a clean Python 3.11 environment, install the local wheel, then run
-`/path/to/clean/python /absolute/checkout/scripts/check_installed.py` from outside the
-checkout. This checks the actual site-packages import, both generic loops, file artifacts,
-settled replay, and legacy doctor/demo/resume with immutable Wiki bytes. Python 3.12 is the
-verified optional native environment; the core does not import its benchmark dependencies.
-Historical external/formal-resource skips are not passed assertions. Preserve full logs;
-do not relax the existing startup-time threshold to obtain a passing label.
+Coordinator evidence on `97c6cbb`: 692 framework tests discovered, 684 passed, eight explicit
+resource skips; LoCoMo 18 and TravelPlanner 11 passed; Ruff and format 330 passed. Keep original
+logs and diagnostics; skips are unrun resources, not passing assertions. No model HTTP was
+used for these regressions. The current wheel passed in the existing Python 3.11 verification
+environment outside the checkout, with four episodes and zero model HTTP. To reproduce, install
+the newly built wheel in a clean Python 3.11 environment, then run
+`/path/to/clean/python /absolute/checkout/scripts/check_installed.py` from outside the checkout.
+It checks the site-packages import, independent Agent/ReAct loops, actual file artifacts,
+settled replay and legacy doctor/demo/resume/Wiki behavior. Historical wheel hashes or older
+73/26/69 checks do not establish that the current wheel is installed and working.
 
-## Native recorded-response acceptance
+## Public API and opt-in null model-call limits
 
-Use the pinned LIFT checkout `9d282e415c5e3b0f65b82c8758a013b269583d93`, the separate
-Python 3.12 environment with `datasets/lift/requirements.lock`, and the exact EALE
-`419789ed1662e7b9ad16aa6620a4b31449612948` q1/q2/q5 material manifest.
-Do not open or stage q6. Provision local trace infrastructure first; keep its credentials
-outside version control. [Adapter instructions](../../datasets/lift/README.md) document
-capabilities, limits and registration. Run with an explicit Docker context:
+`AgentAdapter.run(task, context)` owns its loop and returns `EpisodeResult`. `AgentTask` carries
+instruction, public parameters and attachments; `AgentContext` exposes model/call/view/check;
+`ExecutionBackend` binds execution, host policy and durable receipts. `EpisodeResult.artifacts`
+is an array of objects. Refer to the [SDK guide](agent-sdk.md) for complete construction.
+
+Generic defaults remain `ExecutionProfile.max_model_calls=8`, `ReActAgent.max_turns=16` and
+core generation 4096. Explicit None removes only the corresponding model-call/decision cap:
+
+```python
+from darwinagent.agent import ExecutionProfile, ReActAgent
+
+profile = ExecutionProfile(
+    "explicit-model-unbounded", ("read_text", "write_text"),
+    max_model_calls=None, max_leaf_calls=64,
+)
+agent = ReActAgent(max_turns=None, max_tokens=16384)
+```
+
+These objects do not select a provider, register tools or disable host checks. S/F/C/P assets
+remain subject to the fixed capability and lifecycle contracts. Every model call still
+increments persisted counters; unknown requests/writes never replay automatically. Existing
+v3 bundles, graph-QA paths and finite/default identities remain supported. An old capped K 0
+cannot be silently reused for a new null-cap execution.
+
+## Current local MiniMax reproduction policy
+
+Use the existing Python 3.12 environment and pinned LIFT checkout
+`9d282e415c5e3b0f65b82c8758a013b269583d93`. Development data is the fixed EALE
+`419789ed1662e7b9ad16aa6620a4b31449612948` q1/q2/q5 manifest; q6 remains unopened during development.
+Do not provision Docker, Langfuse, new services or dependencies for this local route.
+
+Copy [minimax.local.example.json](../../datasets/lift/minimax.local.example.json) and assign
+independent private run/data/budget paths. Use a fresh MiniMax budget identity; preserve the
+historical GLM budget and its unknown pause. Within this MiniMax identity all authorized roles,
+processes and new comparison roots share the same ledger. Supply the credential only through
+host `DARWINAGENT_API_KEY`. The model/endpoint environment must exactly match the configuration.
+Only the authorized coordinator executes this real-model command:
 
 ```sh
-DOCKER_CONTEXT=colima-darwin-lift docker build -t darwinagent-lift-tools:task3 datasets/lift
-DOCKER_CONTEXT=colima-darwin-lift DO_TRAJECTORY_JUDGE=false \
-/path/to/python3.12 -m datasets.lift.tests.offline_native \
-  --upstream /path/to/pinned/LIFT --data /private/pinned-data \
-  --output /private/NEW-native-run --trace --trace-env /private/infra/.env
-/path/to/python3.12 -m datasets.lift.tests.trace_probe \
-  --upstream /path/to/pinned/LIFT --root /private/NEW-native-run --trace-env /private/infra/.env
+DARWINAGENT_MODEL=MiniMax-M3.1-Flash-Preview \
+DARWINAGENT_BASE_URL=https://api.minimax.cn/v1 \
+PYTHONPATH=src /path/to/existing/python3.12 -m datasets.lift.local \
+  --upstream /path/to/pinned/LIFT --config /private/minimax-local.json \
+  --run-id UNIQUE_MINIMAX_DEVELOPMENT_RUN
 ```
 
-Do not change the global Docker context. The fixture executes real containers, tools,
-upstream content-evaluation protocol, evolution hooks, fresh delta loading and trace
-readback/postprocessing, using 81 recorded responses and zero model HTTP requests.
-Scores and tokens are synthetic; local wall time is not network latency. Native report
-trajectory placeholders always mean `trajectory_judge=not_run`.
+The explicit policy `minimax-adaptive-v1` uses generic routing (`model_profiles=False`),
+`thinking.type=adaptive`, `reasoning_effort=max`, temperature 0 and generation 16384 for worker,
+judge, proposal and Wiki. The JSON key is `max_tokens`; the actual MiniMax request parameter
+is `max_completion_tokens`, with no extra legacy reasoning buffer and no model/endpoint fallback.
+Generic and previously registered providers retain their existing outgoing token conventions.
 
-## Bounded live development diagnosis: partial and paused
+`unbounded_model_calls:true`, `worker_limit:null` and `http_cap:null` are explicit opt-ins.
+Worker session/turn, judge, proposal and Wiki model-call limits are actual None/null rather
+than a large sentinel. The three native interactions (two corrections), primitive permissions,
+64 leaf calls per episode, one candidate and one evolution round remain fixed. SDK retries
+remain 0 and a submitted unknown request still closes the shared gate. Removing a call cap does
+not remove durable accounting, deadlines, unknown-write isolation or identity verification.
+The legacy [pilot.example.json](../../datasets/lift/pilot.example.json) stays HTTP 100/worker 8.
 
-Current outcome (2026-10-10): LIVE001 on `aadb5b4` failed on a non-JSON settled reply;
-LIVE002 on `669b94d` failed on string-array artifacts. Bounded protocol feedback and explicit
-object-array validation repaired those framework boundaries, with recorded before/after tests.
-Fresh LIVE003 on `68a0084` completed q1 first delivery, whose native intermediate assessment
-was false/0.33, then exhausted the eight-request worker cap during correction. Final task score
-is unavailable. All 26 actual HTTP completed (17 worker, 8 judge, 1 probe), totaling 244539 tokens.
-No unknown submission exists; one ninth local reservation was denied before HTTP. Its native
-worker total remains null, known subtotal 47613. q2, evolution/candidate and q5 A/B/C are
-unstarted; K0 is unchanged, q6 sealed, trajectory judge not_run. No further calls are authorized.
-Keep the stable pause and ledger; remaining global budget does not permit a task-cap bypass.
+Local tools are `list_files`, `read_text`, `read_table`, `transform_tables`, `write_text`, scoped
+to independent task workspaces. Judge tools are read-only. No arbitrary host code or child
+process is exposed. Private criteria, credentials, selected assets and ledgers are outside the
+workspace. Dotenv discovery and native pre-chat reporting are disabled. Native content-judge
+prompts, criteria, parser and scoring remain authoritative through this local adaptation;
+the result is wrapped as a string in the outer `final_response` envelope.
 
-Only completed worker turn 0 (5 requests) and judge (8 requests) traces were read back;
-three completed correction requests remain in local journals, not flushed trace-state.
-No live native CSV/HTML was produced. The retry-overwritten task_time_s field is not wall time;
-LIVE003 measured request elapsed totals are worker 60.9758 s and judge 391.4317 s.
-See the acceptance record for all failures, unstarted rows and costs. Full 642-pass evidence
-belongs to earlier `aadb5b4`; current source has 73/26/69 covering checks. This docs-only update
-preserves the tested wheel/source and rebuilds sdist without repeating unrelated suites.
+## Recorded local mechanism checks
 
+Use fresh output directories. These commands consume recorded responses, not real model calls:
 
-Only the coordinator runs real model calls after review and a fresh source freeze. The
-approved configuration is `glm-5.3-flash`, temperature 0, Coding endpoint
-`https://open.bigmodel.cn/api/coding/paas/v4`, identically for all roles.
-Use at most 3 interaction turns (2 corrections), 8 worker requests per task/session and one
-candidate/evolution round. All actual HTTP attempts across worker, judge, proposal, Wiki,
-availability probes, processes and fresh run directories share one stable 100-request ledger.
-Keep `budget_root` separate from `run_root`; source changes never reset the budget.
+```sh
+PYTHONPATH=src /path/to/existing/python3.12 -m datasets.lift.tests.offline_local \
+  --upstream /path/to/pinned/LIFT --data /private/pinned-q1-q2-q5-data \
+  --unbounded --output /private/NEW_minimax_healthy
+PYTHONPATH=src /path/to/existing/python3.12 -m datasets.lift.tests.offline_local \
+  --upstream /path/to/pinned/LIFT --data /private/pinned-q1-q2-q5-data \
+  --unbounded --failures --output /private/NEW_minimax_failures
+```
 
-A is plain ReAct, B adds K0, C loads the selected K1 (or retained K0 if rejected). q1 is
-training/admission; q2 validates; q5 is development diagnosis. Freeze code, model, backend,
-kernels, evaluator, data and per-task permissions/budgets before comparison. Any repair after
-q5 preserves old failures, creates a new identity and reruns all A/B/C with remaining budget.
-If that cap prevents completion, report partial. q6 remains sealed and independent quality
-confirmation is unrun. No live quality or generality claim follows from the offline fixture.
+Frozen healthy-v3/failure-v3 recorded checks passed with 57/166 calls, zero model HTTP and zero
+infrastructure calls. Healthy selected a fixture candidate; failure continued known failures
+and explicitly selected K 0 fallback. Both replays added zero model calls and zero receipt/artifact
+writes. Scores/tokens are synthetic mechanism evidence, not MiniMax quality or savings.
+Earlier v1/v2 failures remain preserved; their acceptance is not inferred from v3.
 
-The authoritative `all-pair-report.json` includes every planned cell and its arm/phase,
-status, success/content, correction turns, flattened leaf tools, native tool counts, role
-model calls/tokens, measured durations, failures and unknown values. Retain incomplete turns
-and unstarted arms. Report proposal/Wiki overhead and total HTTP separately; missing token
-usage is unknown. A filtered upstream summary cannot replace these rows or hide declines.
-Unknown submitted requests pause all new transport until explicitly resolved; never silently
-retry or clear pause state.
+## Selection, development and independent confirmation
 
-Keep private local `.superpowers/`, dataset materials, credentials and raw judge evidence on
-disk. Export only non-secret aggregate facts and hashes to tracked reports. For each defect,
-record reproduction command, original failure, cause, scoped repair and covering retest;
-original artifacts are immutable evidence.
+q1 public task evidence may be reused across warmup/admission/training for an identical task,
+kernel and identity. q2 private validation is excluded from training Wiki. The existing
+CampaignController/EpisodeExperiment/ProposalSession/Wiki flow exposes complete S/F/C/P authority;
+unsupported declarations and fixed-permission changes fail admission. Only one candidate is
+submitted. Proposal/Wiki calls and original queries are counted even when feedback warns of
+repeated evidence or repairs a copied continuation. Raw sources and old stored cursors remain
+readable; paging is checked at 8000 and 512 wire-character bounds without changing source bytes.
 
-### Settled task failures and the shared request gate
+A is plain ReAct, B adds K 0, C loads the selected K 1 or explicit K 0 fallback. After selection
+freezes, q5 A/B/C run independently; C=K 0 still does not reuse B. The observed real candidate
+changes worker P only. q2 content 0.5833→0.75 with success 0→0 justified selection, not independent
+quality improvement. q5 A/B/C all have healthy final evaluations but success=false, with content 0.6666666667/0.6/0.8.
+Worker calls 14/20/30 and leaves 27/43/49 show greater execution cost for C. All arms used three
+native interactions/two corrections. Negative results must be retained.
 
-The native LIFT plugin retains a terminal task receipt after a known worker/judge
-failure or the unchanged eight-worker-call session limit. Independent q2 and q5
-A/B/C executions continue with the same three native rounds. A failed warmup skips
-proposal work, runs q2 as an independent diagnostic, explicitly rejects promotion,
-and materializes K0 for C. An unhealthy campaign also falls back to K0; this is not
-evidence of a successful evolution. Partial files, turn receipts, trace increments,
-original durations, and failures remain available; replay sends no model requests.
+Only after development scheduling finishes may the coordinator prepare a separate q6-only
+confirmation manifest and fresh root. Set `mode:confirmation`, `selection_run_root` to the
+completed development root, and the q6-specific `data_root`. Use the same frozen source,
+model/request policy, generation, effective caps, ledger, K 0 and selected assets. Confirmation
+performs independent q6 A/B/C without training, proposal, Wiki or evolution. The frozen MiniMax
+confirmation completed with healthy final content scores 0.79/0.86/0.93 and native success=false
+for A/B/C. All arms used three interactions/two corrections; worker calls were 15/18/20 and
+leaves 24/28/59. C used more worker calls, tokens and leaves. Its native task duration includes
+a user-requested suspension and is not clean performance wall time. This establishes higher
+content scores on this one independent task, not task success, efficiency or generality.
+Safe metrics and all costs appear in the acceptance record; private q6 text/criteria are not exported.
 
-Submitted unknown requests, uncertain writes, trace failures, and the shared
-100-HTTP-attempt limit still block all independent work. A denied reservation is
-not a submitted unknown request. `all-pair-report.json` distinguishes failed,
-blocked, cancelled, and unstarted cells. Failed final quality is null; a previous
-judge score is labelled intermediate. Pinned native reports cannot represent
-unjudged null scores. The plugin therefore retains failed pairs in its all-pairs
-report and completes C independently even when B fails; it never substitutes zero
-or claims native CSV/HTML acceptance for an omitted pair.
+## Results, failures and historical boundaries
 
-The explicit `SharedTransport.recover_local_cap_pause` API audits only the legacy
-bare `{"status":"budget_exhausted"}` pause. It requires the exact historical worker
-session, expected current HTTP count below 100, complete reconciled request
-receipts, eight worker calls, a matching local-cap journal denial, and no unknown
-write/request or trace failure. It preserves the original pause bytes and counters
-and creates an immutable recovery acknowledgement. It does not recover newer
-explicit global gates. Only the coordinator may apply this audit to the historical
-live ledger. Source changes require a fresh run identity for all comparison arms;
-historical runs remain separate and the shared HTTP ledger continues unchanged.
+`all-pair-report.json/.csv/.md` includes all planned arms, terminal and intermediate scores,
+failures, unstarted rows, fallback and measured worker/judge/proposal/Wiki calls/tokens/durations.
+Leaf calls count individually, including macros and optional 1–16-action batches; all batch
+contracts validate before effects and known failures stop remaining actions. ReAct keeps one
+latest view while retaining chronological observations and immutable receipts.
+
+A healthy native evaluation can report success=false. A completed comparison can show no
+improvement or regression. Missing final quality/tokens are null, never invented zero; interim
+scores cannot replace final results. Development benchmark accounting is 218 completed HTTP, worker 124/judge 85/proposal 9,
+2533327 tokens and 1403.6033 summed request seconds; two MiniMax availability calls are separate.
+The report acceptance scope is q5 execution verification only, with quality_improvement_claim=false;
+independent q6 execution verification is also complete, while final packaging/review acceptance
+remains pending. Confirmation added 89 completed requests (worker 53, judge 36), 1042902 tokens and
+648.5198 summed request seconds. Cumulative benchmark 307 plus availability 2 equals 309 MiniMax
+attempts; benchmark tokens total 3576229. Historical GLM 335 remains separate.
+
+Known task failures can settle and independent scheduling can continue. Unknown model receipts,
+uncertain writes and applicable shared gates pause new work without automatic replay. New
+MiniMax diagnostics store allowlisted stage/type/status/stream counters and hashed response IDs;
+completed terminal streams survive cleanup failures/cancellation without losing settled receipts.
+These repairs do not reconstruct the cause of the old GLM 007 request.
+
+Historical GLM remains 335/500 (334 completed, 1 unknown), paused and unchanged. Earlier 26/100 and
+container/trace/81-recorded-response records are archived in the acceptance record. They are
+separate source identities and do not describe current MiniMax acceptance. The current local
+route has no Docker/Langfuse/full container trace or independent trajectory-judge result; it is
+not full-container or full-benchmark reproduction. No merge, push, tag, release or upstream
+message occurred. Real measurements and the current wheel checks are complete; final sdist and
+review/audit remain pending. The current wheel hash is
+`9d3466ec0ef1d7d151d61cbaa57553b26443f426832896520b51cde543c9c32b`.

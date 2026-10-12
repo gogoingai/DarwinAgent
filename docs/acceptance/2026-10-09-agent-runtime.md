@@ -1,5 +1,237 @@
 # 通用 Agent 运行时验收 / Generic Agent runtime acceptance
 
+**MiniMax q5 与独立 q6 实测已完成，当前 wheel 源码外安装检查通过；sdist 与最终审查待完成。0.3.0 仅为本地准备版本，未发布。**
+
+**MiniMax q5 and independent q6 measurements are complete; the current wheel passed installed checks outside the checkout. Final sdist and review are pending. 0.3.0 is prepared locally and unpublished.**
+
+本页当前证据属于冻结提交 `97c6cbb695384bdd4f0023d68f2baa0bdfd12dce`，
+冻结测量源码身份摘要为 `0bd50bf7407d8274cd926e82c193d2e5825af84c54b6d28b5010e45f4122d10a`。
+当前层是固定 LIFT 原生内容评判协议的**本地执行适配**。没有为本轮启动 Docker、Langfuse、
+完整容器追踪或独立轨迹评判，也没有完成整个 LIFT 基准。
+[机器可读记录](2026-10-09-agent-runtime.json)将当前检查、完整开发结果与历史记录分开。
+
+Current evidence is bound to the frozen commit and source digest above. The current layer is a
+**LOCAL adaptation** of the pinned native LIFT content-judge protocol. Current MiniMax evidence
+contains no Docker, Langfuse, full container trace, independent trajectory judge or full-benchmark
+acceptance. The JSON separates current checks, terminal development results and history.
+
+## 当前回归与离线机制 / Current regressions and recorded mechanisms
+
+| 检查 / Check | 冻结源码上的证据 / Evidence on frozen source |
+| --- | --- |
+| 完整框架 / Framework | 692 discovered; 684 passed; 8 explicit resource skips; 74.053 s |
+| LoCoMo | 18 passed |
+| TravelPlanner | 11 passed |
+| Ruff check / format | Passed; 330 files formatted |
+| 无上限本地 healthy-v3 / Healthy recorded pilot | PASS; 57 recorded calls; 0 model HTTP; 0 infrastructure calls; no fallback |
+| 无上限本地 failure-v3 / Failure recorded pilot | PASS; 166 recorded calls; 0 model HTTP; 0 infrastructure calls; explicit K 0 fallback |
+| 两组重复读取 / Replay of both pilots | 0 new model calls; 0 receipt/artifact writes |
+| 当前 wheel 与源码外安装 / Current wheel and installed checks | PASS: current source, Python 3.11 site-packages; 4 episodes; settled replay and legacy checks; 0 model HTTP |
+
+八项资源跳过没有算作通过；原有 asyncio 慢任务提示保留。离线录制的分数和 token 只验证
+协议、选择、回退和恢复机制，不能当作 MiniMax 质量或真实调用成本。failure-v3 的 PASS
+表示已知失败继续、保留失败并回退 K 0 的机制符合检查，不表示任务成功或进化成功。
+
+The eight resource skips are unrun, not passes; existing asyncio notices remain in the logs.
+Recorded scores/tokens establish protocol, selection, fallback and replay mechanics only.
+The failure pilot's PASS means failure handling and K 0 fallback satisfy the checks; it does not
+mean the failed tasks succeeded or evolution improved quality.
+
+## 当前模型与执行契约 / Current provider and execution policy
+
+各角色固定为 `MiniMax-M3.1-Flash-Preview`，端点 `https://api.minimax.cn/v1`，温度 0，
+`thinking.type=adaptive`、`reasoning_effort=max`。显式策略 `minimax-adaptive-v1` 将配置的
+生成上限 16384 以 `max_completion_tokens` 发送，不叠加旧推理 buffer；worker、judge、
+proposal、Wiki 使用相同策略。没有模型或端点回退。
+
+本次显式选择模型调用无上限：worker/session、worker/turn、judge、proposal、Wiki 与实际
+HTTP cap 均为真实 `null` / Python `None`，不是极大整数。调用仍逐次持久化记账；未知请求
+或写入仍隔离，不能自动重发。原语权限、每个 Episode 的 64 个 leaf、3 次原生交互
+（最多 2 次纠错）、一轮进化及一个候选保持固定。
+
+All roles use the same explicit model/endpoint, temperature 0, adaptive/max policy and generation
+16384, sent as `max_completion_tokens` without the legacy reasoning buffer. Model-call caps are
+actual null/None under an explicit opt-in. Every call still counts durably; unknown effects remain
+quarantined. Primitive permissions, 64 leaves per episode, three native interaction turns,
+one evolution round and one candidate remain fixed.
+
+通用默认值仍为 `ExecutionProfile.max_model_calls=8`、`ReActAgent.max_turns=16`、核心生成
+4096；旧 `datasets/lift/pilot.example.json` 保持 HTTP 100/worker 8，旧有限预算运行使用原身份。
+现有公开 API、旧 v3 bundle 与 graph-QA 兼容性属于回归范围。
+Generic defaults remain model 8/ReAct 16/generation 4096; the legacy example remains HTTP 100/worker 8.
+Existing finite-budget identities, public APIs, v3 bundles and graph-QA compatibility stay covered.
+
+## 真实开发结果 / Real development results
+
+q2 仅用于候选选择：K 0 的内容分数 0.5833，候选 0.75；success 均为 0。
+严格选择理由为 `quality_improvement`，选中内容 ID
+`5556a04468fe163d4620703f652820a35e91610d1d818ef2cf476f9e36a80d04`。
+实际候选只修改 P 中的 worker 提示。完整 S/F/C/P 空间已向提案开放，但本轮真实候选
+没有修改 S、F 或 C，因此不能据此声称已经测量四类资产共同进化的效果。
+
+The q2 selection content metric rose from 0.5833 to 0.75 while success remained 0 in both entries.
+Selection accepted a worker-P-only candidate. The complete S/F/C/P proposal space is exposed,
+but this real candidate changes no S/F/C asset; q2 selection is not independent quality confirmation.
+
+| q5 组 / Arm | 原生最终内容分数 / Native final content | success | 评审健康 / Healthy | worker 模型调用 / Calls | worker leaf |
+| --- | ---: | --- | --- | ---: | ---: |
+| A: plain ReAct | 0.6666666667 | false | true | 14 | 27 |
+| B: ReAct + K 0 | 0.6 | false | true | 20 | 43 |
+| C: ReAct + selected K 1 | 0.8 | false | true | 30 | 49 |
+
+q5 三组均有健康最终评审、各使用 3 次原生交互/2 次纠错，但任务均未达到 success 标准。
+B 的内容分数低于 A；C 的内容高于 A、B，同时 worker 模型调用、leaf 与 token 均更高。
+这不支持成功率、效率或泛化提升结论。不能用 q2 的采纳理由覆盖 q5 的负面结果。
+
+All three q5 arms have healthy final evaluations and use three native interactions/two corrections,
+but none meets the native success criterion. B scores below A; C scores higher while using more
+worker calls, leaves and tokens. These results do not establish task-success, efficiency or
+generality improvement. q2 selection cannot erase the negative q5 outcomes.
+
+| q5 arm | worker tokens | judge calls | judge leaf | judge tokens | worker request seconds | judge request seconds | native task seconds |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| A | 248186 | 16 | 30 | 215409 | 160.2780 | 94.0174 | 254.5371 |
+| B | 357765 | 14 | 29 | 172170 | 242.0006 | 91.4559 | 333.6781 |
+| C | 589386 | 11 | 23 | 122752 | 329.1521 | 67.6530 | 396.9978 |
+
+上表保留 worker 与 judge 的独立成本；宏调用 A/B/C 为 0/2/3，宏内部 leaf 不隐藏。
+完整物理执行共 7 行，全部 completed/healthy/final、success=false；复用的 q1 准入/训练
+收据不会重复计费。q1 基线/候选内容为 0.8333333333333334/0.67，q2 为 0.5833/0.75。
+全部行及精确费用保留在 JSON，不能只展示 q5 C 的较高内容分数。
+The tables keep worker and judge costs separate. Macro calls A/B/C are 0/2/3 with all leaves counted.
+All seven physical execution rows are completed/healthy/final and success=false. Reused q1 admission/
+training receipts are not double-counted. q1 baseline/candidate content is 0.8333333333333334/0.67;
+q2 is 0.5833/0.75. JSON retains every row and exact cost rather than showing only the best q5 score.
+
+| 开发角色 / Development role | Actual HTTP | Measured tokens | Sum of request seconds |
+| --- | ---: | ---: | ---: |
+| worker | 124 | 1558114 | 890.2466 |
+| judge | 85 | 830758 | 476.4107 |
+| proposal | 9 | 144455 | 36.9460 |
+| benchmark total | 218 | 2533327 | 1403.6033 |
+
+218 次开发 HTTP 全部 completed，unknown/submitted 为 0；两次 MiniMax 可用性调用单列，
+不混入 benchmark。费用包含训练、验证、比较与提案；本轮没有另一个 Wiki 角色模型请求。
+请求耗时之和不是整个 campaign 的墙钟耗时；原生 task 耗时、worker 与 judge 请求耗时分别保留。
+All 218 development HTTP attempts completed, with 0 unknown/submitted. Two availability requests
+remain separate. Costs include training, validation, comparison and proposal; no separate Wiki-role
+model request appears in this development ledger. Summed request time is not campaign wall time.
+
+本地开发报告的 `acceptance_complete:true` 仅指
+`local_q5_A_B_C_execution_verification_only`；`quality_improvement_claim:false`。
+进化流程完成且候选被采纳，与整个版本验收的范围不同。
+The local development report's true acceptance flag is explicitly limited to q5 execution
+verification, with a false general quality-improvement claim; candidate adoption is a separate result.
+
+## 独立 q6 确认 / Independent q6 confirmation
+
+q6 使用单独确认模式、工作区与材料清单，在开发选择冻结后执行 A/B/C；源码摘要、
+模型/请求策略、生成、有效调用 cap、K 0、选中资产和持续计数总账与开发一致。
+确认不训练、不调用 proposal/Wiki、不进化。这里只记录协调者提供的安全汇总，不公开
+任务原文、私有评判条件或原始 judge 理由。
+q6 used a separate confirmation mode, workspace and manifest after development selection froze,
+with the same source/model/policy/generation/caps/K 0/selected assets and continuing ledger. It ran
+no training, proposal, Wiki or evolution. Only safe aggregate measurements are reported.
+
+| q6 arm | Final content | success | Healthy | Worker calls | Worker leaf | Corrections | Macro calls |
+| --- | ---: | --- | --- | ---: | ---: | ---: | ---: |
+| A: plain ReAct | 0.79 | false | true | 15 | 24 | 2 | 0 |
+| B: ReAct + K 0 | 0.86 | false | true | 18 | 28 | 2 | 2 |
+| C: ReAct + selected K 1 | 0.93 | false | true | 20 | 59 | 2 | 3 |
+
+| q6 arm | Worker tokens | Judge calls | Judge leaf | Judge tokens | Worker request seconds | Judge request seconds | Native task seconds |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| A | 148603 | 12 | 24 | 127466 | 96.8877 | 59.8884 | 156.9544 |
+| B | 209800 | 12 | 21 | 113927 | 143.6020 | 55.1612 | 199.0073 |
+| C | 327736 | 12 | 21 | 115370 | 151.0302 | 147.2371 | 298.6358 |
+
+独立单题 q6 中，C 内容分数较 A 高 0.14、较 B 高 0.07；A/B/C 均为健康最终评审，
+三组 native success 均 false，均使用 3 次原生交互/2 次纠错。C worker 调用、leaf、token
+均更高。因此只能表述为**这一道独立题的内容评分上升**，不能声称任务成功、
+效率提高或更广泛的质量/泛化改善。不能把 0.93 写成“93% 成功率”。
+On this one independent task, C's content score is 0.14 above A and 0.07 above B. All native success
+values remain false and all arms use three interactions/two corrections. C uses more worker calls,
+leaves and tokens. This supports **a content-score increase for this one independent task**,
+not task success, efficiency improvement or broader quality/generality. 0.93 is not a 93% success rate.
+
+确认新增 89 次 HTTP，全部 completed：worker 53/686139 tokens/387.9643请求秒，
+judge 36/356763 tokens/260.5556请求秒；没有 proposal/Wiki 模型请求。
+开发218 + 确认89 = benchmark 307 completed，unknown/submitted 为0；benchmark 总 tokens
+为3576229、请求耗时之和2052.1231秒。另有2次可用性探测，MiniMax总尝试为309；
+可用性 token 未在安全汇总中给出，不补0。旧GLM 335单列。请求耗时之和不是campaign墙钟耗时。
+Confirmation added 89 completed HTTP: worker 53/686139 tokens/387.9643 request seconds and
+judge 36/356763 tokens/260.5556 request seconds, with no proposal/Wiki model requests.
+Development 218+confirmation 89=307 completed benchmark requests,0 unknown/submitted,3576229 tokens
+and 2052.1231 summed request seconds. Two availability probes bring total MiniMax attempts to 309;
+their token total was not supplied and is not invented as zero. HistoricalGLM 335 remains separate.
+
+q6C 的原生 `task_time_s=298.6357932090759` 包含用户要求的暂停时间，仅保留为原始
+观测，不用于无暂停的性能比较。分角色请求耗时之和同样是实际记录的时长，不是 campaign
+墙钟时间，也不据此声称性能改善。
+q6C native `task_time_s=298.6357932090759` includes a user-requested suspension. It is retained as
+an observed field and is not clean performance wall time. Role request-duration sums remain observed
+durations rather than campaign wall time and do not support a performance-improvement claim.
+
+## 当前分发与最终准备 / Current distribution and final readiness
+
+当前源码 wheel `darwinagent-0.3.0-py3-none-any.whl` 为336825 bytes、123 members，SHA 256
+`9d3466ec0ef1d7d151d61cbaa57553b26443f426832896520b51cde543c9c32b`。
+构建检查确认私有产物未打包、配置凭据不在包中；Python 3.11现有验证环境在源码目录外
+导入site-packages，完成4个Episode、已结算重放、旧doctor/demo/resume/Wiki检查，0模型HTTP。
+The current-source wheel is 336825 bytes with 123 members and the hash above. Private artifacts and
+configured credentials are excluded. Its existing Python 3.11 verification environment imported
+site-packages outside the checkout and passed four episodes, settled replay and legacy checks,
+with zero model HTTP.
+
+真实测量与wheel安装验证已完成，sdist重建、分发清单同步、文档审查与需求审计仍待完成。
+机器记录的整体 `acceptance_complete:false` 保留这一准备状态；没有合并、推送、标签、
+上游消息或发布。后续分发清单由协调者在文档提交后更新。
+Real measurement and wheel installation checks are complete. Final sdist, distribution manifest,
+documentation review and requirement audit remain pending, so whole-goal acceptance is false.
+No merge, push, tag, upstream message or publication occurred. The coordinator updates the
+[distribution record](2026-10-09-agent-runtime-distributions.json) after this documentation commit.
+
+上述源码身份对应实测冻结快照，也包含当时测试夹具。补充原生契约检查初次为39项、
+38通过/1错误：手写 confirmation 夹具缺少已有的执行策略身份字段。`528d0e9` 仅修正
+`datasets/lift/tests/test_confirmation.py`，没有放宽生产校验；复测39/39通过、0跳过，
+8.598秒、0模型HTTP。原始失败日志保留，限定范围审查仍待完成。
+The measured source identity includes its then-current test fixtures. The initial supplemental
+native contract suite had39tests,38passes and one error caused by missing existing policy fields
+in a handcrafted confirmation fixture. Commit `528d0e9` changes only that test fixture, preserves
+production validation and passes39/39tests with0skips in8.598seconds and0modelHTTP. The original
+failure log is retained; scoped review remains pending.
+
+证明记录核对全部255个非测试源码路径字节不变，生产摘要为
+`bb83f6b8966d528a0706a59b05c0f6e68710060e2346011f2a671154b386f2bf`。
+包含修正夹具的当前集合摘要为
+`ec08e25355eef460262faa97a01756c4bb009612bd6a36cb0def795306a70ef0`；
+它不能替换 `97c6cbb` / `0bd50bf7...` 的实测身份。旧运行身份和实测分数未改，
+也没有宣称真实调用是在 `528d0e9` 上重新执行。
+The proof records all255non-test source paths unchanged with the production digest above. The
+fixture-corrected aggregate is `ec08e25355eef460262faa97a01756c4bb009612bd6a36cb0def795306a70ef0`;
+it does not replace the measured `97c6cbb`/`0bd50bf7...` identity. Original run identities and scores
+are retained; real model execution under `528d0e9` is not claimed.
+
+## 历史 GLM 与报告 / Historical GLM and reports
+
+历史 GLM 总账为 335/500：334 completed、1 unknown，007 仍暂停。HTTP 200 响应头不能证明
+完整流式回执；旧诊断不足以确定超时、流中断或本地保存错误中的哪一种原因。本轮新策略
+不能修复已丢失的历史异常，也不授权重试、放弃或清除旧暂停。最终安全汇总核对5436个
+历史文件，mismatches=0。MiniMax 新账本、2 次可用性和质量结果分别报告，不与旧 GLM 成绩拼接。
+
+Historical GLM remains 335/500 attempts, 334 completed and one unknown; run 007 stays paused.
+The cause of its incomplete receipt cannot be established retrospectively. The new policy does
+not resolve that request or authorize replay/abandonment. The final safe summary verifies 5436 historical files with 0 mismatches. MiniMax quality, its new ledger and the two availability probes remain separate.
+
+以下保存旧 26/100、`68a0084` 及更早源码的验收原文。旧段落中的“当前”“最终”和请求限制
+均指那个历史快照；不能用作 `97c6cbb`/MiniMax 的当前状态。JSON 同样保留旧对象的全部字段。
+The following is the preserved earlier 26/100 report. Its “current”, “final” and budget wording
+refers only to that historical snapshot, not to 97 c 6 cbb/MiniMax. The complete old JSON is retained.
+
+---
+
+# 通用 Agent 运行时验收 / Generic Agent runtime acceptance
+
 **0.3.0 本地准备、未发布；真实验收部分执行，现因单题预算暂停 / Prepared, unpublished; partial live acceptance paused at the task cap.**
 
 本报告记录 2026-10-09—10 隔离分支上的离线验收、两次协议失败与第三次预算暂停，未发布、推送、合并或创建标签。
