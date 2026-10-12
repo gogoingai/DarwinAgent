@@ -1,8 +1,8 @@
 {
   "version": "0.3.0",
-  "status": "real_minimax_measurements_and_package_checks_passed_final_audit_pending",
+  "status": "accepted_within_approved_local_runtime_minimax_measurement_and_unpublished_preparation_scope",
   "date": "2026-10-12",
-  "acceptance_complete": false,
+  "acceptance_complete": true,
   "public_release_verified": false,
   "scope": "local-native-task-adaptation-v1",
   "runtime_source_commit": "97c6cbb695384bdd4f0023d68f2baa0bdfd12dce",
@@ -1747,16 +1747,11 @@
       "final_update_scope": "docs_only; no source, budget, pause or model changes"
     }
   },
-  "pending_final_updates": [
-    "final documentation review and requirement audit",
-    "regenerate sdist and external distribution manifest after final documentation status"
-  ],
   "development": {
     "status": "complete",
     "evidence": "terminal local-minimax-v030-001/all-pair-report.json",
     "acceptance_complete": true,
     "acceptance_scope": "local_q5_A_B_C_execution_verification_only",
-    "global_goal_acceptance_complete": false,
     "quality_improvement_claim": false,
     "selection": {
       "base": "f15137ca68969436931ac0807172d748a393989d8debb22e206b8a52126792fa",
@@ -2052,7 +2047,6 @@
     "comparison_verification_complete": true
   },
   "measurement_complete": true,
-  "whole_goal_acceptance_complete": false,
   "accounting": {
     "benchmark_requests": 307,
     "availability_probes": 2,
@@ -2098,5 +2092,18 @@
     "measurement_identity_rewritten": false,
     "original_failure_log_unchanged": true,
     "scoped_review": "pass"
+  },
+  "acceptance_scope": "approved_local_generic_framework_real_minimax_q5_q6_verification_and_unpublished_package_preparation",
+  "scoped_documentation_review": {
+    "status": "pass",
+    "reviewed_commit": "c4b7726",
+    "final_readiness_diff_verification": "coordinator final packaging review"
+  },
+  "requirement_audit": {
+    "status": "pass",
+    "checks": 14,
+    "all_requirements_passed": true,
+    "scope": "approved_local_generic_framework_real_minimax_q5_q6_verification_and_unpublished_package_preparation",
+    "external_final_distribution_step": "regenerate archive and verify contents after readiness status commit"
   }
 }

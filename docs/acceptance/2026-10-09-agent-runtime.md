@@ -1,8 +1,8 @@
 # 通用 Agent 运行时验收 / Generic Agent runtime acceptance
 
-**MiniMax q5 与独立 q6 实测已完成，当前 wheel 源码外安装检查通过；sdist 打包检查通过；最终文档审查与需求审计待完成。0.3.0 仅为本地准备版本，未发布。**
+**MiniMax q5 与独立 q6 实测已完成，当前 wheel 源码外安装检查通过；sdist 打包检查、文档审查与14项需求审计通过，批准的本地验收范围已完成。0.3.0 仅为本地准备版本，未发布。**
 
-**MiniMax q5 and independent q6 measurements are complete; the current wheel passed installed checks outside the checkout. Sdist package checks passed; final documentation review and requirement audit are pending. 0.3.0 is prepared locally and unpublished.**
+**MiniMax q5 and independent q6 measurements are complete; the current wheel passed installed checks outside the checkout. Sdist checks, scoped documentation review and all 14 requirement checks passed; the approved local acceptance scope is complete. 0.3.0 is prepared locally and unpublished.**
 
 本页当前证据属于冻结提交 `97c6cbb695384bdd4f0023d68f2baa0bdfd12dce`，
 冻结测量源码身份摘要为 `0bd50bf7407d8274cd926e82c193d2e5825af84c54b6d28b5010e45f4122d10a`。
@@ -188,14 +188,18 @@ with zero model HTTP.
 
 真实测量、wheel安装验证与sdist打包检查已通过：sdist无私有产物/配置凭据，
 从sdist重建的wheel与已安装的 `9d3466ec...` wheel逐字节一致。此打包检查对应文档提交
-`5e069e0`；最终文档审查与需求审计待完成，协调者随后按最终文档重建sdist并更新外部分发清单。
-机器记录的整体 `acceptance_complete:false` 保留这一准备状态；没有合并、推送、标签、
+`5e069e0`；修正文档 `c4b7726` 的限定审查与14项需求审计已通过，批准的本地通用框架、
+真实MiniMax q5/q6验证及未发布打包准备完成。协调者随后按最终状态重建sdist、核对归档内容
+并更新外部分发清单。
+机器记录 `acceptance_complete:true` 仅限上述批准范围；没有合并、推送、标签、
 上游消息或发布。后续分发清单由协调者在文档提交后更新。
 Real measurement, wheel installation and sdist package checks passed. The audited sdist excludes
 private artifacts/configured credentials and rebuilds a wheel byte-identical to the installed
 `9d3466ec...` wheel. That package check uses documentation commit `5e069e0`. Final documentation
-review and requirement audit remain pending; the coordinator regenerates the sdist and external
-distribution record after final documentation status. Whole-goal acceptance remains false.
+review of `c4b7726` and all 14 requirement checks passed. Acceptance is complete within the approved
+local generic framework, real MiniMax q5/q6 verification and unpublished package-preparation scope.
+The coordinator regenerates and verifies final archive contents and updates the external distribution
+record after this readiness status. The final distribution step remains separate from scoped acceptance.
 No merge, push, tag, upstream message or publication occurred. The coordinator updates the
 [distribution record](2026-10-09-agent-runtime-distributions.json) after this documentation commit.
 

@@ -5,7 +5,8 @@
 Prepared, unpublished 0.3.0 at frozen source `97c6cbb`.
 The current MiniMax run is a LOCAL adaptation of pinned LIFT task execution and content judging.
 q5 and independent q6 A/B/C measurements are complete; the current wheel passed installed checks.
-Sdist package checks passed; final documentation review and requirement audit remain pending.
+Sdist checks, scoped documentation review and all 14 requirements passed. Acceptance is complete
+within the approved local generic framework, real MiniMax q5/q6 and unpublished package-preparation scope.
 The dated [record](../acceptance/2026-10-09-agent-runtime.md) separates measurements from history.
 
 ## Core checks and actual installed package
@@ -167,7 +168,7 @@ scores cannot replace final results. Development benchmark accounting is 218 com
 2533327 tokens and 1403.6033 summed request seconds; two MiniMax availability calls are separate.
 The report acceptance scope is q5 execution verification only, with quality_improvement_claim=false;
 independent q6 execution verification and package checks are complete, while final documentation
-review and requirement audit remain pending. Confirmation added 89 completed requests (worker 53, judge 36), 1042902 tokens and
+review and all 14 requirements passed within the approved local verification/preparation scope. Confirmation added 89 completed requests (worker 53, judge 36), 1042902 tokens and
 648.5198 summed request seconds. Cumulative benchmark 307 plus availability 2 equals 309 MiniMax
 attempts; benchmark tokens total 3576229. Historical GLM 335 remains separate.
 
@@ -184,6 +185,6 @@ route has no Docker/Langfuse/full container trace or independent trajectory-judg
 not full-container or full-benchmark reproduction. No merge, push, tag, release or upstream
 message occurred. Real measurements and wheel/sdist checks passed: the audited sdist excludes
 private artifacts/configured credentials and rebuilds a byte-identical installed wheel. The check
-uses documentation commit `5e069e0`; the coordinator regenerates the final archive after the
-remaining documentation review/audit. The installed wheel hash is
+uses documentation commit `5e069e0`; scoped review of `c4b7726` and all 14 requirements passed.
+The coordinator regenerates and verifies the final archive after this readiness status. The installed wheel hash is
 `9d3466ec0ef1d7d151d61cbaa57553b26443f426832896520b51cde543c9c32b`.

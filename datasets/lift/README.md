@@ -9,7 +9,8 @@ of pinned upstream task execution and native content judging. It is not complete
 reproduction, and the registration wrapper leaves upstream source untouched.
 
 冻结源码 `97c6cbb`，0.3.0 仅本地准备、未发布。q5 与独立 q6 三组实测已完成，
-当前wheel/源码外安装与sdist打包检查通过；最终文档审查和需求审计待补。详细实测与历史记录见
+当前wheel/源码外安装、sdist、限定文档审查和14项需求审计通过；批准的本地通用框架、
+真实MiniMax q5/q6验证及未发布打包准备范围内验收完成。详细实测与历史记录见
 [验收报告](../../docs/acceptance/2026-10-09-agent-runtime.md)，复现见
 [中文](../../docs/zh-CN/agent-runtime-reproduction.md) / [English](../../docs/en/agent-runtime-reproduction.md)。
 
@@ -145,5 +146,6 @@ Docker/Langfuse 验收。`requirements.lock` 是已解析环境版本清单，�
 当前源码 wheel 已通过现有 Python 3.11 环境的源码外安装检查，4 个 Episode、0 模型 HTTP；
 SHA 256 `9d3466ec0ef1d7d151d61cbaa57553b26443f426832896520b51cde543c9c32b`。
 sdist无私有产物/配置凭据，重建wheel与已安装wheel逐字节一致；打包检查对应文档提交
-`5e069e0`。最终文档评审与需求审计待补，协调者随后重建最终文档归档并同步外部分发清单；
+`5e069e0`。`c4b7726` 文档限定审查与14项需求审计通过；协调者随后按最终状态重建、
+核对归档内容并同步外部分发清单；
 没有推送、标签或发布。
