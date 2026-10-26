@@ -23,12 +23,46 @@ def scoped(name):
     return path
 
 
-def table(name):
+class TableError(ValueError):
+    """Fixed public diagnostic, independent of host paths and credentials."""
+
+    def __init__(self, code):
+        self.public_code = code
+        super().__init__(code)
+
+
+def table_reference(value):
+    if isinstance(value, str) and value:
+        return value, None
+    if isinstance(value, dict) and set(value) <= {"path", "sheet"}:
+        name, sheet = value.get("path"), value.get("sheet")
+        if isinstance(name, str) and name and (sheet is None or isinstance(sheet, str) and sheet):
+            return name, sheet
+    raise TableError("invalid_table_reference")
+
+
+def table(name, sheet=None):
+    return read_table_data(name, sheet)[0]
+
+
+def read_table_data(name, sheet=None):
+    name, sheet = table_reference({"path": name, "sheet": sheet})
     path = scoped(name)
+    try:
+        return _read_table_data(path, sheet)
+    except FileNotFoundError:
+        raise TableError("table_file_not_found") from None
+    except (zipfile.BadZipFile, ElementTree.ParseError, KeyError, StopIteration, IndexError):
+        raise TableError("invalid_workbook") from None
+
+
+def _read_table_data(path, sheet):
     if path.suffix.lower() == ".csv":
-        return list(csv.DictReader(io.StringIO(path.read_text())))
+        if sheet is not None:
+            raise TableError("table_sheet_not_supported")
+        return list(csv.DictReader(io.StringIO(path.read_text()))), []
     if path.suffix.lower() != ".xlsx":
-        raise ValueError("Only CSV and XLSX tables are supported")
+        raise TableError("unsupported_table_format")
     with zipfile.ZipFile(path) as z:
         strings = []
         if "xl/sharedStrings.xml" in z.namelist():
@@ -36,7 +70,13 @@ def table(name):
                 strings.append("".join(si.itertext()))
         book = ElementTree.fromstring(z.read("xl/workbook.xml"))
         sheets = book.find("s:sheets", NS)
-        relation = sheets[0].attrib[
+        if sheets is None or not len(sheets):
+            raise TableError("invalid_workbook")
+        names = [item.attrib["name"] for item in sheets]
+        if sheet is not None and sheet not in names:
+            raise TableError("table_sheet_not_found")
+        selected = sheets[0] if sheet is None else sheets[names.index(sheet)]
+        relation = selected.attrib[
             "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id"
         ]
         rels = ElementTree.fromstring(z.read("xl/_rels/workbook.xml.rels"))
@@ -54,7 +94,8 @@ def table(name):
                 kind = cell.attrib.get("t")
                 value = v.text if v is not None else None
                 if kind == "inlineStr":
-                    value = "".join(cell.find("s:is", NS).itertext())
+                    inline = cell.find("s:is", NS)
+                    value = "".join(inline.itertext()) if inline is not None else None
                 elif kind == "s" and value is not None:
                     value = strings[int(value)]
                 elif kind in (None, "n") and value is not None:
@@ -62,9 +103,9 @@ def table(name):
                 cells[column - 1] = value
             rows.append(cells)
         if not rows:
-            return []
+            return [], names
         headers = rows[0]
-        return [{str(v): row.get(i) for i, v in headers.items()} for row in rows[1:]]
+        return [{str(v): row.get(i) for i, v in headers.items()} for row in rows[1:]], names
 
 
 def quote(name):
@@ -77,12 +118,17 @@ def execute(name, params):
     if name == "read_text":
         return {"path": params["path"], "content": scoped(params["path"]).read_text()}
     if name == "read_table":
-        rows = table(params["path"])
-        return {"rows": rows, "row_count": len(rows), "sheet": "first"}
+        rows, sheets = read_table_data(params["path"], params.get("sheet"))
+        return {
+            "rows": rows,
+            "row_count": len(rows),
+            "sheet": params.get("sheet", "first"),
+            "sheets": sheets,
+        }
     if name == "transform_tables":
         with closing(sqlite3.connect(":memory:")) as db:
             for alias, filename in params["tables"].items():
-                rows = table(filename)
+                rows = table(*table_reference(filename))
                 if not rows:
                     raise ValueError("Empty input table")
                 headers = list(rows[0])

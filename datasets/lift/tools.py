@@ -85,12 +85,12 @@ class DockerTools:
             "list_files": ("List current task workspace files", {}, []),
             "read_text": ("Read a UTF-8 file", {"path": {"type": "string"}}, ["path"]),
             "read_table": (
-                "Read first XLSX sheet or CSV; date serials remain numeric",
-                {"path": {"type": "string"}},
+                "Read XLSX or CSV; optional sheet selects an XLSX sheet by name, omitted means first. Response lists available sheets; date serials remain numeric",
+                {"path": {"type": "string"}, "sheet": {"type": "string"}},
                 ["path"],
             ),
             "transform_tables": (
-                "Run read-only SQLite SELECT over named XLSX/CSV tables; tables maps aliases to paths; numeric text can be CAST, date serials use date(value + 2415018.5)",
+                "Run read-only SQLite SELECT over named XLSX/CSV tables; tables maps aliases to paths or objects {path, sheet} for a named XLSX sheet; numeric text can be CAST, date serials use date(value + 2415018.5)",
                 {
                     "tables": {"type": "object", "additionalProperties": True},
                     "sql": {"type": "string"},

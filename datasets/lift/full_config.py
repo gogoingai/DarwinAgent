@@ -16,13 +16,22 @@ from .full_data import FullLiftDataset
 def build_runner(config, run_id, *, shared=None):
     from src.lift.eval import task_exec
 
-    from .full_agents import full_initial_kernel
+    from .full_resources import prepare_resources, verify_injected_resources
+    from .task_budget import TaskExecutionPolicy
+
+    owned_guard = None
+
+    task_policy = (
+        TaskExecutionPolicy.from_declaration(config["task_execution_policy"])
+        if "task_execution_policy" in config
+        else None
+    )
 
     for key, expected in dict(
         model="MiniMax-M3.1-Flash-Preview",
         base_url="https://api.minimax.cn/v1",
         temperature=0,
-        correction_rounds=30,
+        correction_rounds=task_policy.correction_rounds if task_policy else 30,
         max_tokens=16384,
         worker_limit=None,
         http_cap=None,
@@ -66,15 +75,35 @@ def build_runner(config, run_id, *, shared=None):
                 Path(task_exec.__file__).parents[2],
             ]
         )
-        shared = FullSharedTransport(
-            LLMClient(cfg),
-            budget / "shared",
-            worker_limit=None,
-            enroll_role=True,
-            experiment_identity=dict(
-                run_id=run_id, source_sha256=digest(source), config_sha256=digest(config)
-            ),
-        )
+        client = LLMClient(cfg)
+        owned_guard = prepare_resources(config, client)
+        try:
+            shared = FullSharedTransport(
+                client,
+                budget / "shared",
+                worker_limit=None,
+                enroll_role=True,
+                experiment_identity=dict(
+                    run_id=run_id, source_sha256=digest(source), config_sha256=digest(config)
+                ),
+            )
+        except BaseException:
+            if owned_guard is not None:
+                owned_guard.close()
+            raise
+    else:
+        verify_injected_resources(config, shared.client)
+    try:
+        return _finish_runner(config, run_id, shared, task_policy)
+    except BaseException:
+        if owned_guard is not None:
+            owned_guard.close()
+        raise
+
+
+def _finish_runner(config, run_id, shared, task_policy):
+    from .full_agents import full_initial_kernel
+
     root = Path(config["run_root"]).resolve()
     initial = (
         AgentKernelBundle(root / "K0")
@@ -89,4 +118,5 @@ def build_runner(config, run_id, *, shared=None):
         run_id=run_id,
         rounds=config.get("rounds", 1),
         scenes=config.get("scenes"),
+        task_policy=task_policy,
     )

@@ -9,7 +9,7 @@ from pathlib import Path
 
 from openai import APIStatusError
 
-from darwinagent.llm.client import BudgetExceeded
+from darwinagent.llm.client import BudgetExceeded, ResourceBudgetExceeded, check_resource_budget
 from darwinagent.runtime.artifacts import atomic_json, digest
 from darwinagent.runtime.budgets import counter_transaction
 from darwinagent.runtime.diagnostics import exception_evidence
@@ -18,6 +18,21 @@ from darwinagent.runtime.leases import execution_lease
 
 
 class SharedTransport:
+    def campaign_lease(self):
+        from .scheduling import campaign_lease
+
+        return campaign_lease(self.root)
+
+    def recover_settled_inflight_pause(self, **evidence):
+        from .scheduling import recover_settled_inflight
+
+        return recover_settled_inflight(self, **evidence)
+
+    def settled_inflight_acknowledged(self, path):
+        from .scheduling import settled_inflight_acknowledged
+
+        return settled_inflight_acknowledged(self, path)
+
     def __init__(self, client, root, worker_limit=8):
         self.client, self.root, self.worker_limit = client, Path(root), worker_limit
         self.cfg = client.cfg
@@ -298,16 +313,36 @@ class SharedTransport:
             return audit
 
     def check(self):
+        with self.campaign_lease():
+            result = self._check_gate()
+            check_resource_budget(self.client)
+            return result
+
+    def _check_gate(self):
+        from darwinagent.runtime.model_disposition import ModelDispositionStore
+
+        dispositions = ModelDispositionStore(self.root)
         if (self.root / "worker-limit-amendment.json").exists() and self.worker_limit != 16:
             raise BudgetExceeded("Recreate transport with explicitly amended cumulative worker16")
         if (self.root / "http-cap-amendment.json").exists() and self.cfg.max_http_requests != 500:
             raise BudgetExceeded("Recreate transport with the explicitly amended total HTTP cap")
         active = self.root / "active-pause.json"
         path = active if active.exists() else self.root / "pause.json"
+        actual_worker_attempts = {}
         for request in (self.root / "requests").glob("*.json"):
-            if json.loads(request.read_text())["status"] in {"submitted", "unknown"}:
+            saved = json.loads(request.read_text())
+            status = saved["status"]
+            if saved.get("session_role", saved.get("role")) == "worker":
+                sid = saved.get("session")
+                actual_worker_attempts[sid] = actual_worker_attempts.get(sid, 0) + saved.get(
+                    "actual_http_attempts", 0
+                )
+            if status == "unknown" and dispositions.acknowledged(request):
+                continue
+            if status in {"submitted", "unknown"}:
                 self.pause("unknown")
                 raise BudgetExceeded("Native scheduling paused: unknown", dispatched=True)
+        self._actual_worker_attempts = actual_worker_attempts
         recovered = self.root / "recovery" / "local-cap.json"
         acknowledged = (
             recovered.exists()
@@ -316,6 +351,8 @@ class SharedTransport:
             and json.loads(recovered.read_text())["pause_sha256"]
             == hashlib.sha256(path.read_bytes()).hexdigest()
         )
+        acknowledged = acknowledged or self.settled_inflight_acknowledged(path)
+        acknowledged = acknowledged or dispositions.pause_acknowledged(path)
         if path.exists() and not acknowledged:
             raise BudgetExceeded(
                 "Native scheduling paused: " + json.loads(path.read_text())["status"]
@@ -330,7 +367,9 @@ class SharedTransport:
     def pause(self, status):
         # The amendment permanently binds historical pause bytes. Later gates
         # live separately and cannot be acknowledged by that old recovery.
-        historical = self.cap_amendment and self.cap_amendment.get("original_pause_sha256")
+        historical = (self.cap_amendment and self.cap_amendment.get("original_pause_sha256")) or (
+            self.root / "recovery/settled-inflight.json"
+        ).exists()
         path = self.root / ("active-pause.json" if historical else "pause.json")
         if not path.exists() or (
             not historical and (self.root / "recovery" / "local-cap.json").exists()
@@ -425,6 +464,14 @@ class SessionTransport:
         self.cfg = shared.cfg
 
     async def chat(self, **kwargs):
+        with self.shared.campaign_lease():
+            return await self._chat(kwargs)
+
+    def _check_resources(self):
+        check_resource_budget(self.shared.client)
+
+    async def _chat(self, kwargs):
+        self._check_resources()
         self.shared.check()
         if (
             self.role == "worker"
@@ -448,6 +495,7 @@ class SessionTransport:
             "session": self.session,
             "run_id": self.shared.run_id,
             "role": kwargs.get("role", self.role),
+            "session_role": self.role,
             "namespace": kwargs.get("namespace"),
             "status": "submitted",
             "started": time.time(),
@@ -459,7 +507,7 @@ class SessionTransport:
         if self.cfg.provider_request_policy != "generic":
             record["provider_request_policy"] = self.cfg.provider_request_policy
             record["generation_parameter"] = "max_completion_tokens"
-        atomic_json(path, record)
+        self._persist_receipt(path, record)
         before_http = self.shared.client.http_attempts()
         try:
             response = await self.shared.client.chat(**effective)
@@ -475,7 +523,8 @@ class SessionTransport:
         except BudgetExceeded as exc:
             record["diagnostics"] = exception_evidence(exc)
             record["status"] = "unknown" if exc.dispatched else "budget_exhausted"
-            self.shared.pause(record["status"])
+            if not isinstance(exc, ResourceBudgetExceeded) or exc.dispatched:
+                self.shared.pause(record["status"])
             raise
         except APIStatusError as exc:
             record["diagnostics"] = exception_evidence(exc)
@@ -496,7 +545,7 @@ class SessionTransport:
         finally:
             record["finished"] = time.time()
             record["actual_http_attempts"] = self.shared.client.http_attempts() - before_http
-            atomic_json(path, record)
+            self._persist_receipt(path, record)
             if self.shared.trace and self.role not in {"worker", "judge"}:
                 from .tracing import emit_model_role
 
@@ -508,6 +557,13 @@ class SessionTransport:
                         {"request": call_id, "error_type": type(exc).__name__},
                     )
                     self.shared.pause("trace_incomplete")
+
+    def _persist_receipt(self, path, record):
+        guard = getattr(self.shared.client, "resource_guard", None)
+        if guard is None:
+            atomic_json(path, record)
+        else:
+            guard.persist_json(path, record, writer=atomic_json)
 
     async def aclose(self):
         # Campaign factories close role views; the coordinator owns the shared transport.

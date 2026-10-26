@@ -55,11 +55,12 @@ def token_count(usage):
 
 
 def turn_totals(root, index, turn):
+    from darwinagent.runtime.steps import StepJournal
+
     episode = turn.get("episode")
-    steps = [
-        json.loads(p.read_text())
-        for p in sorted((root / "episodes" / ("turn-" + str(index)) / "steps").glob("[0-9]*.json"))
-    ]
+    step_root = root / "episodes" / ("turn-" + str(index)) / "steps"
+    journal = StepJournal(step_root, create_root=False)
+    steps = [journal.read_active(p)[1] for p in sorted(step_root.glob("[0-9]*.json"))]
     models = [s for s in steps if s["kind"] == "model"]
     events = [e for e in episode["events"] if e["kind"] == "model"] if episode else []
     if steps:

@@ -912,12 +912,21 @@ async def run_and_close(runner):
         failure = exc
         raise
     finally:
+        errors = []
         try:
             await runner.shared.client.aclose()
-        except Exception as exc:
-            if failure is None:
-                raise
-            failure.add_note("Client cleanup failed: " + type(exc).__name__)
+        except BaseException as exc:
+            errors.append(("Client", exc))
+        guard = getattr(runner.shared.client, "resource_guard", None)
+        if guard is not None:
+            try:
+                guard.close()
+            except BaseException as exc:
+                errors.append(("Resource", exc))
+        if failure is None and errors:
+            raise errors[0][1]
+        for kind, exc in errors:
+            failure.add_note(kind + " cleanup failed: " + type(exc).__name__)
 
 
 def main():

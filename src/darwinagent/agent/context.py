@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import inspect
 import json
+from functools import partial
 from string import Template
 
 import yaml
@@ -17,7 +18,7 @@ from darwinagent.runtime.journal_client import JournalClient
 from darwinagent.runtime.steps import UnknownRequest
 
 from .contracts import EpisodeResult
-from .failures import ToolFailure
+from .failures import MacroFailure, ToolFailure, ToolRejectedBeforeEffect
 from .graph import project
 from .interpreter import AsyncInterpreter
 
@@ -28,6 +29,24 @@ class CheckRejected(ValueError):
 
 class EpisodeBudgetExceeded(RuntimeError):
     agent_signal = True
+
+
+class _MacroCapabilityFailure(RuntimeError):
+    """Carry host/capability errors through the interpreter without relabeling them."""
+
+    agent_signal = True
+
+    def __init__(self, original):
+        self.original = original
+        super().__init__("Macro capability failed")
+
+
+async def _macro_capability(handler, *args, **kwargs):
+    try:
+        value = handler(*args, **kwargs)
+        return await value if inspect.isawaitable(value) else value
+    except Exception as exc:
+        raise _MacroCapabilityFailure(exc) from None
 
 
 class AgentContext:
@@ -94,6 +113,28 @@ class AgentContext:
         )
         if limit is not None and used >= limit:
             raise EpisodeBudgetExceeded(f"{kind} budget exhausted: {used}/{limit}")
+
+    def execution_budget(self):
+        """Public per-episode limits at the current durable replay position.
+
+        Future saved steps are excluded, so replay reproduces each original
+        snapshot. Tool counts are expanded primitives, including known failures.
+        This is not the shared HTTP/model accounting ledger.
+        """
+        used = {"model": 0, "tool": 0}
+        for index in range(self.journal.position):
+            row = json.loads((self.journal.root / f"{index:06d}.json").read_text())
+            if row["kind"] in used:
+                used[row["kind"]] += 1
+        limits = {"model": self.profile.max_model_calls, "tool": self.profile.max_leaf_calls}
+        return {
+            kind: {
+                "used": used[kind],
+                "limit": limit,
+                "remaining": None if limit is None else max(0, limit - used[kind]),
+            }
+            for kind, limit in limits.items()
+        }
 
     def tool_descriptions(self):
         return [spec.declaration() for spec in self.tools.values()] + [
@@ -180,6 +221,9 @@ class AgentContext:
             "namespace": "agent_worker",
             "use_cache": False,
         }
+        prepare = getattr(self.client, "prepare_journal_request", None)
+        if prepare is not None:
+            payload = prepare(self.journal, payload)
         self._budget("model", payload, self.profile.max_model_calls)
         result = await self.client.chat(**payload)
         self._event(
@@ -199,18 +243,58 @@ class AgentContext:
             a, fn = self.functions[name]
             validate_value(params, a.input_contract)
             self.check("before_action", {"name": name, "params": plain(params), "effect": "macro"})
+            first_step = self.journal.position
             self._macro_depth += 1
             try:
                 try:
                     async with asyncio.timeout(self.limits.timeout_s):
                         result = await AsyncInterpreter(
-                            fn, {"call": self._leaf_call, "view": self.view}, self.limits
+                            fn,
+                            {
+                                "call": partial(_macro_capability, self._leaf_call),
+                                "view": partial(_macro_capability, self.view),
+                            },
+                            self.limits,
                         ).execute(params)
                 except TimeoutError:
                     if self.usage()["unknown_calls"]:
                         raise UnknownRequest("Macro timeout left an unreceipted call") from None
                     raise EpisodeBudgetExceeded("Macro time budget exhausted") from None
                 validate_value(result, a.output_contract)
+            except _MacroCapabilityFailure as exc:
+                raise exc.original from None
+            except SandboxError as exc:
+                # A restricted-program error cannot settle an interrupted primitive.
+                if self.usage()["unknown_calls"]:
+                    raise UnknownRequest("Macro failure left an unreceipted call") from None
+                code = {
+                    "Result byte limit exceeded": "result_byte_limit",
+                    "Restricted execution time budget exhausted": "execution_time_limit",
+                    "Restricted execution budget exhausted": "execution_budget_limit",
+                }.get(str(exc), "restricted_execution_failed")
+                failure = MacroFailure(
+                    name,
+                    "SandboxError",
+                    f"{name} failed ({code}). Completed primitive receipts are retained; "
+                    "inspect prior observations and use smaller batches or primitive tools. "
+                    "Do not repeat completed writes.",
+                )
+                receipts = []
+                for index in range(first_step, self.journal.position):
+                    path = self.journal.root / f"{index:06d}.json"
+                    row = json.loads(path.read_text())
+                    if row["kind"] == "tool" and row["state"] == "responded":
+                        receipts.append(path.name)
+                failure.completed_receipts = tuple(receipts)
+                failure.error_code = code
+                self._event(
+                    "macro_failure",
+                    name=name,
+                    failure=failure.to_dict(),
+                    error_code=code,
+                    completed_receipts=receipts,
+                )
+                raise failure from None
             finally:
                 self._macro_depth -= 1
             self._event("macro", name=name, params=plain(params), output=plain(result))
@@ -255,7 +339,13 @@ class AgentContext:
                 raise
             except Exception as exc:
                 # A write may have completed before its callback raised. Retain submitted state.
-                if spec.effect == "write":
+                rejected_before_effect = (
+                    isinstance(exc, ToolRejectedBeforeEffect)
+                    and len(exc.args) == 1
+                    and type(exc.args[0]) is str
+                    and exc.args[0] in exc.public_codes
+                )
+                if spec.effect == "write" and not rejected_before_effect:
                     raise UnknownRequest(
                         f"Write has no receipt at {path}: {type(exc).__name__}"
                     ) from None
@@ -282,7 +372,9 @@ class AgentContext:
         return result
 
     def usage(self):
-        rows = [json.loads(p.read_text()) for p in sorted(self.journal.root.glob("[0-9]*.json"))]
+        rows = [
+            self.journal.read_active(p)[1] for p in sorted(self.journal.root.glob("[0-9]*.json"))
+        ]
         models = [r for r in rows if r["kind"] == "model"]
         tools = [r for r in rows if r["kind"] == "tool"]
         return {

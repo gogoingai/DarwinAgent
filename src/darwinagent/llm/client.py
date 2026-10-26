@@ -18,6 +18,8 @@ from openai import APIConnectionError, APIError, APIStatusError, APITimeoutError
 from ..config import Config
 from ..runtime.artifacts import atomic_json
 from ..runtime.budgets import counter_transaction
+from ..runtime.diagnostics import exception_evidence
+from ..runtime.resources import ResourceLimit
 from .registry import REGISTRY_VERSION, request_policy, resolve
 
 
@@ -25,6 +27,19 @@ class BudgetExceeded(RuntimeError):
     def __init__(self, message, *, dispatched=False):
         super().__init__(message)
         self.dispatched = dispatched
+
+
+class ResourceBudgetExceeded(BudgetExceeded):
+    """Known pre-dispatch resource stop; resume after resources are restored."""
+
+
+def check_resource_budget(client):
+    guard = getattr(client, "resource_guard", None)
+    if guard is not None:
+        try:
+            guard.check()
+        except ResourceLimit as exc:
+            raise ResourceBudgetExceeded(str(exc)) from exc
 
 
 class EmptyCompletion(RuntimeError):
@@ -120,6 +135,7 @@ class LLMClient:
     async def _reserve_http_attempt(self, request):
         # Reserve immediately before HTTP dispatch, including retries; crash-safe and
         # shared across all role clients. No prompts or credentials enter this file.
+        check_resource_budget(self)
         if (
             self.cfg.deadline_monotonic is not None
             and time.monotonic() >= self.cfg.deadline_monotonic
@@ -177,6 +193,13 @@ class LLMClient:
                 continue
             seen.add(id(current))
             pending.extend(e for e in (current.__cause__, current.__context__) if e is not None)
+            # Preserve only a fixed category before erasing the SDK body.
+            category = exception_evidence(current).get("provider_error_category")
+            if category is not None:
+                current.transport_diagnostics = dict(
+                    getattr(current, "transport_diagnostics", {}),
+                    provider_error_category=category,
+                )
             classification = type(current).__name__ + ": [redacted]"
             status = getattr(current, "status_code", None)
             if type(status) is int:

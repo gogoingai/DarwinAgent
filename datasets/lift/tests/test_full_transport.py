@@ -9,38 +9,15 @@ from darwinagent.llm.client import BudgetExceeded
 from darwinagent.runtime.artifacts import atomic_json
 from datasets.lift.full_transport import AMENDMENT, FullSharedTransport
 from datasets.lift.transport import SessionTransport, SharedTransport
-from tests.support.full_lift_transport import FakeLLMClient
+from tests.support.full_lift_transport import FakeLLMClient, FullTransportFixture
 
 
 class FullTransportTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
-        self.root = Path(self.temp.name)
-        self.shared_root = self.root / "shared"
-        self.old = FakeLLMClient(self.root)
-        SharedTransport(self.old, self.shared_root, worker_limit=None)
-        atomic_json(self.root / "http-attempts.json", {"attempts": 307})
-        atomic_json(
-            self.shared_root / "requests/original.json",
-            {
-                "status": "completed",
-                "actual_http_attempts": 307,
-                "session": "historic-judge",
-                "run_id": "original-run",
-                "role": "judge",
-                "output": "old evidence",
-            },
-        )
-        atomic_json(self.shared_root / "worker-calls.json", {"historic-worker": 8})
-        self.identity = {
-            "run_id": "fresh-full",
-            "source_sha256": "a" * 64,
-            "config_sha256": "b" * 64,
-        }
-        self.client = FakeLLMClient(self.root, full=True)
-        self.original_bytes = (self.shared_root / "policy.json").read_bytes()
-        self.receipt_bytes = (self.shared_root / "requests/original.json").read_bytes()
+        fixture = FullTransportFixture(Path(self.temp.name))
+        self.__dict__.update(fixture.__dict__)
 
     def full(self, *, enroll=True, client=None, identity=None):
         return FullSharedTransport(

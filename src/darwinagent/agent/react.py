@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 
 from darwinagent.contracts import plain
 from darwinagent.kernel.spec import validate_value
+from darwinagent.runtime.artifacts import digest
 
 from .context import CheckRejected
 from .failures import ToolFailure
@@ -24,6 +25,14 @@ _ACTION_PROTOCOL = (
     "Other artifact objects follow the host artifact contract; no universal metadata field "
     "is required. Do not repeat a completed write just to correct the final response format."
 )
+
+
+def invalid_reply_excerpt(content, cap):
+    """Deterministic working-context projection; raw model receipts stay intact."""
+    if type(cap) is not int or cap <= 0:
+        raise ValueError("Invalid reply projection cap")
+    notice = "[Invalid reply excerpt; the complete reply remains in its raw receipt.]\n"
+    return (notice + content[: max(0, cap - len(notice))])[:cap]
 
 
 class ActionProtocolError(ValueError):
@@ -92,13 +101,15 @@ async def _run_batch(context, actions):
     return {"actions": observations, "stopped": False, "unexecuted_actions": 0}
 
 
-def _current_view(messages, previous, task, context):
+def _current_view(messages, previous, task, context, *, include_budget=False):
     """Replace only our structured snapshot; observations and raw context stay intact."""
     if previous is not None:
         payload = json.loads(messages[previous]["content"])
         payload.pop("view")
         messages[previous]["content"] = json.dumps(payload, ensure_ascii=False)
     view = context.view()
+    if include_budget:
+        view = dict(view, execution_budget=context.execution_budget())
     # The raw no-schema view repeats the exact task already supplied once. A
     # schema's materialized fields are semantic state and must never be trimmed.
     if view.get("task") == task.to_dict():
@@ -112,11 +123,16 @@ def _current_view(messages, previous, task, context):
 
 @dataclass(frozen=True)
 class ReActAgent:
+    # Opt-in subclasses bind this flag in their adapter identity; legacy defaults stay unchanged.
+    expose_execution_budget = False
+
     max_turns: int | None = 16
     role: str = "worker"
     system_prompt: str = _ACTION_PROTOCOL
     max_tokens: int | None = None
     view_layout: str = field(default="latest-view-v1", init=False)
+    max_protocol_failures: int | None = field(default=None, kw_only=True)
+    invalid_reply_context_chars: int | None = field(default=None, kw_only=True)
 
     def __post_init__(self):
         if self.max_turns is not None and (type(self.max_turns) is not int or self.max_turns <= 0):
@@ -125,6 +141,15 @@ class ReActAgent:
             type(self.max_tokens) is not int or self.max_tokens <= 0
         ):
             raise ValueError("max_tokens must be a positive integer or None")
+        if self.max_protocol_failures is not None and (
+            type(self.max_protocol_failures) is not int or self.max_protocol_failures <= 0
+        ):
+            raise ValueError("max_protocol_failures must be a positive integer or None")
+        if self.invalid_reply_context_chars is not None and (
+            type(self.invalid_reply_context_chars) is not int
+            or self.invalid_reply_context_chars <= 0
+        ):
+            raise ValueError("invalid_reply_context_chars must be a positive integer or None")
 
     async def run(self, task, context):
         messages = [
@@ -142,8 +167,11 @@ class ReActAgent:
             },
         ]
         view_position = None
+        protocol_failures = 0
         for _ in itertools.count() if self.max_turns is None else range(self.max_turns):
-            view_position = _current_view(messages, view_position, task, context)
+            view_position = _current_view(
+                messages, view_position, task, context, include_budget=self.expose_execution_budget
+            )
             generation = {} if self.max_tokens is None else {"max_tokens": self.max_tokens}
             response = await context.model(messages, role=self.role, json_mode=True, **generation)
             messages.append({"role": "assistant", "content": response.content})
@@ -152,7 +180,32 @@ class ReActAgent:
                 _validate_action(action)
                 if "actions" in action:
                     _validate_batch(context, action["actions"])
+                elif "tool" in action:
+                    _validate_batch(context, [action])
             except (json.JSONDecodeError, ActionProtocolError) as exc:
+                protocol_failures += 1
+                if (
+                    self.max_protocol_failures is not None
+                    and protocol_failures >= self.max_protocol_failures
+                ):
+                    return context.result(
+                        "Consecutive action protocol failures reached the configured limit.",
+                        status="failed",
+                    )
+                if self.invalid_reply_context_chars is not None:
+                    cap = self.invalid_reply_context_chars
+                    projected = invalid_reply_excerpt(response.content, cap)
+                    context._event(
+                        "context_projection",
+                        projection="invalid_reply_excerpt_v1",
+                        source_model_index=context.events[-1]["index"],
+                        original_digest=digest(response.content),
+                        message_index=len(messages) - 1,
+                        cap=cap,
+                        projected_content=projected,
+                        error_type=type(exc).__name__,
+                    )
+                    messages[-1]["content"] = projected
                 messages.append(
                     {
                         "role": "user",
@@ -175,6 +228,7 @@ class ReActAgent:
                     }
                 )
                 continue
+            protocol_failures = 0
             try:
                 if "final_response" in action:
                     result = context.result(

@@ -27,7 +27,7 @@ class NativeReAct(ReActAgent):
     worker_turn_model_cap: int | None = 8
 
     def identity(self):
-        return {
+        configuration = {
             "runtime": "darwinagent",
             "max_turns": self.max_turns,
             "role": self.role,
@@ -38,6 +38,11 @@ class NativeReAct(ReActAgent):
             "view_layout": self.view_layout,
             "native_correction_rounds": 3,
         }
+        if self.max_protocol_failures is not None:
+            configuration["max_protocol_failures"] = self.max_protocol_failures
+        if self.invalid_reply_context_chars is not None:
+            configuration["invalid_reply_context_chars"] = self.invalid_reply_context_chars
+        return configuration
 
 
 class LocalTaskFailure(RuntimeError):
@@ -212,10 +217,9 @@ class DarwinChatAgent(ChatAgent):
         return result.final_response
 
     def episodes(self):
-        path = self.root / "chat.json"
-        return (
-            [r["episode"] for r in json.loads(path.read_text())["turns"]] if path.exists() else []
-        )
+        from .turn_evidence import recorded_turns
+
+        return [r["episode"] for r in recorded_turns(self.root)]
 
     def count_tools(self):
         return sum(r["usage"]["leaf_calls"] for r in self.episodes())

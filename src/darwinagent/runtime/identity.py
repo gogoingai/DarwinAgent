@@ -67,6 +67,11 @@ def transport_identity(client):
     result["credential_identity"] = digest(
         [getattr(cfg, "api_key", ""), getattr(cfg, "fast_api_key", "")]
     )
+    projection = getattr(client, "request_projection_identity", None)
+    if callable(projection):
+        declaration = projection()
+        if declaration is not None:
+            result["request_projection"] = declaration
     # 注册表结构版本：模型参数/站点语义变化时随之失效（函数内导入避免环）
     from ..llm.registry import REGISTRY_VERSION
 

@@ -18,7 +18,133 @@ from tests.support.full_lift_data import full_lift_fixture
 
 
 class FullControllerTests(unittest.IsolatedAsyncioTestCase):
-    def fixture(self, root, **kwargs):
+    async def test_all_q5_arms_precede_any_q6_and_q5_fault_keeps_q6_unseen(self):
+        import datasets.lift.full as full_module
+
+        for fail_q5 in [False, True]:
+            with self.subTest(fail_q5=fail_q5), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp).resolve()
+                original, client = self.fixture(root)
+                runner = FullLocalRunner(
+                    dataset=original.dataset,
+                    shared=original.shared,
+                    root=root / "two-scenes",
+                    initial=original.initial,
+                    run_id="two-scenes",
+                    scenes=original.dataset.scenes[:2],
+                )
+                q5 = {runner.dataset.task_ids(s, "test")[0] for s in runner.scenes}
+                q6 = {runner.dataset.task_ids(s, "test")[1] for s in runner.scenes}
+                order = []
+                execute = full_module.execute_episode
+                stage = runner.dataset.stage
+                failed = False
+
+                async def observe(
+                    owner, task, kernel, arm, phase, *, _order=order, _execute=execute
+                ):
+                    if phase == "holdout":
+                        _order.append(task.id)
+                    return await _execute(owner, task, kernel, arm, phase)
+
+                def stage_or_fail(task, workspace, *, _fail=fail_q5, _q5=q5, _stage=stage):
+                    nonlocal failed
+                    if _fail and task.id in _q5 and not failed:
+                        failed = True
+                        raise ValueError("synthetic q5 setup failure")
+                    return _stage(task, workspace)
+
+                with (
+                    patch.object(full_module, "execute_episode", side_effect=observe),
+                    patch.object(runner.dataset, "stage", side_effect=stage_or_fail),
+                ):
+                    result = await runner.run()
+                self.assertEqual(sum(t in q5 for t in order), 6)
+                if fail_q5:
+                    self.assertFalse(any(t in q6 for t in order))
+                    self.assertFalse(result["q6_confirmation_ready"])
+                    self.assertFalse(result["coverage_complete"])
+                else:
+                    self.assertEqual(sum(t in q6 for t in order), 6)
+                    self.assertLess(
+                        max(i for i, t in enumerate(order) if t in q5),
+                        min(i for i, t in enumerate(order) if t in q6),
+                    )
+                    self.assertTrue(result["q6_confirmation_ready"])
+
+    async def test_controlled_policy_keeps_native_scoring_and_complete_trajectory(self):
+        from datasets.lift.task_budget import TaskExecutionPolicy
+        from datasets.lift.task_control import TaskControlPolicy
+
+        with tempfile.TemporaryDirectory() as tmp:
+            runner, client = self.fixture(
+                Path(tmp), task_policy=TaskExecutionPolicy(3, 24, control=TaskControlPolicy())
+            )
+            result = await runner.run()
+            self.assertTrue(result["coverage_complete"])
+            self.assertTrue(result["evaluation_healthy"])
+            self.assertEqual(runner.identity()["task_execution_policy"]["kind"], "bounded-task-v2")
+            workers = [r for r in client.requests if r["role"] == "worker"]
+            self.assertTrue(workers)
+            for request in workers:
+                snapshot = json.loads(request["messages"][-1]["content"])["execution_control"]
+                self.assertEqual(snapshot["task_model"]["limit"], 24)
+                self.assertEqual(snapshot["policy"]["retrieval_limit"], 12)
+
+    async def test_completed_content_failures_reach_evolution_without_validation_feedback(self):
+        from datasets.lift.task_budget import TaskExecutionPolicy
+        from datasets.lift.task_control import TaskControlPolicy
+
+        with tempfile.TemporaryDirectory() as tmp:
+            runner, client = self.fixture(
+                Path(tmp),
+                thirty=True,
+                task_policy=TaskExecutionPolicy(3, 24, control=TaskControlPolicy()),
+            )
+            original_chat = client.chat
+
+            async def distinguish_feedback(**kwargs):
+                reply = await original_chat(**kwargs)
+                if kwargs["role"] == "judge":
+                    body = json.loads(reply.content)
+                    if "final_response" in body:
+                        task = json.loads(kwargs["messages"][1]["content"])["task"]["id"]
+                        result = json.loads(body["final_response"])
+                        result["reason"] = (
+                            "PRIVATE_VALIDATION_FAILURE"
+                            if task.endswith("-q4")
+                            else "PUBLIC_TRAINING_FAILURE"
+                        )
+                        body["final_response"] = json.dumps(result)
+                        reply.content = json.dumps(body)
+                return reply
+
+            with (
+                patch.object(client, "chat", side_effect=distinguish_feedback),
+                patch("socket.socket.connect", side_effect=AssertionError("offline only")),
+            ):
+                selected = await runner.evolve(runner.scenes[0])
+            rows = [
+                json.loads(path.read_text())["row"]
+                for path in (runner.root / "episodes").glob("*/receipt.json")
+            ]
+            self.assertTrue(rows)
+            self.assertTrue(all(row["healthy"] for row in rows))
+            self.assertTrue(all(not row["native"]["success"] for row in rows))
+            learning = [
+                r
+                for r in client.requests
+                if r["role"] not in {"worker", "judge", "trajectory_judge"}
+            ]
+            self.assertTrue(any(r["role"] == "proposal" for r in learning))
+            payload = json.dumps(learning)
+            self.assertIn("PUBLIC_TRAINING_FAILURE", payload)
+            for private in ("PRIVATE_VALIDATION_FAILURE", "GOLD_CONTENT", "GOLD_TRAJECTORY"):
+                self.assertNotIn(private, payload)
+            self.assertEqual(selected.content_id, runner.initial.content_id)
+            self.assertEqual(client.http_attempts(), 0)
+
+    def fixture(self, root, *, task_policy=None, resource_guard=None, **kwargs):
         root = root.resolve()
         os.environ["PYTHON_DOTENV_DISABLED"] = "1"
         from datasets.lift.full_agents import full_initial_kernel
@@ -34,7 +160,10 @@ class FullControllerTests(unittest.IsolatedAsyncioTestCase):
         )
         cfg.role_tiers.update(worker="strong", judge="strong", trajectory_judge="strong")
         client = RecordedFullClient(cfg, **kwargs)
+        if resource_guard is not None:
+            client.resource_guard = resource_guard
         shared = SharedTransport(client, root / "budget", worker_limit=None)
+        shared.generation_max_tokens = 16384
         initial = full_initial_kernel(root / "run" / "K0")
         client.initial = initial
         runner = FullLocalRunner(
@@ -44,8 +173,155 @@ class FullControllerTests(unittest.IsolatedAsyncioTestCase):
             initial=initial,
             run_id="synthetic-full",
             scenes=(dataset.scenes[0],),
+            task_policy=task_policy,
         )
         return runner, client
+
+    async def test_resource_pressure_leaves_unstarted_cells_and_can_resume(self):
+        from darwinagent.llm.client import ResourceBudgetExceeded
+        from darwinagent.runtime.resources import ResourceGuard, ResourceLimit
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            guard = ResourceGuard(root, reserve_bytes=4096, min_free_bytes=0, max_rss_bytes=None)
+            guard.prepare()
+            try:
+                runner, client = self.fixture(root, resource_guard=guard)
+                with patch.object(guard, "check", side_effect=ResourceLimit("synthetic pressure")):
+                    with self.assertRaises(ResourceBudgetExceeded):
+                        await runner.run()
+                self.assertEqual(client.calls, 0)
+                cells = [json.loads(p.read_text()) for p in (runner.root / "cells").glob("*.json")]
+                self.assertTrue(cells)
+                self.assertTrue(all(c["status"] == "not_started" for c in cells))
+                self.assertFalse((runner.shared.root / "active-pause.json").exists())
+                runner.shared.check()
+                report = json.loads((runner.root / "full-matrix-report.json").read_text())
+                self.assertEqual(report["status"], "paused")
+                self.assertFalse(report["acceptance_complete"])
+            finally:
+                guard.close()
+
+    async def test_real_factory_releases_reserve_if_enrollment_or_setup_fails(self):
+        from types import SimpleNamespace
+        from unittest.mock import Mock
+
+        from datasets.lift.full_config import build_runner
+        from datasets.lift.full_resources import DEFAULT_LIMITS
+
+        with tempfile.TemporaryDirectory() as tmp:
+            config = dict(
+                model="MiniMax-M3.1-Flash-Preview",
+                base_url="https://api.minimax.cn/v1",
+                temperature=0,
+                correction_rounds=30,
+                max_tokens=16384,
+                worker_limit=None,
+                http_cap=None,
+                provider_request_policy="minimax-adaptive-v1",
+                unbounded_model_calls=True,
+                budget_root=tmp,
+                run_root=tmp,
+                resource_limits=dict(DEFAULT_LIMITS),
+            )
+            environment = {
+                "DARWINAGENT_MODEL": config["model"],
+                "DARWINAGENT_BASE_URL": config["base_url"],
+                "DARWINAGENT_API_KEY": "offline-dummy",
+            }
+            for phase in ["enrollment", "setup"]:
+                guard = SimpleNamespace(close=Mock())
+                with (
+                    self.subTest(phase=phase),
+                    patch.dict(os.environ, environment),
+                    patch("datasets.lift.full_config.LLMClient", return_value=SimpleNamespace()),
+                    patch("datasets.lift.full_resources.prepare_resources", return_value=guard),
+                    patch(
+                        "datasets.lift.full_transport.FullSharedTransport",
+                        side_effect=ValueError("enrollment") if phase == "enrollment" else None,
+                    ),
+                    patch(
+                        "datasets.lift.full_config._finish_runner", side_effect=ValueError("setup")
+                    ),
+                ):
+                    with self.assertRaisesRegex(ValueError, phase):
+                        build_runner(config, "factory-failure")
+                    guard.close.assert_called_once()
+
+    async def test_optional_task_policy_uses_three_rounds_with_unchanged_full_coverage(self):
+        from datasets.lift.full import FullEvaluator, execute_episode
+        from datasets.lift.task_budget import TaskExecutionPolicy
+
+        with tempfile.TemporaryDirectory() as tmp:
+            runner, client = self.fixture(
+                Path(tmp), thirty=True, task_policy=TaskExecutionPolicy(3, 8)
+            )
+            runner.scenes = tuple(runner.dataset.scenes)
+            runner.plan()
+            cells = [json.loads(p.read_text()) for p in (runner.root / "cells").glob("*.json")]
+            self.assertEqual(len(cells), 140)
+            self.assertEqual(sum(c["phase"] == "holdout" for c in cells), 84)
+            runner.scenes = (runner.dataset.scenes[0],)
+            task = runner.dataset.task(runner.dataset.task_ids(runner.scenes[0], "train")[0])
+            _, row = await execute_episode(runner, task, runner.initial, "campaign", "train")
+            self.assertTrue(row["healthy"], row.get("diagnostics"))
+            self.assertEqual(row["native"]["turns"], 3)
+            self.assertEqual(client.judge_count, 3)
+            self.assertEqual(
+                FullEvaluator(runner, runner.scenes[0]).declaration()["task_execution_policy"],
+                TaskExecutionPolicy(3, 8).declaration(),
+            )
+            calls = client.calls
+            runner.task_policy = TaskExecutionPolicy(3, 9)
+            with self.assertRaises(ValueError):
+                runner.verify()
+            self.assertEqual(client.calls, calls)
+
+    async def test_configuration_loader_binds_explicit_task_policy(self):
+        from datasets.lift.full_config import build_runner
+        from datasets.lift.task_budget import TaskExecutionPolicy
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            runner, client = self.fixture(root)
+            config = dict(
+                model="MiniMax-M3.1-Flash-Preview",
+                base_url="https://api.minimax.cn/v1",
+                temperature=0,
+                correction_rounds=3,
+                max_tokens=16384,
+                worker_limit=None,
+                http_cap=None,
+                provider_request_policy="minimax-adaptive-v1",
+                unbounded_model_calls=True,
+                data_root=str(root / "data"),
+                run_root=str(root / "bounded"),
+                task_execution_policy=TaskExecutionPolicy(3, 8).declaration(),
+                scenes=list(runner.scenes),
+            )
+            bounded = build_runner(config, "bounded-config", shared=runner.shared)
+            self.assertEqual(bounded.correction_rounds, 3)
+            self.assertEqual(bounded.task_policy, TaskExecutionPolicy(3, 8))
+            self.assertEqual(bounded.identity()["protocol"], "full-lift-local-bounded-v1")
+            self.assertEqual(client.calls, 0)
+            with self.assertRaises(ValueError):
+                build_runner(dict(config, correction_rounds=30), "mismatch", shared=runner.shared)
+
+    async def test_native_calendar_tamper_refuses_terminal_replay_without_calls(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            runner, client = self.fixture(root)
+            result = await runner.run()
+            row = next(row for row in result["rows"] if row.get("healthy"))
+            self.assertTrue(row.get("native_calendar"), "Terminal receipt must bind its calendar")
+            path = root / "run/episodes" / row["evidence_key"] / "native-date.json"
+            record = json.loads(path.read_text())
+            record["date"] = "2000-01-01"
+            path.write_text(json.dumps(record))
+            calls = client.calls
+            with self.assertRaises(ValueError):
+                await runner.run()
+            self.assertEqual(client.calls, calls)
 
     async def test_native_scoped_matrix_replay_and_isolation(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -68,6 +344,14 @@ class FullControllerTests(unittest.IsolatedAsyncioTestCase):
                 self.assertNotIn(forbidden, serialized)
             self.assertTrue(result["coverage_complete"])
             self.assertTrue(result["evaluation_healthy"], result["rows"])
+            for row in result["rows"]:
+                if row.get("healthy"):
+                    judge_input = (
+                        runner.root / "episodes" / row["evidence_key"] / "trajectory/input.json"
+                    )
+                    self.assertEqual(
+                        json.loads(judge_input.read_text())["schema"], "full-lift-judge-input-v6"
+                    )
             self.assertEqual(result["holdout_cells_settled"], 6)
             self.assertFalse(result["acceptance_complete"])
             holdout = [r for r in result["rows"] if r["phase"] == "holdout"]
@@ -104,9 +388,13 @@ class FullControllerTests(unittest.IsolatedAsyncioTestCase):
                         result = await runner.run()
                 else:
                     result = await runner.run()
-                self.assertTrue(result["coverage_complete"])
+                self.assertEqual(
+                    result["coverage_complete"], not options.get("false_success", False)
+                )
                 self.assertFalse(result["evaluation_healthy"])
-                self.assertEqual(result["holdout_cells_settled"], 6)
+                self.assertEqual(
+                    result["holdout_cells_settled"], 3 if options.get("false_success") else 6
+                )
                 self.assertTrue(any(r["status"] == "failed" for r in result["rows"]))
 
     async def test_plan_all_cells_and_changed_config_rejected(self):
@@ -160,7 +448,19 @@ class FullControllerTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(identity["native_correction_rounds"], 30)
         self.assertIsNone(identity["worker_session_cap"])
         self.assertIsNone(full_worker_profile().max_model_calls)
-        self.assertEqual(len(full_worker_profile().capabilities), 7)
+        self.assertEqual(
+            full_worker_profile().capabilities,
+            (
+                "list_files",
+                "read_text",
+                "read_table",
+                "transform_tables",
+                "write_text",
+                "replace_text",
+                "search_web",
+                "read_web",
+            ),
+        )
         with tempfile.TemporaryDirectory() as temporary:
             from datasets.lift.full_agents import FullDarwinChatAgent
 
@@ -186,7 +486,19 @@ class FullControllerTests(unittest.IsolatedAsyncioTestCase):
                 )
             self.assertEqual(declarations[0], declarations[1])
             self.assertEqual(declarations[1], declarations[2])
-            self.assertEqual(len(FullLocalTools(runner.root, readonly=True).specs()), 6)
+            judge_specs = FullLocalTools(runner.root, readonly=True).specs()
+            self.assertEqual(
+                tuple(t.name for t in judge_specs),
+                (
+                    "list_files",
+                    "read_text",
+                    "read_table",
+                    "transform_tables",
+                    "search_web",
+                    "read_web",
+                ),
+            )
+            self.assertTrue(all(t.effect == "read" for t in judge_specs))
 
     async def test_native_thirtieth_round_and_adopted_bundle(self):
         from datasets.lift.full import execute_episode
@@ -197,7 +509,7 @@ class FullControllerTests(unittest.IsolatedAsyncioTestCase):
             runner.plan()
             episode, row = await execute_episode(runner, task, runner.initial, "campaign", "train")
             self.assertEqual(row["native"]["turns"], 30)
-            self.assertTrue(row["healthy"], row["error"])
+            self.assertTrue(row["healthy"], row.get("diagnostics") or row["error"])
             self.assertEqual(client.judge_count, 30)
             requests = client.calls
             await execute_episode(runner, task, runner.initial, "campaign", "train")
@@ -234,8 +546,9 @@ class FullControllerTests(unittest.IsolatedAsyncioTestCase):
 
             with patch.object(runner.dataset, "stage", side_effect=fail_a):
                 result = await runner.run()
-            self.assertTrue(result["coverage_complete"])
-            self.assertEqual(result["holdout_cells_settled"], 6)
+            self.assertFalse(result["coverage_complete"])
+            self.assertFalse(result["q6_confirmation_ready"])
+            self.assertEqual(result["holdout_cells_settled"], 3)
             self.assertEqual(sum(r["status"] == "failed" for r in result["rows"]), 1)
             runner.scenes = tuple(runner.dataset.scenes)
             runner.plan()
@@ -284,7 +597,8 @@ class FullControllerTests(unittest.IsolatedAsyncioTestCase):
             error.transport_diagnostics = {"response_id": secret, "stage": "request"}
             with patch("src.lift.eval.task_exec.execute_task", side_effect=error):
                 result = await runner.run()
-            self.assertTrue(result["coverage_complete"])
+            self.assertFalse(result["coverage_complete"])
+            self.assertFalse(result["q6_confirmation_ready"])
             self.assertFalse(result["evaluation_healthy"])
             for path in runner.root.rglob("*.json"):
                 self.assertNotIn(secret, path.read_text(), str(path))
@@ -321,7 +635,9 @@ class FullControllerTests(unittest.IsolatedAsyncioTestCase):
 
     def test_cli_help_without_native_or_credentials(self):
         env = dict(os.environ)
-        env.pop("PYTHONPATH", None)
+        # Validate this checkout's core, without the pinned native LIFT package
+        # or an unrelated editable installation shadowing the new API.
+        env["PYTHONPATH"] = str(Path(__file__).resolve().parents[3] / "src")
         for key in ("DARWINAGENT_MODEL", "DARWINAGENT_BASE_URL", "DARWINAGENT_API_KEY"):
             env.pop(key, None)
         result = subprocess.run(

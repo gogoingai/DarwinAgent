@@ -7,7 +7,6 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from darwinagent.agent import AgentTask, ExecutionBackend, ExecutionProfile, ReActAgent, ToolSpec
 from darwinagent.runtime.artifacts import atomic_json, digest
 from darwinagent.runtime.steps import UnknownRequest
 from datasets.lift.full_trajectory import (
@@ -17,7 +16,7 @@ from datasets.lift.full_trajectory import (
     extract_trajectory,
     score_trajectory,
 )
-from tests.support.full_lift_trajectory import RecordedShared, RecordedWorker, read_tool
+from tests.support.full_lift_trajectory import RecordedShared, recorded_transcript
 
 
 class TranscriptTests(unittest.IsolatedAsyncioTestCase):
@@ -25,83 +24,7 @@ class TranscriptTests(unittest.IsolatedAsyncioTestCase):
         os.environ["PYTHON_DOTENV_DISABLED"] = "1"
 
     async def fixture(self, root, *, macro=False):
-        from darwinagent.agent import AgentAsset, AgentKernelAssets
-
-        profile = ExecutionProfile("test", ("read",))
-        kernel = None
-        worker = RecordedWorker()
-        if macro:
-            kernel = AgentKernelAssets(
-                (
-                    AgentAsset(
-                        "schema",
-                        "S",
-                        json.dumps(
-                            {
-                                "nodes": [
-                                    {
-                                        "id": "Task",
-                                        "source": "task",
-                                        "where": {},
-                                        "fields": {
-                                            "instruction": {"path": "instruction", "type": "string"}
-                                        },
-                                    }
-                                ],
-                                "relations": [],
-                            }
-                        ),
-                    ),
-                    AgentAsset(
-                        "twice",
-                        "F",
-                        'def run(params):\n    first = call("read", {"n": 1})\n    second = call("read", {"n": 2})\n    return {"first":first,"second":second}\n',
-                        trial_inputs=({},),
-                        schema_dependencies=("schema",),
-                    ),
-                    AgentAsset(
-                        "worker",
-                        "P",
-                        "$instruction\n$tools\n$view",
-                        role="worker",
-                        schema_dependencies=("schema",),
-                    ),
-                ),
-                profile,
-            ).export(root / "kernel")
-            worker.replies = iter(
-                [
-                    {"tool": "twice", "params": {}},
-                    {"final_response": "first"},
-                    {"final_response": "corrected"},
-                ]
-            )
-        atomic_json(
-            root / "session-identity.json",
-            {
-                "role": "worker",
-                "task_id": "scene/q1",
-                "kernel_id": kernel.content_id if kernel else None,
-                "session": "s",
-            },
-        )
-        backend = ExecutionBackend(
-            ReActAgent(),
-            [ToolSpec("read", read_tool)],
-            profile,
-            worker,
-            root / "episodes",
-        )
-        history, turns = [], []
-        for i, prompt in enumerate(["native task", "native correction"]):
-            history.append({"role": "user", "content": prompt})
-            task = AgentTask("scene/q1", "synthetic", parameters={"native_messages": history})
-            ep = (await backend.run(task, kernel, run_id=f"turn-{i}")).to_dict()
-            receipt = {"message_hash": digest(prompt), "status": ep["status"], "episode": ep}
-            atomic_json(root / "turns" / f"{i}.json", receipt)
-            turns.append(receipt)
-            history.append({"role": "assistant", "content": ep["final_response"]})
-        atomic_json(root / "chat.json", {"history": history, "turns": turns})
+        await recorded_transcript(root, macro=macro)
 
     async def test_real_journal_order_failure_correction_and_raw_snapshots(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -130,6 +53,39 @@ class TranscriptTests(unittest.IsolatedAsyncioTestCase):
                 extract_trajectory(root)
             with self.assertRaises((ValueError, FileNotFoundError)):
                 _verify(transcript)
+
+    async def test_authorized_recovery_preserves_history_and_complete_transcript(self):
+        from darwinagent.runtime.steps import StepJournal
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            await self.fixture(root)
+            original_transcript = extract_trajectory(root)
+            step = root / "episodes/turn-0/steps/000000.json"
+            saved = json.loads(step.read_text())
+            response = saved.pop("response")
+            saved.pop("response_digest")
+            saved["state"] = "submitted"
+            atomic_json(step, saved)
+            original = step.read_bytes()
+            journal = StepJournal(step.parent)
+            retry = journal.retry_model(step, authorization="explicit offline recovery")
+            journal.respond(retry, response)
+            recovered = extract_trajectory(root)
+            self.assertEqual(recovered["all_messages"], original_transcript["all_messages"])
+            self.assertEqual(recovered["leaf_calls"], original_transcript["leaf_calls"])
+            self.assertEqual(step.read_bytes(), original)
+            self.assertIn(str(step.resolve()), recovered["source_hashes"])
+            self.assertIn(str(retry.resolve()), recovered["source_hashes"])
+            _verify(recovered)
+            grant = step.parent / "model-retries" / (step.name + ".json")
+            value = json.loads(grant.read_text())
+            value["authorization"] = ""
+            atomic_json(grant, value)
+            with self.assertRaises(ValueError):
+                _verify(recovered)
+            with self.assertRaises(ValueError):
+                extract_trajectory(root)
 
     async def test_expanded_macro_failure_and_native_prompt_exact(self):
         import hashlib

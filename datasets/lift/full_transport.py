@@ -52,6 +52,18 @@ class FullSharedTransport(SharedTransport):
     def __init__(
         self, client, root, worker_limit=8, *, enroll_role=False, experiment_identity=None
     ):
+        from .scheduling import campaign_lease
+
+        with campaign_lease(root):
+            self._initialize(
+                client,
+                root,
+                worker_limit,
+                enroll_role=enroll_role,
+                experiment_identity=experiment_identity,
+            )
+
+    def _initialize(self, client, root, worker_limit, *, enroll_role, experiment_identity):
         self.role_amendment = None
         self.experiment_identity = _experiment_identity(experiment_identity)
         policy = Path(root) / "policy.json"
@@ -104,6 +116,11 @@ class FullSharedTransport(SharedTransport):
             self._enrollment_sha256 = _sha(enrollment)
         self.generation_max_tokens = 16384
 
+    def scoped(self, session, role):
+        from .rate_control import RateLimitedSessionTransport
+
+        return RateLimitedSessionTransport(self, session, role)
+
     def identity(self):
         result = super().identity()
         if self._validating_original:
@@ -141,20 +158,32 @@ class FullSharedTransport(SharedTransport):
             raise ValueError("Trajectory role must reuse the existing MiniMax HTTP ledger")
 
     def _assert_gate_settled(self):
-        if (self.root / "active-pause.json").exists() or list(
+        from darwinagent.runtime.model_disposition import ModelDispositionStore
+
+        dispositions = ModelDispositionStore(self.root)
+        active = self.root / "active-pause.json"
+        if (active.exists() and not dispositions.pause_acknowledged(active)) or list(
             (self.root / "trace-errors").glob("*.json")
         ):
             raise ValueError("Unresolved active/trace pause forbids trajectory enrollment")
         pause = self.root / "pause.json"
         recovery = self.root / "recovery/local-cap.json"
         if pause.exists() and (
-            not recovery.exists()
-            or json.loads(recovery.read_text()).get("pause_sha256") != _sha(pause)
+            (
+                not recovery.exists()
+                or json.loads(recovery.read_text()).get("pause_sha256") != _sha(pause)
+            )
+            and not self.settled_inflight_acknowledged(pause)
         ):
             raise ValueError("Unresolved pause forbids trajectory enrollment")
-        records = [json.loads(p.read_text()) for p in (self.root / "requests").glob("*.json")]
-        if any(r.get("status") not in {"completed", "failed", "budget_exhausted"} for r in records):
-            raise ValueError("Unsettled/unknown requests forbid trajectory enrollment")
+        records = []
+        for path in (self.root / "requests").glob("*.json"):
+            row = json.loads(path.read_text())
+            if row.get("status") not in {"completed", "failed", "budget_exhausted"} and not (
+                row.get("status") == "unknown" and dispositions.acknowledged(path)
+            ):
+                raise ValueError("Unsettled/unknown requests forbid trajectory enrollment")
+            records.append(row)
         if sum(r.get("actual_http_attempts", 0) for r in records) != self.client.http_attempts():
             raise ValueError("Existing HTTP ledger and settled receipts do not reconcile")
 
@@ -232,6 +261,10 @@ class FullSharedTransport(SharedTransport):
             raise ValueError("Trajectory cumulative worker counter was rolled back")
 
     def check(self):
+        with self.campaign_lease():
+            return self._check_full_gate()
+
+    def _check_full_gate(self):
         # Run the same legacy gate first: new unknown receipts quarantine both views.
         super().check()
         self._assert_fixed_policy()

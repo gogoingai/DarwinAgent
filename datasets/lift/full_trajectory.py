@@ -15,10 +15,11 @@ import os
 from copy import deepcopy
 from pathlib import Path
 
+from darwinagent.agent.react import invalid_reply_excerpt
 from darwinagent.llm.client import BudgetExceeded
 from darwinagent.runtime.artifacts import atomic_json, digest
 from darwinagent.runtime.leases import execution_lease
-from darwinagent.runtime.steps import UnknownRequest
+from darwinagent.runtime.steps import StepJournal, UnknownRequest
 
 
 class IncompleteTrajectory(ValueError):
@@ -26,7 +27,11 @@ class IncompleteTrajectory(ValueError):
 
 
 def _sha(path):
-    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+    checksum = hashlib.sha256()
+    with Path(path).open("rb") as stream:
+        for block in iter(lambda: stream.read(1024 * 1024), b""):
+            checksum.update(block)
+    return checksum.hexdigest()
 
 
 def _read(path, sources):
@@ -56,11 +61,13 @@ def _numbered(directory):
     return paths
 
 
-def extract_trajectory(session_root, *, episode_roots=None):
+def extract_trajectory(session_root, *, episode_roots=None, include_snapshots=True):
     """Read terminal worker sessions, including native corrections and F leaves.
 
     ``episode_roots`` when supplied must equal all recorded turn roots in order;
     it cannot select a subset. Every source file is pinned for judging/replay.
+    ``include_snapshots=False`` retains source references instead of embedding
+    every full request and episode again; chronological messages stay complete.
     """
     root = Path(session_root).resolve()
     sources, messages, requests = {}, [], []
@@ -81,7 +88,7 @@ def extract_trajectory(session_root, *, episode_roots=None):
         raise IncompleteTrajectory("Missing native turn receipts or history")
     if {p.resolve() for p in (root / "episodes").glob("turn-*")} != set(episodes):
         raise IncompleteTrajectory("Unaccounted episode roots")
-    leaves = 0
+    leaves, model_calls = 0, 0
     for i, episode in enumerate(episodes):
         native_user, native_final = chat["history"][2 * i : 2 * i + 2]
         if native_user["role"] != "user" or native_final["role"] != "assistant":
@@ -120,14 +127,49 @@ def extract_trajectory(session_root, *, episode_roots=None):
             events.append(event)
         if events != ep["events"]:
             raise IncompleteTrajectory("Episode events differ from durable records")
+        model_rows = [e for e in events if e["kind"] == "model"]
+        projections = {}
+        for event in events:
+            if event["kind"] != "context_projection":
+                continue
+            parent = event.get("source_model_index")
+            if (
+                type(parent) is not int
+                or parent < 0
+                or parent != event["index"] - 1
+                or events[parent]["kind"] != "model"
+                or parent in projections
+                or event.get("projection") != "invalid_reply_excerpt_v1"
+                or event.get("error_type") not in {"JSONDecodeError", "ActionProtocolError"}
+                or type(event.get("cap")) is not int
+                or event["cap"] <= 0
+            ):
+                raise IncompleteTrajectory("Invalid context projection evidence")
+            projections[parent] = event
         messages.append(native_user)
         previous, model_events, tool_steps = [], [], {}
         expected_order = []
         recorded_steps = []
         steps = _numbered(episode / "steps")
+        journal = StepJournal(episode / "steps", create_root=False)
+        retry_root = journal.root / "model-retries"
+        if retry_root.exists():
+            if retry_root.is_symlink():
+                raise IncompleteTrajectory("Retry evidence cannot be a symlink")
+            inventories[str(retry_root)] = sorted(p.name for p in retry_root.glob("*.json"))
+            for retry_evidence in sorted(retry_root.glob("*.json")):
+                if retry_evidence.is_symlink():
+                    raise IncompleteTrajectory("Retry evidence cannot be a symlink")
+                _read(retry_evidence, sources)
         for step in steps:
             row = _read(step, sources)
-            recorded_steps.append({"name": step.name, "record": row})
+            active_path, active_row = journal.read_active(step)
+            if active_path != step:
+                row = _read(active_path, sources)
+                if row != active_row:
+                    raise IncompleteTrajectory("Authorized recovery changed during extraction")
+            if include_snapshots:
+                recorded_steps.append({"name": step.name, "record": row})
             if row["state"] != "responded" or digest(row["response"]) != row["response_digest"]:
                 raise IncompleteTrajectory("Missing or unsettled model/tool receipt")
             if row.get("previous_requests"):
@@ -146,11 +188,28 @@ def extract_trajectory(session_root, *, episode_roots=None):
                 if payload["role"] != "worker":
                     raise IncompleteTrajectory("Judge/proposer evidence in worker journal")
                 current = payload["messages"]
+                control_message = None
+                if current and current[-1].get("role") == "user":
+                    try:
+                        marker = json.loads(current[-1]["content"])
+                    except (TypeError, json.JSONDecodeError):
+                        marker = None
+                    if (
+                        isinstance(marker, dict)
+                        and set(marker) == {"execution_control"}
+                        and isinstance(marker["execution_control"], dict)
+                        and isinstance(marker["execution_control"].get("policy"), dict)
+                        and marker["execution_control"]["policy"].get("kind") == "task-control-v1"
+                    ):
+                        control_message = current[-1]
+                        current = current[:-1]
                 if len(current) < len(previous) or [
                     _without_view(m) for m in current[: len(previous)]
                 ] != [_without_view(m) for m in previous]:
                     raise IncompleteTrajectory("Model transcript changed beyond view replacement")
                 messages.extend(deepcopy(current[len(previous) :]))
+                if control_message is not None:
+                    messages.append(deepcopy(control_message))
                 response = row["response"]
                 assistant = {
                     "role": "assistant",
@@ -161,9 +220,22 @@ def extract_trajectory(session_root, *, episode_roots=None):
                 previous = deepcopy(current) + [
                     {"role": "assistant", "content": response["content"]}
                 ]
-                requests.append(
-                    {"episode": i, "step": step.name, "input": payload, "response": response}
-                )
+                model_event = model_rows[len(model_events)]
+                projection = projections.get(model_event["index"])
+                if projection is not None:
+                    projected = invalid_reply_excerpt(response["content"], projection["cap"])
+                    if (
+                        projection.get("original_digest") != digest(response["content"])
+                        or projection.get("message_index") != len(current)
+                        or projection.get("projected_content") != projected
+                    ):
+                        raise IncompleteTrajectory("Context projection differs from raw receipt")
+                    previous[-1]["content"] = projected
+                model_calls += 1
+                if include_snapshots:
+                    requests.append(
+                        {"episode": i, "step": step.name, "input": payload, "response": response}
+                    )
                 model_events.append(digest(response["content"]))
                 expected_order.append(("model", digest(response["content"])))
             elif row["kind"] == "tool":
@@ -236,26 +308,45 @@ def extract_trajectory(session_root, *, episode_roots=None):
             or len(model_events) != ep["usage"]["model_calls"]
         ):
             raise IncompleteTrajectory("Episode usage does not reconcile")
-        episode_records.append(
-            {
-                "identity": episode_identity,
-                "turn": turn,
-                "result": result,
-                "events": events,
-                "steps": recorded_steps,
-            }
-        )
+        if include_snapshots:
+            episode_records.append(
+                {
+                    "identity": episode_identity,
+                    "turn": turn,
+                    "result": result,
+                    "events": events,
+                    "steps": recorded_steps,
+                }
+            )
+        else:
+            episode_records.append(
+                {
+                    "identity": {
+                        "kernel_id": episode_identity["kernel_id"],
+                        "task": {k: episode_identity["task"][k] for k in ("id", "instruction")},
+                    },
+                    "turn_source": str(paths[i]),
+                    "result_source": str(episode / "result.json"),
+                    "status": ep["status"],
+                    "usage": ep["usage"],
+                }
+            )
         messages.append(native_final)
     value = {
         "schema": "full-lift-trajectory-v1",
         "identity": identity,
         "all_messages": messages,
-        "raw_requests": requests,
         "episodes": episode_records,
         "leaf_calls": leaves,
         "source_hashes": sources,
         "source_inventory": inventories,
     }
+    if include_snapshots:
+        value["raw_requests"] = requests
+    else:
+        value.update(
+            schema="full-lift-trajectory-v2", session_root=str(root), model_calls=model_calls
+        )
     return dict(value, sha256=digest(value))
 
 
@@ -274,6 +365,10 @@ def _verify(envelope):
     for path, checksum in envelope["source_hashes"].items():
         if _sha(path) != checksum:
             raise ValueError("Pinned trajectory source changed")
+    if envelope.get("schema") == "full-lift-trajectory-v2":
+        expected = extract_trajectory(envelope["session_root"], include_snapshots=False)
+        if envelope != expected:
+            raise ValueError("Referenced trajectory differs from complete source journals")
 
 
 def _native_judge():
@@ -284,7 +379,18 @@ def _native_judge():
     return judge
 
 
-def build_native_judge_input(transcript, *, task_query, trajectory_reqs, source_hashes):
+def build_native_judge_input(
+    transcript,
+    *,
+    task_query,
+    trajectory_reqs,
+    source_hashes,
+    reference_projection=False,
+    chunk_projection=False,
+    nested_reference_projection=False,
+    value_projection=False,
+    readable_value_projection=False,
+):
     """Use upstream's loaded native prompt builder; pin its exact source bytes."""
     import pandas as pd
 
@@ -296,12 +402,55 @@ def build_native_judge_input(transcript, *, task_query, trajectory_reqs, source_
     native_source = str(Path(judge.__file__).resolve())
     if source_hashes.get(native_source) != _sha(native_source):
         raise ValueError("Native judge source must be explicitly pinned")
+    projected, projection = transcript["all_messages"], None
+    if readable_value_projection and not value_projection:
+        raise ValueError("Readable display requires the complete value reference protocol")
+    if value_projection and (
+        reference_projection or chunk_projection or nested_reference_projection
+    ):
+        raise ValueError("Value references use their own complete input protocol")
+    if nested_reference_projection and not (reference_projection and chunk_projection):
+        raise ValueError("Nested references require the chunk and reference protocols")
+    if nested_reference_projection:
+        from .judge_projection import project_nested_tool_observations
+
+        projected, projection = project_nested_tool_observations(projected)
+    elif reference_projection:
+        from .judge_projection import project_tool_observations
+
+        projected, projection = project_tool_observations(projected)
+    chunks = None
+    if chunk_projection:
+        if not reference_projection:
+            raise ValueError("Chunk projection requires reference projection")
+        from .trace_chunks import encode
+
+        projected = deepcopy(projected)
+        indices = [i for i, message in enumerate(projected) if message.get("content") is not None]
+        chunks = encode([judge.format_content_blocks(projected[i]["content"]) for i in indices])
+        for i, rendered in zip(indices, chunks["rendered"], strict=True):
+            projected[i]["content"] = rendered
+    values = None
+    if value_projection:
+        from .trace_values import decode, encode, render
+
+        if readable_value_projection:
+            from .readable_trace import render_readable as render
+
+        projected = deepcopy(projected)
+        indices = [i for i, message in enumerate(projected) if message.get("content") is not None]
+        texts = [judge.format_content_blocks(projected[i]["content"]) for i in indices]
+        values = encode(texts)
+        if decode(values) != texts:
+            raise ValueError("Value projection lost original trajectory content")
+        for i, rendered in zip(indices, render(values), strict=True):
+            projected[i]["content"] = rendered
     messages = judge.build_judge_messages(
         pd.Series(
             {
                 "task_query": task_query,
                 "trajectory_reqs": trajectory_reqs,
-                "all_messages": transcript["all_messages"],
+                "all_messages": projected,
             }
         )
     )
@@ -314,7 +463,74 @@ def build_native_judge_input(transcript, *, task_query, trajectory_reqs, source_
         "messages": messages,
         "source_hashes": dict(transcript["source_hashes"], **source_hashes),
     }
+    if reference_projection:
+        from .judge_projection import REFERENCE_GUIDE, nested_reference_guide
+
+        if projection["entries"]:
+            guide = (
+                nested_reference_guide(projection, transcript["all_messages"])
+                if nested_reference_projection
+                else REFERENCE_GUIDE
+            )
+            messages[1]["content"] = guide + messages[1]["content"]
+        value.update(
+            schema="full-lift-judge-input-v2",
+            trajectory_projection=projection,
+            trajectory_requirements=trajectory_reqs,
+        )
+    if chunk_projection:
+        from .trace_chunks import GUIDE
+
+        messages[1]["content"] = GUIDE + messages[1]["content"]
+        value.update(schema="full-lift-judge-input-v3", text_chunks=chunks)
+    if nested_reference_projection:
+        value["schema"] = "full-lift-judge-input-v4"
+    if value_projection:
+        from .trace_values import GUIDE
+
+        if readable_value_projection:
+            from .readable_trace import GUIDE
+
+        messages[1]["content"] = GUIDE + messages[1]["content"]
+        value.update(
+            schema="full-lift-judge-input-v6"
+            if readable_value_projection
+            else "full-lift-judge-input-v5",
+            value_refs=values,
+            trajectory_requirements=trajectory_reqs,
+        )
     return dict(value, sha256=digest(value))
+
+
+def verify_native_judge_projection(judge_input):
+    """Bind the new representation to the native builder and immutable transcript."""
+    if judge_input.get("schema") not in {
+        "full-lift-judge-input-v2",
+        "full-lift-judge-input-v3",
+        "full-lift-judge-input-v4",
+        "full-lift-judge-input-v5",
+        "full-lift-judge-input-v6",
+    }:
+        if any(k in judge_input for k in ("trajectory_projection", "text_chunks", "value_refs")):
+            raise ValueError("Judge projection requires its declared input protocol")
+        return
+    transcript = judge_input["transcript"]
+    expected = build_native_judge_input(
+        transcript,
+        task_query=transcript["episodes"][0]["identity"]["task"]["instruction"],
+        trajectory_reqs=judge_input["trajectory_requirements"],
+        source_hashes=judge_input["source_hashes"],
+        reference_projection=judge_input["schema"]
+        not in {"full-lift-judge-input-v5", "full-lift-judge-input-v6"},
+        chunk_projection=judge_input["schema"]
+        in {"full-lift-judge-input-v3", "full-lift-judge-input-v4"},
+        nested_reference_projection=judge_input["schema"] == "full-lift-judge-input-v4",
+        value_projection=judge_input["schema"]
+        in {"full-lift-judge-input-v5", "full-lift-judge-input-v6"},
+        readable_value_projection=judge_input["schema"] == "full-lift-judge-input-v6",
+    )
+    if judge_input != expected:
+        raise ValueError("Judge projection or messages differ from verified native input")
 
 
 async def score_trajectory(shared, session, root, judge_input):
@@ -332,6 +548,7 @@ async def score_trajectory(shared, session, root, judge_input):
         shared.cfg.model_for("trajectory_judge")
     _verify(judge_input)
     _verify(judge_input["transcript"])
+    verify_native_judge_projection(judge_input)
     root = Path(root)
     identity = {
         "session": session,
@@ -407,3 +624,158 @@ async def score_trajectory(shared, session, root, judge_input):
             return result
         save()
         return result
+
+
+def scalar_outcome(row):
+    """Interpret saved raw output before retrying a possibly interrupted parse.
+
+    Legacy single-send receipts are immutable. Their intermediate invalid_response
+    state may precede parsing, so this derived interpretation belongs in the new
+    aggregate only, never back in the original receipt.
+    """
+    if row["status"] != "invalid_response":
+        return row["status"], row.get("score")
+    try:
+        score = _native_judge().extract_score_from_response(row["raw_response"])
+        if math.isfinite(score):
+            return "completed", score
+    except (ValueError, TypeError):
+        pass
+    return "invalid_response", None
+
+
+def saturated_empty_completion(row, completion_cap):
+    usage = row.get("usage") or {}
+    tokens = usage.get("completion_tokens")
+    raw = row.get("raw_response")
+    return (
+        row.get("status") == "invalid_response"
+        and type(raw) is str
+        and not raw.strip()
+        and usage.get("empty_content") is True
+        and type(tokens) is int
+        and tokens >= completion_cap
+    )
+
+
+async def score_trajectory_with_retries(
+    shared, session, root, judge_input, *, stop_on_saturated_empty=False
+):
+    """Reassess only settled invalid outputs, at most three scalar attempts.
+
+    Each scalar attempt retains its result in its own directory. Confirmed HTTP
+    rejections may use the transport's separately recorded three-send policy;
+    hence this wrapper permits at most nine physical sends, all ledger charged.
+    Cancellation/unknown submissions propagate; resumption reads settled children
+    before sending. The aggregate includes every attempt's usage, including empty
+    outputs. This policy never replays the worker, tools, or native content judge.
+    """
+    _verify(judge_input)
+    _verify(judge_input["transcript"])
+    verify_native_judge_projection(judge_input)
+    root = Path(root)
+    child_identity = {
+        "session": session,
+        "input_sha256": judge_input["sha256"],
+        "task_id": judge_input["task_id"],
+        "kernel_id": judge_input["kernel_id"],
+        "model": shared.identity(),
+    }
+    identity = dict(child_identity, retry_policy="known-invalid-scalar-v1", max_attempts=3)
+    completion_cap = getattr(shared, "generation_max_tokens", None)
+    if stop_on_saturated_empty:
+        if type(completion_cap) is not int or completion_cap <= 0:
+            raise ValueError("Saturated-empty policy requires a fixed generation token cap")
+        identity.update(
+            retry_policy="known-invalid-scalar-v2",
+            stop_on_saturated_empty=True,
+            completion_cap=completion_cap,
+        )
+
+    def saturated_empty(row):
+        return stop_on_saturated_empty and saturated_empty_completion(row, completion_cap)
+
+    def aggregate(rows):
+        usage = {}
+        for row in rows:
+            for key, value in row.get("usage", {}).items():
+                if type(value) in (int, float):
+                    usage[key] = usage.get(key, 0) + value
+        result = dict(rows[-1])
+        status, score = scalar_outcome(rows[-1])
+        result.update(
+            identity=identity,
+            status=status,
+            score=score,
+            usage=usage,
+            attempts=[
+                {
+                    "path": f"attempts/{i:03d}/result.json",
+                    "sha256": row["sha256"],
+                    "status": row["status"],
+                    "usage": row.get("usage", {}),
+                }
+                for i, row in enumerate(rows)
+            ],
+        )
+        result.pop("sha256", None)
+        if saturated_empty(rows[-1]):
+            result["retry_stop_reason"] = "empty_completion_at_cap"
+        return dict(result, sha256=digest(result))
+
+    with execution_lease(root / "retry.lock"):
+        input_path = root / "input.json"
+        if input_path.exists():
+            if json.loads(input_path.read_text()) != judge_input:
+                raise ValueError("Trajectory retry input changed")
+        else:
+            atomic_json(input_path, judge_input)
+        attempts_root = root / "attempts"
+        existing = sorted(attempts_root.iterdir()) if attempts_root.exists() else []
+        if [p.name for p in existing] != [f"{i:03d}" for i in range(len(existing))] or len(
+            existing
+        ) > 3:
+            raise ValueError("Trajectory retry attempt inventory changed")
+        final_path = root / "result.json"
+        rows = []
+        if final_path.exists():
+            for directory in existing:
+                row = json.loads((directory / "result.json").read_text())
+                if (
+                    row.get("identity") != child_identity
+                    or row.get("sha256") != digest({k: v for k, v in row.items() if k != "sha256"})
+                    or json.loads((directory / "input.json").read_text()) != judge_input
+                ):
+                    raise ValueError("Trajectory retry attempt identity/integrity changed")
+                rows.append(row)
+            if (
+                not rows
+                or any(
+                    scalar_outcome(r)[0] != "invalid_response" or saturated_empty(r)
+                    for r in rows[:-1]
+                )
+                or scalar_outcome(rows[-1])[0] in {"submitted", "unknown"}
+                or (
+                    scalar_outcome(rows[-1])[0] == "invalid_response"
+                    and len(rows) != 3
+                    and not saturated_empty(rows[-1])
+                )
+            ):
+                raise ValueError("Trajectory retry terminal inventory invalid")
+            expected = aggregate(rows)
+            if json.loads(final_path.read_text()) != expected:
+                raise ValueError("Trajectory retry aggregate changed")
+            return expected
+        for index in range(3):
+            directory = attempts_root / f"{index:03d}"
+            saved_input = directory / "input.json"
+            if saved_input.exists() and json.loads(saved_input.read_text()) != judge_input:
+                raise ValueError("Trajectory retry attempt input changed")
+            row = await score_trajectory(shared, session, directory, judge_input)
+            rows.append(row)
+            if scalar_outcome(row)[0] != "invalid_response" or saturated_empty(row) or index == 2:
+                if len(existing) > index + 1:
+                    raise ValueError("Unexpected attempts after settled terminal judge")
+                result = aggregate(rows)
+                atomic_json(final_path, result)
+                return result

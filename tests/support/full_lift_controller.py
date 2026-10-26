@@ -32,6 +32,17 @@ class RecordedFullClient:
         if role == "trajectory_judge":
             response = {"trajectory_score": 0.75}
         elif role == "judge":
+            actions = [
+                json.loads(m["content"]) for m in kwargs["messages"] if m["role"] == "assistant"
+            ]
+            if not any(a.get("tool") == "read_text" for a in actions):
+                return SimpleNamespace(
+                    content=json.dumps(
+                        {"tool": "read_text", "params": {"path": "result/delivery.txt"}}
+                    ),
+                    usage={"prompt_tokens": 10, "completion_tokens": 5},
+                    elapsed_s=0.0,
+                )
             self.judge_count += 1
             request = json.loads(kwargs["messages"][1]["content"])
             q4 = request["task"]["id"].endswith("-q4")
@@ -58,7 +69,22 @@ class RecordedFullClient:
             ):
                 response = {"tool": "list_files", "params": {}}
             else:
-                response = {"final_response": "Synthetic delivery"}
+                actions = [
+                    json.loads(m["content"]) for m in kwargs["messages"] if m["role"] == "assistant"
+                ]
+                if not any(a.get("tool") == "write_text" for a in actions):
+                    response = {
+                        "tool": "write_text",
+                        "params": {
+                            "path": "result/delivery.txt",
+                            "content": "Synthetic delivered content",
+                        },
+                    }
+                else:
+                    response = {
+                        "final_response": "Synthetic delivery",
+                        "artifacts": [{"path": "result/delivery.txt"}],
+                    }
         elif role == "proposal":
             if self.adopt:
                 assets = [a.to_dict() for a in self.initial.assets.assets]

@@ -175,7 +175,7 @@ class ReActRecoveryTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(len(client.requests), 2)
             self.assertFalse((root / "first/result.json").exists())
 
-    async def test_unknown_registered_tool_error_is_not_protocol_recovery(self):
+    async def test_unregistered_action_is_rejected_before_effect_and_can_be_corrected(self):
         with tempfile.TemporaryDirectory() as temporary:
             client = RawRecordedClient(
                 ['{"tool":"not_registered","params":{}}', '{"final_response":"valid"}']
@@ -187,10 +187,40 @@ class ReActRecoveryTests(unittest.IsolatedAsyncioTestCase):
                 client,
                 Path(temporary),
             )
-            result = await backend.run(AgentTask("q", "deliver"), run_id="first")
-            self.assertEqual(result.status, "failed")
+            task = AgentTask("q", "deliver")
+            result = await backend.run(task, run_id="first")
+            self.assertEqual(result.status, "completed")
+            self.assertEqual(result.final_response, "valid")
+            self.assertEqual(len(client.requests), 2)
+            self.assertEqual(result.usage["leaf_calls"], 0)
+            self.assertEqual(result.usage["unknown_calls"], 0)
+            feedback = json.loads(client.requests[1]["messages"][-1]["content"])
+            self.assertEqual(feedback["observation"]["error"]["error_type"], "ActionProtocolError")
+            self.assertIn("No action was executed", feedback["observation"]["error"]["message"])
+            replay = await backend.run(task, run_id="first")
+            self.assertEqual(replay.to_dict(), result.to_dict())
+            self.assertEqual(len(client.requests), 2)
+
+    async def test_unregistered_action_feedback_cannot_exceed_model_budget(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            client = RawRecordedClient(
+                ['{"tool":"not_registered","params":{}}', '{"final_response":"valid"}']
+            )
+            backend = ExecutionBackend(
+                ReActAgent(),
+                [],
+                ExecutionProfile("unsupported-cap", (), max_model_calls=1),
+                client,
+                Path(temporary),
+            )
+            task = AgentTask("q", "deliver")
+            result = await backend.run(task, run_id="first")
+            self.assertEqual(result.status, "budget_exhausted")
             self.assertEqual(len(client.requests), 1)
-            self.assertEqual(result.events[-1]["error_type"], "ValueError")
+            self.assertEqual(result.usage["leaf_calls"], 0)
+            self.assertEqual(result.usage["unknown_calls"], 0)
+            self.assertEqual((await backend.run(task, run_id="first")).status, "budget_exhausted")
+            self.assertEqual(len(client.requests), 1)
 
     async def test_artifact_strings_receive_feedback_without_rewriting_settled_file(self):
         with tempfile.TemporaryDirectory() as temporary:

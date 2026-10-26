@@ -10,16 +10,18 @@ import ssl
 import time
 import uuid
 import zlib
+from dataclasses import replace
 from html.parser import HTMLParser
 from pathlib import Path
 from urllib.parse import parse_qs, urlencode, urljoin, urlsplit, urlunsplit
 
-from darwinagent.agent import ToolSpec
+from darwinagent.agent import PublicToolError, ToolSpec
 from darwinagent.contracts import plain
 from darwinagent.runtime.artifacts import atomic_json
 
 from .data import sha
 from .local_tools import LocalTools
+from .text_edits import EditFailure, read_text, replace_text
 
 PROVIDER = "duckduckgo-lite-v1"
 ENDPOINT = "https://lite.duckduckgo.com/lite/"
@@ -33,8 +35,54 @@ MAX_TEXT = 40_000
 MAX_REDIRECTS = 4
 
 
-class WebFailure(ValueError):
+class TableFailure(PublicToolError):
+    """Actionable local input failures without host exception text."""
+
+    public_codes = frozenset(
+        {
+            "invalid_table_reference",
+            "table_file_not_found",
+            "invalid_workbook",
+            "table_sheet_not_supported",
+            "table_sheet_not_found",
+            "unsupported_table_format",
+        }
+    )
+
+
+class WebFailure(PublicToolError):
     """Fixed, credential-free failure code; external exception messages are never exposed."""
+
+    public_codes = frozenset(
+        {
+            "network_timeout",
+            "dns_resolver_failure",
+            "dns_response_limit",
+            "dns_response_mismatch",
+            "nonpublic_destination",
+            "dns_no_addresses",
+            "unsafe_url",
+            "unsafe_port",
+            "invalid_url_or_dns_failure",
+            "redirect_limit_or_missing_location",
+            "provider_challenge",
+            "provider_blocked",
+            "http_failure",
+            "unsupported_content_encoding",
+            "body_limit",
+            "decoded_body_limit",
+            "invalid_compressed_body",
+            "network_failure",
+            "redirect_limit",
+            "invalid_search_response",
+            "frozen_full_tools_changed",
+            "invalid_search_arguments",
+            "invalid_read_arguments",
+            "unsupported_content_type",
+            "output_limit",
+            "tool_failure",
+        }
+    )
 
 
 class TextHTML(HTMLParser):
@@ -366,6 +414,8 @@ class FullLocalTools(LocalTools):
         super().__init__(workspace, readonly)
         self.full_source = Path(__file__)
         self.full_hash = sha(self.full_source)
+        self.edit_source = Path(__file__).with_name("text_edits.py")
+        self.edit_hash = sha(self.edit_source)
         self.audit_path = Path(self.workspace).parent / (Path(self.workspace).name + "-tool-audit")
 
     def identity(self):
@@ -373,6 +423,7 @@ class FullLocalTools(LocalTools):
             **super().identity(),
             "full_tools_sha256": sha(Path(__file__)),
             "local_tools_sha256": sha(Path(__file__).with_name("local_tools.py")),
+            "text_edits_sha256": sha(Path(__file__).with_name("text_edits.py")),
             "provider": PROVIDER,
             "endpoint": ENDPOINT,
             "network_timeout_seconds": TIMEOUT,
@@ -393,7 +444,15 @@ class FullLocalTools(LocalTools):
         try:
             if sha(self.full_source) != self.full_hash:
                 raise WebFailure("frozen_full_tools_changed")
-            if name not in {"search_web", "read_web"}:
+            if sha(self.edit_source) != self.edit_hash:
+                raise WebFailure("frozen_full_tools_changed")
+            if name == "replace_text" and self.readonly:
+                raise PermissionError("Judge has read-only artifacts")
+            if name in {"replace_text", "read_text"}:
+                result = (replace_text if name == "replace_text" else read_text)(
+                    self.workspace, plain(params)
+                )
+            elif name not in {"search_web", "read_web"}:
                 self.audit_path = None
                 try:
                     result = await super().invoke(name, params)
@@ -447,10 +506,14 @@ class FullLocalTools(LocalTools):
             output = {"ok": True, "result": result}
             return result
         except Exception as exc:
+            code = getattr(exc, "public_code", None)
+            if name in {"read_table", "transform_tables"} and code in TableFailure.public_codes:
+                output = {"ok": False, "error_type": "TableFailure", "message": code}
+                raise TableFailure(code) from None
             # Legacy errors also use fixed messages here to avoid leaking host paths.
-            message = str(exc) if isinstance(exc, WebFailure) else "tool_failure"
+            message = str(exc) if isinstance(exc, (WebFailure, EditFailure)) else "tool_failure"
             output = {"ok": False, "error_type": type(exc).__name__, "message": message}
-            if isinstance(exc, (WebFailure, PermissionError)):
+            if isinstance(exc, (WebFailure, EditFailure, PermissionError)):
                 raise
             raise WebFailure(message) from None
         finally:
@@ -472,38 +535,92 @@ class FullLocalTools(LocalTools):
                 )
 
     async def search_web(self, params):
+        control = getattr(self, "retrieval_control", None)
+        if control is not None:
+            control.before_tool("search_web")
         return await self.invoke("search_web", params)
 
     async def read_web(self, params):
+        control = getattr(self, "retrieval_control", None)
+        if control is not None:
+            control.before_tool("read_web")
         return await self.invoke("read_web", params)
 
+    async def replace_text(self, params):
+        return await self.invoke("replace_text", params)
+
     def specs(self):
-        return super().specs() + (
-            ToolSpec(
-                "search_web",
-                self.search_web,
-                {
-                    "type": "object",
-                    "properties": {
-                        "query": {"type": "string"},
-                        "max_results": {"type": "integer"},
+        edits = (
+            ()
+            if self.readonly
+            else (
+                ToolSpec(
+                    "replace_text",
+                    self.replace_text,
+                    {
+                        "type": "object",
+                        "properties": {
+                            key: {"type": "string"}
+                            for key in ("path", "expected_sha256", "old", "new")
+                        },
+                        "required": ["path", "expected_sha256", "old", "new"],
+                        "additionalProperties": False,
                     },
-                    "required": ["query"],
-                    "additionalProperties": False,
-                },
-                description="Search live public web using DuckDuckGo Lite; returns title, URL, snippet and retrieval time; provider failure is explicit",
-                identity=self.identity(),
-            ),
-            ToolSpec(
-                "read_web",
-                self.read_web,
-                {
-                    "type": "object",
-                    "properties": {"url": {"type": "string"}},
-                    "required": ["url"],
-                    "additionalProperties": False,
-                },
-                description="Read public HTTP(S) HTML/plain text, bounded to 40000 characters; reports title, final URL and truncation",
-                identity=self.identity(),
-            ),
+                    description="Edit an existing UTF-8 file without rewriting it: replace exactly one nonempty old fragment with new; expected_sha256 is required from the latest read_text/write receipt. Stale files and nonunique matches reject without writing. Prefer small edits for large HTML; every edit is one counted write.",
+                    effect="write",
+                    identity=self.identity(),
+                ),
+            )
+        )
+        return (
+            tuple(
+                replace(
+                    tool,
+                    input_contract={
+                        "type": "object",
+                        "properties": {
+                            "path": {"type": "string"},
+                            "offset": {"type": "integer"},
+                            "limit": {"type": "integer"},
+                            "expected_sha256": {"type": "string"},
+                        },
+                        "required": ["path"],
+                        "additionalProperties": False,
+                    },
+                    description="Read UTF-8 text. Large files return a bounded page: follow next_offset until null, keeping expected_sha256 equal to the first page sha256. Offsets count characters; optional limit is 1..128000. sha256 binds the complete file, content_sha256 binds this page. Small default reads retain the full-text response.",
+                )
+                if tool.name == "read_text"
+                else tool
+                for tool in super().specs()
+            )
+            + edits
+            + (
+                ToolSpec(
+                    "search_web",
+                    self.search_web,
+                    {
+                        "type": "object",
+                        "properties": {
+                            "query": {"type": "string"},
+                            "max_results": {"type": "integer"},
+                        },
+                        "required": ["query"],
+                        "additionalProperties": False,
+                    },
+                    description="Search live public web using DuckDuckGo Lite; returns title, URL, snippet and retrieval time; provider failure is explicit",
+                    identity=self.identity(),
+                ),
+                ToolSpec(
+                    "read_web",
+                    self.read_web,
+                    {
+                        "type": "object",
+                        "properties": {"url": {"type": "string"}},
+                        "required": ["url"],
+                        "additionalProperties": False,
+                    },
+                    description="Read public HTTP(S) HTML/plain text, bounded to 40000 characters; reports title, final URL and truncation",
+                    identity=self.identity(),
+                ),
+            )
         )

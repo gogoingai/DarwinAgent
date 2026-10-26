@@ -44,7 +44,14 @@ class FullCampaignBackend(ExecutionBackend):
 
         self.owner, self.scene = owner, scene
         super().__init__(
-            FullNativeReAct(max_turns=None, max_tokens=16384),
+            FullNativeReAct(
+                max_turns=None,
+                max_tokens=16384,
+                native_rounds=owner.correction_rounds,
+                worker_session_cap=owner.task_policy.worker_request_limit
+                if owner.task_policy
+                else None,
+            ),
             FullLocalTools(workspace or owner.root / "template").specs(),
             full_worker_profile(),
             owner.shared.scoped("campaign-worker", "worker"),
@@ -69,13 +76,16 @@ class FullEvaluator:
         self.owner, self.scene = owner, scene
 
     def declaration(self):
-        return dict(
+        result = dict(
             kind="full-native-content-and-trajectory-v1",
             scene=self.scene,
             dataset=self.owner.dataset.identity(),
             model=self.owner.shared.identity(),
-            correction_rounds=30,
+            correction_rounds=self.owner.correction_rounds,
         )
+        if self.owner.task_policy is not None:
+            result["task_execution_policy"] = self.owner.task_policy.declaration()
+        return result
 
     async def evaluate(self, task, episode):
         key = episode.usage["full_evidence"]
@@ -92,11 +102,32 @@ class FullEvaluator:
 
 
 class FullLocalRunner:
-    def __init__(self, *, dataset, shared, root, initial, run_id, rounds=1, scenes=None):
+    def __init__(
+        self, *, dataset, shared, root, initial, run_id, rounds=1, scenes=None, task_policy=None
+    ):
+        with shared.campaign_lease():
+            self._initialize(
+                dataset=dataset,
+                shared=shared,
+                root=root,
+                initial=initial,
+                run_id=run_id,
+                rounds=rounds,
+                scenes=scenes,
+                task_policy=task_policy,
+            )
+
+    def _initialize(self, *, dataset, shared, root, initial, run_id, rounds, scenes, task_policy):
         from src.lift.eval import task_exec
 
         if type(rounds) is not int or rounds < 1:
             raise ValueError("Full campaign rounds must be positive")
+        from .task_budget import TaskExecutionPolicy
+
+        if task_policy is not None and not isinstance(task_policy, TaskExecutionPolicy):
+            raise ValueError("Task policy must be an explicit validated declaration")
+        self.task_policy = task_policy
+        self.correction_rounds = task_policy.correction_rounds if task_policy else 30
         if (
             shared.trace
             or shared.worker_limit is not None
@@ -150,10 +181,17 @@ class FullLocalRunner:
             source=self.source,
             initial=initial.content_id,
             transport=shared.identity(),
-            correction_rounds=30,
+            correction_rounds=self.correction_rounds,
             generation_max_tokens=16384,
             tools=FullLocalTools(self.root / "template").identity(),
+            confirmation_policy="q5-health-before-q6-v1",
         )
+        if task_policy is not None:
+            self.frozen_identity["protocol"] = "full-lift-local-bounded-v1"
+            self.frozen_identity["task_execution_policy"] = task_policy.declaration()
+        guard = getattr(shared.client, "resource_guard", None)
+        if guard is not None:
+            self.frozen_identity["resource_policy"] = guard.declaration()
         self.frozen_identity = json.loads(json.dumps(self.frozen_identity))
         identity = self.root / "integration-identity.json"
         if identity.exists():
@@ -167,6 +205,11 @@ class FullLocalRunner:
 
     def verify(self):
         assert_files(self.source)
+        guard = getattr(self.shared.client, "resource_guard", None)
+        if (guard.declaration() if guard is not None else None) != self.frozen_identity.get(
+            "resource_policy"
+        ):
+            raise ValueError("Frozen resource policy changed")
         if (
             snapshot_files(
                 [
@@ -183,6 +226,9 @@ class FullLocalRunner:
         if (
             list(self.scenes) != self.frozen_identity["scenes"]
             or self.rounds != self.frozen_identity["rounds"]
+            or self.correction_rounds != self.frozen_identity["correction_rounds"]
+            or (self.task_policy.declaration() if self.task_policy else None)
+            != self.frozen_identity.get("task_execution_policy")
         ):
             raise ValueError("Frozen scene scope or rounds changed")
         if self.initial.content_id != self.frozen_identity["initial"]:
@@ -315,6 +361,10 @@ class FullLocalRunner:
         return self.shared.scoped("evolution-" + digest([scene, str(stage)])[:24], "proposal_wiki")
 
     async def run(self):
+        with self.shared.campaign_lease():
+            return await self._run_owned()
+
+    async def _run_owned(self):
         self.verify()
         with execution_lease(self.root / "full-run.lock"):
             self.plan()  # All 84 holdout cells are durable before any dispatch.
@@ -329,9 +379,12 @@ class FullLocalRunner:
                         raise ValueError("Frozen scene selection manifest changed")
                 else:
                     atomic_json(path, selection)
-                for scene in self.scenes:
-                    selected = selected_by_scene[scene]
-                    for task_id in self.dataset.task_ids(scene, "test"):
+                for test_index in (0, 1):
+                    if test_index == 1 and not self.development_ready():
+                        return self.write_report()
+                    for scene in self.scenes:
+                        selected = selected_by_scene[scene]
+                        task_id = self.dataset.task_ids(scene, "test")[test_index]
                         for arm, kernel in (("A", None), ("B", self.initial), ("C", selected)):
                             await execute_episode(
                                 self, self.dataset.task(task_id), kernel, arm, "holdout"
@@ -339,6 +392,19 @@ class FullLocalRunner:
             finally:
                 self.write_report()
         return self.write_report()
+
+    def development_ready(self):
+        """Keep every q6 untouched until all q5 executions/judgments are healthy."""
+        for scene in self.scenes:
+            task_id = self.dataset.task_ids(scene, "test")[0]
+            for arm in ("A", "B", "C"):
+                path = self.cell_path(task_id, arm, "holdout")
+                if not path.exists():
+                    return False
+                row = json.loads(path.read_text())
+                if row.get("status") != "completed" or not row.get("healthy"):
+                    return False
+        return True
 
     def write_report(self):
         from .full_report import write_report

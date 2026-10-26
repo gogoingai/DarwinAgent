@@ -3,7 +3,7 @@
 from .backend import ExecutionBackend
 from .context import AgentContext, CheckRejected, EpisodeBudgetExceeded
 from .contracts import AgentAdapter, AgentTask, EpisodeResult, ExecutionProfile, ToolSpec
-from .failures import ToolFailure
+from .failures import PublicToolError, ToolFailure, ToolRejectedBeforeEffect
 from .kernel import AgentAsset, AgentKernelAssets, AgentKernelBundle
 from .react import ReActAgent
 from .tools import file_tools
@@ -24,4 +24,6 @@ __all__ = [
     "ReActAgent",
     "file_tools",
     "ToolFailure",
+    "PublicToolError",
+    "ToolRejectedBeforeEffect",
 ]
